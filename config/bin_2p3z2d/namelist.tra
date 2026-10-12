@@ -149,7 +149,7 @@ double_diffusion   = .false.           ! enable double diffusion parameterizatio
 ! --- Surface Restoring ---
 surf_relax_T       = 0.0               ! surface temperature restoring coefficient [m/s] (0 = disabled)
 surf_relax_S       = 1.929e-06         ! surface salinity restoring coefficient [m/s]
-balance_salt_water = .true.            ! balance virtual salt flux with freshwater flux
+balance_salt_water = .true.            ! currently not used: the fluxes are always balanced globally
 
 ! --- Climatology Restoring ---
 clim_relax         = 0.0               ! 3D climatology restoring coefficient [1/s] (0 = disabled)

@@ -316,13 +316,18 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
               exchange(:) = ice_temp(:)*a_ice(:)                      ! ice surface temperature * concentration
             elseif (i.eq.5) then
               exchange(:) = ice_alb(:)                                ! ice albedo
-            elseif (i.eq.6) then
+            elseif (i.eq.6 .or. i.eq.7) then
+              ! surface velocity, sent as eastward (6) and northward (7)
+              ! component: rotate from the model grid to geographical coordinates
               do n=1,partit%myDim_nod2D+partit%eDim_nod2D
-                exchange(n) = UVnode(1,1,n)
-              end do
-            elseif (i.eq.7) then
-              do n=1,partit%myDim_nod2D+partit%eDim_nod2D
-                exchange(n) = UVnode(2,1,n)
+                tx = UVnode(1,1,n)
+                ty = UVnode(2,1,n)
+                if (rotated_grid) call vector_r2g(tx, ty, mesh%coord_nod2D(1, n), mesh%coord_nod2D(2, n), 0)
+                if (i.eq.6) then
+                  exchange(n) = tx
+                else
+                  exchange(n) = ty
+                end if
               end do
             elseif (i.eq.8) then
               ! Effective (grid-mean = per-ice * concentration) sea-ice
