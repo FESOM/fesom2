@@ -20,7 +20,7 @@ module mod_partitioning
     use mod_partit, only: t_partit, com_struct, MAX_NEIGHBOR_PARTITIONS
     implicit none
     private
-    public :: par_init, par_ex, set_partition, read_mesh_dims, set_empty_comms
+    public :: par_init, par_ex, set_partition, read_mesh_dims, set_empty_comms, die
 
     integer, parameter :: DIST_FORMAT_VERSION = 1
 
@@ -118,6 +118,7 @@ contains
         call clear_com(partit%com_elem2D_full)
         call clear_com(partit%com_nod2D_full)
         call clear_com(partit%com_edge2D)
+        call clear_com(partit%com_elem2D_shared)
         if (allocated(partit%com_nod2D_full%rlist)) deallocate(partit%com_nod2D_full%rlist)
         if (allocated(partit%com_nod2D_full%slist)) deallocate(partit%com_nod2D_full%slist)
         if (allocated(partit%com_edge2D%rlist))     deallocate(partit%com_edge2D%rlist)
@@ -270,6 +271,9 @@ contains
     end subroutine read_com
 
     subroutine die(msg, partit)
+        ! Print msg and abort every rank (MPI_Abort): a failing rank must not leave the
+        ! others waiting in a collective. Public for the setup-time list builders
+        ! (mod_shared_elem).
         character(len=*), intent(in) :: msg
         type(t_partit),   intent(in) :: partit
         write(*,'(a)') 'set_partition: '//msg

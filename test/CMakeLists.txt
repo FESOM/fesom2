@@ -434,3 +434,30 @@ add_fesom_test(test_minlayers 1)
 set_tests_properties(test_minlayers_np1 PROPERTIES
     PASS_REGULAR_EXPRESSION "fewer than 2 layers"
     FAIL_REGULAR_EXPRESSION "did NOT stop")
+
+# Shared-element sync (docs/plans/20261012-shared-element-sync.md): test_shared_elem checks
+# the list com_elem2D_shared against an independent oracle (S1). pi has the FESOM2 dist
+# layout of production dist_512; pi_w, core2_w and the NEMO cut-outs the fesom_ini layout.
+# The triangle meshes are read rotated (FESOM3_TEST_ROTATE=1), the cut-outs unrotated.
+# np 1 (the 1-rank synthesis): the list is empty.
+add_fesom_test(test_shared_elem 1)
+set_tests_properties(test_shared_elem_np1 PROPERTIES ENVIRONMENT "FESOM3_TEST_ROTATE=1")
+foreach(_case pi:${_mesh_pi}:2,8:1 pi_w:${_mesh_piw}:2,4:1 mixed:${_mesh_mix}:2:0
+              quad:${_mesh_q}:2:0 core2_w:${_mesh_c2w}:8:1)
+    string(REPLACE ":" ";" _c ${_case})
+    list(GET _c 0 _tag)
+    list(GET _c 1 _mesh)
+    list(GET _c 2 _nps)
+    list(GET _c 3 _rot)
+    string(REPLACE "," ";" _nps ${_nps})
+    foreach(_np ${_nps})
+        add_mesh_test(test_shared_elem_${_tag}_np${_np} test_shared_elem ${_mesh} ${_np}
+                      FESOM3_TEST_ROTATE=${_rot})
+    endforeach()
+endforeach()
+# a vertex without a known owner (com_nod2D receive blocks cleared) stops the builder
+add_mesh_test(test_shared_elem_corrupt_np2 test_shared_elem ${_mesh_pi} 2
+              FESOM3_TEST_SHARED_CORRUPT=1)
+set_tests_properties(test_shared_elem_corrupt_np2 PROPERTIES
+    PASS_REGULAR_EXPRESSION "has a vertex with no known owner"
+    FAIL_REGULAR_EXPRESSION "did NOT stop")

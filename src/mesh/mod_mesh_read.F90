@@ -18,6 +18,7 @@ module mod_mesh_read
     use mod_partit,      only: t_partit
     use mod_partitioning, only: read_mesh_dims
     use mod_halo,        only: exchange_nod, allreduce_sum
+    use mod_shared_elem, only: build_com_elem2D_shared
     use mod_mesh_rotate, only: init_mesh_rotation, g2r, r2g, trim_cyclic
     implicit none
     private
@@ -28,7 +29,7 @@ contains
     subroutine read_mesh(mesh, partit, mesh_dir, alpha_deg, beta_deg, gamma_deg, &
                          cyclic_deg, force_rotation, n_cw_swaps)
         type(t_mesh),     intent(inout) :: mesh
-        type(t_partit),   intent(in)    :: partit
+        type(t_partit),   intent(inout) :: partit   ! inout: read_mesh_local adds com_elem2D_shared
         character(len=*), intent(in)    :: mesh_dir
         real(kind=WP),    intent(in)    :: alpha_deg, beta_deg, gamma_deg, cyclic_deg
         logical,          intent(in)    :: force_rotation
@@ -413,7 +414,7 @@ contains
     subroutine read_mesh_local(mesh, partit, mesh_dir, alpha_deg, beta_deg, gamma_deg, &
                                cyclic_deg, force_rotation, n_cw_swaps)
         type(t_mesh),     intent(inout) :: mesh
-        type(t_partit),   intent(in)    :: partit
+        type(t_partit),   intent(inout) :: partit
         character(len=*), intent(in)    :: mesh_dir
         real(kind=WP),    intent(in)    :: alpha_deg, beta_deg, gamma_deg, cyclic_deg
         logical,          intent(in)    :: force_rotation
@@ -568,6 +569,8 @@ contains
         call enforce_cw_orientation(mesh, n_cw_swaps, nelem=nElemO)
         call setup_vertical_local(mesh, partit)
         deallocate(imap_elem)
+        ! one designated owner per shared (border) element: the list update_vel syncs uv over
+        call build_com_elem2D_shared(mesh, partit)
     end subroutine read_mesh_local
 
     subroutine build_nod_in_elem_local(mesh, partit)

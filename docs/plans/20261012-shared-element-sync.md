@@ -224,22 +224,24 @@
 - Create: `test/test_shared_elem.F90`
 - Modify: `test/CMakeLists.txt`
 
-- [ ] Before changing any code, freeze the baseline and build it:
+- [x] Before changing any code, freeze the baseline and build it:
   - Export `HEAD` with `git archive` into `$S/src_base`.
   - Copy the uncommitted `src/io/mod_io_zarr.F90` over it.
   - Build `$S/build_base` from `$S/src_base`. Tasks 3 and 7 compare against it.
-- [ ] Add `com_elem2D_shared` and `sync_shared_elem` (default `.true.`) to `t_partit`. Clear the list in `set_empty_comms`, and make `die` public.
-- [ ] Add the integer variant `exchange_elem_shared_2D_i` (generic `exchange_elem_shared`) and `allreduce_max_i0` to `mod_halo`.
-- [ ] Implement `build_com_elem2D_shared` (Technical Details, builder steps 2–6), re-entrant and stopping through `die`. Call it at the end of `read_mesh_local`, and make `partit` `intent(inout)` in `read_mesh` and `read_mesh_local`.
-- [ ] Create `test_shared_elem` with S1. The independent oracle: allgather the owned global node ids into a global owner map, then recompute every owned element's owner set and designated owner. Check that:
+- [x] Add `com_elem2D_shared` and `sync_shared_elem` (default `.true.`) to `t_partit`. Clear the list in `set_empty_comms`, and make `die` public.
+- [x] Add the integer variant `exchange_elem_shared_2D_i` (generic `exchange_elem_shared`) and `allreduce_max_i0` to `mod_halo`.
+- [x] Implement `build_com_elem2D_shared` (Technical Details, builder steps 2–6), re-entrant and stopping through `die`. Call it at the end of `read_mesh_local`, and make `partit` `intent(inout)` in `read_mesh` and `read_mesh_local`.
+- [x] Create `test_shared_elem` with S1. The independent oracle: allgather the owned global node ids into a global owner map, then recompute every owned element's owner set and designated owner. Check that:
   - an element is in the receive block of its designated owner exactly when it is shared and this rank is not that owner;
   - it is in the send block for every other owner exactly when this rank is the designated owner;
   - blocks are ascending by global id and partners are ascending;
   - every shared element has exactly one designated owner (a per-element count, summed over ranks);
   - at np 1 the list is empty.
-- [ ] Add the error-case ctest at np 2 on pi. With `FESOM3_TEST_SHARED_CORRUPT=1` the test clears the receive blocks of `com_nod2D` and calls the builder again. The test passes on `PASS_REGULAR_EXPRESSION "has a vertex with no known owner"`. It fails on `FAIL_REGULAR_EXPRESSION "did NOT stop"`, which the test prints if the call returns.
-- [ ] Register `test_shared_elem` at np 1; np 2 and 8 on pi; np 2 and 4 on pi_w; np 2 on nemo025mix_cut and nemo025q_cut; np 8 on core2_w.
-- [ ] Run ctest: all pass, including `test_types`.
+- [x] Add the error-case ctest at np 2 on pi. With `FESOM3_TEST_SHARED_CORRUPT=1` the test clears the receive blocks of `com_nod2D` and calls the builder again. The test passes on `PASS_REGULAR_EXPRESSION "has a vertex with no known owner"`. It fails on `FAIL_REGULAR_EXPRESSION "did NOT stop"`, which the test prints if the call returns.
+- [x] Register `test_shared_elem` at np 1; np 2 and 8 on pi; np 2 and 4 on pi_w; np 2 on nemo025mix_cut and nemo025q_cut; np 8 on core2_w.
+- [x] Run ctest: all pass, including `test_types`.
+- ➕ Additions to the builder (12 Oct): before the self-check, one `MPI_Alltoall` of the per-partner send counts checks that both sides of every pair agree; a mismatch would otherwise hang the self-check exchange instead of stopping with a message. It also stops if an owned element has no owned vertex (the partition rule the design relies on). S1 checks the rule from the other side too: every vertex owner owns the element.
+- Measured: pi 35 shared elements at np 2, 226 at np 8; core2_w 2,099 at np 8 (2,102 extra copies).
 
 ### Task 2: Block exchange and the copy-spread probe
 
@@ -247,15 +249,15 @@
 - Modify: `src/infra/mod_halo.F90`
 - Modify: `test/test_shared_elem.F90`
 
-- [ ] Add `exchange_elem_shared_blk_r` to the generic `exchange_elem_shared`.
-- [ ] Add the generic `shared_copy_max_elem`: rank 1 through `probe`, rank 3 through a new block probe on `core_blk_r`. It returns the local maximum.
-- [ ] S2 block test: fill a `(2,nl-1,elem)` array and the `(1,:,:,:)` section of a `(1,2,nl-1,elem)` array with `1000*mype + global id`. Check that:
+- [x] Add `exchange_elem_shared_blk_r` to the generic `exchange_elem_shared`.
+- [x] Add the generic `shared_copy_max_elem`: rank 1 through `probe`, rank 3 through a new block probe on `core_blk_r`. It returns the local maximum.
+- [x] S2 block test: fill a `(2,nl-1,elem)` array and the `(1,:,:,:)` section of a `(1,2,nl-1,elem)` array with `1000*mype + global id`. Check that:
   - before the exchange, the block probe (allreduce max) is positive at np>1;
   - after it, every shared copy holds `1000*d(e) + global id` and the probe is 0;
   - non-shared owned slots and halo slots are bitwise unchanged.
-- [ ] S2 rank-1 probe test: plant a known difference on one receive slot of a rank-1 array. The probe must return exactly that difference on that rank and 0 on the others.
-- [ ] S2 at np 1: the arrays stay bitwise unchanged and the probes return 0.
-- [ ] Run ctest: all pass.
+- [x] S2 rank-1 probe test: plant a known difference on one receive slot of a rank-1 array. The probe must return exactly that difference on that rank and 0 on the others.
+- [x] S2 at np 1: the arrays stay bitwise unchanged and the probes return 0.
+- [x] Run ctest: all pass.
 
 ### Task 3: Sync `uv` in `update_vel`, with the `FESOM3_SHARED_SYNC` knob
 

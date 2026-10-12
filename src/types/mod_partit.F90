@@ -42,6 +42,14 @@ module mod_partit
         type(com_struct) :: com_nod2D_full
         type(com_struct) :: com_edge2D
         integer :: dist_format = 0          ! dist_N/format.out version (0: FESOM2 layout only)
+        ! Shared elements (src/infra/mod_shared_elem.F90; runtime, not serialized): an element
+        ! is owned by every rank that owns one of its vertices, so a border element has 2-3
+        ! owned copies. com_elem2D_shared sends the copy of the designated owner (the highest
+        ! vertex-owner rank) to the other owners: receive blocks = this rank's non-designated
+        ! copies, send blocks = the elements it is the designated owner of. Built at the end
+        ! of read_mesh_local; sync_shared_elem = FESOM3_SHARED_SYNC (update_vel syncs uv).
+        type(com_struct) :: com_elem2D_shared
+        logical :: sync_shared_elem = .true.
 
         integer, allocatable, dimension(:) :: part   ! global owner map (nod2D)
 
