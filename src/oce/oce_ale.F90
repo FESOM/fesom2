@@ -36,7 +36,8 @@ module oce_ale
     use mod_dyn,        only: t_dyn
     use mod_partit,     only: t_partit
     use mod_part_bounds, only: owned_bounds, is_multirank
-    use mod_halo,       only: exchange_nod, exchange_elem, exchange_elem_full
+    use mod_halo,       only: exchange_nod, exchange_elem, exchange_elem_full, exchange_elem_shared
+    use mod_timer,      only: timer_start, timer_stop, TMR_OCE_SHSYNC
     use mod_config,     only: which_ALE          ! M6 ALE: 'linfs'/'zlevel'/'zstar'
     use oce_wsplit,     only: wsplit_implicit_fraction   ! the C^1 w_e/w_i split function
     implicit none
@@ -155,7 +156,23 @@ contains
                 UV(2,nz,elem) = UV(2,nz,elem) + UV_rhs(2,nz,elem) + Fy
             end do
         end do
-        if (is_multirank(partit)) call exchange_elem(UV, partit)   ! FESOM2 :172 (eDim com_elem2D)
+        if (is_multirank(partit)) then
+            ! One owner per shared element (src/infra/mod_shared_elem.F90): a border element
+            ! is owned by every rank that owns one of its vertices, and each owner has just
+            ! updated its own copy. The copies differ by roundoff (order-dependent sums in the
+            ! viscosity filter), which the rvo_upwind blend can turn into O(1); the ranks
+            ! then compute different fluxes across their common edges and ssh_rhs_old no
+            ! longer sums to zero (linfs mass leak). Every other owner takes the designated
+            ! owner's copy -- what a restart read does -- BEFORE the halo exchange, so the
+            ! eDim halo copies carry the synced value too. FESOM3_SHARED_SYNC=0 skips it.
+            ! (Nested ifs: partit is optional and Fortran does not short-circuit.)
+            if (partit%sync_shared_elem) then
+                call timer_start(TMR_OCE_SHSYNC)
+                call exchange_elem_shared(UV, partit)
+                call timer_stop(TMR_OCE_SHSYNC)
+            end if
+            call exchange_elem(UV, partit)                         ! FESOM2 :172 (eDim com_elem2D)
+        end if
     end subroutine update_vel
 
     !===========================================================================

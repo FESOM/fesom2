@@ -40,6 +40,22 @@
 #       EVERY config (the line before the drift), which is why every tail below is one
 #       line longer than the drift block alone.
 #
+#   linfs + sea ice, np 2 and 8 -> SHARED-ELEMENT gate (docs/plans/20261012-shared-element-sync.md).
+#       A border element is owned by every rank that owns one of its vertices; update_vel syncs
+#       uv to the designated owner's copy. FESOM3_DIVSUM_TOL=1e-12 makes the driver stop unless
+#       the divergence-sum ratio |sum ssh_rhs_old| / sum|ssh_rhs_old| stays below 1e-12 in every
+#       step (a linfs mass leak raises it) and the copy spreads of uv, uv_rhsAB and sigma are 0.
+#       Vector-invariant momentum with rvo_upwind 1 (the CORE2 leak's trigger) at np 2 and 8,
+#       the scalar advection (momadv 2, the default) at np 2. The same vinv case with
+#       FESOM3_SHARED_SYNC=0 is report-only: it shows whether the copies drift without the sync.
+#       Measured 2026-10-12 (pi, 20 steps, cold start): max ratio 1.6e-16 (vinv np 2), 3.1e-16
+#       (vinv np 8), 1.8e-16 (scalar np 2), every spread 0. Sync off: uv spread 6.9e-18 -- the
+#       roundoff drift -- and uv_rhsAB spread 5.8e-11, i.e. the rvo_upwind blend has amplified it
+#       by ~1e7 within 20 steps (sigma 0; the ratio stays 1.6e-16 this early at these small
+#       velocities). The other configs report ratios <= 3.8e-16 and zero spreads.
+#   Every driver run prints one shared-element line after the drift block, so every tail
+#   below is one line longer than before.
+#
 # Measured zstar baseline on pi, 20 steps, before any bottom change:
 #   np=1  heat -4.87e-15  salt -1.66e-14
 #   np=2  heat  0.00e+00  salt -7.80e-15
@@ -71,7 +87,7 @@ fail=0
 for np in 1 2 8; do
     echo "=== zstar, np=$np, $NSTEPS steps (conservation gate, tol=$TOL) ==="
     if FESOM3_WHICH_ALE=zstar FESOM3_CONSERVE_TOL="$TOL" \
-         mpirun $MPIFLAGS -n "$np" "$BIN" 2>&1 | tail -7; then
+         mpirun $MPIFLAGS -n "$np" "$BIN" 2>&1 | tail -8; then
         :
     else
         echo "run_conserve_pi: FAILED (zstar np=$np)"; fail=1
@@ -89,7 +105,7 @@ while read -r -u 3 label vars; do
     [ -z "$label" ] && continue
     echo "=== zstar + $label, np=1, $NSTEPS steps (conservation gate, tol=$TOL) ==="
     if env $vars FESOM3_WHICH_ALE=zstar FESOM3_CONSERVE_TOL="$TOL" \
-         mpirun $MPIFLAGS -n 1 "$BIN" 2>&1 | tail -8; then
+         mpirun $MPIFLAGS -n 1 "$BIN" 2>&1 | tail -9; then
         :
     else
         echo "run_conserve_pi: FAILED (zstar+$label np=1)"; fail=1
@@ -117,7 +133,7 @@ CFG
 # most -- the same reason the zstar loop above runs it.
 echo "=== zstar + momadv-vinv, np=8, $NSTEPS steps (conservation gate, tol=$TOL) ==="
 if FESOM3_MOMADV_OPT=1 FESOM3_WHICH_ALE=zstar FESOM3_CONSERVE_TOL="$TOL" \
-     mpirun $MPIFLAGS -n 8 "$BIN" < /dev/null 2>&1 | tail -7; then
+     mpirun $MPIFLAGS -n 8 "$BIN" < /dev/null 2>&1 | tail -8; then
     :
 else
     echo "run_conserve_pi: FAILED (zstar+momadv-vinv np=8)"; fail=1
@@ -126,7 +142,7 @@ fi
 # upwind blend at np=8: its exchange_elem of omega_e is the one new MR communication.
 echo "=== zstar + momadv-vinv-upw, np=8, $NSTEPS steps (conservation gate, tol=$TOL) ==="
 if FESOM3_MOMADV_OPT=1 FESOM3_RVO_UPWIND=0.7 FESOM3_WHICH_ALE=zstar FESOM3_CONSERVE_TOL="$TOL" \
-     mpirun $MPIFLAGS -n 8 "$BIN" < /dev/null 2>&1 | tail -7; then
+     mpirun $MPIFLAGS -n 8 "$BIN" < /dev/null 2>&1 | tail -8; then
     :
 else
     echo "run_conserve_pi: FAILED (zstar+momadv-vinv-upw np=8)"; fail=1
@@ -138,17 +154,42 @@ fi
 # that consumer at scale (the halo values themselves are pinned by test_wsplit S5).
 echo "=== zstar + wsplit, np=8, $NSTEPS steps (conservation gate, tol=$TOL) ==="
 if env $WSPLIT_CFG FESOM3_WHICH_ALE=zstar FESOM3_CONSERVE_TOL="$TOL" \
-     mpirun $MPIFLAGS -n 8 "$BIN" < /dev/null 2>&1 | tail -7; then
+     mpirun $MPIFLAGS -n 8 "$BIN" < /dev/null 2>&1 | tail -8; then
     :
 else
     echo "run_conserve_pi: FAILED (zstar+wsplit np=8)"; fail=1
 fi
 
 echo "=== linfs, np=1, $NSTEPS steps (invariants only; drift reported, not gated) ==="
-if FESOM3_WHICH_ALE=linfs mpirun $MPIFLAGS -n 1 "$BIN" 2>&1 | tail -6; then
+if FESOM3_WHICH_ALE=linfs mpirun $MPIFLAGS -n 1 "$BIN" 2>&1 | tail -7; then
     :
 else
     echo "run_conserve_pi: FAILED (linfs invariants np=1)"; fail=1
+fi
+
+# SHARED: linfs + sea ice, the shared-element gate (header). Own blocks, not the heredoc loop:
+# that loop runs np 1 only. The sync-off case is report-only (no FESOM3_DIVSUM_TOL).
+SHARED_ENV="FESOM3_WHICH_ALE=linfs FESOM3_CONSERVE_ICE=1"
+while read -r -u 3 label np vars; do
+    [ -z "$label" ] && continue
+    echo "=== linfs + ice + $label, np=$np, $NSTEPS steps (shared-element gate, divsum tol=$TOL) ==="
+    if env $SHARED_ENV $vars FESOM3_DIVSUM_TOL="$TOL" \
+         mpirun $MPIFLAGS -n "$np" "$BIN" < /dev/null 2>&1 | tail -8; then
+        :
+    else
+        echo "run_conserve_pi: FAILED (linfs+ice+$label np=$np)"; fail=1
+    fi
+done 3<<CFG
+momadv-vinv-upw1 2 FESOM3_MOMADV_OPT=1 FESOM3_RVO_UPWIND=1.0
+momadv-vinv-upw1 8 FESOM3_MOMADV_OPT=1 FESOM3_RVO_UPWIND=1.0
+momadv-scalar 2 FESOM3_MOMADV_OPT=2
+CFG
+echo "=== linfs + ice + momadv-vinv-upw1, np=2, sync OFF, $NSTEPS steps (report only) ==="
+if env $SHARED_ENV FESOM3_MOMADV_OPT=1 FESOM3_RVO_UPWIND=1.0 FESOM3_SHARED_SYNC=0 \
+     mpirun $MPIFLAGS -n 2 "$BIN" < /dev/null 2>&1 | tail -8; then
+    :
+else
+    echo "run_conserve_pi: FAILED (linfs+ice+momadv-vinv-upw1 np=2 sync off)"; fail=1
 fi
 
 if [ "$fail" -ne 0 ]; then

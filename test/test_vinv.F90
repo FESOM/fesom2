@@ -36,6 +36,8 @@ program test_vinv
     !   V4 non-degeneracy   -> zeta /= 0 somewhere. Catches a stub or a no-op (the whole
     !                          point of writing this test before the implementation).
     !   V5 finiteness       -> no NaN/Inf anywhere, including at bathymetry steps.
+    !   V13 (np > 1)        -> the uv_rhsAB copies of the shared (border) elements stay
+    !                          bitwise equal with the upwind blend on (shared_copy_guard).
     !
     ! MESHES (hybrid meshes, Task 10): FESOM3_MESH_DIR (default pi, rotated 50/15/-90;
     ! FESOM3_TEST_ROTATE=0 reads it unrotated, e.g. the NEMO-mixed cut-out), or, with
@@ -75,7 +77,7 @@ program test_vinv
     use mod_mesh_analytic, only: generate_mixed_patch, generate_quad_patch
     use mod_part_bounds,   only: owned_bounds
     use oce_dyn_vinv,      only: relative_vorticity, momentum_adv_vinv
-    use mod_halo,          only: exchange_elem
+    use mod_halo,          only: exchange_elem, shared_copy_max_elem
     implicit none
 
     character(len=512) :: mesh_dir, cbuf
@@ -537,6 +539,8 @@ program test_vinv
 
     ! V10 + V11 share the test-side reconstruction of normals/weights
     call upwind_checks()
+    ! V13 (np > 1): shared-element copies of uv_rhsAB stay equal with the blend on
+    if (partit%npes > 1) call shared_copy_guard()
     rvo_upwind = 0.0_WP
 
     if (nfail == 0) then
@@ -661,6 +665,50 @@ contains
         call check_true('V10 inflow neighbours are upstream', nbad10 == 0)
         call check_true('V11 single-neighbour blend equals upwind omega', errmax < 1.0e-9_WP)
     end subroutine upwind_checks
+
+    subroutine shared_copy_guard()
+        ! V13: a shared (border) element is owned by every rank that owns one of its
+        ! vertices, and only uv is synced to the designated owner's copy (update_vel,
+        ! docs/plans/20261012-shared-element-sync.md). With equal uv copies the uv_rhsAB
+        ! copies must stay BITWISE equal by themselves: every input of momentum_adv_vinv is
+        ! per element from the same global geometry, or a nodal field (vorticity, KE, w_e)
+        ! that its owner computes and exchanges. V11's field (u = CU*lat^2 on the owned
+        ! elements, identical on every copy) has varying vorticity, so the upwind blend
+        ! (rvo_upwind = 1) selects neighbours -- the branchy path that turned the roundoff
+        ! spread of the copies into O(1) in the CORE2 leak. Not vacuous: the blend must
+        ! change uv_rhsAB on some shared element by more than 1e-6 relative.
+        real(kind=WP), allocatable :: rhs0(:,:,:,:)
+        real(kind=WP) :: spread, dmax, rmax
+        integer :: p, k, e
+        rvo_upwind = 0.0_WP
+        dyn%uv_rhsAB = 0.0_WP
+        call momentum_adv_vinv(dyn, mesh, partit)
+        rhs0 = dyn%uv_rhsAB
+        rvo_upwind = 1.0_WP
+        dyn%uv_rhsAB = 0.0_WP
+        call momentum_adv_vinv(dyn, mesh, partit)
+        spread = shared_copy_max_elem(dyn%uv_rhsAB(1,:,:,:), partit)
+        call max_all(spread)
+        ! the shared elements of this rank: its receive slots and the elements it sends
+        dmax = 0.0_WP; rmax = 0.0_WP
+        do p = 1, 2
+            do k = 1, merge(size(partit%com_elem2D_shared%rlist), size(partit%com_elem2D_shared%slist), p == 1)
+                if (p == 1) then
+                    e = partit%com_elem2D_shared%rlist(k)
+                else
+                    e = partit%com_elem2D_shared%slist(k)
+                end if
+                dmax = max(dmax, maxval(abs(dyn%uv_rhsAB(1,:,:,e) - rhs0(1,:,:,e))))
+                rmax = max(rmax, maxval(abs(rhs0(1,:,:,e))))
+            end do
+        end do
+        call max_all(dmax); call max_all(rmax)
+        if (partit%mype == 0) write(*,'(a,es12.4,a,es12.4)') '  V13 shared-copy spread of uv_rhsAB = ', &
+            spread, '   blend change on shared elements (rel) = ', dmax/max(rmax, tiny(1.0_WP))
+        call check_true('V13 uv_rhsAB copies of shared elements bitwise equal', spread == 0.0_WP)
+        call check_true('V13 blend active on shared elements (non-vacuity)', &
+                        dmax > 1.0e-6_WP*rmax .and. rmax > 0.0_WP)
+    end subroutine shared_copy_guard
 
     logical function is_parallelogram(e)
         ! a triangle, or a quad whose diagonals bisect each other (to 1e-9 of its size)

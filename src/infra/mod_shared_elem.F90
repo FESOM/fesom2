@@ -39,6 +39,8 @@ contains
         integer, allocatable :: own(:), order(:), nsend(:), nrecv(:), peer(:)
         integer, allocatable :: pos_s(:), pos_r(:), chk(:)
         character(len=256) :: msg
+        character(len=16)  :: env
+        integer :: env_len, ios
 
         npes   = partit%npes
         mype   = partit%mype
@@ -46,6 +48,24 @@ contains
         nNodL  = nNodO + partit%eDim_nod2D
         nElemO = partit%myDim_elem2D
         call reset_com(partit%com_elem2D_shared)
+
+        ! ---- FESOM3_SHARED_SYNC: unset or 1 = update_vel syncs uv (default), 0 = off (the
+        !      old unsynced copies, for A/B comparisons; the list is built anyway, so the
+        !      copy-spread diagnostic still shows the drift). Value-based like
+        !      FESOM3_MOMADV_OPT; any other value stops. No every-N option: every step with
+        !      unequal copies leaks. ----
+        partit%sync_shared_elem = .true.
+        call get_environment_variable('FESOM3_SHARED_SYNC', env, length=env_len, status=ios)
+        if (ios == 0 .and. env_len > 0) then
+            select case (trim(adjustl(env)))
+            case ('1')
+                partit%sync_shared_elem = .true.
+            case ('0')
+                partit%sync_shared_elem = .false.
+            case default
+                call die('FESOM3_SHARED_SYNC must be 0 or 1', partit)
+            end select
+        end if
 
         ! ---- owner of every owned and eDim node (com_nod2D receive blocks) ----
         allocate(own(nNodL))

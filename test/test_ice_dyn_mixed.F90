@@ -26,6 +26,11 @@ program test_ice_dyn_mixed
     !   D5 ocean2ice: a uniform surface velocity gives the same node velocity (owned + halo);
     !      triangles: the kite-share gather == the former area-weighted mean at all-triangle
     !      nodes
+    !   D6 (np > 1) shared elements (docs/plans/20261012-shared-element-sync.md): a border
+    !      element is owned by every rank that owns one of its vertices and only the ocean uv
+    !      is synced between the copies; the sigma copies must stay bitwise equal by
+    !      themselves after EVP and after mEVP (3 subcycles, hashed ice velocity, a, m and
+    !      SSH), and sigma must be nonzero on some shared element (not vacuous)
     use mpi
     use test_util,         only: setup_test_mesh, check, finish, max_all, sum_all, hval
     use mod_precision,     only: WP
@@ -40,6 +45,7 @@ program test_ice_dyn_mixed
     use mod_tracer,        only: t_tracer
     use mod_ice_dyn,       only: ocean2ice, EVPdynamics_solve, stress_tensor, stress2rhs
     use mod_ice_setup,     only: build_bc_index_nod2D
+    use mod_halo,          only: shared_copy_max_elem
     implicit none
 
     type(t_partit) :: partit, tpartit, apartit, qpartit
@@ -78,6 +84,7 @@ contains
         logical, allocatable :: alltri(:)
         real(kind=WP), allocatable :: X(:), Y(:), ro(:), rabs(:)
         real(kind=WP) :: d1(4), d1s(2), d1t, d2, d2t, d3(2), d4(2), d4s(2), d5(2), v(4), sc, sc2
+        real(kind=WP) :: d6(2), d6s(2)
         real(kind=WP) :: e11, e22, e12, ex, wa, uo, vo, rb, cb, ue, ve
         real(kind=WP), allocatable :: u0(:), v0(:)
         real(kind=WP), parameter :: OM = 1.0e-6_WP, LA = 1.0e-6_WP, LB = 2.0e-6_WP, &
@@ -316,6 +323,32 @@ contains
         d5(2) = d5(2)/0.1_WP
         call max_all(d5(1), p); call max_all(d5(2), p)
 
+        !--- D6 (np > 1): the sigma copies of the shared elements stay bitwise equal ---
+        d6 = 0.0_WP; d6s = 0.0_WP
+        if (p%npes > 1) then
+            do iv = 0, 1
+                call ice_state_uniform(ice, nNodL)
+                call hashed_velocity(ice, ngid, nNodL)        ! mEVP sigma stays 0 at rest
+                do n = 1, nNodL
+                    ice%data(1)%values(n) = 0.5_WP + 0.4_WP*hval(ngid(n), 41)
+                    ice%data(2)%values(n) = 2.0_WP + 1.0_WP*hval(ngid(n), 42)
+                    ice%srfoce_ssh(n)     = 0.1_WP*hval(ngid(n), 21)
+                end do
+                ice%whichEVP = iv; ice%evp_rheol_steps = 3
+                call EVPdynamics_solve(ice, m, p)
+                d6(iv+1) = max(shared_copy_max_elem(ice%work%sigma11, p), &
+                               shared_copy_max_elem(ice%work%sigma12, p), &
+                               shared_copy_max_elem(ice%work%sigma22, p))
+                call max_all(d6(iv+1), p)
+                do k = 1, size(p%com_elem2D_shared%rlist)
+                    e = p%com_elem2D_shared%rlist(k)
+                    d6s(iv+1) = max(d6s(iv+1), abs(ice%work%sigma11(e)), abs(ice%work%sigma12(e)), &
+                                    abs(ice%work%sigma22(e)))
+                end do
+                call max_all(d6s(iv+1), p)
+            end do
+        end if
+
         if (p%mype == 0) then
             write(*,'(a,a,i0,a,i0)') tag, ': owned triangles=', ntri, ' quads=', nquad
             if (planar) then
@@ -329,6 +362,8 @@ contains
             write(*,'(a,a,2es10.2)') tag, ': D2 adjoint identity / triangles vs former stress2rhs:', d2, d2t
             write(*,'(a,a,2es10.2)') tag, ': D3 SSH tilt EVP / mEVP:', d3
             write(*,'(a,a,2es10.2)') tag, ': D5 ocean2ice uniform / triangles vs former gather:', d5
+            if (p%npes > 1) write(*,'(a,a,2es10.2,a,2es10.2,a)') tag, &
+                ': D6 shared-copy spread of sigma EVP / mEVP:', d6, '  (max|sigma| on shared', d6s, ' Pa)'
         end if
         if (planar) then
             call check(d1(1) < 1.0e-13_WP, tag//': D1 uniform drift has zero strain rate', p%mype)
@@ -349,6 +384,12 @@ contains
         call check(d3(2) < 1.0e-12_WP, tag//': D3 mEVP SSH tilt node shares', p%mype)
         call check(d5(1) < 1.0e-14_WP, tag//': D5 ocean2ice uniform velocity gathered exactly', p%mype)
         call check(d5(2) < 1.0e-14_WP, tag//': D5 triangles: ocean2ice == former area-weighted mean', p%mype)
+        if (p%npes > 1) then
+            call check(d6(1) == 0.0_WP .and. d6s(1) > 0.0_WP, &
+                       tag//': D6 EVP: sigma copies of shared elements bitwise equal (and nonzero)', p%mype)
+            call check(d6(2) == 0.0_WP .and. d6s(2) > 0.0_WP, &
+                       tag//': D6 mEVP: sigma copies of shared elements bitwise equal (and nonzero)', p%mype)
+        end if
         deallocate(ngid, egid, X, Y, ro, rabs, alltri)
     end subroutine check_ice
 

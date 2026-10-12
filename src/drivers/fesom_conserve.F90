@@ -41,6 +41,18 @@ program fesom_conserve
     !   FESOM3_WSPLIT_EXPECT_SPLIT=N  error stop unless >= N owned faces split (hook comment)
     !   FESOM3_CONSERVE_ICE  presence -> sea ice ON (see below)
     !   FESOM3_WHICHEVP    0=EVP / 1=mEVP (with FESOM3_CONSERVE_ICE)    default: 0
+    !   FESOM3_DIVSUM_TOL  shared-element gate (below); unset/0 = report only
+    !
+    ! SHARED ELEMENTS (docs/plans/20261012-shared-element-sync.md). A border element is owned by
+    ! every rank that owns one of its vertices; update_vel syncs uv to the designated owner's
+    ! copy (FESOM3_SHARED_SYNC, src/infra/mod_shared_elem.F90). Every step the driver takes the
+    ! divergence-sum ratio |sum ssh_rhs_old| / sum|ssh_rhs_old| over the owned nodes (a leak of
+    ! the linear free surface shows as a ratio above ~1e-12) and the copy spreads of uv,
+    ! uv_rhsAB and sigma11/12/22 (max|copy - designated copy|). No per-step line (run_tri_
+    ! regression greps "step 20 "): the run maxima go into ONE end-of-run line. With
+    ! FESOM3_DIVSUM_TOL > 0 the run stops with an error if the max ratio exceeds it, or if the
+    ! sync is on and any spread is nonzero. With zstar ssh_rhs_old also carries the freshwater
+    ! term, so gate the ratio with linfs.
     !
     ! SEA ICE (FESOM3_CONSERVE_ICE, hybrid-mesh Task 17). The ice dynamics (EVP/mEVP) and the
     ! ice TG/FCT advection run every step, coupled to the ocean both ways as in the production
@@ -66,7 +78,7 @@ program fesom_conserve
     ! -4.9e-15, salt -1.7e-14 at np=1; 0.0 and -7.8e-15 at np=2) and is the mode to gate on.
     use mpi
     use, intrinsic :: iso_fortran_env, only: int32
-    use mod_precision,      only: WP, MP
+    use mod_precision,      only: WP, MP, MPI_WP
     use mod_constants,      only: density_0, pi, rad
     use mod_param_phys,     only: N2smth_h, alpha, theta, shear_splines, N2_splines, rvo_upwind
     use mod_param_phys,     only: mix_coeff_PP, A_ver, K_ver, Kv0_const, mix_scheme_nmb
@@ -98,7 +110,7 @@ program fesom_conserve
     use oce_ssh_rhs,        only: init_stiff_mat_ale
     use mod_step_oce,       only: step_oce
     use mod_config,         only: which_ALE
-    use mod_halo,           only: allreduce_sum, allreduce_max
+    use mod_halo,           only: allreduce_sum, allreduce_max, shared_copy_max_elem
     use oce_wsplit,         only: wsplit_assert_params
     use mod_ice,            only: t_ice
     use mod_ice_setup,      only: ice_setup
@@ -137,6 +149,9 @@ program fesom_conserve
     type(t_ice)     :: ice
     type(t_atmflux) :: atm
     real(kind=WP)   :: icemass0(3), icemass(3), idrift(3), klon, kwave
+    real(kind=WP)   :: divsum_tol, shmax(4)    ! FESOM3_DIVSUM_TOL; run maxima: ratio, dUV, dAB, dsig
+    logical         :: shared_ok
+    character(len=24) :: verdict
 
     call get_environment_variable('FESOM3_MESH_DIR', mesh_dir)
     if (len_trim(mesh_dir) == 0) &
@@ -154,6 +169,12 @@ program fesom_conserve
     conserve_tol = 0.0_WP
     call get_environment_variable('FESOM3_CONSERVE_TOL', env, length=env_len, status=ios)
     if (ios == 0 .and. env_len > 0) read(env, *, iostat=ios) conserve_tol
+    divsum_tol = 0.0_WP
+    call get_environment_variable('FESOM3_DIVSUM_TOL', env, length=env_len, status=ios)
+    if (ios == 0 .and. env_len > 0) then
+        read(env, *, iostat=ios) divsum_tol
+        if (ios /= 0) error stop 'FESOM3_DIVSUM_TOL: not a real'
+    end if
     ! GM bolus / Redi isopycnal diffusion. Redi matters here specifically: it is the only
     ! caller of diff_ver_part_redi_expl, which is the only place tr_xynodes is computed --
     ! and tr_xynodes is one of the two node-averaging denominators the depth-independent
@@ -527,6 +548,7 @@ program fesom_conserve
     ! runloop: N steps, state persists (multi-step AB2 evolution). lfirst=(n==1).
     ! Invariants are checked BEFORE the first step (the IC baseline) and after each step.
     call check_invariants(0)
+    shmax = 0.0_WP
     content0 = content
     volume0  = volume
     if (use_ice) icemass0 = icemass
@@ -549,6 +571,7 @@ program fesom_conserve
                           real_salt_flux, is_nonlinfs, stress_surf, partit)
         end if
         call check_invariants(n)
+        call shared_element_diag()
     end do
 
     ! Last-step vertical Courant number + w split statistics (owned faces, all ranks).
@@ -574,6 +597,25 @@ program fesom_conserve
         write(*,'(a,i0,a,a,a)') 'fesom_conserve: done (', nsteps, ' steps, which_ALE=', &
             trim(which_ALE), ').'
     end if
+    ! shared elements: one line with the run maxima (and the verdict when gated)
+    shared_ok = shmax(1) <= divsum_tol
+    if (partit%sync_shared_elem) shared_ok = shared_ok .and. all(shmax(2:4) == 0.0_WP)
+    if (partit%mype == 0) then
+        if (divsum_tol > 0.0_WP) then
+            if (shared_ok) then
+                verdict = ' -- OK within tol='
+            else
+                verdict = ' -- VIOLATED, tol='
+            end if
+            write(*,'(a,a,4(a,es10.3),a,es9.2)') 'fesom_conserve: shared elements (sync ', &
+                trim(merge('ON ', 'OFF', partit%sync_shared_elem)), '): max divsum=', shmax(1), &
+                '  dUV=', shmax(2), '  dAB=', shmax(3), '  dsig=', shmax(4), trim(verdict), divsum_tol
+        else
+            write(*,'(a,a,4(a,es10.3))') 'fesom_conserve: shared elements (sync ', &
+                trim(merge('ON ', 'OFF', partit%sync_shared_elem)), '): max divsum=', shmax(1), &
+                '  dUV=', shmax(2), '  dAB=', shmax(3), '  dsig=', shmax(4)
+        end if
+    end if
     if (conserve_tol > 0.0_WP) then
         ! written as .not.(<= tol) so that a NaN drift fails the gate
         if (.not. (abs(drift(1)) <= conserve_tol .and. abs(drift(2)) <= conserve_tol .and. &
@@ -586,9 +628,32 @@ program fesom_conserve
         if (partit%mype == 0) &
             write(*,'(a,es12.4)') 'fesom_conserve: CONSERVATION OK within tol=', conserve_tol
     end if
+    if (divsum_tol > 0.0_WP .and. .not. shared_ok) then
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+        error stop 1
+    end if
     call par_ex(partit%MPI_COMM_FESOM, partit%mype)
 
 contains
+
+    subroutine shared_element_diag()
+        ! the step's divergence-sum ratio and shared-copy spreads -> run maxima shmax
+        ! (header SHARED ELEMENTS); spreads are local, so one MPI_MAX
+        real(kind=WP) :: s(2), d(4)
+        integer :: ierr
+        s = [sum(dyn%ssh_rhs_old(1:nNodO)), sum(abs(dyn%ssh_rhs_old(1:nNodO)))]
+        if (partit%npes > 1) call allreduce_sum(s, partit)
+        d(1) = abs(s(1)) / max(s(2), tiny(1.0_WP))
+        d(2) = shared_copy_max_elem(dyn%uv, partit)
+        d(3) = shared_copy_max_elem(dyn%uv_rhsAB(1,:,:,:), partit)
+        d(4) = 0.0_WP
+        if (use_ice) d(4) = max(shared_copy_max_elem(ice%work%sigma11, partit), &
+                                shared_copy_max_elem(ice%work%sigma12, partit), &
+                                shared_copy_max_elem(ice%work%sigma22, partit))
+        if (partit%npes > 1) call MPI_Allreduce(MPI_IN_PLACE, d(2:4), 3, MPI_WP, MPI_MAX, &
+                                                partit%MPI_COMM_FESOM, ierr)
+        shmax = max(shmax, d)
+    end subroutine shared_element_diag
 
     real(kind=WP) function reldrift(a, b)
         real(kind=WP), intent(in) :: a, b

@@ -269,25 +269,27 @@
 - Modify: `test/test_shared_elem.F90`
 - Modify: `test/CMakeLists.txt`
 
-- [ ] In the builder, read the knob (builder step 1) into `partit%sync_shared_elem`, and print ON or OFF in the log line.
-- [ ] Add the subset timer `TMR_OCE_SHSYNC`, "(of which) shared sync", under `TMR_OCE_SSH`.
-- [ ] In `update_vel`, call `exchange_elem_shared(UV)` before `exchange_elem(UV)`, timed and as shown in Technical Details. Add a comment saying why.
-- [ ] Add `FESOM3_SHARED_SYNC` to the env-block comment of the production driver, so that block stays the full list of run variables.
-- [ ] S3 mechanism test, through the real kernels:
+- [x] In the builder, read the knob (builder step 1) into `partit%sync_shared_elem`, and print ON or OFF in the log line.
+- [x] Add the subset timer `TMR_OCE_SHSYNC`, "(of which) shared sync", under `TMR_OCE_SSH`.
+- [x] In `update_vel`, call `exchange_elem_shared(UV)` before `exchange_elem(UV)`, timed and as shown in Technical Details. Add a comment saying why.
+- [x] Add `FESOM3_SHARED_SYNC` to the env-block comment of the production driver, so that block stays the full list of run variables.
+- [x] S3 mechanism test, through the real kernels:
   - Set `uv` and `uv_rhs` from hashes of the global id, so they are equal on every copy. Add δ = 1e-3 m/s to `uv_rhs` on this rank's receive slots (the non-designated copies). Set `d_eta = 0`.
   - Allocate `hbar`, `hbar_old`, `dhe`, `ssh_rhs_old` and `helem` the way `fesom_conserve` and `test_vinv` do.
   - Call `update_vel`, then `compute_hbar_ale`. Compute r = |Σ ssh_rhs_old| / Σ|ssh_rhs_old| over owned nodes (allreduce).
   - Sync on: r < 1e-12 and `shared_copy_max_elem(uv)` is 0.
   - Sync off (`partit%sync_shared_elem = .false.`): r > 1e-8 and the probe ≈ δ.
   - At np 1: r < 1e-12 either way.
-- [ ] Error and OFF cases as ctests at np 2 on pi:
+- [x] Error and OFF cases as ctests at np 2 on pi:
   - `FESOM3_SHARED_SYNC=2` must match `"FESOM3_SHARED_SYNC must be 0 or 1"`, paired with `FAIL_REGULAR_EXPRESSION "did NOT stop"`.
   - `FESOM3_SHARED_SYNC=0` must still build the list and log `shared-element sync: OFF`.
-- [ ] np 1 bit-identity:
+- [x] np 1 bit-identity:
   - Command: `REF_BIN=$S/build_base/bin NEW_BIN=$S/build/bin ROOT=$S/tri TOL_PRE=0 TOL_EARLY=0 TOL_OCEAN=0 TOL_ICE=0 TOL_MIX=0 TOL_ICE_EARLY=0 tools/run_tri_regression.sh prod:pi:1 prod:core2:1`.
   - Every printed d must be 0. A PASS alone is not enough, because float32 output gets a 2⁻²¹ allowance.
-- [ ] OFF bit-identity: run the same command with `FESOM3_SHARED_SYNC=0` exported and the case `prod:pi:2`. Every printed d must be 0.
-- [ ] Run ctest: all pass.
+- [x] OFF bit-identity: run the same command with `FESOM3_SHARED_SYNC=0` exported and the case `prod:pi:2`. Every printed d must be 0.
+- [x] Run ctest: all pass.
+- Measured (12 Oct): S3 ratio with the sync on 9e-20 to 2e-17 on every mesh, off 7e-6 (pi np 2) to 4e-4 (pi_w np 4), uv spread off = δ exactly. np 1 bit-identity: pi and CORE2, 98 printed d, all 0. OFF bit-identity: pi np 2, 49 printed d, all 0; the startup log says `shared-element sync: OFF, 35 shared elements`.
+- ➕ The timer name field (`TNAME`) is now 24 characters wide, so "(of which) shared sync" fits; the report prints the existing names unchanged.
 
 ### Task 4: Guard tests for the `uv_rhsAB` and sigma copies
 
@@ -295,17 +297,18 @@
 - Modify: `test/test_vinv.F90`
 - Modify: `test/test_ice_dyn_mixed.F90`
 
-- [ ] Add `test_vinv` V13 at np>1 (V12 is taken: "blend linear in rvo_upwind", `:642-658`):
+- [x] Add `test_vinv` V13 at np>1 (V12 is taken: "blend linear in rvo_upwind", `:642-658`):
   - Use V11's velocity field, u = CU·lat², v = 0, which has varying vorticity. `set_shear` has constant vorticity, so the blend would be inert there.
   - Call `relative_vorticity` and `momentum_adv_vinv` with `rvo_upwind = 1.0` and `uv_rhsAB = 0`.
   - The allreduce max of `shared_copy_max_elem(dyn%uv_rhsAB(1,:,:,:))` must be exactly 0.
   - So the guard is not vacuous, also require that on some shared element the blend changes `uv_rhsAB` by more than 1e-6 relative to `rvo_upwind = 0`.
-- [ ] Add `test_ice_dyn_mixed` D6 at np>1:
+- [x] Add `test_ice_dyn_mixed` D6 at np>1:
   - Use a hashed ice velocity: mEVP sigma stays 0 at rest. Run at least 2 subcycles.
   - Run `EVPdynamics_solve` with EVP, then with mEVP. After each, the allreduce max of `shared_copy_max_elem` of `sigma11`, `sigma12` and `sigma22` must be exactly 0.
   - So the check is not vacuous, require nonzero sigma on some shared element.
-- [ ] If a guard fails: ➕ add the sync for that field at the place given under Fields in Solution Overview, gated by `partit%sync_shared_elem`. For sigma, also add `exchange_elem_shared_2D_r` with an S2-style test. Record the cause in this plan and rerun the guard.
-- [ ] Run ctest: all pass.
+- [x] (not needed) If a guard fails: ➕ add the sync for that field at the place given under Fields in Solution Overview, gated by `partit%sync_shared_elem`. For sigma, also add `exchange_elem_shared_2D_r` with an S2-style test. Record the cause in this plan and rerun the guard.
+- [x] Run ctest: all pass.
+- Measured (12 Oct): both guards hold, no fallback sync. V13: spread 0, blend change on the shared elements 0.98 (pi np 2), 0.71 (mixed), 0.79 (quad). D6: spread 0 with EVP and mEVP; max|sigma| on the shared elements 1.0e3 / 17 Pa (mixed np 2), 3.6e2 / 6.4 Pa (quad np 2), 3.8e3 / 66 Pa (core2_w np 8).
 
 ### Task 5: Leak and copy-spread diagnostics in the drivers
 
@@ -315,16 +318,19 @@
 - Modify: `tools/run_conserve_pi.sh`
 - Modify: `test/CMakeLists.txt`
 
-- [ ] In `fesom_lifecycle_native_mr`, extend the `FESOM3_STEP_DIAG` block as described in Technical Details, with the new fields after `Smax`.
-- [ ] In `fesom_conserve`, add the per-step numbers (no new per-step line), the end-of-run line with their maxima, and `FESOM3_DIVSUM_TOL`.
-- [ ] Add multi-rank configs to `run_conserve_pi.sh`, in their own blocks like the `for np` loop at `:71`, since the heredoc loop runs at np 1 only. Common settings: pi, linfs, `FESOM3_CONSERVE_ICE=1`, 20 steps.
+- [x] In `fesom_lifecycle_native_mr`, extend the `FESOM3_STEP_DIAG` block as described in Technical Details, with the new fields after `Smax`.
+- [x] In `fesom_conserve`, add the per-step numbers (no new per-step line), the end-of-run line with their maxima, and `FESOM3_DIVSUM_TOL`.
+- [x] Add multi-rank configs to `run_conserve_pi.sh`, in their own blocks like the `for np` loop at `:71`, since the heredoc loop runs at np 1 only. Common settings: pi, linfs, `FESOM3_CONSERVE_ICE=1`, 20 steps.
   - Sync on, `FESOM3_DIVSUM_TOL=1e-12` (a hard gate: ratio < 1e-12, spreads 0):
     - `FESOM3_MOMADV_OPT=1 FESOM3_RVO_UPWIND=1.0` at np 2 and 8;
     - `FESOM3_MOMADV_OPT=2` (scalar advection, the default) at np 2.
   - Sync off (`FESOM3_SHARED_SYNC=0`), vector-invariant scheme, np 2: report only. Record whether `dUV`/`dAB` > 0, i.e. whether the copies drift without the sync.
-- [ ] Register the ctest `fesom_conserve_linfs_vinv_shsync_np2` (pi, the first sync-on config) following `fesom_conserve_zstar_np*` (`test/CMakeLists.txt:278-291`).
-- [ ] Run `BIN=$S/build/bin/fesom_conserve tools/run_conserve_pi.sh` (all configs): it must be green. Write the measured ratios and spreads into the script comment.
-- [ ] Run ctest: all pass.
+- [x] Register the ctest `fesom_conserve_linfs_vinv_shsync_np2` (pi, the first sync-on config) following `fesom_conserve_zstar_np*` (`test/CMakeLists.txt:278-291`).
+- [x] Run `BIN=$S/build/bin/fesom_conserve tools/run_conserve_pi.sh` (all configs): it must be green. Write the measured ratios and spreads into the script comment.
+- [x] Run ctest: all pass (167/167).
+- Measured (12 Oct, pi, 20 steps): max ratio 1.6e-16 (vinv np 2), 3.1e-16 (vinv np 8), 1.8e-16 (scalar np 2), spreads 0. Sync off: `dUV` 6.9e-18, `dAB` 5.8e-11, i.e. the copies drift and the blend amplifies the drift by ~1e7 within 20 steps; the ratio stays 1.6e-16 this early. Every other config of the script reports ratios <= 3.8e-16 and zero spreads.
+- ➕ `run_conserve_pi.sh`: every driver run prints one more line, so every `tail` grew by one. The script needs `source env.sh intel` first (mpirun).
+- ➕ README also lists `FESOM3_STEP_DIAG` with its new fields.
 
 ### Task 6: Gates and cost
 

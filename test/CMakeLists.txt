@@ -436,8 +436,10 @@ set_tests_properties(test_minlayers_np1 PROPERTIES
     FAIL_REGULAR_EXPRESSION "did NOT stop")
 
 # Shared-element sync (docs/plans/20261012-shared-element-sync.md): test_shared_elem checks
-# the list com_elem2D_shared against an independent oracle (S1). pi has the FESOM2 dist
-# layout of production dist_512; pi_w, core2_w and the NEMO cut-outs the fesom_ini layout.
+# the list com_elem2D_shared against an independent oracle (S1), its exchange and the
+# copy-spread probe (S2), and the mechanism through update_vel + compute_hbar_ale with the
+# sync on and off (S3). pi has the FESOM2 dist layout of production dist_512; pi_w, core2_w
+# and the NEMO cut-outs the fesom_ini layout.
 # The triangle meshes are read rotated (FESOM3_TEST_ROTATE=1), the cut-outs unrotated.
 # np 1 (the 1-rank synthesis): the list is empty.
 add_fesom_test(test_shared_elem 1)
@@ -461,3 +463,26 @@ add_mesh_test(test_shared_elem_corrupt_np2 test_shared_elem ${_mesh_pi} 2
 set_tests_properties(test_shared_elem_corrupt_np2 PROPERTIES
     PASS_REGULAR_EXPRESSION "has a vertex with no known owner"
     FAIL_REGULAR_EXPRESSION "did NOT stop")
+# FESOM3_SHARED_SYNC: an invalid value stops the builder; 0 still builds the list and logs OFF
+add_mesh_test(test_shared_elem_badknob_np2 test_shared_elem ${_mesh_pi} 2
+              FESOM3_TEST_ROTATE=1 FESOM3_SHARED_SYNC=2)
+set_tests_properties(test_shared_elem_badknob_np2 PROPERTIES
+    PASS_REGULAR_EXPRESSION "FESOM3_SHARED_SYNC must be 0 or 1"
+    FAIL_REGULAR_EXPRESSION "did NOT stop")
+add_mesh_test(test_shared_elem_off_np2 test_shared_elem ${_mesh_pi} 2
+              FESOM3_TEST_ROTATE=1 FESOM3_SHARED_SYNC=0)
+set_tests_properties(test_shared_elem_off_np2 PROPERTIES
+    PASS_REGULAR_EXPRESSION "shared-element sync: OFF, [0-9]+ shared elements.*ALL PASS"
+    FAIL_REGULAR_EXPRESSION "FAIL")
+# Shared-element gate in the full model (fesom_conserve, header SHARED ELEMENTS): linfs,
+# vector-invariant momentum with rvo_upwind 1 (the CORE2 leak's trigger), sea ice, np 2.
+# FESOM3_DIVSUM_TOL=1e-12: the divergence-sum ratio must stay below 1e-12 in every step and
+# the uv / uv_rhsAB / sigma copy spreads must be 0 (tools/run_conserve_pi.sh runs np 8 and the
+# scalar advection too).
+add_test(NAME fesom_conserve_linfs_vinv_shsync_np2
+         COMMAND ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS} -np 2 $<TARGET_FILE:fesom_conserve>)
+set_tests_properties(fesom_conserve_linfs_vinv_shsync_np2 PROPERTIES
+    ENVIRONMENT "FESOM3_MESH_DIR=${_mesh_pi};FESOM3_IC_FILE=${_icf};FESOM3_NSTEPS=20;FESOM3_WHICH_ALE=linfs;FESOM3_MOMADV_OPT=1;FESOM3_RVO_UPWIND=1.0;FESOM3_CONSERVE_ICE=1;FESOM3_DIVSUM_TOL=1e-12"
+    PASS_REGULAR_EXPRESSION "shared elements \\(sync ON\\).* -- OK within tol"
+    FAIL_REGULAR_EXPRESSION "VIOLATED"
+    SKIP_REGULAR_EXPRESSION "cannot open;No such file")

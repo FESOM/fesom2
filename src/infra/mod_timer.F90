@@ -39,26 +39,27 @@ module mod_timer
     integer, parameter, public :: TMR_OCE_DYN     = 14
     integer, parameter, public :: TMR_OCE_SSH     = 15
     integer, parameter, public :: TMR_OCE_SOLVE   = 16   ! SUBSET of SSH (the CG solve) — not summed
-    integer, parameter, public :: TMR_OCE_GMREDI  = 17
-    integer, parameter, public :: TMR_OCE_TRACER  = 18
-    integer, parameter, public :: NTIMER          = 18
+    integer, parameter, public :: TMR_OCE_SHSYNC  = 17   ! SUBSET of SSH (update_vel's shared-element uv sync)
+    integer, parameter, public :: TMR_OCE_GMREDI  = 18
+    integer, parameter, public :: TMR_OCE_TRACER  = 19
+    integer, parameter, public :: NTIMER          = 19
 
-    character(len=20), parameter :: TNAME(NTIMER) = [character(len=20) :: &
+    character(len=24), parameter :: TNAME(NTIMER) = [character(len=24) :: &
         'ocean2ice', 'forcing', 'sbc / crossing', 'open/reopen', 'read+inflate', 'interp loop', &
         'time-interp', 'bulk NCAR', 'wind/ice stress', &
         'ice', 'oce_fluxes', 'step_oce (ocean)', &
         'mix, pres, EOS', 'dynamics u,v,w', 'dynamics ssh', '(of which) ssh solve', &
-        'GM / Redi', 'tracer' ]
+        '(of which) shared sync', 'GM / Redi', 'tracer' ]
     ! parent id for the indented report (0 = top-level component)
     integer, parameter :: TPARENT(NTIMER) = [ 0, 0, TMR_FORCING, TMR_FRC_SBC, TMR_FRC_SBC, TMR_FRC_SBC, &
         TMR_FORCING, TMR_FORCING, TMR_FORCING, &
         0, 0, 0, &
-        TMR_STEP_OCE, TMR_STEP_OCE, TMR_STEP_OCE, TMR_OCE_SSH, TMR_STEP_OCE, TMR_STEP_OCE ]
+        TMR_STEP_OCE, TMR_STEP_OCE, TMR_STEP_OCE, TMR_OCE_SSH, TMR_OCE_SSH, TMR_STEP_OCE, TMR_STEP_OCE ]
     ! .true. => this timer is a subset of its parent (don't add to the parent's child-sum check)
     logical, parameter :: TSUBSET(NTIMER) = [ .false.,.false.,.false., .true.,.true.,.true., &
         .false.,.false.,.false., &
         .false.,.false.,.false., &
-        .false.,.false.,.false., .true., .false.,.false. ]
+        .false.,.false.,.false., .true., .true., .false.,.false. ]
 
     real(real64) :: tacc(NTIMER) = 0.0_real64   ! accumulated seconds
     real(real64) :: tbeg(NTIMER) = 0.0_real64   ! start stamp of an open interval
