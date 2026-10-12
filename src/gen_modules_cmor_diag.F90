@@ -208,8 +208,10 @@ contains
         ku = mesh%ulevels_nod2D(n2)  ! Upper level (surface or cavity)
         kl = mesh%nlevels_nod2D(n2)  ! Bottom level + 1
         
-        ! Bottom pressure: SSH contribution
-        pbo(n2) = eta_n(n2) * density_0 * g
+        ! Bottom pressure: SSH contribution. With zlevel and zstar the layer
+        ! thicknesses below already contain the surface elevation, except under
+        ! ice-shelf cavities, where they are fixed.
+        if (trim(which_ALE)=='linfs' .or. ku>1) pbo(n2) = eta_n(n2) * density_0 * g
         
         ! Loop through water column levels
         z_up = mesh%zbar_3d_n(ku, n2)  ! Top of first layer
