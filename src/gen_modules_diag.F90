@@ -857,8 +857,9 @@ subroutine compute_ice_diag(mode, ice, partit, mesh)
     end if
 !$OMP PARALLEL DO
 DO n=1, partit%myDim_nod2D
-   vol_ice(n) =ice%data(1)%values(n)*ice%data(2)%values(n)
-   vol_snow(n)=ice%data(1)%values(n)*ice%data(3)%values(n)
+   ! m_ice and m_snow are already volume per unit grid-cell area
+   vol_ice(n) =ice%data(2)%values(n)
+   vol_snow(n)=ice%data(3)%values(n)
 END DO
 !$OMP END PARALLEL DO
 
