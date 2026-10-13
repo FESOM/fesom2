@@ -1,6 +1,6 @@
 module write_step_info_module
     USE g_config, only: dt, use_ice, use_icebergs, ib_num, logfile_outfreq, which_ALE, &
-            toy_ocean
+            toy_ocean, blowup_eta_max
     USE MOD_MESH
     USE MOD_PARTIT
     USE par_support_module, only: par_ex
@@ -175,7 +175,7 @@ subroutine check_blowup(istep, mon, ice, dynamics, tracers, partit, mesh)
     ! Decide from the ocean record of this step (global, so every rank agrees):
     ! eta and the surface layer, temperature and salinity on the wet levels.
     tripped = monitor_nonfinite(mon, 'eta')  > 0     .or. &
-              monitor_value(mon, 'eta', 'min') < -10.0 .or. monitor_value(mon, 'eta', 'max') > 10.0 .or. &
+              monitor_value(mon, 'eta', 'min') < -blowup_eta_max .or. monitor_value(mon, 'eta', 'max') > blowup_eta_max .or. &
               monitor_nonfinite(mon, 'deta') > 0
     if ( .not. trim(which_ALE)=='linfs') then
         tripped = tripped .or. monitor_nonfinite(mon, 'wvel1') > 0 .or. &
@@ -194,10 +194,10 @@ subroutine check_blowup(istep, mon, ice, dynamics, tracers, partit, mesh)
     do n=1, partit%myDim_nod2d       
        !___________________________________________________________________
        ! check ssh
-       if ( ((eta_n(n) /= eta_n(n)) .or. eta_n(n)<-10.0 .or. eta_n(n)>10.0 .or. (d_eta(n) /= d_eta(n)) ) ) then
+       if ( ((eta_n(n) /= eta_n(n)) .or. eta_n(n)<-blowup_eta_max .or. eta_n(n)>blowup_eta_max .or. (d_eta(n) /= d_eta(n)) ) ) then
 !$OMP CRITICAL
           write(*,*) '___CHECK FOR BLOW UP___________ --> mstep=',istep
-          write(*,*) ' --STOP--> found eta_n become NaN or <-10.0, >10.0'
+          write(*,*) ' --STOP--> found eta_n become NaN or |eta_n| > blowup_eta_max =', blowup_eta_max
           write(*,*) 'mype     = ',partit%mype
           write(*,*) 'mstep    = ',istep
           write(*,*) 'node     = ',n
