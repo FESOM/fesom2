@@ -2928,13 +2928,13 @@ subroutine init_ref_density(partit, mesh)
                 if (partit%mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
             call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
         end select
-        rho = bulk_0 + auxz*bulk_pz + auxz*bulk_pz2
+        rho = bulk_0 + auxz*(bulk_pz + auxz*bulk_pz2)
         density_ref(nzmin, node) = rho*rhopot/(rho+0.1_WP*auxz*real(state_equation))
 
         !_______________________________________________________________________
         do nz=nzmin+1,nzmax
             auxz=mesh%Z_3d_n(nz,node)
-            rho = bulk_0 + auxz*bulk_pz + auxz*bulk_pz2
+            rho = bulk_0 + auxz*(bulk_pz + auxz*bulk_pz2)
             density_ref(nz,node) = rho*rhopot/(rho+0.1_WP*auxz*real(state_equation))
         end do
     end do
@@ -3005,7 +3005,7 @@ end where
                 call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
             end select    
             auxz=mesh%Z_3d_n(nz,node)
-            rho = bulk_0   + auxz*bulk_pz   + auxz*bulk_pz2
+            rho = bulk_0   + auxz*(bulk_pz   + auxz*bulk_pz2)
             density_ref(nz,node) = rho*rhopot/(rho+0.1_WP*auxz*real(state_equation))
         end do
     end do
@@ -3023,7 +3023,7 @@ do nz=1,68
         call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
     end select    
  auxz=mesh%Z(nz)
- rho = bulk_0   + auxz*bulk_pz   + auxz*bulk_pz2
+ rho = bulk_0   + auxz*(bulk_pz   + auxz*bulk_pz2)
  rho = rho*rhopot/(rho+0.1_WP*auxz*real(state_equation))
  write(*,*) "mytest:", ref_temp1D(nz), ref_salt1D(nz), auxz, rho
 end do

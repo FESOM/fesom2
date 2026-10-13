@@ -39,6 +39,7 @@ module g_config
   !_____________________________________________________________________________
   ! *** restart_log ***
   integer                :: logfile_outfreq=1      ! logfile info. outp. freq., # steps
+  real(kind=WP)          :: blowup_eta_max=10.0_WP ! blow-up check: stop if |eta_n| exceeds this [m]
   integer                :: restart_length=1
   character(3)           :: restart_length_unit='m'
   integer                :: raw_restart_length=1
@@ -49,7 +50,7 @@ module g_config
   namelist /restart_log/   restart_length    , restart_length_unit, & 
                            raw_restart_length, raw_restart_length_unit, &
                            bin_restart_length, bin_restart_length_unit, &
-                           logfile_outfreq
+                           logfile_outfreq, blowup_eta_max
   !_____________________________________________________________________________
   ! *** ale_def ***
   ! Which ALE case to use : 'linfs', 'zlevel', 'zstar'
