@@ -117,7 +117,7 @@ module recom_config
   Logical                :: REcoM_Grazing_Variable_Preference = .true.  ! Decides if grazing should have preference for phyN or DiaN
   Logical                :: Grazing_detritus      = .false.    ! Decides grazing on detritus                            
   Logical                :: het_resp_noredfield   = .true.     ! Decides respiratation of copepods              
-  Logical                :: diatom_mucus          = .true.           ! Effect of nutrient limitation on the aggregation
+  Logical                :: diatom_mucus          = .true.     ! Effect of nutrient limitation on the aggregation
   Logical                :: O2dep_remin           = .true.     ! NEW O2remin Add option for O2 dependency of organic matter remineralization
   Logical                :: use_ballasting        = .true.     ! NEW BALL
   Logical                :: use_density_scaling   = .true.     ! NEW BALL
@@ -125,13 +125,13 @@ module recom_config
   Logical                :: OmegaC_diss           = .true.     ! NEW DISS Use mocsy calcite omega to compute calcite dissolution
   Logical                :: CO2lim                = .true.     ! NEW Use CO2 dependence of growth and calcification
   !Logical                :: inter_CT_CL           = .true.    ! NEW inter use interaction between CO2 and both, temperature and light
-  Logical                :: Diags                 = .true.    !!!!!!!!!!!!!!!!!!!!!!Change in recom.F90 Diagnostics -> Diags
+  Logical                :: Diags                 = .true.     !!!!!!!!!!!!!!!!!!!!!!Change in recom.F90 Diagnostics -> Diags
   Logical                :: constant_CO2          = .true.
   Logical                :: UseFeDust             = .true.     ! Turns dust input of iron off when set to.false.
   Logical                :: UseDustClim           = .true.
-  Logical                :: UseDustClimAlbani     = .true.    ! Use Albani dustclim field (If it is false Mahowald will be used)
+  Logical                :: UseDustClimAlbani     = .true.     ! Use Albani dustclim field (If it is false Mahowald will be used)
   Logical                :: use_photodamage       = .false.    ! use Alvarez et al (2018) for chlorophyll degradation
-  logical                :: HetRespFlux_plus      = .true.     !MB More stable computation of zooplankton respiration fluxes adding a small number to HetN
+  logical                :: HetRespFlux_plus      = .true.     ! MB More stable computation of zooplankton respiration fluxes adding a small number to HetN
   character(100)         :: REcoMDataPath         = '/albedo/work/projects/MarESys/ogurses/input/mesh_CORE2_finaltopo_mean/'
   logical                :: restore_alkalinity    = .true.
   logical                :: useRivers             = .false.
@@ -300,9 +300,9 @@ module recom_config
 !! *** Zooplankton ***
   Real(kind=8)                 :: graz_max      = 2.4d0           ! [mmol N/(m3 * day)] Maximum grazing loss parameter 
   Real(kind=8)                 :: epsilonr      = 0.35d0          ! [(mmol N)2 /m6] Half saturation constant for grazing loss 
-  Real(kind=8)                 :: res_het       = 0.01d0          ! [1/day] Respiration by heterotrophs and mortality (loss to detritus)
+  Real(kind=8)                 :: res_het       = 0.01d0          ! [1/day] Respiration by heterotrophs (loss to DIC)
   Real(kind=8)                 :: Redfield      = 6.625           ! [mmol C/mmol N] Redfield ratio of C:N = 106:16
-  Real(kind=8)                 :: loss_het      = 0.05d0          ! [1/day] Temperature dependent N degradation of extracellular organic N (EON)
+  Real(kind=8)                 :: loss_het      = 0.05d0          ! [m3/(mmolN*day)] The quadratic mortality rate (loss to detritus)
   Real(kind=8)                 :: pzDia         = 0.5d0           ! Maximum diatom preference
   Real(kind=8)                 :: sDiaNsq       = 0.d0
   Real(kind=8)                 :: pzPhy         = 1.0d0           ! Maximum nano-phytoplankton preference 
@@ -546,23 +546,15 @@ contains
         imiczoon = 35
         imiczooc = 36
 
+        idicremin = 37 ! added by Sina
+
         ! Terrestrial DOC input (when enable_R2OMIP is enabled)
         if (enable_R2OMIP) then
-            idoct = 37
-            idicremin = 38
-        else
-            idicremin = 37
-        end if
+            idoct = 38
+        end if 
 
-!        idicremin = 38 ! added by Sina
-
-!        allocate(recom_cocco_tracer_id(3))
         recom_cocco_tracer_id = (/1029, 1030, 1031/)
-
-!        allocate(recom_phaeo_tracer_id(3))
         recom_phaeo_tracer_id = (/1032, 1033, 1034/)
-
-!        allocate(recom_det2_tracer_id(4))
         recom_det2_tracer_id = (/1025, 1026, 1027, 1028/)
 
     else if (enable_coccos .and. .not. enable_3zoo2det) then
@@ -580,18 +572,14 @@ contains
         iphac   = 27
         iphachl = 28
 
+        idicremin = 29
+
         ! Terrestrial DOC input (when enable_R2OMIP is enabled)
         if (enable_R2OMIP) then
-            idoct = 29
-            idicremin = 30
-        else
-            idicremin = 29
-        end if
+            idoct = 30
+        end if 
 
-!        allocate(recom_cocco_tracer_id(3))
         recom_cocco_tracer_id = (/1023, 1024, 1025/)
-
-!        allocate(recom_phaeo_tracer_id(3))
         recom_phaeo_tracer_id = (/1026, 1027, 1028/)
 
     else if (enable_3zoo2det .and. .not. enable_coccos) then
@@ -605,17 +593,13 @@ contains
         imiczoon = 29
         imiczooc = 30
 
+        idicremin = 31
+
         ! Terrestrial DOC input (when enable_R2OMIP is enabled)
         if (enable_R2OMIP) then
-            idoct = 31
-            idicremin = 32
-        else
-            idicremin = 31
-        end if
+            idoct = 32
+        end if 
 
-        !idicremin = 32 ! added by Sina
-
-!        allocate(recom_det2_tracer_id(4))
         recom_det2_tracer_id = (/1025, 1026, 1027, 1028/)
     else
         ! =======================================================================
@@ -626,13 +610,12 @@ contains
         ! Detritus: det1 only
         ! (All indices already set to default values)
 
+        idicremin = 23
+
         ! Terrestrial DOC input (when enable_R2OMIP is enabled)
         if (enable_R2OMIP) then
-            idoct = 23
-            idicremin = 24
-        else
-            idicremin = 23
-        end if
+            idoct = 24
+        endif
     endif
   end subroutine initialize_tracer_indices
 
@@ -793,9 +776,9 @@ subroutine validate_recom_tracers(num_tracers, mype)
     expected_tracer_ids(28) = 1026  ! PhaeoN
     expected_tracer_ids(29) = 1027  ! PhaeoC
     expected_tracer_ids(30) = 1028  ! PhaeoChl
-    expected_tracer_ids(31) = 1037  ! DIC remin (added by Sina)
+    expected_tracer_ids(31) = 1029  ! DIC remin (added by Sina)
     if (enable_R2OMIP) then
-      expected_tracer_ids(32) = 1029  ! DOCt (terrestrial DOC) ! Sina: changed 31 to 32
+      expected_tracer_ids(32) = 1030  ! DOCt (terrestrial DOC) ! Sina: changed 31 to 32
     end if
 
   else if (enable_3zoo2det .and. .not. enable_coccos) then
@@ -808,16 +791,16 @@ subroutine validate_recom_tracers(num_tracers, mype)
     expected_tracer_ids(30) = 1028  ! DetZ2Calc
     expected_tracer_ids(31) = 1029  ! Zoo3N
     expected_tracer_ids(32) = 1030  ! Zoo3C
-    expected_tracer_ids(33) = 1037  ! DIC remin (added by Sina)
+    expected_tracer_ids(33) = 1031  ! DIC remin (added by Sina)
     if (enable_R2OMIP) then
-      expected_tracer_ids(34) = 1031  ! DOCt (terrestrial DOC) ! Sina: changed 33 to 34 
+      expected_tracer_ids(34) = 1032  ! DOCt (terrestrial DOC) ! Sina: changed 33 to 34 
     end if
 
   else
-    expected_tracer_ids(25) = 1037 ! add DIC remin tracer to base BGC tracers (added by Sina)
+    expected_tracer_ids(25) = 1023 ! add DIC remin tracer to base BGC tracers (added by Sina)
     ! Base configuration: only tracers 1, 2, 1001-1022
     if (enable_R2OMIP) then
-      expected_tracer_ids(26) = 1023  ! DOCt (terrestrial DOC) ! Sina: changed 25 to 26
+      expected_tracer_ids(26) = 1024  ! DOCt (terrestrial DOC) ! Sina: changed 25 to 26
     end if
   end if
 
@@ -875,17 +858,17 @@ subroutine validate_recom_tracers(num_tracers, mype)
         write(*,*) '    - Zoo2N, Zoo2C:       1023-1024'
         write(*,*) '    - DetZ2 pool:         1025-1028'
         write(*,*) '    - MicZooN, MicZooC:   1029-1030'
-        write(*,*) '    - DICremin:           1037     ' ! added by Sina
+        write(*,*) '    - DICremin:           1031     ' ! added by Sina
         if (enable_R2OMIP) then
-          write(*,*) '  Terrestrial DOC:        1031 (1 tracer)'
+          write(*,*) '  Terrestrial DOC:        1032 (1 tracer)'
         end if
       else if (enable_coccos .and. .not. enable_3zoo2det) then
         write(*,*) '  Coccos extension:       1023-1028 (6 tracers)'
         write(*,*) '    - CoccoN, C, Chl:     1023-1025'
         write(*,*) '    - PhaeoN, C, Chl:     1026-1028'
-        write(*,*) '    - DICremin:           1037     ' ! added by Sina
+        write(*,*) '    - DICremin:           1029     ' ! added by Sina
         if (enable_R2OMIP) then
-          write(*,*) '  Terrestrial DOC:        1029 (1 tracer)'
+          write(*,*) '  Terrestrial DOC:        1030 (1 tracer)'
         end if
       else if (enable_3zoo2det .and. enable_coccos) then
         write(*,*) '    - Zoo2N, Zoo2C:       1023-1024'
@@ -899,8 +882,9 @@ subroutine validate_recom_tracers(num_tracers, mype)
           write(*,*) '  Terrestrial DOC:        1038 (1 tracer)' ! Sina: increased from 1037 to 1038
         end if
       else
+        write(*,*) '  DICremin:        1023 (1 tracer)'
         if (enable_R2OMIP) then
-          write(*,*) '  Terrestrial DOC:        1023 (1 tracer)'
+          write(*,*) '  Terrestrial DOC:        1024 (1 tracer)'
         end if
       end if
 
@@ -1158,23 +1142,23 @@ subroutine validate_tracer_id_sequence(tracer_ids, num_tracers, mype)
 
   else if (enable_coccos .and. .not. enable_3zoo2det) then
     expected_ids(25:30) = (/1023, 1024, 1025, 1026, 1027, 1028/)
-    expected_ids(31)    = 1037 ! DICremin, added by Sina
+    expected_ids(31)    = 1029 ! DICremin, added by Sina
     if (enable_R2OMIP) then
-      expected_ids(32) = 1029  ! DOCt ! Sina: increased 31 to 32
+      expected_ids(32) = 1030  ! DOCt ! Sina: increased 31 to 32
     end if
 
   else if (enable_3zoo2det .and. .not. enable_coccos) then
     expected_ids(25:32) = (/1023, 1024, 1025, 1026, 1027, 1028, 1029, 1030/)
-    expected_ids(33)    = 1037 ! DICremin, added by Sina
+    expected_ids(33)    = 1031 ! DICremin, added by Sina
     if (enable_R2OMIP) then
-      expected_ids(34) = 1031  ! DOCt ! Sina: increased 33 to 34
+      expected_ids(34) = 1032  ! DOCt ! Sina: increased 33 to 34
     end if
     
   else
     ! Base configuration
-    expected_ids(25) = 1037    ! DICremin, added by Sina
+    expected_ids(25) = 1023    ! DICremin, added by Sina
     if (enable_R2OMIP) then
-      expected_ids(26) = 1023  ! DOCt ! Sina: increased 25 to 26
+      expected_ids(26) = 1024  ! DOCt ! Sina: increased 25 to 26
     end if
   end if
 
@@ -2152,8 +2136,11 @@ module REcoM_ciso
    
 end module REcoM_ciso
 
-
-
+! ==============================================================================
+! MODULE: recom_diags_management
+! Purpose: Allocation, initialization, update, and deallocation of all REcoM
+!          diagnostic arrays (per-node water column and global 2D/3D fields).
+! ==============================================================================
 module recom_diags_management
     use recom_config
     implicit none
@@ -2162,7 +2149,7 @@ contains
 
 ! ==============================================================================
 ! SUBROUTINE: allocate_and_init_diags
-! Purpose: Allocate and initialize all diagnostic arrays for a water column
+! Purpose: Allocate and initialize all local (per-column) diagnostic arrays
 ! ==============================================================================
 subroutine allocate_and_init_diags(nl)
     use recom_locvar

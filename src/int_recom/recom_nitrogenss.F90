@@ -282,27 +282,29 @@ subroutine recom_nitrogenss(tracers, partit, mesh)
               Ocean_2_Sed_flux(n,3) = tv_si
               Ocean_2_Sed_flux(n,4) = tv_calc
 
-              !------------------------------------------------------------------
-              ! DENITRIFICATION CALCULATION (Middelburg et al. 1996)
-              !------------------------------------------------------------------
-              ! Step 1: Calculate labile carbon flux
-              ! Only ~10% of organic carbon is readily available for bacteria
-              Fc = max(tiny, LABILE_FRACTION * tv_c)
-              
-              ! Step 2: Apply empirical relationship
-              ! log₁₀(Denit) = -0.9543 + 0.7662×log₁₀(Fc) - 0.2350×[log₁₀(Fc)]²
-              log_Fc = log(Fc)
-              log_Fc_sq = log_Fc * log_Fc
-              denit_factor = DENIT_C1 + DENIT_C2 * log_Fc + DENIT_C3 * log_Fc_sq
-              
-              ! Step 3: Convert from log₁₀ space to actual rate
-              ! Denit = 10^(denit_factor) [µmol C cm⁻² d⁻¹]
-              denit_factor = exp(denit_factor * LOG10)
-              
-              ! Step 4: Convert to nitrogen removal rate [mmol N d⁻¹]
-              ! Apply N:C stoichiometry, area, and unit conversion
-              denit_rate = q_NC_Denit * denit_factor * area_diff * CONVERSION_FACTOR
-              
+            !  !------------------------------------------------------------------
+            !  ! DENITRIFICATION CALCULATION (Middelburg et al. 1996)
+            !  !------------------------------------------------------------------
+            !  ! Step 1: Calculate labile carbon flux
+            !  ! Only ~10% of organic carbon is readily available for bacteria
+            !  Fc = max(tiny, LABILE_FRACTION * tv_c)
+            !  
+            !  ! Step 2: Apply empirical relationship
+            !  ! log₁₀(Denit) = -0.9543 + 0.7662×log₁₀(Fc) - 0.2350×[log₁₀(Fc)]²
+            !  log_Fc = log(Fc)
+            !  log_Fc_sq = log_Fc * log_Fc
+            !  denit_factor = DENIT_C1 + DENIT_C2 * log_Fc + DENIT_C3 * log_Fc_sq
+            !  
+            !  ! Step 3: Convert from log₁₀ space to actual rate
+            !  ! Denit = 10^(denit_factor) [µmol C cm⁻² d⁻¹]
+            !  denit_factor = exp(denit_factor * LOG10)
+            !  
+            !  ! Step 4: Convert to nitrogen removal rate [mmol N d⁻¹]
+            !  ! Apply N:C stoichiometry, area, and unit conversion
+            !  denit_rate = q_NC_Denit * denit_factor * area_diff * CONVERSION_FACTOR
+            
+            denit_rate = 0 ! no denitritfication in sediment 
+
               !------------------------------------------------------------------
               ! PERMANENT BURIAL CALCULATION (Dunne et al. 2007)
               !------------------------------------------------------------------

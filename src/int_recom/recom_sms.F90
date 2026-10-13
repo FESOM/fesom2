@@ -2246,18 +2246,18 @@ real(kind=8) :: &
                 else
                     ! Saturation model: degradation increases with light
                     ! Uses same exponential form as P-I curve
-                    KOchl = deg_Chl * (real(one) - exp(-alfa * CHL2C_plast * PARave / pMax))
+                    ! KOchl = deg_Chl * (real(one) - exp(-alfa * CHL2C_plast * PARave / pMax))
 
                     !< Alternative linear model (commented out):
                     !< Degradation directly proportional to light intensity
-                    !KOchl = deg_Chl * CHL2C_plast * PARave
+                    KOchl = deg_Chl * CHL2C_plast * PARave
 
                     ! Ensure minimum degradation rate (10% of base)
                     KOchl = max((deg_Chl * 0.1d0), KOchl)
 
                     !< Safety constraint (commented out):
                     !< Caps maximum degradation at 0.3 day-1
-                    !KOchl = min(KOchl, 0.3d0)
+                    KOchl = min(KOchl, 0.3d0)
                 end if
 
                 !---------------------------------------------------------------------------
@@ -2268,12 +2268,12 @@ real(kind=8) :: &
                     KOchl_dia = deg_Chl_d * 0.1d0
                 else
                     ! Diatom-specific photodamage model
-                    KOchl_dia = deg_Chl_d * (real(one) - exp(-alfa_d * CHL2C_plast_dia * PARave / pMax_dia))
+                    ! KOchl_dia = deg_Chl_d * (real(one) - exp(-alfa_d * CHL2C_plast_dia * PARave / pMax_dia))
 
-                    !KOchl_dia = deg_Chl_d * CHL2C_plast_dia * PARave
+                    KOchl_dia = deg_Chl_d * CHL2C_plast_dia * PARave
 
                     KOchl_dia = max((deg_Chl_d * 0.1d0), KOchl_dia)
-                    !KOchl_dia = min(KOchl_dia, 0.3d0)
+                    KOchl_dia = min(KOchl_dia, 0.3d0)
                 end if
 
                 if (enable_coccos) then
@@ -2286,12 +2286,12 @@ real(kind=8) :: &
                         KOchl_cocco = deg_Chl_c * 0.1d0
                     else
                         ! Coccolithophore-specific photodamage model
-                        KOchl_cocco = deg_Chl_c * (real(one) - exp(-alfa_c * CHL2C_plast_cocco * PARave / pMax_cocco))
+                        ! KOchl_cocco = deg_Chl_c * (real(one) - exp(-alfa_c * CHL2C_plast_cocco * PARave / pMax_cocco))
 
-                        !KOchl_cocco = deg_Chl_c * CHL2C_plast_cocco * PARave
+                        KOchl_cocco = deg_Chl_c * CHL2C_plast_cocco * PARave
 
                         KOchl_cocco = max((deg_Chl_c * 0.1d0), KOchl_cocco)
-                        !KOchl_cocco = min(KOchl_cocco, 0.3d0)
+                        KOchl_cocco = min(KOchl_cocco, 0.3d0)
                     end if
 
                     !-----------------------------------------------------------------------
@@ -2302,12 +2302,12 @@ real(kind=8) :: &
                         KOchl_phaeo = deg_Chl_p * 0.1d0
                     else
                         ! Phaeocystis-specific photodamage model
-                        KOchl_phaeo = deg_Chl_p * (real(one) - exp(-alfa_p * CHL2C_plast_phaeo * PARave / pMax_phaeo))
+                        ! KOchl_phaeo = deg_Chl_p * (real(one) - exp(-alfa_p * CHL2C_plast_phaeo * PARave / pMax_phaeo))
 
-                        !KOchl_phaeo = deg_Chl_p * CHL2C_plast_phaeo * PARave
+                        KOchl_phaeo = deg_Chl_p * CHL2C_plast_phaeo * PARave
 
                         KOchl_phaeo = max((deg_Chl_p * 0.1d0), KOchl_phaeo)
-                        !KOchl_phaeo = min(KOchl_phaeo, 0.3d0)
+                        KOchl_phaeo = min(KOchl_phaeo, 0.3d0)
                     end if
 
                 endif ! enable_coccos
@@ -5755,7 +5755,15 @@ real(kind=8) :: &
             ! Note: redO2C converts carbon-based rates to oxygen equivalents
             !       using the Redfield ratio (typically ~170/122 = 1.39 mol O2/mol C)
 
-            if (ciso) then
+        !===============================================================================
+        ! 37. DIC remineralzation tracer to track remineralization as an diagnostics
+        !===============================================================================
+        !   idicremin       : Tracer for remineralization diagnostics (added by Sina)
+        sms(k,idicremin) = (                  &
+            + rho_c1 * arrFunc * O2Func * EOC &
+            ) * dt_b + sms(k,idicremin)
+
+        if (ciso) then
 
                 !===========================================================================
                 ! 1. CARBON-13 (13C) BUDGETS
@@ -7214,16 +7222,6 @@ real(kind=8) :: &
             endif ! Diags
 
         end do ! Main vertikal loop ends
-
-
-        !===============================================================================
-        ! 37. DIC remineralzation tracer to track remineralization as an diagnostics
-        !===============================================================================
-        !   idicremin       : Tracer for remineralization diagnostics (added by Sina)
-        sms(k,idicremin) = (                  &
-            + rho_c1 * arrFunc * O2Func * EOC &
-            ) * dt_b + sms(k,idicremin)
-
 
         !===============================================================================
         ! BENTHIC REMINERALIZATION

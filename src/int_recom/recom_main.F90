@@ -153,10 +153,24 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
 
 ! Resetting DICremin tracer to zero when reaching surface (added by Sina) 
   do tr_num=1,num_tracers
-    if (tracers%data(tr_num)%ID==1037) then
-       tracers%data(tr_num)%values(1, : ) = 0
+   if (enable_3zoo2det .and. enable_coccos) then
+       if (tracers%data(tr_num)%ID==1037) then
+           tracers%data(tr_num)%values(1, : ) = 0
+       end if
+   else if (enable_3zoo2det .and. .not. enable_coccos) then
+       if (tracers%data(tr_num)%ID==1031) then
+           tracers%data(tr_num)%values(1, : ) = 0
+       end if
+   else if (.not. enable_3zoo2det .and. enable_coccos) then
+       if (tracers%data(tr_num)%ID==1029) then
+           tracers%data(tr_num)%values(1, : ) = 0
+       end if
+   else
+       if (tracers%data(tr_num)%ID==1023) then
+           tracers%data(tr_num)%values(1, : ) = 0
+       end if
    end if
-end do
+  end do
 
 ! ======================================================================================
 !********************************* LOOP STARTS *****************************************
