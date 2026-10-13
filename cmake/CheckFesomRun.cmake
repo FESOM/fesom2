@@ -9,9 +9,10 @@
 # ---------------
 # The previous harness decided pass/fail from the process exit code alone, and
 # even accepted exit code 1 as success. That is unsound for FESOM because:
-#   * par_ex(..., abort) aborts via MPI_ABORT(COMM, 1) -> exit code 1.
-#   * FESOM frequently prints "ERROR ..." and then a bare Fortran `stop`, which
-#     exits 0 under gfortran; par_ex without `abort` also returns 0.
+#   * par_ex aborts via MPI_ABORT(COMM, 1) -> exit code 1.
+#   * FESOM in places prints "ERROR ..." and then a bare Fortran `stop`, which
+#     exits 0 under gfortran. (Until par_ex was made to abort always, a call
+#     without its `abort` argument also returned 0.)
 # So a crashed or aborted run could be reported green.
 #
 # A run is considered PASSED only if ALL of these hold:

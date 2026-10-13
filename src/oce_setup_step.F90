@@ -135,8 +135,9 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
 #endif        
         case ('TOY'                   ) ; mix_scheme_nmb = 9
         case default 
-            stop "!not existing mixing scheme!"
+            if (partit%mype==0) write(*,*) "!not existing mixing scheme!"
             call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+            stop
     end select
 
     ! initialise fesom1.4 like KPP

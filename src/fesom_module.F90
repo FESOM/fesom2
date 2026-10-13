@@ -6,7 +6,7 @@ module fesom_main_storage_module
   USE MOD_ICE
   USE MOD_TRACER
   USE MOD_PARTIT
-  use par_support_module, only: par_ex
+  use par_support_module, only: par_ex, par_finalize
   USE MOD_DYN
   USE o_ARRAYS
   USE o_PARAM
@@ -1472,7 +1472,7 @@ contains
 #endif
     ! Enhanced profiler report. It reduces over MPI_COMM_FESOM, so every rank has to
     ! call it once while MPI is still up: here, before the REcoM group loop and before
-    ! par_ex. In the OpenIFS-coupled build par_ex calls oasis_terminate, which finalizes
+    ! par_finalize. In the OpenIFS-coupled build par_finalize calls oasis_terminate, which finalizes
     ! MPI, so a report after it aborts every rank ("MPI_Comm_f2c() was called after
     ! MPI_FINALIZE") once the run is otherwise complete.
 #if defined (FESOM_PROFILING)
@@ -1623,8 +1623,8 @@ contains
 #endif
 
 #if defined (__oifs) 
-    ! OpenIFS coupled version has to call oasis_terminate through par_ex
-    call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype)
+    ! OpenIFS coupled version has to call oasis_terminate through par_finalize
+    call par_finalize(f%partit%MPI_COMM_FESOM, f%partit%mype)
 #endif
 
 #if defined(__recom) && defined (__usetp)
@@ -1638,9 +1638,9 @@ contains
     
 #if defined(__recom) && defined(__usetp) && defined(__oifs)
     ! FESOM program group 0 already performed the OASIS-coordinated shutdown
-    ! (oasis_terminate, via the #if defined(__oifs) call par_ex(...) block in the
+    ! (oasis_terminate, via the #if defined(__oifs) call par_finalize(...) block in the
     ! per-group stats loop above) and is therefore already MPI-finalized at this
-    ! point. Calling par_ex/oasis_terminate a second time here would re-enter
+    ! point. Calling par_finalize/oasis_terminate a second time here would re-enter
     ! oasis_terminate's global MPI_Barrier(mpi_comm_global_world,...) + MPI_Finalize
     ! sequence on an already-finalized MPI session -- undefined behaviour that
     ! aborts group 0's ranks while group 1 (and OIFS/rnfmap/lpj_guess/xios, whose
@@ -1661,10 +1661,10 @@ contains
     ! mpi/pmix_v3 "Error handler invoked" step cancellation above, independent of
     ! any PMIx/UCX tuning.
     if (f%my_fesom_group /= 0) then
-        call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype)
+        call par_finalize(f%partit%MPI_COMM_FESOM, f%partit%mype)
     end if
 #else
-    if(f%fesom_did_mpi_init) call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype) ! finalize MPI before FESOM prints its stats block, otherwise there is sometimes output from other processes from an earlier time in the programm AFTER the starts block (with parastationMPI)
+    if(f%fesom_did_mpi_init) call par_finalize(f%partit%MPI_COMM_FESOM, f%partit%mype) ! finalize MPI before FESOM prints its stats block, otherwise there is sometimes output from other processes from an earlier time in the programm AFTER the starts block (with parastationMPI)
 #endif
 
 #if defined(__recom) && defined(__usetp)
