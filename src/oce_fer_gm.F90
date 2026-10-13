@@ -371,7 +371,7 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
                 elseif (K_GM_bvref==2) then
                     ! ferreira bvref value mean over mixed layer
                     !!PS bvref=max(sum(bvfreq(1:MLD1_ind(n), n))/(MLD1_ind(n)), 1.e-6_WP)
-                    bvref=max(sum(bvfreq(nzmin:MLD1_ind(n), n))/(MLD1_ind(n)), 1.e-6_WP)
+                    bvref=max(sum(bvfreq(nzmin:MLD1_ind(n), n))/(MLD1_ind(n)-nzmin+1), 1.e-6_WP)
                 elseif (K_GM_bvref==3) then
                     ! ferreira bvref value depth weighted mean over mixed layer
                     aux_zz=0.0_WP
