@@ -16,6 +16,9 @@ MODULE o_mixing_KPP_mod
   USE g_forcing_arrays
   USE g_comm_auto
   USE g_support
+#if defined (FESOM_PROFILING)
+  use fesom_profiler
+#endif
   IMPLICIT NONE
   
   private 
@@ -269,6 +272,9 @@ contains
      real(KIND=WP)              :: dens_up, minmix
      real(KIND=WP)              :: u_loc, v_loc
      real(kind=WP)              :: usurf, vsurf
+#ifdef ENABLE_OPENACC
+     logical, save              :: blmc_created = .false.
+#endif
      real(kind=WP)              :: rhopot, bulk, pz
      real(kind=WP)              :: bulk_0, bulk_pz, bulk_pz2
      real(kind=WP)              :: rho_surf, rho_insitu
@@ -356,29 +362,69 @@ contains
 ! compute interior mixing coefficients everywhere, due to constant 
 ! internal wave activity, static instability, and local shear 
 ! instability.
+#if defined (FESOM_PROFILING)
+     call fesom_profiler_start("kpp_ri_iwmix")
+#endif
      CALL ri_iwmix(viscA, diffK, dynamics, tracers, partit, mesh)
+#if defined (FESOM_PROFILING)
+     call fesom_profiler_end("kpp_ri_iwmix")
+#endif
 ! add double diffusion
      IF (double_diffusion) then
         CALL ddmix(diffK, tracers, partit, mesh)
      END IF
 
 ! boundary layer mixing coefficients: diagnose new b.l. depth
+#if defined (FESOM_PROFILING)
+     call fesom_profiler_start("kpp_bldepth")
+#endif
      CALL bldepth(partit, mesh)
+#if defined (FESOM_PROFILING)
+     call fesom_profiler_end("kpp_bldepth")
+#endif
 ! boundary layer diffusivities
+#if defined (FESOM_PROFILING)
+     call fesom_profiler_start("kpp_blmix")
+#endif
      CALL blmix_kpp(viscA, diffK, partit, mesh)
+#if defined (FESOM_PROFILING)
+     call fesom_profiler_end("kpp_blmix")
+#endif
 ! enhance diffusivity at interface kbl - 1
+#if defined (FESOM_PROFILING)
+     call fesom_profiler_start("kpp_enhance")
+#endif
      CALL enhance(viscA, diffK, partit, mesh)
+#if defined (FESOM_PROFILING)
+     call fesom_profiler_end("kpp_enhance")
+#endif
     
+#if defined (FESOM_PROFILING)
+     call fesom_profiler_start("kpp_smooth_final")
+#endif
      if (smooth_blmc) then
         call exchange_nod(blmc(:,:,1), partit)
         call exchange_nod(blmc(:,:,2), partit)
         call exchange_nod(blmc(:,:,3), partit)
+#ifdef ENABLE_OPENACC
+        ! blmc smoothing on the device (smooth_nod3D_acc)
+        if (.not. blmc_created) then
+            !$ACC ENTER DATA CREATE(blmc)
+            blmc_created = .true.
+        end if
+        !$ACC UPDATE DEVICE(blmc)
+        do j=1, 3
+           call smooth_nod3D_acc(blmc(:,:,j), 3, partit, mesh)
+        end do
+        !$ACC UPDATE HOST(blmc)
+#else
         do j=1, 3
           !_____________________________________________________________________  
           ! all loops go over myDim_nod2D so no halo information --> for smoothing 
           ! haloinfo is required --> therefor exchange_nod
          call smooth_nod(blmc(:,:,j), 3, partit, mesh)
         end do
+#endif
      end if
 !$OMP BARRIER
 ! then combine blmc and viscA/diffK
@@ -424,6 +470,9 @@ contains
         IF (viscAE(nzmin,elem) < minmix) viscAE(nzmin,elem) = minmix    
      END DO
 !$OMP END PARALLEL DO
+#if defined (FESOM_PROFILING)
+     call fesom_profiler_end("kpp_smooth_final")
+#endif
   END SUBROUTINE oce_mixing_kpp
 
 

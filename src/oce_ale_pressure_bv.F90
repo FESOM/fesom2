@@ -37,8 +37,6 @@ module oce_ale_pressure_bv_module
     logical :: pbv_on_device = .false.
     ! ... and sw_alpha_beta, compute_sigma_xy (their results current on the device)
     logical :: ab_on_device = .false., sxy_on_device = .false.
-    ! work arrays of smooth_nod3D_acc
-    real(kind=WP), allocatable :: smth_vol(:,:), smth_work(:,:)
 
 contains
 
@@ -3111,62 +3109,6 @@ subroutine compute_neutral_slope(partit, mesh)
     call exchange_nod(slope_tapered, partit)
 end subroutine compute_neutral_slope
 #ifdef ENABLE_OPENACC
-!
-!
-!===============================================================================
-! smooth_nod3D on the device for a nodal field that is current there: the same patch sums per level
-! in the same element order; the inverse patch volume and the sums are device work arrays of this module.
-subroutine smooth_nod3D_acc(arr, N_smooth, partit, mesh)
-    IMPLICIT NONE
-    type(t_mesh),   intent(in),    target :: mesh
-    type(t_partit), intent(inout), target :: partit
-    integer,        intent(in)            :: N_smooth
-    real(kind=WP),  intent(inout)         :: arr(:,:)
-    integer                               :: n, q, el, nz, j, nlev, uln, nln, ule, nle
-    real(kind=WP)                         :: v, w
-
-    nlev=ubound(arr,1)
-    if (.not. allocated(smth_vol)) then
-        allocate(smth_vol(nlev, partit%myDim_nod2D), smth_work(nlev, partit%myDim_nod2D))
-        !$ACC ENTER DATA CREATE(smth_vol, smth_work)
-    end if
-    do q=1, N_smooth
-!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(uln, nln, nz, j, el, ule, nle, v, w)
-        DO n=1, partit%myDim_nod2D
-            uln = mesh%ulevels_nod2d(n)
-            nln = min(nlev,mesh%nlevels_nod2d(n))
-            DO nz=uln, nln
-                v = 0._WP
-                w = 0._WP
-                DO j=1, mesh%nod_in_elem2D_num(n)
-                    el = mesh%nod_in_elem2D(j,n)
-                    ule = max( uln, mesh%ulevels(el) )
-                    nle = min( nln, min(nlev,mesh%nlevels(el)) )
-                    if (nz>=ule .and. nz<=nle) then
-                        v = v + mesh%elem_area(el)
-                        w = w + mesh%elem_area(el) * (arr(nz, mesh%elem2D_nodes(1,el)) &
-                                                    + arr(nz, mesh%elem2D_nodes(2,el)) &
-                                                    + arr(nz, mesh%elem2D_nodes(3,el)))
-                    end if
-                END DO
-                ! the patch volume (inverse, scaled by 1/3) is computed in the first sweep
-                if (q==1) smth_vol(nz,n) = 1._WP / (3._WP * v)
-                smth_work(nz,n) = w
-            END DO
-        END DO
-!$ACC END PARALLEL LOOP
-!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(uln, nln, nz)
-        DO n=1, partit%myDim_nod2D
-            uln = mesh%ulevels_nod2d(n)
-            nln = min(nlev,mesh%nlevels_nod2d(n))
-            DO nz=uln,nln
-                arr(nz, n) = smth_work(nz, n) * smth_vol(nz,n)
-            END DO
-        END DO
-!$ACC END PARALLEL LOOP
-        call exchange_nod(arr, partit, luse_g2g=.true.)
-    end do
-end subroutine smooth_nod3D_acc
 !
 !
 !===============================================================================
