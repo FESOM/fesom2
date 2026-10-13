@@ -311,7 +311,7 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
             if     (K_GM_resscalorder==1) then
                 Ki(nzmin,n)=K_hor*(reso/refscalresol)**K_GM_resscalorder 
             elseif (K_GM_resscalorder==2) then
-                Ki(nzmin,n)=K_hor**(mesh%area(1,n)/(refscalresol**2)*2)**(1/K_GM_resscalorder) 
+                Ki(nzmin,n)=K_hor*(mesh%area(1,n)/(refscalresol**2)*2)**(1/K_GM_resscalorder) 
             end if 
 
         end if
@@ -322,6 +322,9 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
     if (Redi .and. Fer_GM) then
 !$OMP DO
         do n=1, partit%myDim_nod2D
+            ! the level the vertical scaling below reads as surface template;
+            ! nzmin is not carried over from the loop above
+            nzmin=mesh%ulevels_nod2D(n)
             !PS Ki(nzmin, n)=fer_k(nzmin, n)
             Ki(nzmin, n)=max(fer_scal(n)*Redi_Kmax, K_GM_min)
 !PS             Ki(nzmin, n)=fer_scal(n)*K_Redi_max
@@ -368,7 +371,7 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
                 elseif (K_GM_bvref==2) then
                     ! ferreira bvref value mean over mixed layer
                     !!PS bvref=max(sum(bvfreq(1:MLD1_ind(n), n))/(MLD1_ind(n)), 1.e-6_WP)
-                    bvref=max(sum(bvfreq(nzmin:MLD1_ind(n), n))/(MLD1_ind(n)), 1.e-6_WP)
+                    bvref=max(sum(bvfreq(nzmin:MLD1_ind(n), n))/(MLD1_ind(n)-nzmin+1), 1.e-6_WP)
                 elseif (K_GM_bvref==3) then
                     ! ferreira bvref value depth weighted mean over mixed layer
                     aux_zz=0.0_WP

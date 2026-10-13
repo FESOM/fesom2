@@ -96,6 +96,7 @@ subroutine ice_init(ice, partit, mesh)
     alb_tramp        = ice%thermo%alb_tramp
     snowdist         = ice%thermo%snowdist
     new_iclasses     = ice%thermo%new_iclasses
+    use_meltponds    = ice%thermo%use_meltponds
     open_water_albedo= ice%thermo%open_water_albedo
     c_melt           = ice%thermo%c_melt
     h_cutoff         = ice%thermo%h_cutoff
@@ -159,6 +160,14 @@ subroutine ice_init(ice, partit, mesh)
     ice%thermo%alb_tramp = alb_tramp
     ice%thermo%snowdist = snowdist
     ice%thermo%new_iclasses=new_iclasses
+    ! the weights hpdf of the observed thickness distribution are tabulated for
+    ! exactly size(hpdf) classes
+    if (new_iclasses .and. iclasses /= size(ice%thermo%hpdf)) then
+        if (partit%mype==0) write(*,*) 'ERROR: new_iclasses=.true. requires iclasses=', size(ice%thermo%hpdf), ' in namelist.ice, but iclasses=', iclasses
+        flush(6)
+        call MPI_Barrier(partit%MPI_COMM_FESOM, partit%MPIerr)
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+    end if
     ice%thermo%open_water_albedo=open_water_albedo
     ice%thermo%use_meltponds = use_meltponds
     if (use_meltponds) call init_meltponds('namelist.ice', partit%mype)

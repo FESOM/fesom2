@@ -18,7 +18,7 @@ module ice_thermo_oce_module
 #if !defined (__oasis) && !defined (__ifsinterface) && !defined (__yac)
     public :: thermodynamics, therm_ice, budget, obudget, flooding, &
               TFrez, compute_solar_zenith_angle, albw_taylor, &
-              albw_briegleb
+              albw_briegleb, open_water_albedo_at
 #endif
 
 contains
@@ -757,13 +757,14 @@ subroutine obudget (ithermp, qa,fsh,flo,t,ug,ta,ch,ce,geolon, geolat, fh, evap, 
     real(kind=WP) qa,t,ta,fsh,flo,ug,ch,ce,fh,evap
     real(kind=WP) hfsenow, hfswrow, hflwrow, hfradow, hflatow, hftotow, hflwrdout,b
     real(kind=WP) q1, q2 		! coefficients for saturated specific humidity
-    real(kind=WP) c1, c4, c5, coszen, geolon, geolat
+    real(kind=WP) c1, c4, c5, geolon, geolat
     logical :: standard_saturation_shum_formula = .true.
     integer :: ii
     !___________________________________________________________________________
     integer, pointer :: open_water_albedo
     real(kind=WP), pointer :: boltzmann, emiss_wat, inv_rhowat, inv_rhoair, rhoair, &
-                              tmelt, cl, clhw, cpair, albw
+                              tmelt, cl, clhw, cpair
+    real(kind=WP)          :: albw
     boltzmann  => ithermp%boltzmann
     emiss_wat  => ithermp%emiss_wat
     inv_rhowat => ithermp%inv_rhowat
@@ -773,7 +774,6 @@ subroutine obudget (ithermp, qa,fsh,flo,t,ug,ta,ch,ce,geolon, geolat, fh, evap, 
     cl         => ithermp%cl
     clhw       => ithermp%clhw
     cpair      => ithermp%cpair
-    albw       => ithermp%albw
     open_water_albedo => ithermp%open_water_albedo
     
     !___________________________________________________________________________
@@ -782,14 +782,9 @@ subroutine obudget (ithermp, qa,fsh,flo,t,ug,ta,ch,ce,geolon, geolat, fh, evap, 
     c5 = 237.3_WP
     q1 = 640380._WP
     q2 = -5107.4_WP
-    if(open_water_albedo > 0)then
-        coszen=compute_solar_zenith_angle(daynew, timenew/3600., geolon, geolat)
-        if(open_water_albedo > 1)then
-           albw=albw_briegleb(coszen)
-        else
-           albw=albw_taylor(coszen)
-        endif
-     endif
+    ! open water albedo of this vertex, kept local: ithermp is shared by all
+    ! vertices and threads
+    albw = open_water_albedo_at(ithermp, geolon, geolat)
 
     ! (saturated) surface specific humidity
     if(standard_saturation_shum_formula) then
@@ -861,6 +856,27 @@ function TFrez(S)
 end function TFrez
 
 
+! Open water albedo at one vertex: the namelist value albw, or a value that
+! depends on the solar zenith angle if open_water_albedo>0. Used for the surface
+! heat flux (obudget) and for the shortwave penetration (cal_shortwave_rad), which
+! have to agree.
+function open_water_albedo_at(ithermp, geolon, geolat) result(alb)
+    type(t_ice_thermo), intent(in) :: ithermp
+    real(kind=WP)     , intent(in) :: geolon, geolat   ! geographical coordinates [rad]
+    real(kind=WP)                  :: alb, coszen
+    alb = ithermp%albw
+    if (ithermp%open_water_albedo > 0) then
+        coszen = compute_solar_zenith_angle(daynew, timenew/3600., geolon, geolat)
+        if (ithermp%open_water_albedo > 1) then
+            alb = albw_briegleb(coszen)
+        else
+            alb = albw_taylor(coszen)
+        end if
+    end if
+end function open_water_albedo_at
+!
+!
+!_______________________________________________________________________________
 function compute_solar_zenith_angle(day_of_year, hour_utc, longitude, latitude) result(cos_zenith)
     !-----------------------------------------------------------------------
     ! Purpose: Compute the cosine of the solar zenith angle given the day of the year,

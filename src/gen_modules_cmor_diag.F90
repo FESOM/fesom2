@@ -208,8 +208,10 @@ contains
         ku = mesh%ulevels_nod2D(n2)  ! Upper level (surface or cavity)
         kl = mesh%nlevels_nod2D(n2)  ! Bottom level + 1
         
-        ! Bottom pressure: SSH contribution
-        pbo(n2) = eta_n(n2) * density_0 * g
+        ! Bottom pressure: SSH contribution. With zlevel and zstar the layer
+        ! thicknesses below already contain the surface elevation, except under
+        ! ice-shelf cavities, where they are fixed.
+        if (trim(which_ALE)=='linfs' .or. ku>1) pbo(n2) = eta_n(n2) * density_0 * g
         
         ! Loop through water column levels
         z_up = mesh%zbar_3d_n(ku, n2)  ! Top of first layer
@@ -264,14 +266,17 @@ contains
     ! sw_3d is temperature flux at level interfaces [K*m/s]
     ! Absorption in layer k = (sw_3d(k) - sw_3d(k+1)) * vcpw [W/m^2]
     !=================================================================
+    ! sw_3d is only allocated with shortwave penetration (use_sw_pene)
     rsdoabsorb = 0.0_WP
-    do n2 = 1, partit%myDim_nod2D
-        ku = mesh%ulevels_nod2D(n2)
-        kl = mesh%nlevels_nod2D(n2)
-        do k = ku, kl-1
-            rsdoabsorb(k, n2) = (sw_3d(k, n2) - sw_3d(k+1, n2)) * vcpw
+    if (allocated(sw_3d)) then
+        do n2 = 1, partit%myDim_nod2D
+            ku = mesh%ulevels_nod2D(n2)
+            kl = mesh%nlevels_nod2D(n2)
+            do k = ku, kl-1
+                rsdoabsorb(k, n2) = (sw_3d(k, n2) - sw_3d(k+1, n2)) * vcpw
+            end do
         end do
-    end do
+    end if
     
     !=================================================================
     ! Compute global mean salinity and temperature
@@ -312,7 +317,8 @@ contains
     sivols = 0.0_WP
     
     do n2 = 1, partit%myDim_nod2D
-        if (mesh%coord_nod2D(2, n2) > 0.0_WP) then
+        ! geographical latitude; coord_nod2D is on the rotated grid
+        if (mesh%geo_coord_nod2D(2, n2) > 0.0_WP) then
             ! Northern hemisphere
             siarean = siarean + ice%data(1)%values(n2) * mesh%area(1, n2)
             if (ice%data(1)%values(n2) >= 0.15_WP) then

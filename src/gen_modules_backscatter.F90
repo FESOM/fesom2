@@ -112,7 +112,7 @@ module g_backscatter
             el=mesh%edge_tri(:,ed)
             !New viscosity lines
             len=sqrt(sum(mesh%elem_area(el)))
-            DO  nz=1,minval(mesh%nlevels(el))-1
+            DO  nz=maxval(mesh%ulevels(el)),minval(mesh%nlevels(el))-1
                 u1=(UV(1,nz,el(1))-UV(1,nz,el(2)))
                 v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))
                 ! New viscosity lines
@@ -143,7 +143,7 @@ module g_backscatter
             le(2)=mesh%edge_cross_dxdy(2,ed)-mesh%edge_cross_dxdy(4,ed)
             crosslen=sqrt(le(1)**2+le(2)**2) 
             
-            DO  nz=1,minval(mesh%nlevels(el))-1
+            DO  nz=maxval(mesh%ulevels(el)),minval(mesh%nlevels(el))-1
                 vi=dt*len*(v_back(nz,el(1))+v_back(nz,el(2)))/crosslen
                 !if(mype==0) write(*,*) 'vi ', vi , ' and ed' , ed
                 !if(mype==0) write(*,*) 'dt*len/crosslen ', dt*len/crosslen, ' and ed' , ed
@@ -195,7 +195,7 @@ module g_backscatter
         END DO
         
         DO ed=1, partit%myDim_elem2D
-            DO  nz=1,mesh%nlevels(ed)-1
+            DO  nz=mesh%ulevels(ed),mesh%nlevels(ed)-1
             UV_rhs(1,nz,ed)=UV_rhs(1,nz,ed)+UV_dis(1,nz,ed)+UV_back(1,nz,ed)
             UV_rhs(2,nz,ed)=UV_rhs(2,nz,ed)+UV_dis(2,nz,ed)+UV_back(2,nz,ed)               
             END DO 
@@ -357,7 +357,7 @@ module g_backscatter
         !Also check with the normalization by area; as before we use element length sqrt(2*elem_area(ed))
         v_back=0.0_WP
         DO  elem=1, partit%myDim_elem2D 
-            DO  nz=1,mesh%nlevels(elem)-1
+            DO  nz=mesh%ulevels(elem),mesh%nlevels(elem)-1
                 !v_back(1,ed)=c_back*sqrt(2.0_WP*elem_area(ed))*sqrt(max(2.0_WP*uke(1,ed),0.0_WP))*(3600.0_WP*24.0_WP/tau_c)*4.0_WP/sqrt(2.0_WP*elem_area(ed))**2 !*sqrt(max(2.0_WP*uke(1,ed),0.0_WP))
                 !v_back(nz,elem)=-c_back*sqrt(4._WP/sqrt(3.0_WP)*elem_area(elem))*sqrt(max(2.0_WP*uke(nz,elem),0.0_WP)) !Is the scaling correct
                 v_back(nz,elem)=min(-dynamics%c_back*sqrt(mesh%elem_area(elem))*sqrt(max(2.0_WP*uke(nz,elem),0.0_WP)),0.2*mesh%elem_area(elem)/dt) !Is the scaling correct
@@ -397,7 +397,7 @@ module g_backscatter
         uke_back=0.0_WP
         uke_dis=0.0_WP
         DO ed=1, partit%myDim_elem2D
-            DO nz=1, mesh%nlevels(ed)-1  
+            DO nz=mesh%ulevels(ed),mesh%nlevels(ed)-1  
                 uke_dis(nz,ed) =(UV(1,nz,ed)*UV_dis_tend( 1,nz,ed)+UV(2,nz,ed)*UV_dis_tend( 2,nz,ed))   
                 uke_back(nz,ed)=(UV(1,nz,ed)*UV_back_tend(1,nz,ed)+UV(2,nz,ed)*UV_back_tend(2,nz,ed))
             END DO
@@ -432,7 +432,7 @@ module g_backscatter
                     vol=vol+mesh%elem_area(elem)
                 END DO
                 U_work(nz,node)=U_work(nz,node)/vol
-                V_work(nz,node)=U_work(nz,node)/vol
+                V_work(nz,node)=V_work(nz,node)/vol
             END DO
             work_uv=U_work(nz,:)
             call exchange_nod(work_uv, partit)
@@ -443,7 +443,7 @@ module g_backscatter
         END DO
         
         DO el=1,partit%myDim_elem2D
-            DO nz=1, mesh%nlevels(el)-1     
+            DO nz=mesh%ulevels(el),mesh%nlevels(el)-1     
                 rosb_array(nz,el)=sqrt((sum(mesh%gradient_sca(1:3,el)*U_work(nz,mesh%elem2D_nodes(1:3,el)))-&
                     sum(mesh%gradient_sca(4:6, el)*V_work(nz,mesh%elem2D_nodes(1:3,el))))**2+&
                     (sum(mesh%gradient_sca(4:6, el)*U_work(nz,mesh%elem2D_nodes(1:3,el)))+&
@@ -474,7 +474,7 @@ module g_backscatter
                 scaling=1._WP/(1._WP+(dynamics%uke_scaling_factor*reso/rosb))!(4._wp*reso/rosb))
             END IF
             
-            DO nz=1, mesh%nlevels(ed)-1  
+            DO nz=mesh%ulevels(ed),mesh%nlevels(ed)-1  
                 elnodes=mesh%elem2D_nodes(:,ed)
                 rosb_array(nz,ed)=rosb_array(nz,ed)/max(abs(sum(mesh%coriolis_node(elnodes(:)))), f_min)
                 uke_dis(nz,ed)=scaling*1._WP/(1._WP+rosb_array(nz,ed)/dynamics%rosb_dis)*uke_dis(nz,ed)
@@ -497,7 +497,7 @@ module g_backscatter
             call exchange_elem(uke_adv, partit)
 
             DO ed=1, partit%myDim_elem2D
-                DO  nz=1,mesh%nlevels(ed)-1
+                DO  nz=mesh%ulevels(ed),mesh%nlevels(ed)-1
                 uke_rhs_old(nz,ed)=uke_rhs(nz,ed)
                 uke_rhs(nz,ed)=-uke_dis(nz,ed)-uke_back(nz,ed)+uke_dif(nz,ed)-uke_adv(nz, ed)
                 uke(nz,ed)=uke(nz,ed)+1.5_WP*uke_rhs(nz,ed)-0.5_WP*uke_rhs_old(nz,ed)
@@ -505,7 +505,7 @@ module g_backscatter
             END DO
         else
             DO ed=1, partit%myDim_elem2D
-                DO  nz=1,mesh%nlevels(ed)-1
+                DO  nz=mesh%ulevels(ed),mesh%nlevels(ed)-1
                 uke_rhs_old(nz,ed)=uke_rhs(nz,ed)
                 uke_rhs(nz,ed)=-uke_dis(nz,ed)-uke_back(nz,ed)+uke_dif(nz,ed)
                 uke(nz,ed)=uke(nz,ed)+1.5_WP*uke_rhs(nz,ed)-0.5_WP*uke_rhs_old(nz,ed)
