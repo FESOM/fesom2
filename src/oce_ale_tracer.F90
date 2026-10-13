@@ -526,10 +526,9 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
 
     ttf_rhs_bak = 0.0
 #ifdef ENABLE_OPENACC
-    ! del_ttf arrives on the device from the advection. Diagnostics, the conservation
-    ! probes, the explicit vertical scheme and recom read it on the host: then the
-    ! whole diffusion of this tracer runs there.
-    diff_on_device = .not. (tracers%data(tr_num)%ltra_diag .or. ldiag_diapmix .or. (conservation_freq > 0) &
+    ! del_ttf arrives on the device from the advection; when a diagnostic, the explicit vertical
+    ! scheme or recom reads it on the host, the whole diffusion of this tracer runs there
+    diff_on_device = .not. (tracers%data(tr_num)%ltra_diag .or. ldiag_diapmix &
                             .or. (.not. tracers%data(tr_num)%i_vert_diff))
 #if defined(__recom)
     diff_on_device = .false.
