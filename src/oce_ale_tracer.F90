@@ -16,6 +16,7 @@ module oce_ale_tracer_module
     USE g_forcing_arrays
     USE oce_adv_tra_driver_module, only: do_oce_adv_tra
     USE fesom_conservation_module, only: conservation_probe
+    USE oce_dyn_module, only: mom_on_device
 #if defined (FESOM_PROFILING)
     use fesom_profiler
 #endif
@@ -124,6 +125,8 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     integer                                  :: nz, n, nu1, nl1
     !___________________________________________________________________________
     ! pointer on necessary derived types
+    logical :: gm_on_device = .false.
+    integer :: nlu, nlw
     real(kind=WP), dimension(:,:,:), pointer :: UV, fer_UV
     real(kind=WP), dimension(:,:)  , pointer :: Wvel, Wvel_e, Wvel_i, fer_Wvel
     real(kind=WP_full), dimension(:,:)  , pointer :: del_ttf
@@ -153,7 +156,12 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     ! update 3D velocities with the bolus velocities:
     ! 1. bolus velocities are computed according to GM implementation after R. Ferrari et al., 2010
     ! 2. bolus velocities are used only for advecting tracers and shall be subtracted back afterwards
-    if (Fer_GM) then
+#ifdef ENABLE_OPENACC
+    ! with zstar and the momentum on the device the bolus velocities (computed or uploaded in
+    ! vert_vel_ale_acc) are added on the device below and the host copies stay untouched
+    gm_on_device = Fer_GM .and. trim(which_ALE)=='zstar' .and. mom_on_device
+#endif
+    if (Fer_GM .and. .not. gm_on_device) then
 !$OMP PARALLEL DO
         do elem=1, partit%myDim_elem2D+partit%eDim_elem2D
            UV(:, :, elem)    =UV(:, :, elem) + fer_UV(:, :, elem)
@@ -183,6 +191,28 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         !$ACC UPDATE DEVICE(dynamics%w, dynamics%w_e, dynamics%uv) !!! async(1) 
 !!!     !$ACC UPDATE DEVICE(tracers%work%fct_ttf_min, tracers%work%fct_ttf_max, tracers%work%fct_plus, tracers%work%fct_minus)
         !$ACC UPDATE DEVICE (mesh%helem, mesh%hnode, mesh%hnode_new, mesh%zbar_3d_n, mesh%z_3d_n)
+#ifdef ENABLE_OPENACC
+        if (gm_on_device) then
+            nlu = size(UV,2)
+            nlw = size(Wvel,1)
+            !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(nz)
+            do elem=1, partit%myDim_elem2D+partit%eDim_elem2D
+                do nz=1, nlu
+                    UV(1, nz, elem)=UV(1, nz, elem) + fer_UV(1, nz, elem)
+                    UV(2, nz, elem)=UV(2, nz, elem) + fer_UV(2, nz, elem)
+                end do
+            end do
+            !$ACC END PARALLEL LOOP
+            !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(nz)
+            do node=1, partit%myDim_nod2D+partit%eDim_nod2D
+                do nz=1, nlw
+                    Wvel_e(nz, node)=Wvel_e(nz, node)+fer_Wvel(nz, node)
+                    Wvel  (nz, node)=Wvel  (nz, node)+fer_Wvel(nz, node)
+                end do
+            end do
+            !$ACC END PARALLEL LOOP
+        end if
+#endif
 #if defined (FESOM_PROFILING)
         call fesom_profiler_end("tr_uploads")
 #endif
@@ -464,7 +494,8 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 
     !___________________________________________________________________________
     ! subtract the the bolus velocities back from 3D velocities:
-    if (Fer_GM) then
+    ! (the device copies keep the bolus part until the next upload)
+    if (Fer_GM .and. .not. gm_on_device) then
 !$OMP PARALLEL DO
         do elem=1, partit%myDim_elem2D+partit%eDim_elem2D
            UV(:, :, elem)    =UV(:, :, elem) - fer_UV(:, :, elem)
