@@ -119,6 +119,9 @@ module recom_config
   Real(kind=8)                 :: Pa2atm         = 101325.d0    ! [Pa/atm] 
   Real(kind=8)                 :: redO2C         = 1.453        ! O2:C ratio Anderson and Sarmiento, 1994
 
+  Logical                :: enable_AWICM = .false.      ! Control AWICM
+  namelist /parecomsetup/ enable_AWICM
+
 !! *** General configuration ***
 
   Logical                :: use_REcoM            = .true.
