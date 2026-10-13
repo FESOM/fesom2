@@ -63,6 +63,8 @@ module cmor_variables_diag
 
   ! Auxiliary arrays for tendency tracking
   ! FESOM 2 uses (level, nod2D) indexing
+  ! layer contents hnode*T and hnode*S of the previous call, so that the tendencies
+  ! include the change of the layer thickness (zlevel, zstar)
   real(kind=WP), save, allocatable :: previous_temp(:,:)  ! (nl-1, myDim_nod2D)
   real(kind=WP), save, allocatable :: previous_salt(:,:)  ! (nl-1, myDim_nod2D)
 
@@ -186,8 +188,8 @@ contains
     if (first_call) then
         do n2 = 1, partit%myDim_nod2D
             do k = mesh%ulevels_nod2D(n2), mesh%nlevels_nod2D(n2)-1
-                previous_temp(k, n2) = temp(k, n2)
-                previous_salt(k, n2) = salt(k, n2)
+                previous_temp(k, n2) = temp(k, n2) * mesh%hnode(k, n2)
+                previous_salt(k, n2) = salt(k, n2) * mesh%hnode(k, n2)
             end do
         end do
         first_call = .false.
@@ -230,14 +232,14 @@ contains
             ! Bottom pressure: steric contribution (accumulate through column)
             pbo(n2) = pbo(n2) + g * dz * dens_val
             
-            ! Temperature tendency: dT/dt * rho * Cp * dz
+            ! Temperature tendency: d(T*dz)/dt * rho * Cp
             ! Tendency is expressed as rate of change of heat content per unit area
             opottemptend(n2) = opottemptend(n2) + &
-                (temp(k, n2) - previous_temp(k, n2)) / dt * vcpw * mesh%hnode(k, n2)
+                (temp(k, n2) * mesh%hnode(k, n2) - previous_temp(k, n2)) / dt * vcpw
 
-            ! Salinity tendency: dS/dt * dz [psu*m/s]
+            ! Salinity tendency: d(S*dz)/dt [psu*m/s]
             osalttend(n2) = osalttend(n2) + &
-                (salt(k, n2) - previous_salt(k, n2)) / dt * mesh%hnode(k, n2)
+                (salt(k, n2) * mesh%hnode(k, n2) - previous_salt(k, n2)) / dt
 
             ! Advection tendency from saved del_ttf snapshots
             ! del_ttf_adv has units [tracer*m], divide by dt to get [tracer*m/s]
@@ -283,14 +285,18 @@ contains
     ! Volume-weighted average over all levels
     ! Use areasvol for proper cavity handling
     !=================================================================
+    ! volo is recomputed with the current layer thicknesses, like the numerators
     soga = 0.0_WP
     thetaoga = 0.0_WP
+    volo = 0.0_WP
     do n2 = 1, partit%myDim_nod2D
         do k = mesh%ulevels_nod2D(n2), mesh%nlevels_nod2D(n2)-1
             soga = soga + salt(k, n2) * mesh%areasvol(k, n2) * mesh%hnode(k, n2)
             thetaoga = thetaoga + temp(k, n2) * mesh%areasvol(k, n2) * mesh%hnode(k, n2)
+            volo = volo + mesh%areasvol(k, n2) * mesh%hnode(k, n2)
         end do
     end do
+    call MPI_AllREDUCE(MPI_IN_PLACE, volo, 1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, ierr)
     call MPI_AllREDUCE(MPI_IN_PLACE, soga, 1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, ierr)
     call MPI_AllREDUCE(MPI_IN_PLACE, thetaoga, 1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, ierr)
     soga = soga / volo
@@ -380,8 +386,8 @@ contains
     ! Update previous tracer values for next time step
     do n2 = 1, partit%myDim_nod2D
         do k = mesh%ulevels_nod2D(n2), mesh%nlevels_nod2D(n2)-1
-            previous_temp(k, n2) = temp(k, n2)
-            previous_salt(k, n2) = salt(k, n2)
+            previous_temp(k, n2) = temp(k, n2) * mesh%hnode(k, n2)
+            previous_salt(k, n2) = salt(k, n2) * mesh%hnode(k, n2)
         end do
     end do
 
