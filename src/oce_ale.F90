@@ -1940,6 +1940,13 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
         fer_Wvel=> dynamics%fer_w(:,:)
     end if
     
+#ifdef ENABLE_OPENACC
+    ! the device version covers zstar with the momentum on the device
+    if (trim(which_ALE)=='zstar' .and. mom_on_device) then
+        call vert_vel_ale_acc(dynamics, partit, mesh)
+        return
+    end if
+#endif
     if ( .not. dynamics%use_ssh_se_subcycl) then
         d_eta       => dynamics%d_eta(:)
         ssh_rhs     => dynamics%ssh_rhs(:)
@@ -2440,6 +2447,206 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
     call compute_Wvel_split(dynamics, partit, mesh)
     
 end subroutine vert_vel_ale
+#ifdef ENABLE_OPENACC
+!
+!
+!===============================================================================
+! vert_vel_ale on the device for zstar (see vert_vel_ale), followed by compute_CFLz and compute_Wvel_split:
+! the same edge contributions per node in the same order; the results go back to the host.
+subroutine vert_vel_ale_acc(dynamics, partit, mesh)
+    implicit none
+    type(t_dyn)   , intent(inout), target :: dynamics
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh),   intent(inout), target :: mesh
+    integer       :: n, k, nz, ed, el1, el2, nzmin, nzmax, nbad_w, nbad_h, nlw
+    real(kind=WP) :: dx1, dy1, dx2, dy2, c1, c2, dd, dd1, dddt, cflmax, wsplit_maxcfl
+    logical       :: fer, plus, use_wsplit
+    logical, save :: data_created = .false.
+    real(kind=WP), dimension(:,:,:), pointer :: UV, fer_UV
+    real(kind=WP), dimension(:,:)  , pointer :: Wvel, Wvel_e, Wvel_i, CFL_z, fer_Wvel
+    UV     => dynamics%uv(:,:,:)
+    Wvel   => dynamics%w(:,:)
+    Wvel_e => dynamics%w_e(:,:)
+    Wvel_i => dynamics%w_i(:,:)
+    CFL_z  => dynamics%cfl_z(:,:)
+    fer    = Fer_GM
+    if (fer) then
+        fer_UV   => dynamics%fer_uv(:,:,:)
+        fer_Wvel => dynamics%fer_w(:,:)
+    else
+        ! not referenced on the device path (fer=.false.), kept associated for DEFAULT(PRESENT)
+        fer_UV   => dynamics%uv(:,:,:)
+        fer_Wvel => dynamics%w(:,:)
+    end if
+    use_wsplit    = dynamics%use_wsplit
+    wsplit_maxcfl = dynamics%wsplit_maxcfl
+    nlw = size(Wvel,1)
+    if (.not. data_created) then
+        !$ACC ENTER DATA CREATE(dynamics%cfl_z, mesh%hbar, mesh%hbar_old, water_flux)
+        if (fer) then
+            !$ACC ENTER DATA CREATE(dynamics%fer_uv, dynamics%fer_w)
+        end if
+        data_created = .true.
+    end if
+    ! hnode_new: the zstar update sets only the levels above nlevels_nod2D_min, the rest
+    ! keeps its values, and all of it is brought back to the host below
+    !$ACC UPDATE DEVICE(UV, mesh%helem, mesh%zbar_3d_n, mesh%hbar, mesh%hbar_old, water_flux, mesh%hnode_new)
+    if (fer) then
+        !$ACC UPDATE DEVICE(fer_UV)
+    end if
+
+    ! divergence of the layer transports, gathered per node over its edges
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(k, nz, ed, el1, el2, nzmin, nzmax, dx1, dy1, dx2, dy2, c1, c2, plus)
+    do n=1, partit%myDim_nod2D+partit%eDim_nod2D
+        do nz=1, nlw
+            Wvel(nz, n)=0.0_WP
+            if (fer) fer_Wvel(nz, n)=0.0_WP
+        end do
+        do k=1, mesh%nod_in_edge2D_num(n)
+            ed   = mesh%nod_in_edge2D(k,n)
+            el1  = mesh%edge_tri(1,ed)
+            el2  = mesh%edge_tri(2,ed)
+            plus = mesh%nod_in_edge2D_sgn(k,n)>0
+            dx1  = mesh%edge_cross_dxdy(1,ed)
+            dy1  = mesh%edge_cross_dxdy(2,ed)
+            nzmin = mesh%ulevels(el1)
+            nzmax = mesh%nlevels(el1)-1
+            do nz=nzmin, nzmax
+                c1=( UV(2,nz,el1)*dx1 - UV(1,nz,el1)*dy1 )*mesh%helem(nz,el1)
+                if (plus) then
+                    Wvel(nz, n)=Wvel(nz, n)+c1
+                else
+                    Wvel(nz, n)=Wvel(nz, n)-c1
+                end if
+                if (fer) then
+                    c2=(fer_UV(2,nz,el1)*dx1- fer_UV(1,nz,el1)*dy1)*mesh%helem(nz,el1)
+                    if (plus) then
+                        fer_Wvel(nz, n)=fer_Wvel(nz, n)+c2
+                    else
+                        fer_Wvel(nz, n)=fer_Wvel(nz, n)-c2
+                    end if
+                end if
+            end do
+            if (el2>0) then
+                dx2 = mesh%edge_cross_dxdy(3,ed)
+                dy2 = mesh%edge_cross_dxdy(4,ed)
+                nzmin = mesh%ulevels(el2)
+                nzmax = mesh%nlevels(el2)-1
+                do nz=nzmin, nzmax
+                    c1=-(UV(2,nz,el2)*dx2 - UV(1,nz,el2)*dy2)*mesh%helem(nz,el2)
+                    if (plus) then
+                        Wvel(nz, n)=Wvel(nz, n)+c1
+                    else
+                        Wvel(nz, n)=Wvel(nz, n)-c1
+                    end if
+                    if (fer) then
+                        c2=-(fer_UV(2,nz,el2)*dx2-fer_UV(1,nz,el2)*dy2)*mesh%helem(nz,el2)
+                        if (plus) then
+                            fer_Wvel(nz, n)=fer_Wvel(nz, n)+c2
+                        else
+                            fer_Wvel(nz, n)=fer_Wvel(nz, n)-c2
+                        end if
+                    end if
+                end do
+            end if
+        end do
+    end do
+!$ACC END PARALLEL LOOP
+
+    ! cumulative sum from the bottom, division by the area, zstar distribution
+    nbad_w = 0
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(nz, nzmin, nzmax, dd, dd1, dddt) REDUCTION(+:nbad_w)
+    do n=1, partit%myDim_nod2D
+        nzmin = mesh%ulevels_nod2D(n)
+        nzmax = mesh%nlevels_nod2d(n)-1
+        do nz=nzmax,nzmin,-1
+            Wvel(nz,n)=Wvel(nz,n)+Wvel(nz+1,n)
+            if (fer) fer_Wvel(nz,n)=fer_Wvel(nz,n)+fer_Wvel(nz+1,n)
+        end do
+        do nz=nzmin,nzmax
+            Wvel(nz,n)=Wvel(nz,n)/mesh%area(nz,n)
+            if (fer) fer_Wvel(nz,n)=fer_Wvel(nz,n)/mesh%area(nz,n)
+            if (Wvel(nz,n)/=Wvel(nz,n)) nbad_w = nbad_w + 1
+        end do
+        nzmax = mesh%nlevels_nod2D_min(n)-1
+        if (nzmin==1) then
+            dd1=mesh%zbar_3d_n(nzmax,n)
+            dd=mesh%zbar_3d_n(nzmin,n)-dd1
+            dd=(mesh%hbar(n)-mesh%hbar_old(n))/dd
+            dddt=dd/dt
+            do nz=nzmin, nzmax-1
+                Wvel(nz,n)    =Wvel(nz,n) -(mesh%zbar_3d_n(nz,n)-dd1)*dddt
+                mesh%hnode_new(nz,n)=mesh%hnode(nz,n)+(mesh%zbar_3d_n(nz,n)-mesh%zbar_3d_n(nz+1,n))*dd
+            end do
+            Wvel(nzmin,n)=Wvel(nzmin,n)-water_flux(n)
+        end if
+    end do
+!$ACC END PARALLEL LOOP
+    if (nbad_w > 0) write(*,*) ' --> subroutine vert_vel_ale_acc --> found NaN in Wvel at ', nbad_w, &
+                               ' points, mype =', partit%mype, ', mstep =', mstep
+    call exchange_nod(Wvel, partit, luse_g2g=.true.)
+    call exchange_nod(mesh%hnode_new, partit, luse_g2g=.true.)
+    if (fer) call exchange_nod(fer_Wvel, partit, luse_g2g=.true.)
+
+    ! negative layer thickness, CFL and the explicit/implicit split
+    nbad_h = 0
+    cflmax = 0.0_WP
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(nz, nzmin, nzmax, c1, c2, dd) REDUCTION(+:nbad_h) REDUCTION(max:cflmax)
+    do n=1, partit%myDim_nod2D+partit%eDim_nod2D
+        do nz=1, size(mesh%hnode_new,1)
+            if (mesh%hnode_new(nz,n) < 0.0_WP) nbad_h = nbad_h + 1
+        end do
+        do nz=1, size(CFL_z,1)
+            CFL_z(nz,n)=0._WP
+        end do
+        nzmin = mesh%ulevels_nod2D(n)
+        nzmax = mesh%nlevels_nod2D(n)-1
+        do nz=nzmin,nzmax
+            c1=abs(Wvel(nz,n)  *dt/mesh%hnode_new(nz,n))
+            c2=abs(Wvel(nz+1,n)*dt/mesh%hnode_new(nz,n))
+            CFL_z(nz,  n)=CFL_z(nz,n)+c1
+            CFL_z(nz+1,n)=               c2
+        end do
+        do nz=1, size(CFL_z,1)
+            cflmax=max(cflmax, CFL_z(nz,n))
+        end do
+        do nz=nzmin, nzmax+1
+            Wvel_e(nz, n)=Wvel(nz, n)
+            Wvel_i(nz, n)=0.0_WP
+            if (use_wsplit .and. (CFL_z(nz, n) > wsplit_maxcfl)) then
+                dd=max((CFL_z(nz, n)-wsplit_maxcfl), 0.0_WP)/max(wsplit_maxcfl, 1.e-12)
+                Wvel_e(nz, n)=(1.0_WP/(1.0_WP+dd))*Wvel(nz, n)
+                Wvel_i(nz, n)=(dd    /(1.0_WP+dd))*Wvel(nz, n)
+            end if
+        end do
+    end do
+!$ACC END PARALLEL LOOP
+    if (nbad_h > 0) write(*,*) ' --> fatal problem <--: layerthickness of a layer became smaller than zero at ', nbad_h, &
+                               ' points, mype =', partit%mype, ', mstep =', mstep
+    ! tracer step, diagnostics and the next step use them on the host
+    !$ACC UPDATE HOST(Wvel, Wvel_e, Wvel_i, CFL_z, mesh%hnode_new)
+    if (fer) then
+        !$ACC UPDATE HOST(fer_Wvel)
+    end if
+    if (cflmax > 1.0_WP .and. flag_warn_cflz) then
+        do n=1, partit%myDim_nod2D
+            nzmin = mesh%ulevels_nod2D(n)
+            nzmax = mesh%nlevels_nod2D(n)-1
+            do nz=nzmin, nzmax
+                if (abs(CFL_z(nz,n)-cflmax) < 1.e-12 .and. CFL_z(nz,n) > 1.75_WP .and. CFL_z(nz,n)<=2.5_WP ) then
+                    print '(A, A, F4.2, A, I6, A, F7.2,A,F6.2, A, I3,I3,I3)', achar(27)//'[33m'//' --> WARNING CFLz>1.75:'//achar(27)//'[0m',&
+                          'CFLz_max=',cflmax,',mstep=',mstep,',glon/glat=',mesh%geo_coord_nod2D(1,n)/rad,'/',mesh%geo_coord_nod2D(2,n)/rad,&
+                          ',nz/nzmin/nzmax=',nz,nzmin,nzmax
+                elseif (abs(CFL_z(nz,n)-cflmax) < 1.e-12 .and. CFL_z(nz,n) > 2.5_WP) then
+                    print '(A, A, F4.2, A, I6, A, F7.2,A,F6.2, A, I3,I3,I3)', achar(27)//'[31m'//' --> WARNING CFLz>2.5:'//achar(27)//'[0m',&
+                          'CFLz_max=',cflmax,',mstep=',mstep,',glon/glat=',mesh%geo_coord_nod2D(1,n)/rad,'/',mesh%geo_coord_nod2D(2,n)/rad,&
+                          ',nz/nzmin/nzmax=',nz,nzmin,nzmax
+                end if
+            end do
+        end do
+    end if
+end subroutine vert_vel_ale_acc
+#endif
 
 !
 !
