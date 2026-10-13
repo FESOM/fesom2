@@ -596,9 +596,9 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL NVHPC )
       target_compile_definitions(${PROJECT_NAME} PRIVATE ENABLE_OPENACC)
       target_compile_options(${PROJECT_NAME} PRIVATE
       $<$<CONFIG:DEBUG>:-Mallocatable=95 ${_FESOM_NVHPC_RKIND} -pgf90libs -Mnofma -Minfo=all -acc=verystrict -gpu=math_uniform,cuda12.2,cc80>
-      $<$<CONFIG:RELEASE>:-Mallocatable=95 ${_FESOM_NVHPC_RKIND} -pgf90libs -Minfo=all -acc=verystrict -gpu=cc80>)
+      $<$<CONFIG:RELEASE>:-Mallocatable=95 ${_FESOM_NVHPC_RKIND} -pgf90libs -Minfo=all -acc=verystrict -gpu=cc80,pinned>)
       set(CMAKE_EXE_LINKER_FLAGS_DEBUG "-acc=verystrict -Mnofma -gpu=math_uniform,cuda12.2,cc80")
-      set(CMAKE_EXE_LINKER_FLAGS_RELEASE "-acc=verystrict -gpu=cc80")
+      set(CMAKE_EXE_LINKER_FLAGS_RELEASE "-acc=verystrict -gpu=cc80,pinned")
       if(${DISABLE_OPENACC_ATOMICS})
          target_compile_definitions(${PROJECT_NAME} PRIVATE DISABLE_OPENACC_ATOMICS)
       endif()
