@@ -1659,6 +1659,13 @@ subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
     UV_rhs     => dynamics%uv_rhs(:,:,:)
     ssh_rhs    => dynamics%ssh_rhs(:)
     ssh_rhs_old=> dynamics%ssh_rhs_old(:)
+#ifdef ENABLE_OPENACC
+    ! UV and UV_rhs of this step are on the device with the momentum
+    if (mom_on_device) then
+        call compute_ssh_rhs_ale_acc(dynamics, partit, mesh)
+        return
+    end if
+#endif
 
     !___________________________________________________________________________
     ! loop over local edges
@@ -1759,6 +1766,87 @@ subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
     call exchange_nod(ssh_rhs, partit)
 !$OMP BARRIER
 end subroutine compute_ssh_rhs_ale
+#ifdef ENABLE_OPENACC
+!
+!
+!===============================================================================
+! compute_ssh_rhs_ale on the device: the same per-node gather over the incident edges in ascending
+! edge order; the water flux and ssh_rhs_old come from the host, ssh_rhs goes back for the solver.
+subroutine compute_ssh_rhs_ale_acc(dynamics, partit, mesh)
+    implicit none
+    type(t_mesh)  , intent(inout), target :: mesh
+    type(t_partit), intent(inout), target :: partit
+    type(t_dyn)   , intent(inout), target :: dynamics
+    integer       :: ed, el1, el2, nz, n, k, nzmin, nzmax
+    real(kind=WP) :: c1, c2, deltaX1, deltaX2, deltaY1, deltaY2, alph
+    logical       :: linfs, fw2press
+    logical, save :: data_created = .false.
+    real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
+    real(kind=WP), dimension(:)    , pointer :: ssh_rhs, ssh_rhs_old
+    UV         => dynamics%uv(:,:,:)
+    UV_rhs     => dynamics%uv_rhs(:,:,:)
+    ssh_rhs    => dynamics%ssh_rhs(:)
+    ssh_rhs_old=> dynamics%ssh_rhs_old(:)
+    alph     = alpha
+    linfs    = trim(which_ALE)=='linfs'
+    fw2press = use_cavity_fw2press
+    if (.not. data_created) then
+        !$ACC ENTER DATA CREATE(dynamics%ssh_rhs, dynamics%ssh_rhs_old, water_flux)
+        data_created = .true.
+    end if
+    !$ACC UPDATE DEVICE(ssh_rhs_old, water_flux)
+
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(ed, el1, el2, nz, k, nzmin, nzmax, c1, c2, deltaX1, deltaX2, deltaY1, deltaY2)
+    do n=1, partit%myDim_nod2D+partit%eDim_nod2D
+        ssh_rhs(n)=0.0_WP
+        do k=1, mesh%nod_in_edge2D_num(n)
+            ed =mesh%nod_in_edge2D(k,n)
+            el1=mesh%edge_tri(1,ed)
+            el2=mesh%edge_tri(2,ed)
+            c1=0.0_WP
+            deltaX1=mesh%edge_cross_dxdy(1,ed)
+            deltaY1=mesh%edge_cross_dxdy(2,ed)
+            nzmin = mesh%ulevels(el1)
+            nzmax = mesh%nlevels(el1)-1
+            do nz=nzmin, nzmax
+                c1=c1+alph*((UV(2,nz,el1)+UV_rhs(2,nz,el1))*deltaX1- &
+                            (UV(1,nz,el1)+UV_rhs(1,nz,el1))*deltaY1)*mesh%helem(nz,el1)
+            end do
+            c2=0.0_WP
+            if(el2>0) then
+                deltaX2=mesh%edge_cross_dxdy(3,ed)
+                deltaY2=mesh%edge_cross_dxdy(4,ed)
+                nzmin = mesh%ulevels(el2)
+                nzmax = mesh%nlevels(el2)-1
+                do nz=nzmin, nzmax
+                    c2=c2-alph*((UV(2,nz,el2)+UV_rhs(2,nz,el2))*deltaX2- &
+                                (UV(1,nz,el2)+UV_rhs(1,nz,el2))*deltaY2)*mesh%helem(nz,el2)
+                end do
+            end if
+            if (mesh%nod_in_edge2D_sgn(k,n)>0) then
+                ssh_rhs(n)=ssh_rhs(n)+(c1+c2)
+            else
+                ssh_rhs(n)=ssh_rhs(n)-(c1+c2)
+            end if
+        end do
+        if (n <= partit%myDim_nod2D) then
+            nzmin = mesh%ulevels_nod2D(n)
+            if (.not. linfs) then
+                if (nzmin>1) then
+                    if (fw2press) ssh_rhs(n)=ssh_rhs(n)-alph*water_flux(n)*mesh%areasvol(nzmin,n)
+                else
+                    ssh_rhs(n)=ssh_rhs(n)-alph*water_flux(n)*mesh%areasvol(nzmin,n)+(1.0_WP-alph)*ssh_rhs_old(n)
+                end if
+            else
+                ssh_rhs(n)=ssh_rhs(n)+(1.0_WP-alph)*ssh_rhs_old(n)
+            end if
+        end if
+    end do
+!$ACC END PARALLEL LOOP
+    !$ACC UPDATE HOST(ssh_rhs)
+    call exchange_nod(ssh_rhs, partit)
+end subroutine compute_ssh_rhs_ale_acc
+#endif
 !
 !
 !===============================================================================
@@ -3737,15 +3825,33 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! Update stiffness matrix by dhe=hbar(n+1/2)-hbar(n-1/2) on elements, only
     ! needed for zlevel and zstar
     if (.not. dynamics%use_ssh_se_subcycl) then
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("ssh_stiff_update")
+#endif
         if (.not. trim(which_ale)=='linfs') call update_stiff_mat_ale(partit, mesh)
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("ssh_stiff_update")
+#endif
         if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call compute_ssh_rhs_ale'//achar(27)//'[0m'
         ! ssh_rhs=-alpha*\nabla\int(U_n+U_rhs)dz-(1-alpha)*...
         ! see "FESOM2: from finite elements to finte volumes, S. Danilov..." eq. (18) rhs
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("ssh_rhs")
+#endif
         call compute_ssh_rhs_ale(dynamics, partit, mesh)
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("ssh_rhs")
+#endif
 
         ! Take updated ssh matrix and solve --> new ssh!
         t30=MPI_Wtime() 
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("ssh_cg")
+#endif
         call solve_ssh_ale(dynamics, partit, mesh)
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("ssh_cg")
+#endif
         
         if ((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) then
             if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call relax_zonal_vel'//achar(27)//'[0m'
