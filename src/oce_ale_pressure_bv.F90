@@ -13,7 +13,7 @@ module oce_ale_pressure_bv_module
     USE Toy_Neverworld2, only: thermal_alpha, do_cabbeling, cabbeling_Cb, do_thermobar, &
             thermobaric_Th, do_haline, haline_beta
 
-    USE oce_density_kernels, only: densityJM_components
+    USE oce_density_kernels, only: densityJM_components, densityJM_components_abs
 
     implicit none
 
@@ -60,6 +60,15 @@ subroutine pressure_bv(tracers, partit, mesh)
     smallvalue=1.0e-20
     buoyancy_crit=0.0003_WP
     mixing_kpp = (mix_scheme_nmb==1 .or. mix_scheme_nmb==18)
+#ifdef ENABLE_OPENACC
+    ! the device version covers the configurations without cavities, linfs, the dMOC
+    ! diagnostic, vertical N2 smoothing and the linear equation of state
+    if (.not. (ldiag_dMOC .or. use_cavity .or. trim(which_ale)=='linfs' .or. N2smth_v .or. state_equation/=1)) then
+        call pressure_bv_acc(tracers, partit, mesh)
+        if (N2smth_h) call smooth_nod (bvfreq, N2smth_hidx, partit, mesh)
+        return
+    end if
+#endif
     !___________________________________________________________________________
     ! Screen salinity
     a    =0.0_WP
@@ -337,6 +346,166 @@ subroutine pressure_bv(tracers, partit, mesh)
 if (N2smth_h) call smooth_nod (bvfreq, N2smth_hidx, partit, mesh)
 
 end subroutine pressure_bv
+#ifdef ENABLE_OPENACC
+!
+!
+!===============================================================================
+! pressure_bv on the device, one water column per thread, same arithmetic as the host version for
+! its configuration (see pressure_bv); temperature, salinity and the layer depths are uploaded.
+subroutine pressure_bv_acc(tracers, partit, mesh)
+    IMPLICIT NONE
+    type(t_mesh),   intent(in) ,    target  :: mesh
+    type(t_partit), intent(inout),  target  :: partit
+    type(t_tracer), intent(in),     target  :: tracers
+    ! column work arrays have this fixed size (private arrays of run-time size would
+    ! come from the per-thread device heap)
+    integer, parameter                      :: pbv_nl_max = 128
+    real(kind=WP), parameter                :: sigma_theta_crit=0.125_WP       ! Levitus threshold for MLD2
+    real(kind=WP), parameter                :: sigma_theta_crit_cmor=0.03_WP   ! Griffies threshold for MLD3
+    real(kind=WP)                           :: rhopot(pbv_nl_max), bulk_0(pbv_nl_max), bulk_pz(pbv_nl_max)
+    real(kind=WP)                           :: bulk_pz2(pbv_nl_max), rho(pbv_nl_max), dbsfc1(pbv_nl_max)
+    real(kind=WP)                           :: zmean, dz_inv, a, rho_up, rho_dn, t, s, db_max, bulk_up, bulk_dn
+    real(kind=WP)                           :: rho_surf, sref
+    integer                                 :: node, nz, nzmax, nzmin
+    logical                                 :: flag1, flag2, flag3, mixing_kpp
+    logical, save                           :: data_created = .false.
+    real(kind=WP),  dimension(:,:), pointer :: temp, salt
+    temp=>tracers%data(1)%values(:,:)
+    salt=>tracers%data(2)%values(:,:)
+
+    if (mesh%nl > pbv_nl_max) then
+        if (partit%mype==0) write(*,*) 'pressure_bv_acc: mesh%nl =', mesh%nl, ' > pbv_nl_max =', pbv_nl_max
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+    end if
+    mixing_kpp = (mix_scheme_nmb==1 .or. mix_scheme_nmb==18)
+    sref = S_ref_anomaly
+    if (.not. data_created) then
+        !$ACC ENTER DATA CREATE(density_m_rho0, density_sigma0, bvfreq, MLD1, MLD2, MLD3, MLD1_ind, MLD2_ind, MLD3_ind) COPYIN(density_ref)
+        if (mixing_kpp) then
+            !$ACC ENTER DATA CREATE(dbsfc)
+        end if
+        data_created = .true.
+    end if
+    ! temperature and salinity are current on the host at the start of the step (the
+    ! tracer step uploads them again)
+    !$ACC UPDATE DEVICE(mesh%Z_3d_n, temp, salt)
+
+    !___________________________________________________________________________
+    ! screen salinity
+    a = 0.0_WP
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) REDUCTION(min:a) PRIVATE(nz, nzmin, nzmax)
+    do node=1, partit%myDim_nod2D+partit%eDim_nod2D
+        nzmin = mesh%ulevels_nod2D(node)
+        nzmax = mesh%nlevels_nod2D(node)
+        do nz=nzmin,nzmax-1
+            a=min(a, salt(nz,node))
+        enddo
+    enddo
+!$ACC END PARALLEL LOOP
+    if( a < -S_ref_anomaly ) then
+        write (*,*)' --> pressure_bv: s<0 happens!', a
+        partit%pe_status=1
+        do node=1, partit%myDim_nod2D+partit%eDim_nod2D
+            nzmin = mesh%ulevels_nod2D(node)
+            nzmax = mesh%nlevels_nod2D(node)
+            do nz=nzmin, nzmax-1
+                if (salt(nz, node) < -S_ref_anomaly) write (*,*) 'the model blows up at n=', partit%mylist_nod2D(node), ' ; ', 'nz=', nz
+            end do
+        end do
+    endif
+
+    !___________________________________________________________________________
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(rhopot, bulk_0, bulk_pz, bulk_pz2, rho, dbsfc1, &
+!$ACC     zmean, dz_inv, rho_up, rho_dn, t, s, db_max, bulk_up, bulk_dn, rho_surf, nz, nzmin, nzmax, flag1, flag2, flag3)
+    do node=1, partit%myDim_nod2D+partit%eDim_nod2D
+        nzmin = mesh%ulevels_nod2D(node)
+        nzmax = mesh%nlevels_nod2D(node)
+        do nz=1, mesh%nl
+            rho(nz)      = 0.0_WP
+            bulk_0(nz)   = 0.0_WP
+            bulk_pz(nz)  = 0.0_WP
+            bulk_pz2(nz) = 0.0_WP
+            rhopot(nz)   = 0.0_WP
+            dbsfc1(nz)   = 0.0_WP
+        end do
+        db_max   = 0.0_WP
+
+        ! equation of state
+        do nz=nzmin, nzmax-1
+            t=temp(nz, node)
+            s=salt(nz, node)
+            call densityJM_components_abs(t, s + sref, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
+        end do
+
+        ! density for the PGF and buoyancy difference to the surface
+        do nz=nzmin, nzmax-1
+            rho(nz) = bulk_0(nz) + mesh%Z_3d_n(nz,node)*(bulk_pz(nz)   + mesh%Z_3d_n(nz,node)*bulk_pz2(nz))
+            rho(nz) = rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*mesh%Z_3d_n(nz,node)*real(state_equation))-density_ref(nz,node)
+            density_m_rho0(nz,node) = rho(nz)
+            density_sigma0(nz,node) = rhopot(nz)-density_ref(nz,node)
+            rho_surf=bulk_0(nzmin)   + mesh%Z_3d_n(nz,node)*(bulk_pz(nzmin)   + mesh%Z_3d_n(nz,node)*bulk_pz2(nzmin))
+            rho_surf=rho_surf*rhopot(nzmin)/(rho_surf+0.1_WP*mesh%Z_3d_n(nz,node)*real(state_equation))
+            dbsfc1(nz) = -g * ( rho_surf - (rho(nz)+density_ref(nz,node)) ) / (rho(nz)+density_ref(nz,node))
+            db_max = max(dbsfc1(nz)/abs(mesh%Z_3d_n(nzmin,node)-mesh%Z_3d_n(max(nz, nzmin+1),node)), db_max)
+        end do
+        dbsfc1(nzmax)=dbsfc1(nzmax-1)
+        if (mixing_kpp) then
+            do nz=nzmin, nzmax
+                dbsfc(nz, node)=dbsfc1(nz)
+            end do
+        end if
+
+        ! N2 and the mixed layer depths (see pressure_bv)
+        MLD1(node)=mesh%Z_3d_n(nzmin+1,node)
+        MLD2(node)=mesh%Z_3d_n(nzmin+1,node)
+        MLD3(node)=mesh%Z_3d_n(nzmin+1,node)
+        MLD1_ind(node)=nzmin+1
+        MLD2_ind(node)=nzmin+1
+        MLD3_ind(node)=nzmin+1
+        flag1=.true.
+        flag2=.true.
+        flag3=.true.
+        do nz=nzmin+1,nzmax-1
+            zmean   = 0.5_WP*(mesh%Z_3d_n(nz-1, node)+mesh%Z_3d_n(nz, node))
+            bulk_up = bulk_0(nz-1) + zmean*(bulk_pz(nz-1) + zmean*bulk_pz2(nz-1))
+            bulk_dn = bulk_0(nz)   + zmean*(bulk_pz(nz)   + zmean*bulk_pz2(nz))
+            rho_up  = bulk_up*rhopot(nz-1) / (bulk_up + 0.1_WP*zmean*real(state_equation))
+            rho_dn  = bulk_dn*rhopot(nz)   / (bulk_dn + 0.1_WP*zmean*real(state_equation))
+            dz_inv  = 1.0_WP/(mesh%Z_3d_n(nz-1,node)-mesh%Z_3d_n(nz,node))
+            bvfreq(nz,node)  = -g*dz_inv*(rho_up-rho_dn)/density_0
+            if (bvfreq(nz, node) > db_max .and. flag1) then
+                MLD1(node)    =mesh%Z_3d_n(nz, node)
+                MLD1_ind(node)=nz
+                flag1=.false.
+            end if
+            if ((rhopot(nz)-rhopot(nzmin) > sigma_theta_crit) .and. flag2) then
+                MLD2(node)=MLD2(node)+(mesh%Z_3d_n(nz,node)-MLD2(node))/(rhopot(nz)-rhopot(nz-1)+1.e-20)*(rhopot(1)+sigma_theta_crit-rhopot(nz-1))
+                MLD2_ind(node)=nz
+                flag2=.false.
+            elseif (flag2) then
+                MLD2(node)=mesh%Z_3d_n(nz,node)
+            end if
+            if ((rhopot(nz)-rhopot(nzmin) > sigma_theta_crit_cmor) .and. flag3) then
+                MLD3(node)=MLD3(node)+(mesh%Z_3d_n(nz,node)-MLD3(node))/(rhopot(nz)-rhopot(nz-1)+1.e-20)*(rhopot(1)+sigma_theta_crit_cmor-rhopot(nz-1))
+                MLD3_ind(node)=nz
+                flag3=.false.
+            elseif (flag3) then
+                MLD3(node)=mesh%Z_3d_n(nz,node)
+            end if
+        end do
+        if (flag2) MLD2_ind(node)=nzmax-1
+        if (flag3) MLD3_ind(node)=nzmax-1
+        bvfreq(nzmin,node)=bvfreq(nzmin+1,node)
+        bvfreq(nzmax,node)=bvfreq(nzmax-1,node)
+    end do
+!$ACC END PARALLEL LOOP
+    ! host copies of the results
+    !$ACC UPDATE HOST(density_m_rho0, density_sigma0, bvfreq, MLD1, MLD2, MLD3, MLD1_ind, MLD2_ind, MLD3_ind)
+    if (mixing_kpp) then
+        !$ACC UPDATE HOST(dbsfc)
+    end if
+end subroutine pressure_bv_acc
+#endif
 !
 !
 !

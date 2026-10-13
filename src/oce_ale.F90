@@ -3194,7 +3194,13 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     !___________________________________________________________________________
     ! calculate equation of state, density, pressure and mixed layer depths
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call pressure_bv'//achar(27)//'[0m'
-    call pressure_bv(tracers, partit, mesh)            !!!!! HeRE change is made. It is linear EoS now.
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_start("pd_pressure_bv")
+#endif
+    call pressure_bv(tracers, partit, mesh)
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_end("pd_pressure_bv")
+#endif            !!!!! HeRE change is made. It is linear EoS now.
 
     !___________________________________________________________________________
     ! calculate calculate pressure gradient force
@@ -3202,7 +3208,13 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     if (trim(which_ale)=='linfs') then
         call pressure_force_4_linfs(tracers, partit, mesh)
     else  
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("pd_pressure_force")
+#endif
         call pressure_force_4_zxxxx(tracers, partit, mesh)
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("pd_pressure_force")
+#endif
     end if
     
     !___________________________________________________________________________
@@ -3214,14 +3226,32 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     !___________________________________________________________________________
     ! calculate alpha and beta
     ! it will be used for KPP, Redi, GM etc. Shall we keep it on in general case?
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_start("pd_alpha_beta")
+#endif
     call sw_alpha_beta(tracers%data(1)%values, tracers%data(2)%values, partit, mesh)
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_end("pd_alpha_beta")
+#endif
 
     ! computes the xy gradient of a neutral surface; will be used by Redi, GM etc.
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_start("pd_sigma_xy")
+#endif
     call compute_sigma_xy(tracers%data(1)%values,tracers%data(2)%values, partit, mesh)
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_end("pd_sigma_xy")
+#endif
 
     ! compute both: neutral slope and tapered neutral slope. Can be later combined with compute_sigma_xy
     ! will be primarily used for computing Redi diffusivities. etc?
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_start("pd_neutral_slope")
+#endif
     call compute_neutral_slope(partit, mesh)
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_end("pd_neutral_slope")
+#endif
  
     !___________________________________________________________________________
     call status_check(partit)
@@ -3264,7 +3294,13 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! use FESOM2.0 tuned k-profile parameterization for vertical mixing 
     if (mix_scheme_nmb==1 .or. mix_scheme_nmb==18 ) then
         if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call oce_mixing_KPP'//achar(27)//'[0m' 
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("mix_kpp")
+#endif
         call oce_mixing_KPP(Av, Kv_double, dynamics, tracers, partit, mesh)
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("mix_kpp")
+#endif
 !$OMP PARALLEL DO
         do node=1, partit%myDim_nod2D+partit%eDim_nod2D
            Kv(:, node)=Kv_double(:, node, 1)
