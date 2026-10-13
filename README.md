@@ -1,20 +1,73 @@
 # FESOM_F
 
 FESOM_F is a clean-architecture **Fortran** reimplementation of the FESOM2 ocean + sea-ice model.
-Its numerical kernels are transcribed line-for-line from FESOM2, so the model reproduces a reference
-FESOM2 configuration **bit-for-bit**; the surrounding "plumbing" (data types, the parallel layer,
-configuration, I/O) is redesigned for clarity and future flexibility. The guiding rule is
-*"first reproduce exactly, then optimize."*
+It began as a line-for-line transcription of FESOM2's numerical kernels and reproduced a reference
+FESOM2 configuration **bit-for-bit** up to milestone M10; the surrounding "plumbing" (data types, the
+parallel layer, configuration, I/O) is redesigned for clarity and future flexibility. The guiding rule
+was *"first reproduce exactly, then optimize."* Since v1 the model has moved beyond FESOM2 on purpose
+(see below).
+
+**Main achievements beyond FESOM2:**
+
+- **Bottom at vertices.** The vertex column defines the bottom and each element takes the depth of
+  its shallowest vertex, so no velocity touches topography; tracer cells are straight prisms with the
+  same area at every level.
+- **Vector-invariant momentum advection** (`FESOM3_MOMADV_OPT=1`) with an upwind-blended face
+  vorticity, together with a Courant-dependent explicit/implicit split of the vertical velocity
+  (`FESOM3_WSPLIT`).
+- **Quad and hybrid (triangle + quad) meshes.** One set of 4-slot kernels runs triangle, quad and
+  mixed meshes, from mesh generation and partitioning (`fesom_ini`) to output. FESOM_F runs on the NEMO
+  ORCA025 quad mesh, and triangle meshes give the same results as before at roundoff level.
 
 **Status:** v1 is feature-complete. Milestones M0–M10 are done and tagged (`m0`, `m1`, `m2-mvp`,
 `m3` … `m10`): dynamical core, sea-ice EVP/mEVP, GM/Redi, KPP, zstar ALE, TKE, multi-year production
 runs, Zarr output, and restart/checkpoint. Through M10 the model was byte-exact against FESOM2.
 
-> **The bottom now sits at vertices**, which makes FESOM_F deliberately different from FESOM2 —
-> `nlvls.out` is authoritative and each element's bottom is derived as the shallowest of its 3 or 4
-> vertices, so velocities touching topography vanish by construction. Bit-identity with the oracle
-> is therefore retired, and conservation, mesh-delta and self-consistency gates take its place.
-> See [IMPLEMENTATION.md](IMPLEMENTATION.md) §Bottom at vertices and [TESTING.md](TESTING.md) §6a.
+### Changes since v1 (September–October 2026)
+
+The results now differ from FESOM2 on purpose. Bit-identity with the FESOM2 oracle is retired;
+conservation, mesh-delta, regression and self-consistency gates take its place
+([TESTING.md](TESTING.md) §6a).
+
+- **Bottom at vertices.**
+  - `nlvls.out` is authoritative: the vertex column defines the bottom, and each element takes the
+    depth of its shallowest vertex (3 or 4), so velocities touching topography vanish by construction.
+  - The scalar-cell area is 1-D and the same at every level, and the z* stretch covers the full column.
+  - New conservation and no-leakage gates (`fesom_conserve`), including the Redi path.
+  - See [IMPLEMENTATION.md](IMPLEMENTATION.md) §Bottom at vertices.
+- **Time step:** `FESOM3_STEP_PER_DAY` sets the number of steps per day.
+- **Forcing:**
+  - The time bracket is reset at a year rollover, which fixes the leap-year crash.
+  - Three fixes synced from FESOM2 2.7.4–2.8.0.
+- **Vertical mixing:**
+  - Cubic-spline N² and shear at the interfaces (`FESOM3_N2_SPLINES`, `FESOM3_SHEAR_SPLINES`), and a
+    ramped convective adjustment.
+  - `N2smth_v` is removed.
+- **Momentum advection:** a vector-invariant form (`FESOM3_MOMADV_OPT=1`). The face vorticity is
+  upwind-blended (`FESOM3_RVO_UPWIND`), and implicit w_i advection is in advective form.
+- **w split (`FESOM3_WSPLIT`):** a smooth, Courant-dependent explicit/implicit split of the vertical
+  velocity, with implicit FCT tracer advection.
+- **MUSCL:** up/downwind gradients are computed on the fly (reference RK3 rule), and the stored
+  per-edge gradients are gone. The CORE2 MFCT step is about 9 % faster.
+- **SSH solver:**
+  - Jacobi preconditioner and fewer halo exchanges.
+  - Tolerance and iteration limit can be set with `FESOM3_SSH_SOLTOL` and `FESOM3_SSH_MAXITER`.
+- **Hybrid meshes (triangles and quads):**
+  - Python mesh tools (`tools/mesh/`): NEMO quad mesh, checks, splitting, cut-outs.
+  - `fesom_ini`, a port of FESOM2's mesh_part with METIS 5.1.0 that handles mixed meshes.
+  - Unified 4-slot kernels with kite weights for ocean dynamics, tracers, mixing and GM, forcing and
+    ice coupling, EVP/mEVP and the sea-ice FCT.
+  - Triangle-only meshes give the same results at roundoff level. See §5.
+- **Shared-element velocity sync:**
+  - A border element belongs to every rank that owns one of its vertices. Each step, `update_vel` now
+    sends one designated copy to the other owners (`FESOM3_SHARED_SYNC=0` turns this off).
+  - This fixes the volume leak of the earlier multi-rank runs.
+  - A run resumed from a restart now matches a straight run bit for bit at np > 1.
+- **Zarr I/O:** the chunk writer and reader no longer copy through `transfer()`. This fixes the
+  end-of-run restart crash on large meshes.
+
+Production runs on Levante with these changes conserve volume to roundoff: CORE2 on 512 ranks (about
+95 model years per day) and the NEMO ORCA025 quad mesh on 1280 ranks (about 29 model years per day).
 
 See **[IMPLEMENTATION.md](IMPLEMENTATION.md)** for the architecture and design decisions, and
 **[TESTING.md](TESTING.md)** for how it is validated against FESOM2 and how it scales.
@@ -131,6 +184,22 @@ export FESOM3_FER_GM=1 FESOM3_REDI=1 FESOM3_MIX_TKE=1 FESOM3_SW_PENE=1 FESOM3_CH
 srun -l -n 864 ./build_intel_dp/bin/fesom_lifecycle_native_mr > run.log 2>&1
 ```
 
+The physics options added since v1 are off by default (the shared-element sync is on). The current
+CORE2 and NEMO production runs use `FESOM3_WHICH_ALE=linfs` and add:
+
+```bash
+export FESOM3_MOMADV_OPT=1 FESOM3_RVO_UPWIND=1.0     # vector-invariant momentum advection
+export FESOM3_WSPLIT=1                               # Courant-dependent explicit/implicit w split
+export FESOM3_SHEAR_SPLINES=1 FESOM3_N2_SPLINES=1    # spline shear and N² (set both)
+export FESOM3_STEP_PER_DAY=48                        # 1800 s on CORE2; 72 (1200 s) on NEMO 0.25°
+```
+
+> **On/off switches are presence-based.** `FESOM3_FER_GM`, `FESOM3_REDI`, `FESOM3_MIX_TKE`,
+> `FESOM3_MIX_KPP`, `FESOM3_SW_PENE`, `FESOM3_CHL_SWEENEY`, `FESOM3_WSPLIT`, `FESOM3_SHEAR_SPLINES`,
+> `FESOM3_N2_SPLINES` and `FESOM3_STEP_DIAG` are on whenever the variable is set and not empty, also
+> for `=0`; leave it unset to turn the option off. `FESOM3_MOMADV_OPT`, `FESOM3_RVO_UPWIND`,
+> `FESOM3_WSPLIT_MAXCFL`/`_MINCFL` and `FESOM3_SHARED_SYNC` take values.
+
 **Where the knobs are defined.** The authoritative, always-current list of run variables is the
 environment block at the top of **`src/drivers/fesom_lifecycle_native_mr.F90`** (each is read with
 `get_environment_variable`); the SSH solver knobs and `FESOM3_SHARED_SYNC` in the table below are read
@@ -147,9 +216,13 @@ examples. The most common variables:
 | `FESOM3_NSTEPS` | number of time steps (or use `FESOM3_RUN_LENGTH` + `FESOM3_RUN_UNIT`) |
 | `FESOM3_STEP_PER_DAY` | time steps per day (default `48` = 1800 s; CORE2 uses 48, finer meshes need more) |
 | `FESOM3_WHICHEVP` | sea-ice solver: `0` = EVP, `1` = mEVP |
-| `FESOM3_WHICH_ALE` | vertical coordinate: `linfs`, `zlevel`, `zstar` |
+| `FESOM3_WHICH_ALE` | vertical coordinate: `linfs` (default) or `zstar`. `zlevel` is not ported, and the driver does not reject it: do not use it |
 | `FESOM3_FER_GM`, `FESOM3_REDI` | Gent–McWilliams bolus advection, Redi isopycnal diffusion |
 | `FESOM3_MIX_KPP`, `FESOM3_MIX_TKE`, `FESOM3_SW_PENE` | vertical mixing and shortwave penetration |
+| `FESOM3_SHEAR_SPLINES`, `FESOM3_N2_SPLINES` | cubic-spline shear and N² at the interfaces (set both) |
+| `FESOM3_MOMADV_OPT` | momentum advection: `2` (default) = flux form, `1` = vector invariant |
+| `FESOM3_RVO_UPWIND` | upwind blend of the face vorticity in [0, 1] (default `0`; vector invariant only) |
+| `FESOM3_WSPLIT`, `FESOM3_WSPLIT_MAXCFL`, `FESOM3_WSPLIT_MINCFL` | Courant-dependent explicit/implicit w split; explicit CFL cap (default `1.0`) and onset (default half the cap) |
 | `FESOM3_OUTPUT`, `FESOM3_OUTPUT_EVERY` | output directory (enables output) and step cadence |
 | `FESOM3_RESTART`, `FESOM3_RESTART_LENGTH`, `FESOM3_RESTART_UNIT` | checkpoint directory and cadence |
 | `FESOM3_SHARED_SYNC` | shared border elements: `1` (default) = every step the other owners take the designated owner's `uv` (no volume leak, exact np>1 restarts); `0` = off, the old unsynced copies (A/B comparisons only). Read in `src/infra/mod_shared_elem.F90` |
@@ -196,14 +269,17 @@ of MPI ranks (`srun -n <NP>`); a single-rank run reads the global `nod2d.out`/`e
 So switching meshes — or switching rank counts on the same mesh — is just changing `FESOM3_MESH_DIR`
 and `-n`, provided the matching `dist_<NP>/` exists.
 
-Two meshes are used routinely:
+These meshes are used routinely:
 
 - **pi** — a small test mesh (~3k nodes), shipped with the FESOM2 oracle at
   `/home/a/a270088/port2/fesom2/tests/data/MESHES/pi` (with `dist_1/`, `dist_2/`, `dist_8/`). This is
   the default when `FESOM3_MESH_DIR` is unset, and what the byte-gates and `ctest` use — it runs in
   seconds on a login node.
-- **CORE2** — the global ~1° production mesh (242 917 nodes) at
-  `/pool/data/AWICM/FESOM2/MESHES_FESOM2.1/core2`, with partitions up to `dist_864`.
+- **CORE2** — the global ~1° triangle production mesh (126,858 nodes, 244,659 triangles, 47 levels)
+  at `/pool/data/AWICM/FESOM2/MESHES_FESOM2.1/core2`, with partitions up to `dist_864`.
+- **NEMO 0.25°** — the ORCA025 grid as a quad mesh, `nemo025q_fesom` (915,866 nodes, 902,408 quads,
+  46 levels), and the mixed test mesh `nemo025mix` (685,452 quads and 433,912 triangles on the same
+  nodes), at `/work/ab0995/a270029/meshes/`. Production runs use 1280 ranks and a 1200 s step.
 
 To run on a new mesh, create its `dist_<NP>/` partition for your target rank count with the in-tree
 partitioner **`build_*/bin/fesom_ini`** (FESOM2's `mesh_part`, ported): run it in a work directory
@@ -256,14 +332,14 @@ ds = xr.open_zarr("ssh.fesom.1958.zarr")   # CF time axis, embedded lon/lat
 src/            Fortran source
   params/         precision, constants, configuration            (6 modules)
   types/          mesh / partition / dynamics / tracers / ice    (5)
-  infra/          MPI halo layer, partitioning, clock, timers    (9)
+  infra/          MPI halo layer, partitioning, clock, timers    (10)
   mesh/           mesh read, geometry, rotation                  (4)
-  oce/            ocean physics kernels                          (24)
+  oce/            ocean physics kernels                          (27)
   ice/            sea-ice dynamics, thermodynamics, coupling     (6)
   forcing/        atmospheric forcing read + bulk fluxes         (3)
   io/             Zarr output, decomposition, restart            (8)
   step/           timestep orchestration                         (2)
-  drivers/        program entry points + byte-gate drivers       (32)
+  drivers/        program entry points + byte-gate drivers       (33)
 mesh_part/      fesom_ini sources (FESOM2's mesh partitioner, mixed-mesh capable)
 lib/metis-5.1.0/  vendored METIS used by fesom_ini
 cmake/          compiler-flag and helper modules
