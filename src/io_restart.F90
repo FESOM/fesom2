@@ -169,12 +169,20 @@ subroutine ini_ocean_io(dynamics, tracers, partit, mesh)
   ! Not allocated with split-explicit subcycling (use_ssh_se_subcycl), which does not use the CG solver.
   if (allocated(dynamics%d_eta)) &
   call oce_files%def_node_var_optional('d_eta', 'SSH increment / CG initial guess', 'm', dynamics%d_eta, mesh, partit)
+#if defined(USE_SINGLE_PRECISION)
+  call oce_files%def_node_var('hnode', 'nodal layer thickness', 'm',   mesh%hnode_wp, mesh, partit)
+#else
   call oce_files%def_node_var('hnode', 'nodal layer thickness', 'm',   mesh%hnode, mesh, partit)
+#endif
   ! hnode_new is filled by vert_vel_ale, but fer_solve_Gamma and init_Redi_GM run EARLIER in
   ! the step and read it (oce_fer_gm.F90:82, :266), so with Fer_GM they consume the previous
   ! step's value -> prognostic across the step boundary. Also written by the binary path
   ! (MOD_MESH.F90, write_bin_array(mesh%hnode_new)).
+#if defined(USE_SINGLE_PRECISION)
+  call oce_files%def_node_var_optional('hnode_new', 'nodal layer thickness, next step', 'm', mesh%hnode_new_wp, mesh, partit)
+#else
   call oce_files%def_node_var_optional('hnode_new', 'nodal layer thickness, next step', 'm', mesh%hnode_new, mesh, partit)
+#endif
   
   !___Define the netCDF variables for 3D fields_______________________________
 #ifdef ENABLE_NVHPC_WORKAROUNDS
