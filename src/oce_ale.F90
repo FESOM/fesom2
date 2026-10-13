@@ -1633,6 +1633,104 @@ subroutine update_stiff_mat_ale(partit, mesh)
 !DS
 
 end subroutine update_stiff_mat_ale
+#if defined(ENABLE_OPENACC) && !defined(DIAG_STIFF_DRIFT)
+!
+!
+!===============================================================================
+! update_stiff_mat_ale on the device: every row adds its incident edges in the host order and writes
+! only its own entries, so the rows run in parallel with unchanged results.
+subroutine update_stiff_mat_ale_acc(partit, mesh)
+    use, intrinsic :: iso_fortran_env, only: real64
+    use g_config,only: dt
+    use o_PARAM
+    use MOD_MESH
+    USE MOD_PARTIT
+    implicit none
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(inout), target :: mesh
+    integer                             :: n, i, j, k, row, ed, n2, myDim_nod2D
+    integer                             :: el(2), elnodes(3), elem, npos(3), offset
+    real(kind=WP)                       :: factor, fy(3)
+    logical, save                       :: data_created = .false.
+    real(kind=WP),     pointer          :: values(:)
+#if defined(USE_SINGLE_PRECISION)
+    real(kind=real64), pointer          :: values_full(:)
+#endif
+    integer,           pointer          :: rowptr(:)
+
+#if defined(USE_SINGLE_PRECISION)
+    if (.not. allocated(mesh%ssh_stiff%values_full)) then
+        allocate(mesh%ssh_stiff%values_full(size(mesh%ssh_stiff%values)))
+        mesh%ssh_stiff%values_full = real(mesh%ssh_stiff%values, real64)
+    end if
+    values_full => mesh%ssh_stiff%values_full
+#endif
+    values => mesh%ssh_stiff%values
+    rowptr => mesh%ssh_stiff%rowptr
+    if (.not. data_created) then
+        ! the values are cumulative: start from the host copy once, then keep them on the device
+#if defined(USE_SINGLE_PRECISION)
+        !$ACC ENTER DATA COPYIN(values, values_full)
+#else
+        !$ACC ENTER DATA COPYIN(values)
+#endif
+        !$ACC ENTER DATA CREATE(mesh%dhe)
+        data_created = .true.
+    end if
+    !$ACC UPDATE DEVICE(mesh%dhe)
+
+    factor=g*dt*alpha*theta
+    myDim_nod2D=partit%myDim_nod2D
+    !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(offset, n2, ed, el, j, i, elem, elnodes, k, n, npos, fy)
+    do row=1, myDim_nod2D
+        offset=rowptr(row)-rowptr(1)
+        do n2=1, mesh%nod_in_edge2D_num(row)
+            ed=mesh%nod_in_edge2D(n2,row)
+            el(1)=mesh%edge_tri(1,ed)
+            el(2)=mesh%edge_tri(2,ed)
+            j=1
+            if (mesh%nod_in_edge2D_sgn(n2,row)<0) j=2
+            do i=1, 2
+                elem=el(i)
+                if (elem<1) cycle
+                elnodes(1)=mesh%elem2D_nodes(1,elem)
+                elnodes(2)=mesh%elem2D_nodes(2,elem)
+                elnodes(3)=mesh%elem2D_nodes(3,elem)
+                do k=1, 3
+                   do n=1, rowptr(row+1)-rowptr(row)
+                      if (elnodes(k)==mesh%nn_pos(n, row)) then
+                          npos(k)=offset+n
+                          EXIT
+                      end if
+                   end do
+                end do
+                do k=1, 3
+                    fy(k) = -mesh%dhe(elem)* &
+                            ( mesh%gradient_sca(k,elem)   * mesh%edge_cross_dxdy(2*i  ,ed)   &
+                             -mesh%gradient_sca(k+3,elem) * mesh%edge_cross_dxdy(2*i-1,ed) )
+                    if (i==2) fy(k)=-fy(k)
+                    if (j==2) fy(k)=-fy(k)
+#if defined(USE_SINGLE_PRECISION)
+                    values_full(npos(k))=values_full(npos(k)) + real(fy(k)*factor, real64)
+#else
+                    values(npos(k))=values(npos(k)) + fy(k)*factor
+#endif
+                end do
+            end do
+        end do
+    end do
+    !$ACC END PARALLEL LOOP
+#if defined(USE_SINGLE_PRECISION)
+    !$ACC PARALLEL LOOP DEFAULT(PRESENT)
+    do n=1, size(values)
+        values(n) = real(values_full(n), WP)
+    end do
+    !$ACC END PARALLEL LOOP
+    !$ACC UPDATE HOST(values_full)
+#endif
+    !$ACC UPDATE HOST(values)
+end subroutine update_stiff_mat_ale_acc
+#endif
 !
 !
 !===============================================================================
@@ -3901,7 +3999,13 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
 #if defined (FESOM_PROFILING)
         call fesom_profiler_start("ssh_stiff_update")
 #endif
-        if (.not. trim(which_ale)=='linfs') call update_stiff_mat_ale(partit, mesh)
+        if (.not. trim(which_ale)=='linfs') then
+#if defined(ENABLE_OPENACC) && !defined(DIAG_STIFF_DRIFT)
+            call update_stiff_mat_ale_acc(partit, mesh)
+#else
+            call update_stiff_mat_ale(partit, mesh)
+#endif
+        end if
 #if defined (FESOM_PROFILING)
         call fesom_profiler_end("ssh_stiff_update")
 #endif
