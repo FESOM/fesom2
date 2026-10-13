@@ -471,7 +471,7 @@ subroutine read_initial_conditions(which_readr, ice, dynamics, tracers, partit, 
   call MPI_Bcast(binfiles_exist, 1, MPI_LOGICAL, RAW_RESTART_METADATA_RANK, partit%MPI_COMM_FESOM, mpierr)
 
   ! Read restart files in order of preference
-  if(rawfiles_exist) then
+  if(rawfiles_exist .and. raw_restart_length_unit /= "off") then
     ! Read raw/core dump restart
     which_readr = 1
     ! Note: This will need to be updated once we have read functions that accept paths
