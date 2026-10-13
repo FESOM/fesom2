@@ -2200,7 +2200,8 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
     
 #ifdef ENABLE_OPENACC
     ! the device version covers zstar with the momentum on the device
-    if (trim(which_ALE)=='zstar' .and. mom_on_device) then
+    vv_on_device = trim(which_ALE)=='zstar' .and. mom_on_device
+    if (vv_on_device) then
         call vert_vel_ale_acc(dynamics, partit, mesh)
         return
     end if
@@ -4134,6 +4135,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
 #endif
 #if defined(_OPENACC)
         gm_on_dev = sxy_on_device .and. gm_device_ok(mesh)
+        redi_on_device = gm_on_dev .and. Redi
 #endif
         if (gm_on_dev) then
             call init_Redi_GM_acc(dynamics, partit, mesh)

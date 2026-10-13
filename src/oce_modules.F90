@@ -343,6 +343,9 @@ real(kind=WP), allocatable,dimension(:,:)   :: density_dmoc
 real(kind=WP), allocatable,dimension(:,:)   :: pgf_x, pgf_y
 ! OpenACC: pgf_x/pgf_y of this step were computed on the device (host copy not current)
 logical                                     :: pgf_on_device = .false.
+! OpenACC: vert_vel_ale ran on the device in this step (w, w_e, UV, helem, zbar_3d_n,
+! hnode_new current there); Ki and slope_tapered computed on the device (GM/Redi)
+logical                                     :: vv_on_device = .false., redi_on_device = .false.
 
 !_______________________________________________________________________________
 !!PS ! dummy arrays

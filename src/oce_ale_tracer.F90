@@ -188,9 +188,13 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 #if defined (FESOM_PROFILING)
         call fesom_profiler_start("tr_uploads")
 #endif
-        !$ACC UPDATE DEVICE(dynamics%w, dynamics%w_e, dynamics%uv) !!! async(1) 
+        ! after vert_vel_ale_acc w, w_e, UV, helem, zbar_3d_n and hnode_new are current on the device
+        if (.not. vv_on_device) then
+            !$ACC UPDATE DEVICE(dynamics%w, dynamics%w_e, dynamics%uv)
+            !$ACC UPDATE DEVICE (mesh%helem, mesh%hnode_new, mesh%zbar_3d_n)
+        end if
 !!!     !$ACC UPDATE DEVICE(tracers%work%fct_ttf_min, tracers%work%fct_ttf_max, tracers%work%fct_plus, tracers%work%fct_minus)
-        !$ACC UPDATE DEVICE (mesh%helem, mesh%hnode, mesh%hnode_new, mesh%zbar_3d_n, mesh%z_3d_n)
+        !$ACC UPDATE DEVICE (mesh%hnode, mesh%z_3d_n)
 #ifdef ENABLE_OPENACC
         if (gm_on_device) then
             nlu = size(UV,2)
@@ -216,7 +220,10 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 #if defined (FESOM_PROFILING)
         call fesom_profiler_end("tr_uploads")
 #endif
-        !$ACC UPDATE DEVICE (Ki, slope_tapered) ! computed on the host (GM/Redi); used by the diffusion
+        ! used by the diffusion; computed on the host unless GM/Redi ran on the device
+        if (.not. redi_on_device) then
+            !$ACC UPDATE DEVICE (Ki, slope_tapered)
+        end if
 #ifdef ENABLE_OPENACC
         ! inputs of the implicit vertical diffusion, computed on the host (mixing, forcing,
         ! vertical velocity split); unallocated ones (e.g. the KPP arrays of another

@@ -687,6 +687,10 @@ subroutine init_Redi_GM_acc(dynamics, partit, mesh)
     call exchange_nod(fer_c, partit)
     call exchange_nod(fer_k, partit)
     if (Redi) call exchange_nod(Ki, partit)
+    ! the Redi diffusion uses Ki on the device, halos included
+    if (Redi .and. partit%npes > 1) then
+        !$ACC UPDATE DEVICE(Ki)
+    end if
 end subroutine init_Redi_GM_acc
 !
 !
