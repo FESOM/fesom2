@@ -1880,6 +1880,12 @@ subroutine compute_hbar_ale(dynamics, partit, mesh)
     ssh_rhs    => dynamics%ssh_rhs(:)
     ssh_rhs_old=> dynamics%ssh_rhs_old(:)
 
+#ifdef ENABLE_OPENACC
+    if (mom_on_device .and. .not. trim(which_ALE)=='linfs') then
+        ! divergence of the transports on the device (as in compute_ssh_rhs_ale_acc)
+        call compute_hbar_rhs_acc(dynamics, partit, mesh)
+    else
+#endif
     !___________________________________________________________________________
     ! compute the rhs
 
@@ -1953,6 +1959,9 @@ subroutine compute_hbar_ale(dynamics, partit, mesh)
         call exchange_nod(ssh_rhs_old, partit)
 !$OMP BARRIER
     end if 
+#ifdef ENABLE_OPENACC
+    end if
+#endif
     !___________________________________________________________________________
     ! update the thickness
 !$OMP PARALLEL DO
@@ -1982,6 +1991,68 @@ subroutine compute_hbar_ale(dynamics, partit, mesh)
     end do
 !$OMP END PARALLEL DO
 end subroutine compute_hbar_ale
+#ifdef ENABLE_OPENACC
+!
+!
+!===============================================================================
+! The ssh_rhs_old part of compute_hbar_ale (zstar/zlevel) on the device: the same per-node gather
+! over the incident edges in ascending edge order; ssh_rhs_old goes back to the host.
+subroutine compute_hbar_rhs_acc(dynamics, partit, mesh)
+    implicit none
+    type(t_dyn)   , intent(inout), target :: dynamics
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh),   intent(inout), target :: mesh
+    integer       :: ed, el1, el2, n, k, nz, nzmin, nzmax
+    real(kind=WP) :: c1, c2, deltaX1, deltaX2, deltaY1, deltaY2
+    real(kind=WP), dimension(:,:,:), pointer :: UV
+    real(kind=WP), dimension(:)    , pointer :: ssh_rhs_old
+    UV         => dynamics%uv(:,:,:)
+    ssh_rhs_old=> dynamics%ssh_rhs_old(:)
+    ! ssh_rhs_old and water_flux are on the device (compute_ssh_rhs_ale_acc)
+    !$ACC UPDATE DEVICE(UV, water_flux)
+
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(ed, el1, el2, k, nz, nzmin, nzmax, c1, c2, deltaX1, deltaX2, deltaY1, deltaY2)
+    do n=1, partit%myDim_nod2D+partit%eDim_nod2D
+        ssh_rhs_old(n)=0.0_WP
+        do k=1, mesh%nod_in_edge2D_num(n)
+            ed =mesh%nod_in_edge2D(k,n)
+            el1=mesh%edge_tri(1,ed)
+            el2=mesh%edge_tri(2,ed)
+            c1=0.0_WP
+            deltaX1=mesh%edge_cross_dxdy(1,ed)
+            deltaY1=mesh%edge_cross_dxdy(2,ed)
+            nzmin = mesh%ulevels(el1)
+            nzmax = mesh%nlevels(el1)-1
+            do nz=nzmin, nzmax
+                c1=c1+(UV(2,nz,el1)*deltaX1-UV(1,nz,el1)*deltaY1)*mesh%helem(nz,el1)
+            end do
+            c2=0.0_WP
+            if(el2>0) then
+                deltaX2=mesh%edge_cross_dxdy(3,ed)
+                deltaY2=mesh%edge_cross_dxdy(4,ed)
+                nzmin = mesh%ulevels(el2)
+                nzmax = mesh%nlevels(el2)-1
+                do nz=nzmin, nzmax
+                    c2=c2-(UV(2,nz,el2)*deltaX2-UV(1,nz,el2)*deltaY2)*mesh%helem(nz,el2)
+                end do
+            end if
+            if (mesh%nod_in_edge2D_sgn(k,n)>0) then
+                ssh_rhs_old(n)=ssh_rhs_old(n)+(c1+c2)
+            else
+                ssh_rhs_old(n)=ssh_rhs_old(n)-(c1+c2)
+            end if
+        end do
+        if (n <= partit%myDim_nod2D) then
+            if (mesh%ulevels_nod2D(n) == 1) then
+                ssh_rhs_old(n)=ssh_rhs_old(n)-water_flux(n)*mesh%areasvol(mesh%ulevels_nod2D(n),n)
+            end if
+        end if
+    end do
+!$ACC END PARALLEL LOOP
+    !$ACC UPDATE HOST(ssh_rhs_old)
+    call exchange_nod(ssh_rhs_old, partit)
+end subroutine compute_hbar_rhs_acc
+#endif
 !
 !
 !===============================================================================
@@ -3943,7 +4014,13 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     !___________________________________________________________________________
     ! Do horizontal and vertical scaling of GM/Redi  diffusivity 
     if (Fer_GM .or. Redi) then
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("gm_init_redi")
+#endif
         call init_Redi_GM(partit, mesh)
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("gm_init_redi")
+#endif
     end if
     
     ! Implementation of Gent & McWiliams parameterization after R. Ferrari et al., 2010
@@ -3951,7 +4028,13 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     if (Fer_GM .or. use_mle) then
         if (Fer_GM) then
             if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call fer_solve_Gamma'//achar(27)//'[0m'
+#if defined (FESOM_PROFILING)
+            call fesom_profiler_start("gm_solve_gamma")
+#endif
             call fer_solve_Gamma(partit, mesh)
+#if defined (FESOM_PROFILING)
+            call fesom_profiler_end("gm_solve_gamma")
+#endif
         end if
         ! Fox-Kemper mixed-layer eddies add to the same streamfunction, so the bolus
         ! velocity, the vertical velocity from continuity, tracer advection and the
@@ -3960,7 +4043,13 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
             if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call mle_add_gamma'//achar(27)//'[0m'
             call mle_add_gamma(partit, mesh)
         end if
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("gm_gamma2vel")
+#endif
         call fer_gamma2vel(dynamics, partit, mesh)
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("gm_gamma2vel")
+#endif
     end if
     t7=MPI_Wtime()
 #if defined (FESOM_PROFILING)
