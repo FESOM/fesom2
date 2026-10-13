@@ -895,6 +895,8 @@ contains
     ! on the device from here on (host copy refreshed before restart and blowup output)
     !$ACC ENTER DATA COPYIN (f%dynamics%work) CREATE (f%dynamics%uv_rhs, f%dynamics%eta_n, f%dynamics%work%uvnode_rhs)
     !$ACC ENTER DATA COPYIN (f%dynamics%uv_rhsAB, f%mesh%coriolis, f%mesh%areasvol_inv) CREATE (pgf_x, pgf_y)
+    ! viscosity filter (visc_filt_bcksct_acc); u_b/v_b exist only for opt_visc 5
+    !$ACC ENTER DATA COPYIN (f%mesh%elem_edges) CREATE (f%dynamics%work%u_c, f%dynamics%work%v_c, f%dynamics%work%u_b, f%dynamics%work%v_b)
     !$ACC ENTER DATA CREATE (f%tracers%work%del_ttf)
     !$ACC ENTER DATA CREATE (f%tracers%data, f%tracers%work) 
     do tr_num=1, f%tracers%num_tracers

@@ -12,15 +12,12 @@ module oce_ale_vel_rhs_module
     USE g_comm_auto
     USE g_sbf, only: l_mslp
     use oce_ale_ssh_splitexpl_subcycl_module, only: momentum_adv_scalar_transpv
-    use oce_dyn_module, only: viscosity_filter
+    use oce_dyn_module, only: viscosity_filter, mom_on_device
 
     implicit none
 
     private
     public :: compute_vel_rhs, momentum_adv_scalar
-    ! OpenACC: the momentum rhs of this step is computed on the device (set in
-    ! compute_vel_rhs; .false. for configurations the device path does not cover)
-    logical :: mom_on_device = .false.
     ! column work arrays of momentum_adv_scalar have this fixed size (private arrays of
     ! run-time size would come from the per-thread device heap)
     integer, parameter :: mom_nl_max = 128
@@ -348,10 +345,8 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
 !$OMP END PARALLEL DO
 #else
 !$ACC END PARALLEL LOOP
-    if (mom_on_device) then
-        ! viscosity filter and implicit vertical viscosity still run on the host
-        !$ACC UPDATE HOST(UV_rhs)
-    else
+    ! on the device path UV_rhs stays on the device for the viscosity filter
+    if (.not. mom_on_device) then
         !$ACC UPDATE DEVICE(UV_rhsAB)
     end if
 #endif

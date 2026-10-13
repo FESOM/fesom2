@@ -17,6 +17,10 @@ module oce_dyn_module
               visc_filt_bcksct, visc_filt_bilapl, visc_filt_bidiff, &
               compute_ke_wrho, compute_apegen, compute_PePm, &
               check_viscopt, check_validviscopt_5
+    public :: mom_on_device
+    ! OpenACC: the momentum rhs of this step is computed on the device (set in
+    ! compute_vel_rhs; .false. for configurations the device path does not cover)
+    logical :: mom_on_device = .false.
 
 contains
 
@@ -185,6 +189,11 @@ subroutine viscosity_filter(option, dynamics, partit, mesh)
     ! h_viscosity_leiht needs vorticity, so vorticity array should be 
     ! allocated. At present, there are two rounds of smoothing in 
     ! h_viscosity. 
+    ! on the device path UV_rhs comes from compute_vel_rhs on the device; only option 5
+    ! has a device version
+    if (mom_on_device .and. option/=5) then
+        !$ACC UPDATE HOST(dynamics%uv_rhs)
+    end if
     SELECT CASE (option)
         CASE (5)
             if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[37m'//'         --> call visc_filt_bcksct'//achar(27)//'[0m'
@@ -205,6 +214,10 @@ subroutine viscosity_filter(option, dynamics, partit, mesh)
             call par_abort(partit%MPI_COMM_FESOM, partit%mype)
             stop
     END SELECT
+    ! the implicit vertical viscosity still runs on the host
+    if (mom_on_device .and. option==5) then
+        !$ACC UPDATE HOST(dynamics%uv_rhs)
+    end if
 end subroutine viscosity_filter  
 !
 !
@@ -229,6 +242,12 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
     V_c    => dynamics%work%v_c(:,:)
     U_b    => dynamics%work%u_b(:,:)
     V_b    => dynamics%work%v_b(:,:)
+#ifdef ENABLE_OPENACC
+    if (mom_on_device) then
+        call visc_filt_bcksct_acc(dynamics, partit, mesh)
+        return
+    end if
+#endif
 
     !___________________________________________________________________________
     ! An analog of harmonic viscosity operator.
@@ -346,6 +365,125 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
 !$OMP END DO
 !$OMP END PARALLEL
 end subroutine visc_filt_bcksct
+#ifdef ENABLE_OPENACC
+!
+!
+!_______________________________________________________________________________
+! visc_filt_bcksct on the device (UV and UV_rhs present there), same arithmetic per element and level;
+! update_u/update_v are replaced by direct accumulation (no private arrays of run-time size).
+SUBROUTINE visc_filt_bcksct_acc(dynamics, partit, mesh)
+    IMPLICIT NONE
+    type(t_dyn)   , intent(inout), target :: dynamics
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
+    !___________________________________________________________________________
+    real(kind=8)  :: u1, v1, len, vi, gamma0, gamma1, gamma2, easybsreturn
+    integer       :: nz, nl1, ed, el1, el2, k, elem, nzmin, nzmax, e1, e2, e3, q
+    !___________________________________________________________________________
+    real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
+    real(kind=WP), dimension(:,:)  , pointer :: U_c, V_c, U_b, V_b
+    UV     => dynamics%uv(    :,:,:)
+    UV_rhs => dynamics%uv_rhs(:,:,:)
+    U_c    => dynamics%work%u_c(:,:)
+    V_c    => dynamics%work%v_c(:,:)
+    U_b    => dynamics%work%u_b(:,:)
+    V_b    => dynamics%work%v_b(:,:)
+    gamma0       = dynamics%visc_gamma0
+    gamma1       = dynamics%visc_gamma1
+    gamma2       = dynamics%visc_gamma2
+    easybsreturn = dynamics%visc_easybsreturn
+    nl1          = size(U_b, 1)
+
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(nz)
+    DO elem=1, partit%myDim_elem2D+partit%eDim_elem2D
+        DO nz=1, nl1
+            U_b(nz, elem) = 0.0_WP
+            V_b(nz, elem) = 0.0_WP
+            U_c(nz, elem) = 0.0_WP
+            V_c(nz, elem) = 0.0_WP
+        END DO
+    END DO
+!$ACC END PARALLEL LOOP
+
+    !___________________________________________________________________________
+    ! each owned element gathers the contributions of its three edges in ascending
+    ! edge order, as on the host
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(e1, e2, e3, q, ed, el1, el2, len, nzmin, nzmax, nz, u1, v1, vi)
+    DO elem=1, partit%myDim_elem2D
+        e1=mesh%elem_edges(1,elem)
+        e2=mesh%elem_edges(2,elem)
+        e3=mesh%elem_edges(3,elem)
+        if (e1>e2) then; q=e1; e1=e2; e2=q; end if
+        if (e2>e3) then; q=e2; e2=e3; e3=q; end if
+        if (e1>e2) then; q=e1; e1=e2; e2=q; end if
+        DO q=1,3
+            if (q==1) ed=e1
+            if (q==2) ed=e2
+            if (q==3) ed=e3
+            if(partit%myList_edge2D(ed)>mesh%edge2D_in) cycle
+            el1=mesh%edge_tri(1,ed)
+            el2=mesh%edge_tri(2,ed)
+            len=sqrt(mesh%elem_area(el1)+mesh%elem_area(el2))
+            nzmax = min(mesh%nlevels(el1), mesh%nlevels(el2))
+            nzmin = max(mesh%ulevels(el1), mesh%ulevels(el2))
+            DO  nz=nzmin,nzmax-1
+                u1=UV(1,nz,el1)-UV(1,nz,el2)
+                v1=UV(2,nz,el1)-UV(2,nz,el2)
+                vi=dt*max(gamma0, max(gamma1*sqrt(u1*u1+v1*v1), gamma2*(u1*u1+v1*v1)))*len
+                if (el1==elem) then
+                    U_b(nz, elem)=U_b(nz, elem)-(u1*vi)/mesh%elem_area(elem)
+                    V_b(nz, elem)=V_b(nz, elem)-(v1*vi)/mesh%elem_area(elem)
+                else
+                    U_b(nz, elem)=U_b(nz, elem)+(u1*vi)/mesh%elem_area(elem)
+                    V_b(nz, elem)=V_b(nz, elem)+(v1*vi)/mesh%elem_area(elem)
+                end if
+            END DO
+        END DO
+    END DO
+!$ACC END PARALLEL LOOP
+    call exchange_elem(U_b, partit, luse_g2g=.true.)
+    call exchange_elem(V_b, partit, luse_g2g=.true.)
+
+    !___________________________________________________________________________
+    ! smooth from elements to nodes
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(nzmin, nzmax, nz, k, elem, vi, u1, v1)
+    DO ed=1, partit%myDim_nod2D
+        nzmin = mesh%ulevels_nod2D(ed)
+        nzmax = mesh%nlevels_nod2D(ed)
+        DO nz=nzmin, nzmax-1
+            vi=0.0_WP
+            u1=0.0_WP
+            v1=0.0_WP
+            DO k=1, mesh%nod_in_elem2D_num(ed)
+                elem=mesh%nod_in_elem2D(k,ed)
+                vi=vi+mesh%elem_area(elem)
+                u1=u1+U_b(nz,elem)*mesh%elem_area(elem)
+                v1=v1+V_b(nz,elem)*mesh%elem_area(elem)
+            END DO
+            U_c(nz,ed)=u1/vi
+            V_c(nz,ed)=v1/vi
+        END DO
+    END DO
+!$ACC END PARALLEL LOOP
+    call exchange_nod(U_c, V_c, partit, luse_g2g=.true.)
+
+    !___________________________________________________________________________
+    ! back to elements: unsmoothed term minus the backscatter part of the smoothed one
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(nzmin, nzmax, nz, e1, e2, e3)
+    DO ed=1, partit%myDim_elem2D
+        e1 = mesh%elem2D_nodes(1,ed)
+        e2 = mesh%elem2D_nodes(2,ed)
+        e3 = mesh%elem2D_nodes(3,ed)
+        nzmin = mesh%ulevels(ed)
+        nzmax = mesh%nlevels(ed)
+        DO nz=nzmin, nzmax-1
+            UV_rhs(1,nz,ed)=UV_rhs(1,nz,ed)+U_b(nz,ed) -easybsreturn*(U_c(nz,e1)+U_c(nz,e2)+U_c(nz,e3))/3.0_WP
+            UV_rhs(2,nz,ed)=UV_rhs(2,nz,ed)+V_b(nz,ed) -easybsreturn*(V_c(nz,e1)+V_c(nz,e2)+V_c(nz,e3))/3.0_WP
+        END DO
+    END DO
+!$ACC END PARALLEL LOOP
+end subroutine visc_filt_bcksct_acc
+#endif
 !
 !
 !_______________________________________________________________________________
