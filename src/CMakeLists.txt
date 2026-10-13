@@ -588,7 +588,7 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL NVHPC )
    target_compile_definitions(${PROJECT_NAME} PRIVATE ENABLE_NVHPC_WORKAROUNDS)
    # default real kind follows USE_SINGLE_PRECISION
    if(USE_SINGLE_PRECISION)
-      set(_FESOM_NVHPC_RKIND -Mr4)
+      set(_FESOM_NVHPC_RKIND -r4)
    else()
       set(_FESOM_NVHPC_RKIND -Mr8)
    endif()
