@@ -326,7 +326,7 @@ subroutine EVPdynamics(ice, partit, mesh)
     ! If Icepack is used, always update the tracers
 #if defined (__icepack)
     a_ice_old(:)  = a_ice(:)
-    m_ice_old(:)  = a_ice(:)
+    m_ice_old(:)  = m_ice(:)
     m_snow_old(:) = m_snow(:)
     call icepack_to_fesom (nx_in=(partit%myDim_nod2D+partit%eDim_nod2D), &
                             aice_out=a_ice,                 &
