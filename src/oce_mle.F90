@@ -43,8 +43,11 @@ subroutine mle_add_gamma(partit, mesh)
     !          in the restart; it respins within a few decay times.
     !  Ce, Lf, tau and the limits are namelist-tunable (oce_dyn)
     !
-    !  GM and MLE do not double count: the ODM95 taper drives GM to zero wherever
-    !  the neutral slope exceeds ODM95_Scr, which is the whole mixed layer front.
+    !  MLE is added on top of GM, as in other ocean models: GM is not switched off
+    !  in the mixed layer. Its streamfunction goes to zero at the surface through
+    !  the boundary conditions of fer_solve_Gamma, and MLE acts on the mixed layer
+    !  only. The ODM95 slope taper does not reduce the GM coefficient unless
+    !  K_GM_Ktaper=.true., and then only down to K_GM_min.
     !
     !  Gamma is parallel to grad_h(b), as in fer_solve_Gamma, whose interior limit
     !  is Gamma = K*grad_h(b)/N**2. mu vanishes at both ends of the range, so the
