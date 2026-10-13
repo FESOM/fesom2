@@ -16,6 +16,9 @@ module oce_ale_tracer_module
     USE g_forcing_arrays
     USE oce_adv_tra_driver_module, only: do_oce_adv_tra
     USE fesom_conservation_module, only: conservation_probe
+#if defined (FESOM_PROFILING)
+    use fesom_profiler
+#endif
     USE diagnostics, only: ldiag_DVD, ldiag_diapmix, density_dmoc_avg, diap_avg_count, &
             dmoc_avg_count, dmoc_is_due, dT_diap, dS_diap, dd_diap
     USE g_forcing_param, only: use_age_tracer
@@ -174,9 +177,15 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     
     !___________________________________________________________________________
     ! loop over all tracers
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("tr_uploads")
+#endif
         !$ACC UPDATE DEVICE(dynamics%w, dynamics%w_e, dynamics%uv) !!! async(1) 
 !!!     !$ACC UPDATE DEVICE(tracers%work%fct_ttf_min, tracers%work%fct_ttf_max, tracers%work%fct_plus, tracers%work%fct_minus)
         !$ACC UPDATE DEVICE (mesh%helem, mesh%hnode, mesh%hnode_new, mesh%zbar_3d_n, mesh%z_3d_n)
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("tr_uploads")
+#endif
         !$ACC UPDATE DEVICE (Ki, slope_tapered) ! computed on the host (GM/Redi); used by the diffusion
 #ifdef ENABLE_OPENACC
         ! inputs of the implicit vertical diffusion, computed on the host (mixing, forcing,
@@ -238,8 +247,14 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[37m'//'         --> call init_tracers_AB'//achar(27)//'[0m'
         ! values were last changed on the host (diffusion, surface fluxes); valuesold
         ! and valuesAB stay on the device, where init_tracers_AB updates them.
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("tr_init_ab")
+#endif
         !$ACC UPDATE DEVICE(tracers%data(tr_num)%values)
         call init_tracers_AB(tr_num, tracers, partit, mesh)
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("tr_init_ab")
+#endif
         if (conservation_freq > 0) call conservation_probe('start', 'a', tr_num, tracers, partit, mesh)
  
         ! advect tracers
@@ -247,7 +262,13 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 	!here update only those initialized in the init_tracers. (values, valuesAB, edge_up_dn_grad, ...)
         ! it will update del_ttf with contributions from horizontal and vertical advection parts (del_ttf_advhoriz and del_ttf_advvert)
 	!$ACC wait(1)
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("tr_adv")
+#endif
         call do_oce_adv_tra(dt, UV, Wvel, Wvel_i, Wvel_e, tr_num, dynamics, tracers, partit, mesh)
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("tr_adv")
+#endif
 
         !___________________________________________________________________________
         ! update array for total tracer flux del_ttf with the fluxes from horizontal
@@ -298,7 +319,13 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         ! diffuse tracers
         if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[37m'//'         --> call diff_tracers_ale'//achar(27)//'[0m'
         if (conservation_freq > 0) call conservation_probe('advection', 'a', tr_num, tracers, partit, mesh)
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("tr_diff")
+#endif
         call diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("tr_diff")
+#endif
 
         !___________________________________________________________________________
         ! Radioactive decay of 14C and 39Ar
@@ -331,7 +358,13 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         end if
         if (conservation_freq > 0) call conservation_probe('relaxation', 'b', tr_num, tracers, partit, mesh)
 
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("tr_exchange")
+#endif
         call exchange_nod(tracers%data(tr_num)%values(:,:), partit)
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("tr_exchange")
+#endif
 !$OMP BARRIER
 
 !!!        !$ACC UPDATE HOST (tracers%work%fct_ttf_min, tracers%work%fct_ttf_max, tracers%work%fct_plus, tracers%work%fct_minus) &

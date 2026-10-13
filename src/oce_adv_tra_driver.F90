@@ -98,8 +98,13 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
         ! Low-order tendency: each node gathers the horizontal fluxes of its incident edges
         ! (mesh%nod_in_edge2D, sign +1 for the edge's first node, -1 for its second) in
         ! ascending edge order, so the result does not depend on the number of threads.
+        ! (also the OpenACC version without atomics: reproducible gather, no host round trip)
+#if !defined(ENABLE_OPENACC) || defined(DISABLE_OPENACC_ATOMICS)
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, k, edge, el, nl1, nu1, nl2, nu2, nu12, nl12, nz)
+#else
+        !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(k, edge, el, nl1, nu1, nl2, nu2, nu12, nl12, nz) VECTOR_LENGTH(acc_vl)
+#endif
         do n=1, partit%myDim_nod2D+partit%eDim_nod2D
             do k=1, mesh%nod_in_edge2D_num(n)
                 edge=mesh%nod_in_edge2D(k,n)
@@ -120,7 +125,11 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
                 end do
             end do
         end do
+#ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
+#else
+        !$ACC END PARALLEL LOOP
+#endif
 #else
 #if !defined(DISABLE_OPENACC_ATOMICS)
         !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
@@ -514,8 +523,13 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
     ! Horizontal: each node gathers the fluxes of its incident edges (mesh%nod_in_edge2D,
     ! sign +1 for the edge's first node, -1 for its second). No two threads write the same
     ! node, and the summation order per node is the ascending edge order at any thread count.
+    ! (also the OpenACC version without atomics: reproducible gather, no host round trip)
+#if !defined(ENABLE_OPENACC) || defined(DISABLE_OPENACC_ATOMICS)
 #ifndef ENABLE_OPENACC
 !$OMP DO
+#else
+    !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(k, edge, el, nl1, nu1, nl2, nu2, nu12, nl12, nz) VECTOR_LENGTH(acc_vl)
+#endif
     do n=1, partit%myDim_nod2D+partit%eDim_nod2D
         do k=1, mesh%nod_in_edge2D_num(n)
             edge=mesh%nod_in_edge2D(k,n)
@@ -536,8 +550,12 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
             end do
         end do
     end do
+#ifndef ENABLE_OPENACC
 !$OMP END DO
 !$OMP END PARALLEL
+#else
+    !$ACC END PARALLEL LOOP
+#endif
 #else
 #if !defined(DISABLE_OPENACC_ATOMICS)
     !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
