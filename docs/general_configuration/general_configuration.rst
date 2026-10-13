@@ -23,7 +23,7 @@ Section &timestep
 Section &clockinit
 """"""""""""""""""
 
-- **timenew=0.0**, **daynew=1**, **yearnew=1958** define the starting time stamp. If this triplet matches the first line of ``<runid>.clock`` the model performs a cold start from initial conditions; otherwise it expects restart files at ``RestartInPath`` and does a warm start. The driver resets ``timenew`` to ``0`` when it encounters ``86400`` to keep times in the ``[0,86400)`` range.
+- **timenew=0.0**, **daynew=1**, **yearnew=1958**. The start date of a run is taken from the clock file ``<runid>.clock``, not from this section: if the two lines of the clock file are identical the model performs a cold start from initial conditions; otherwise it expects restart files at ``RestartInPath`` and does a warm start. ``yearnew`` is the first year of the experiment and has to stay the same in all legs; with ``use_transit`` the input year of the transient tracers is counted from it. ``timenew`` and ``daynew`` are not used. In the clock file the day is the day of the year, and the driver resets the time to ``0`` when it encounters ``86400`` to keep times in the ``[0,86400)`` range.
 
 Section &paths
 """"""""""""""
