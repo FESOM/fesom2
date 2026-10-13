@@ -187,6 +187,10 @@ subroutine ini_ocean_io(dynamics, tracers, partit, mesh)
   !___Define the netCDF variables for 3D fields_______________________________
 #ifdef ENABLE_NVHPC_WORKAROUNDS
   dynamics_workaround => dynamics
+  tracers_workaround  => tracers
+  if (allocated(tracer_restart_name)) deallocate(tracer_restart_name)
+  allocate(tracer_restart_name(tracers%num_tracers))
+  tracer_restart_name = ''
 #endif
   call oce_files%def_elem_var('u', 'zonal velocity',        'm/s', dynamics%uv(1,:,:), mesh, partit)
   call oce_files%def_elem_var('v', 'meridional velocity',   'm/s', dynamics%uv(2,:,:), mesh, partit)
@@ -287,6 +291,9 @@ subroutine ini_ocean_io(dynamics, tracers, partit, mesh)
          write(longname,'(A15,i4.4)') 'passive tracer ', j
          units='none'
      END SELECT
+#ifdef ENABLE_NVHPC_WORKAROUNDS
+     tracer_restart_name(j) = trname
+#endif
      if ((tracers%data(j)%ID==101) .or. (tracers%data(j)%ID==102) .or. (tracers%data(j)%ID==103) .or. (tracers%data(j)%ID==304)) then
         call oce_files%def_node_var_optional(trim(trname), trim(longname), trim(units), tracers%data(j)%values(:,:), mesh, partit)
 #if defined(__recom)
