@@ -49,10 +49,6 @@ subroutine oce_fluxes_mom(ice, dynamics, partit, mesh)
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: u_ice, v_ice, a_ice, u_w, v_w
     real(kind=WP), dimension(:), pointer  :: stress_iceoce_x, stress_iceoce_y  
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     u_ice           => ice%uice(:)
     v_ice           => ice%vice(:)
     a_ice           => ice%data(1)%values(:)
@@ -67,7 +63,7 @@ subroutine oce_fluxes_mom(ice, dynamics, partit, mesh)
     !___________________________________________________________________________
 
 #if defined (__icepack)
-     call icepack_to_fesom(nx_in=(myDim_nod2D+eDim_nod2D), &
+     call icepack_to_fesom(nx_in=(partit%myDim_nod2D+partit%eDim_nod2D), &
                            aice_out=a_ice)
 #endif
     !___________________________________________________________________________
@@ -75,10 +71,10 @@ subroutine oce_fluxes_mom(ice, dynamics, partit, mesh)
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, elem, elnodes, n1, aux)
 !$OMP DO
-    do n=1,myDim_nod2D+eDim_nod2D   
+    do n=1,partit%myDim_nod2D+partit%eDim_nod2D   
         !_______________________________________________________________________
         ! if cavity node skip it 
-        if (ulevels_nod2d(n)>1) cycle
+        if (mesh%ulevels_nod2d(n)>1) cycle
         
         !_______________________________________________________________________
         if(a_ice(n)>0.001_WP) then
@@ -97,14 +93,14 @@ subroutine oce_fluxes_mom(ice, dynamics, partit, mesh)
     !___________________________________________________________________________
     ! compute total surface stress (iceoce+atmoce) on elements
 !$OMP DO
-    DO elem=1,myDim_elem2D
+    DO elem=1,partit%myDim_elem2D
         !_______________________________________________________________________
         ! if cavity element skip it 
-        if (ulevels(elem)>1) cycle
+        if (mesh%ulevels(elem)>1) cycle
         
         !_______________________________________________________________________
         ! total surface stress (iceoce+atmoce) on elements 
-        elnodes=elem2D_nodes(:,elem)
+        elnodes=mesh%elem2D_nodes(:,elem)
         
         !!PS stress_surf(1,elem)=sum(stress_iceoce_x(elnodes)*a_ice(elnodes) + &
         !!PS                         stress_atmoce_x(elnodes)*(1.0_WP-a_ice(elnodes)))/3.0_WP
@@ -136,10 +132,6 @@ subroutine ocean2ice(ice, dynamics, tracers, partit, mesh)
     real(kind=WP), dimension(:,:)  , pointer :: temp, salt
     real(kind=WP), dimension(:,:,:), pointer :: UV
     real(kind=WP), dimension(:)    , pointer :: S_oc_array, T_oc_array, u_w, v_w, elevation
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     temp       => tracers%data(1)%values(:,:)
     salt       => tracers%data(2)%values(:,:)
     UV         => dynamics%uv(:,:,:)
@@ -154,43 +146,43 @@ subroutine ocean2ice(ice, dynamics, tracers, partit, mesh)
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, elem, k, uw, vw, vol)
      if (ice%ice_update) then
 !$OMP DO
-        do n=1, myDim_nod2d+eDim_nod2d  
-            if (ulevels_nod2D(n)>1) cycle 
+        do n=1, partit%myDim_nod2d+partit%eDim_nod2d  
+            if (mesh%ulevels_nod2D(n)>1) cycle 
             T_oc_array(n) = temp(1,n)
             S_oc_array(n) = salt(1,n) + S_ref_anomaly   ! state stores S-S_ref (0 unless use_salt_anomaly)
-            elevation(n)  = hbar(n)
+            elevation(n)  = mesh%hbar(n)
         end do
 !$OMP END DO
     else
 !$OMP DO
-        do n=1, myDim_nod2d+eDim_nod2d
-            if (ulevels_nod2D(n)>1) cycle 
+        do n=1, partit%myDim_nod2d+partit%eDim_nod2d
+            if (mesh%ulevels_nod2D(n)>1) cycle 
              T_oc_array(n) = (T_oc_array(n)*real(ice%ice_steps_since_upd,WP)+temp(1,n))/real(ice%ice_steps_since_upd+1,WP)
              S_oc_array(n) = (S_oc_array(n)*real(ice%ice_steps_since_upd,WP)+salt(1,n)+S_ref_anomaly)/real(ice%ice_steps_since_upd+1,WP)
-             elevation(n)  = (elevation(n) *real(ice%ice_steps_since_upd,WP)+  hbar(n))/real(ice%ice_steps_since_upd+1,WP)
+             elevation(n)  = (elevation(n) *real(ice%ice_steps_since_upd,WP)+  mesh%hbar(n))/real(ice%ice_steps_since_upd+1,WP)
         end do
 !$OMP END DO
     end if
 
 !$OMP DO
-    do n=1, myDim_nod2d+eDim_nod2d
+    do n=1, partit%myDim_nod2d+partit%eDim_nod2d
        u_w(n) = 0.0_WP
        v_w(n) = 0.0_WP
     end do
 !$OMP END DO
 
 !$OMP DO
-    do n=1, myDim_nod2d  
-        if (ulevels_nod2D(n)>1) cycle 
+    do n=1, partit%myDim_nod2d  
+        if (mesh%ulevels_nod2D(n)>1) cycle 
         uw  = 0.0_WP
         vw  = 0.0_WP
         vol = 0.0_WP
-        do k=1, nod_in_elem2D_num(n)
-            elem=nod_in_elem2D(k,n)
-            if (ulevels(elem)>1) cycle
-            vol = vol + elem_area(elem)
-            uw  = uw+ UV(1,1,elem)*elem_area(elem)
-            vw  = vw+ UV(2,1,elem)*elem_area(elem)
+        do k=1, mesh%nod_in_elem2D_num(n)
+            elem=mesh%nod_in_elem2D(k,n)
+            if (mesh%ulevels(elem)>1) cycle
+            vol = vol + mesh%elem_area(elem)
+            uw  = uw+ UV(1,1,elem)*mesh%elem_area(elem)
+            vw  = vw+ UV(2,1,elem)*mesh%elem_area(elem)
         end do
         uw = uw/vol
         vw = vw/vol
@@ -248,10 +240,6 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     real(kind=WP), allocatable :: wiso_delta_rain(:,:),wiso_delta_snow(:,:),wiso_delta_ocean(:,:),wiso_delta_seaice(:,:)
     !---wiso-code-end
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     temp          => tracers%data(1)%values(:,:)
     salt          => tracers%data(2)%values(:,:)
     a_ice         => ice%data(1)%values(:)
@@ -267,10 +255,10 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     inv_rhowat    => ice%thermo%inv_rhowat
     
     !___________________________________________________________________________
-    allocate(flux(myDim_nod2D+eDim_nod2D))
+    allocate(flux(partit%myDim_nod2D+partit%eDim_nod2D))
 
 !$OMP PARALLEL DO
-    do n=1, myDim_nod2d+eDim_nod2d  
+    do n=1, partit%myDim_nod2d+partit%eDim_nod2d  
        flux(n) = 0.0_WP
     end do
 !$OMP END PARALLEL DO
@@ -280,16 +268,16 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
       wiso_oce1 => tracers%data(index_wiso_tracers(1))%values(:,:)
       wiso_oce2 => tracers%data(index_wiso_tracers(2))%values(:,:)
       wiso_oce3 => tracers%data(index_wiso_tracers(3))%values(:,:)
-      allocate(snmelt(myDim_nod2D+eDim_nod2D))
-      allocate(icemelt(myDim_nod2D+eDim_nod2D))
-      allocate(wiso_prec_o16(myDim_nod2D+eDim_nod2D))
-      allocate(wiso_rain(myDim_nod2D+eDim_nod2D,3))
-      allocate(wiso_snow(myDim_nod2D+eDim_nod2D,3))
-      allocate(wiso_melt(myDim_nod2D+eDim_nod2D,3))
-      allocate(wiso_delta_rain(myDim_nod2D+eDim_nod2D,3))
-      allocate(wiso_delta_snow(myDim_nod2D+eDim_nod2D,3))
-      allocate(wiso_delta_ocean(myDim_nod2D+eDim_nod2D,3))
-      allocate(wiso_delta_seaice(myDim_nod2D+eDim_nod2D,3))
+      allocate(snmelt(partit%myDim_nod2D+partit%eDim_nod2D))
+      allocate(icemelt(partit%myDim_nod2D+partit%eDim_nod2D))
+      allocate(wiso_prec_o16(partit%myDim_nod2D+partit%eDim_nod2D))
+      allocate(wiso_rain(partit%myDim_nod2D+partit%eDim_nod2D,3))
+      allocate(wiso_snow(partit%myDim_nod2D+partit%eDim_nod2D,3))
+      allocate(wiso_melt(partit%myDim_nod2D+partit%eDim_nod2D,3))
+      allocate(wiso_delta_rain(partit%myDim_nod2D+partit%eDim_nod2D,3))
+      allocate(wiso_delta_snow(partit%myDim_nod2D+partit%eDim_nod2D,3))
+      allocate(wiso_delta_ocean(partit%myDim_nod2D+partit%eDim_nod2D,3))
+      allocate(wiso_delta_seaice(partit%myDim_nod2D+partit%eDim_nod2D,3))
     end if
     !---wiso-code-end
 
@@ -305,7 +293,7 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     !     
 #if defined (__icepack)
 
-    call icepack_to_fesom (nx_in         = (myDim_nod2D+eDim_nod2D), &
+    call icepack_to_fesom (nx_in         = (partit%myDim_nod2D+partit%eDim_nod2D), &
                            aice_out      = a_ice,                    &
                            vice_out      = m_ice,                    &
                            vsno_out      = m_snow,                   &
@@ -318,7 +306,7 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
                            evap_out      = ice_sublimation           )
 
 !$OMP PARALLEL DO
-    do n=1, myDim_nod2d+eDim_nod2d  
+    do n=1, partit%myDim_nod2d+partit%eDim_nod2d  
         ! Heat flux 
         heat_flux(n)       = - net_heat_flux(n)
 
@@ -339,7 +327,7 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
 
 #else
 !$OMP PARALLEL DO
-    do n=1, myDim_nod2d+eDim_nod2d  
+    do n=1, partit%myDim_nod2d+partit%eDim_nod2d  
        heat_flux(n)   = -net_heat_flux(n)
        water_flux(n)  = -fresh_wa_flux(n)
     end do
@@ -373,7 +361,7 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     ! save total heat flux (heat_flux_in) since heat_flux will be alternated by 
     ! sw_pene
 !$OMP PARALLEL DO
-    do n=1, myDim_nod2d+eDim_nod2d  
+    do n=1, partit%myDim_nod2d+partit%eDim_nod2d  
        heat_flux_in(n)=heat_flux(n) ! sw_pene will change the heat_flux
     end do
 !$OMP END PARALLEL DO
@@ -395,8 +383,8 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     if (use_virt_salt) then ! will remain zero otherwise
         rsss=ref_sss
 !$OMP PARALLEL DO
-        do n=1, myDim_nod2D+eDim_nod2D
-            if (ref_sss_local) rsss = salt(ulevels_nod2d(n),n) + S_ref_anomaly   ! S_ref=0 unless use_salt_anomaly
+        do n=1, partit%myDim_nod2D+partit%eDim_nod2D
+            if (ref_sss_local) rsss = salt(mesh%ulevels_nod2d(n),n) + S_ref_anomaly   ! S_ref=0 unless use_salt_anomaly
             virtual_salt(n)=rsss*water_flux(n)
         end do
 !$OMP END PARALLEL DO        
@@ -407,10 +395,10 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
         ! the balancing --> but we balance the contribution under the cavity over 
         ! the rest of the ocean
         ! ocean_area in case of cavity contains only the open ocean area
-        net = net/ocean_area
+        net = net/mesh%ocean_area
 !$OMP PARALLEL DO 
-        do n=1, myDim_nod2D+eDim_nod2D
-            if (ulevels_nod2d(n) > 1) cycle ! --> is cavity node 
+        do n=1, partit%myDim_nod2D+partit%eDim_nod2D
+            if (mesh%ulevels_nod2d(n) > 1) cycle ! --> is cavity node 
             virtual_salt(n)=virtual_salt(n)-net
         end do
 !$OMP END PARALLEL DO
@@ -431,10 +419,10 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
         
         ! compute virtual salt flux within the cavity
 !$OMP PARALLEL DO         
-        do n=1, myDim_nod2D+eDim_nod2D
+        do n=1, partit%myDim_nod2D+partit%eDim_nod2D
             virtual_salt(n)=0.0_WP
-            if (ulevels_nod2d(n) == 1) cycle ! --> is open ocean node 
-            if (ref_sss_local) rsss = salt(ulevels_nod2d(n),n) + S_ref_anomaly   ! S_ref=0 unless use_salt_anomaly
+            if (mesh%ulevels_nod2d(n) == 1) cycle ! --> is open ocean node 
+            if (ref_sss_local) rsss = salt(mesh%ulevels_nod2d(n),n) + S_ref_anomaly   ! S_ref=0 unless use_salt_anomaly
             virtual_salt(n)=rsss*water_flux(n)
         end do
 !$OMP END PARALLEL DO        
@@ -444,10 +432,10 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
         
         ! counter balance the integrated cavity salt flux only in the open ocean 
         ! --> ensure global salt conservation !!!
-        net = net/ocean_area
+        net = net/mesh%ocean_area
 !$OMP PARALLEL DO         
-        do n=1, myDim_nod2D+eDim_nod2D
-            if (ulevels_nod2d(n) > 1) cycle ! --> is cavity node
+        do n=1, partit%myDim_nod2D+partit%eDim_nod2D
+            if (mesh%ulevels_nod2d(n) > 1) cycle ! --> is cavity node
             virtual_salt(n)=virtual_salt(n)-net
         end do
 !$OMP END PARALLEL DO
@@ -473,29 +461,29 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     ! balance SSS restoring to climatology
     if (use_cavity) then
 !$OMP PARALLEL DO    
-        do n=1, myDim_nod2D+eDim_nod2D
+        do n=1, partit%myDim_nod2D+partit%eDim_nod2D
             relax_salt(n) = 0.0_WP
-            if (ulevels_nod2d(n) > 1) cycle ! --> is cavity node --> only do salt relaxation in open ocean
+            if (mesh%ulevels_nod2d(n) > 1) cycle ! --> is cavity node --> only do salt relaxation in open ocean
             ! Ssurf is absolute; subtract S_ref (0 unless use_salt_anomaly) to match the anomaly state
-            relax_salt(n)=surf_relax_S*(Ssurf(n)-S_ref_anomaly-salt(ulevels_nod2d(n),n))
+            relax_salt(n)=surf_relax_S*(Ssurf(n)-S_ref_anomaly-salt(mesh%ulevels_nod2d(n),n))
         end do
 !$OMP END PARALLEL DO
     else
 !$OMP PARALLEL DO
-        do n=1, myDim_nod2D+eDim_nod2D
+        do n=1, partit%myDim_nod2D+partit%eDim_nod2D
             ! Ssurf is absolute; subtract S_ref (0 unless use_salt_anomaly) to match the anomaly state
-            relax_salt(n)=surf_relax_S*(Ssurf(n)-S_ref_anomaly-salt(ulevels_nod2d(n),n))
+            relax_salt(n)=surf_relax_S*(Ssurf(n)-S_ref_anomaly-salt(mesh%ulevels_nod2d(n),n))
         end do
 !$OMP END PARALLEL DO
     end if 
     
     ! --> if use_cavity=.true. relax_salt anyway zero where is cavity see above
     call integrate_nod(relax_salt, net, partit, mesh)
-    net = net/ocean_area
+    net = net/mesh%ocean_area
 !$OMP PARALLEL DO
-    do n=1, myDim_nod2D+eDim_nod2D
+    do n=1, partit%myDim_nod2D+partit%eDim_nod2D
         !--> only balance salt_relaxation in open ocean under the cavity it remains zero
-        if (ulevels_nod2d(n) > 1) cycle ! --> is cavity node
+        if (mesh%ulevels_nod2d(n) > 1) cycle ! --> is cavity node
         relax_salt(n)=relax_salt(n)-net
     end do
 !$OMP END PARALLEL DO
@@ -519,7 +507,7 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     !           to the freshwater flux into the ocean
                    
 !$OMP PARALLEL DO
-    do n=1, myDim_nod2D+eDim_nod2D
+    do n=1, partit%myDim_nod2D+partit%eDim_nod2D
         flux(n) = evaporation(n)                     &
                   -ice_sublimation(n)                 & ! the ice2atmos subplimation does not contribute to the freshwater flux into the ocean
                   +prec_rain(n)                       &                  
@@ -561,7 +549,7 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     !!PS   if ( .not. use_floatice .and. .not. use_virt_salt) then
     if (.not. use_virt_salt) then
 !$OMP PARALLEL DO
-        do n=1, myDim_nod2D+eDim_nod2D
+        do n=1, partit%myDim_nod2D+partit%eDim_nod2D
            flux(n) = flux(n)-thdgr(n)*rhoice*inv_rhowat-thdgrsn(n)*rhosno*inv_rhowat
         end do
 !$OMP END PARALLEL DO
@@ -574,7 +562,7 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
         end if
         
         call integrate_nod(ibfwb + ibfwe + ibfwl + ibfwbv, net, partit, mesh)
-        if (mype==0) write(*,*) " * total iceberg fw flux: ", net
+        if (partit%mype==0) write(*,*) " * total iceberg fw flux: ", net
     end if
     
     !___________________________________________________________________________
@@ -583,12 +571,12 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
         ! not contributing to the ocean volume increase/decrease since under the
         ! cavity ist linfs 
         if (.not. use_virt_salt) then !zstar, zlevel
-            where (ulevels_nod2d > 1) flux = 0.0_WP
+            where (mesh%ulevels_nod2d > 1) flux = 0.0_WP
             
         ! with linfs we balance the freshwater flux globally, thereby ot changeing
         ! the freshwater flux under the cavity
         else ! linfs 
-            where (ulevels_nod2d > 1) flux = -water_flux
+            where (mesh%ulevels_nod2d > 1) flux = -water_flux
         end if 
     end if 
 
@@ -606,17 +594,17 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
         ! due to rigid lid approximation under the cavity we to not add freshwater
         ! under the cavity for the freshwater balancing we do this only for the open
         ! ocean
-        net = net/ocean_area
+        net = net/mesh%ocean_area
 !$OMP PARALLEL DO
-        do n=1, myDim_nod2D+eDim_nod2D
-            if (ulevels_nod2d(n) > 1) cycle
+        do n=1, partit%myDim_nod2D+partit%eDim_nod2D
+            if (mesh%ulevels_nod2d(n) > 1) cycle
             water_flux(n)=water_flux(n)+net
         end do
 !$OMP END PARALLEL DO
     else
-        net = net/ocean_area
+        net = net/mesh%ocean_area
 !$OMP PARALLEL DO
-        do n=1, myDim_nod2D+eDim_nod2D
+        do n=1, partit%myDim_nod2D+partit%eDim_nod2D
            water_flux(n)=water_flux(n)+net
         end do
 !$OMP END PARALLEL DO
@@ -626,8 +614,8 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     ! use the balanced water_flux and relax_salt flux (same as in the tracer 
     ! boundary condition) to compute the dens_flux for MOC diagnostic
 !$OMP PARALLEL DO
-    do n=1, myDim_nod2D+eDim_nod2D    
-        if (ulevels_nod2d(n) == 1) then ! --> is open ocean node
+    do n=1, partit%myDim_nod2D+partit%eDim_nod2D    
+        if (mesh%ulevels_nod2d(n) == 1) then ! --> is open ocean node
             ! density-flux diagnostic wants absolute S; S_ref=0 unless use_salt_anomaly
             dens_flux(n)=sw_alpha(1,n) * heat_flux_in(n) / vcpw + sw_beta(1, n) * (relax_salt(n) + water_flux(n) * (salt(1,n)+S_ref_anomaly))
         else
@@ -652,7 +640,7 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
 
     nt=3
     wiso_rain(:,nt)=www3*1000._WP                              ! atmospheric H216O flux over open water
-    wiso_flux_oce(:,nt)=wiso_rain(:,nt)-net/ocean_area         ! correction to enforce total H216O flux be zero
+    wiso_flux_oce(:,nt)=wiso_rain(:,nt)-net/mesh%ocean_area         ! correction to enforce total H216O flux be zero
 
     do nt=1,2
       if (nt .EQ. 1) wiso_rain(:,nt)=www1*1000._WP/((20._WP/18._WP)*100._WP)           ! atmospheric H218O flux over open water
@@ -664,7 +652,7 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
 
     nt=3
     wiso_snow(:,nt)=iii3*1000._WP                              ! atmospheric H216O flux over sea ice
-    wiso_flux_ice(:,nt)=wiso_snow(:,nt)-net/ocean_area         ! correction to enforce total H216O flux be zero
+    wiso_flux_ice(:,nt)=wiso_snow(:,nt)-net/mesh%ocean_area         ! correction to enforce total H216O flux be zero
     where (a_ice(:).le.0.001_WP) wiso_flux_ice(:,nt)=0.0_WP    ! limit corrected H216O flux to sea ice areas, only
 
     do nt=1,2
@@ -686,7 +674,7 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
 
     ! calculate delta values of ocean surface water and sea ice for H218O and HDO
     nt=1
-    do n=1, myDim_nod2D+eDim_nod2D
+    do n=1, partit%myDim_nod2D+partit%eDim_nod2D
        ! calculate delta of open water (top ocean level)
        wiso_delta_ocean(n,nt)=wiso_smow(nt)
        if (wiso_oce3(1,n).gt.zwisomin) wiso_delta_ocean(n,nt) = wiso_oce1(1,n)/wiso_oce3(1,n)
@@ -696,7 +684,7 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     end do
 
     nt=2
-    do n=1, myDim_nod2D+eDim_nod2D
+    do n=1, partit%myDim_nod2D+partit%eDim_nod2D
        ! calculate delta of open water (top ocean level)
        wiso_delta_ocean(n,nt)=wiso_smow(nt)
        if (wiso_oce3(1,n).gt.zwisomin) wiso_delta_ocean(n,nt) = wiso_oce2(1,n)/wiso_oce3(1,n)
@@ -744,11 +732,11 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     ! here: update sea ice isotope tracer concentration, only
     ! sea ice isotope tracer concentration are limited to sea ice areas, only
     ! (ocean water isotope tracers are updated in routine *oce_ale_tracer*)
-    do n=1, myDim_nod2D+eDim_nod2D
+    do n=1, partit%myDim_nod2D+partit%eDim_nod2D
        tr_arr_ice(n,:) = tr_arr_ice(n,:) + dt*wiso_flux_ice(n,:)
     end do
 
-    do n=1, myDim_nod2D+eDim_nod2D
+    do n=1, partit%myDim_nod2D+partit%eDim_nod2D
        if (tr_arr_ice(n,3) .gt. 1500._WP) then                           ! check if H216O tracer concentration reaches (arbitrary) limit of 1500.
           tr_arr_ice(n,1) = 1500._WP*tr_arr_ice(n,1)/tr_arr_ice(n,3)     ! reduce H2O18 based on the original ratio between H2O18 and H2O16 (i.e. the delta values are not changed)
           tr_arr_ice(n,2) = 1500._WP*tr_arr_ice(n,2)/tr_arr_ice(n,3)     ! reduce HDO16 based on the original ratio between HDO16 and H2O16 (i.e. the delta values are not changed)
@@ -756,7 +744,7 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
        endif
     end do
 
-    do n=1, myDim_nod2D+eDim_nod2D
+    do n=1, partit%myDim_nod2D+partit%eDim_nod2D
        if (tr_arr_ice(n,3) .le. 1._WP) then              ! check if H216O tracer concentration becomes too small or even negative
           tr_arr_ice(n,1) = wiso_smow(1)                 ! set delta H2O18 to SMOW value
           tr_arr_ice(n,2) = wiso_smow(2)                 ! set delta HDO16 to SMOW value
@@ -772,7 +760,7 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
 !---fwf-code-begin
     if(use_landice_water) then
 !$OMP PARALLEL DO
-      do n=1, myDim_nod2D+eDim_nod2D
+      do n=1, partit%myDim_nod2D+partit%eDim_nod2D
          water_flux(n)=water_flux(n)-runoff_landice(n)*landice_season(month)
       end do
 !$OMP END PARALLEL DO
@@ -781,7 +769,7 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     !___________________________________________________________________________
     if(lwiso .and. use_landice_water) then
 !$OMP PARALLEL DO
-      do n=1, myDim_nod2D+eDim_nod2D
+      do n=1, partit%myDim_nod2D+partit%eDim_nod2D
          wiso_flux_oce(n,1)=wiso_flux_oce(n,1)+runoff_landice(n)*1000.0*wiso_smow(1)*(1-30.0/1000.0)*landice_season(month)
          wiso_flux_oce(n,2)=wiso_flux_oce(n,2)+runoff_landice(n)*1000.0*wiso_smow(2)*(1-240.0/1000.0)*landice_season(month)
          wiso_flux_oce(n,3)=wiso_flux_oce(n,3)+runoff_landice(n)*1000.0*landice_season(month)
@@ -832,13 +820,13 @@ contains
         vflx = 0.0_WP
         if (itr == 0) return
 
-        do node = 1, myDim_nod2D+eDim_nod2D
-            vflx(node) = tracers%data(itr)%values(ulevels_nod2d(node), node)*water_flux(node)
+        do node = 1, partit%myDim_nod2D+partit%eDim_nod2D
+            vflx(node) = tracers%data(itr)%values(mesh%ulevels_nod2d(node), node)*water_flux(node)
         end do
         call integrate_nod(vflx, vnet, partit, mesh)
-        vnet = vnet/ocean_area
-        do node = 1, myDim_nod2D+eDim_nod2D
-            if (ulevels_nod2d(node) > 1) cycle ! --> is cavity node
+        vnet = vnet/mesh%ocean_area
+        do node = 1, partit%myDim_nod2D+partit%eDim_nod2D
+            if (mesh%ulevels_nod2d(node) > 1) cycle ! --> is cavity node
             vflx(node) = vflx(node)-vnet
         end do
     end subroutine virtual_tracer_flux

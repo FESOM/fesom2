@@ -276,10 +276,6 @@ CONTAINS
         TYPE(t_mesh),   intent(in), TARGET :: mesh
         INTEGER, DIMENSION(:), POINTER     :: temp
 
-#include "../associate_part_def.h"
-#include "../associate_mesh_def.h"
-#include "../associate_part_ass.h"
-#include "../associate_mesh_ass.h"
 
         IF (lnomultio) RETURN
 

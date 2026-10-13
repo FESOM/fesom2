@@ -101,10 +101,6 @@ contains
     character(len=8)           :: dt_str
     character(LEN=24) :: startdatetime
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
     WRITE(startdatetime, '(I4.4,"-",I2.2,"-",I2.2,"T",I2.2,":",I2.2,":",I2.2,".",I3.3, "Z")') &
          yearnew, month, day_in_month, &
@@ -116,79 +112,79 @@ contains
     CALL yac_fdef_datetime(startdatetime)
 
     ! find boundary nodes
-    ALLOCATE(node_is_boundary(myDim_nod2D))
+    ALLOCATE(node_is_boundary(partit%myDim_nod2D))
     node_is_boundary = .FALSE.
-    DO i=1,myDim_edge2D
-       IF (myList_edge2D(i) > edge2D_in) THEN
-          IF (edges(1,i) <= myDim_nod2D) &
-               node_is_boundary(edges(1,i)) = .TRUE.
-          IF (edges(2,i) <= myDim_nod2D) &
-               node_is_boundary(edges(2,i)) = .TRUE.
+    DO i=1,partit%myDim_edge2D
+       IF (partit%myList_edge2D(i) > mesh%edge2D_in) THEN
+          IF (mesh%edges(1,i) <= partit%myDim_nod2D) &
+               node_is_boundary(mesh%edges(1,i)) = .TRUE.
+          IF (mesh%edges(2,i) <= partit%myDim_nod2D) &
+               node_is_boundary(mesh%edges(2,i)) = .TRUE.
        END IF
     END DO
     nbr_boundary_nodes = COUNT(node_is_boundary)
 
-    nbr_vertices = myDim_elem2D + myDim_edge2D + nbr_boundary_nodes
-    nbr_connections = 2*SUM(nod_in_elem2D_num(1:myDim_nod2D)) + 2*nbr_boundary_nodes
+    nbr_vertices = partit%myDim_elem2D + partit%myDim_edge2D + nbr_boundary_nodes
+    nbr_connections = 2*SUM(mesh%nod_in_elem2D_num(1:partit%myDim_nod2D)) + 2*nbr_boundary_nodes
 
     ALLOCATE(x_vertices(nbr_vertices))
     ALLOCATE(y_vertices(nbr_vertices))
-    ALLOCATE(nbr_vertices_per_cell(myDim_nod2D))
+    ALLOCATE(nbr_vertices_per_cell(partit%myDim_nod2D))
     ALLOCATE(cell_to_vertex(nbr_connections))
 
     ! compute vertices
     ! 1 element centers
-    DO i=1,myDim_elem2D
-       CALL compute_center(geo_coord_nod2D(1:2,elem2D_nodes(1, i)), &
-            geo_coord_nod2D(1:2,elem2D_nodes(2, i)), &
-            geo_coord_nod2D(1:2,elem2D_nodes(3, i)), mid)
+    DO i=1,partit%myDim_elem2D
+       CALL compute_center(mesh%geo_coord_nod2D(1:2,mesh%elem2D_nodes(1, i)), &
+            mesh%geo_coord_nod2D(1:2,mesh%elem2D_nodes(2, i)), &
+            mesh%geo_coord_nod2D(1:2,mesh%elem2D_nodes(3, i)), mid)
        x_vertices(i) = mid(1)
        y_vertices(i) = mid(2)
     END DO
     ! 2 edges midpoints
-    DO i=1,myDim_edge2D
-       CALL compute_midpoint(geo_coord_nod2D(1:2,edges(1,i)), geo_coord_nod2D(1:2,edges(2,i)), mid)
-       x_vertices(myDim_elem2D + i) = mid(1)
-       y_vertices(myDim_elem2D + i) = mid(2)
+    DO i=1,partit%myDim_edge2D
+       CALL compute_midpoint(mesh%geo_coord_nod2D(1:2,mesh%edges(1,i)), mesh%geo_coord_nod2D(1:2,mesh%edges(2,i)), mid)
+       x_vertices(partit%myDim_elem2D + i) = mid(1)
+       y_vertices(partit%myDim_elem2D + i) = mid(2)
     END DO
     ! 3 boundary nodes -> are added on the fly when the cells are computed
 
     ! compute cells
-    vtx_idx = myDim_elem2D + myDim_edge2D
+    vtx_idx = partit%myDim_elem2D + partit%myDim_edge2D
     c2v_idx = 0
-    DO i=1,myDim_nod2D
-       nbr_vertices_per_cell(i) = 2*nod_in_elem2D_num(i)
-       curr_elem = nod_in_elem2D(1,i)
-       curr_edge = elem_edges(1, curr_elem)
-       IF (ALL(edges(1:2,curr_edge) /= i)) curr_edge = elem_edges(2, curr_elem)
+    DO i=1,partit%myDim_nod2D
+       nbr_vertices_per_cell(i) = 2*mesh%nod_in_elem2D_num(i)
+       curr_elem = mesh%nod_in_elem2D(1,i)
+       curr_edge = mesh%elem_edges(1, curr_elem)
+       IF (ALL(mesh%edges(1:2,curr_edge) /= i)) curr_edge = mesh%elem_edges(2, curr_elem)
        IF (node_is_boundary(i)) THEN
           nbr_vertices_per_cell(i) = nbr_vertices_per_cell(i) + 2
           ! we're starting with the boundary node
           vtx_idx = vtx_idx+1
-          x_vertices(vtx_idx) = geo_coord_nod2D(1,i)
-          y_vertices(vtx_idx) = geo_coord_nod2D(2,i)
+          x_vertices(vtx_idx) = mesh%geo_coord_nod2D(1,i)
+          y_vertices(vtx_idx) = mesh%geo_coord_nod2D(2,i)
           c2v_idx = c2v_idx + 1
           cell_to_vertex(c2v_idx) = vtx_idx
-          elem_loop: DO j=1,nod_in_elem2D_num(i)
+          elem_loop: DO j=1,mesh%nod_in_elem2D_num(i)
              DO k=1,3
-                IF (myList_edge2D(elem_edges(k,nod_in_elem2D(j,i))) > edge2D_in .AND. &
-                     ANY(edges(1:2,elem_edges(k,nod_in_elem2D(j,i))) == i)) THEN
-                   curr_elem = nod_in_elem2D(j,i)
-                   curr_edge = elem_edges(k, curr_elem)
+                IF (partit%myList_edge2D(mesh%elem_edges(k,mesh%nod_in_elem2D(j,i))) > mesh%edge2D_in .AND. &
+                     ANY(mesh%edges(1:2,mesh%elem_edges(k,mesh%nod_in_elem2D(j,i))) == i)) THEN
+                   curr_elem = mesh%nod_in_elem2D(j,i)
+                   curr_edge = mesh%elem_edges(k, curr_elem)
                    EXIT elem_loop
                 END IF
              END DO
           END DO elem_loop
        END IF
 
-       DO j=1,nod_in_elem2D_num(i)
+       DO j=1,mesh%nod_in_elem2D_num(i)
           IF (curr_elem == 0) THEN
              WRITE (0,*) "Error: cells with two or more coast lines are currently not supported by the yac setup code"
              STOP
           ENDIF
           ! add the midpoint of curr_edge
           c2v_idx = c2v_idx + 1
-          cell_to_vertex(c2v_idx) = myDim_elem2D + curr_edge
+          cell_to_vertex(c2v_idx) = partit%myDim_elem2D + curr_edge
           ! add the center of curr_elem
           c2v_idx = c2v_idx + 1
           IF (curr_elem < 1) THEN
@@ -197,16 +193,16 @@ contains
           cell_to_vertex(c2v_idx) = curr_elem
           ! find next edge
           edge_loop: DO k=1,3
-             IF (elem_edges(k, curr_elem) /= curr_edge .AND. &
-                  ANY(edges(1:2,elem_edges(k, curr_elem)) == i)) THEN
-                curr_edge = elem_edges(k, curr_elem)
+             IF (mesh%elem_edges(k, curr_elem) /= curr_edge .AND. &
+                  ANY(mesh%edges(1:2,mesh%elem_edges(k, curr_elem)) == i)) THEN
+                curr_edge = mesh%elem_edges(k, curr_elem)
                 EXIT edge_loop
              END IF
           END DO edge_loop
-          IF (edge_tri(1, curr_edge) /= curr_elem) THEN
-             curr_elem = edge_tri(1, curr_edge)
+          IF (mesh%edge_tri(1, curr_edge) /= curr_elem) THEN
+             curr_elem = mesh%edge_tri(1, curr_edge)
           ELSE
-             curr_elem = edge_tri(2, curr_edge)
+             curr_elem = mesh%edge_tri(2, curr_edge)
           END IF
        END DO
 
@@ -214,14 +210,14 @@ contains
        IF (node_is_boundary(i)) THEN
           ! add the midpoint of curr_edge
           c2v_idx = c2v_idx + 1
-          cell_to_vertex(c2v_idx) = myDim_elem2D + curr_edge
+          cell_to_vertex(c2v_idx) = partit%myDim_elem2D + curr_edge
        END IF
     END DO
 
     CALL yac_fdef_grid( &
          "fesom_grid", & ! grid_name
          nbr_vertices, &   ! nbr_vertices
-         myDim_nod2D, &  ! nbr_cells
+         partit%myDim_nod2D, &  ! nbr_cells
          nbr_connections, & ! nbr_connections
          nbr_vertices_per_cell, & ! nbr_vertices_per_cell
          x_vertices, & ! x_vertices
@@ -235,10 +231,10 @@ contains
          grid_id )
 
     CALL yac_fdef_points(grid_id, &
-         myDim_nod2D, &
+         partit%myDim_nod2D, &
          YAC_LOCATION_CELL, &
-         geo_coord_nod2D(1,1:myDim_nod2D), &
-         geo_coord_nod2D(2,1:myDim_nod2D), &
+         mesh%geo_coord_nod2D(1,1:partit%myDim_nod2D), &
+         mesh%geo_coord_nod2D(2,1:partit%myDim_nod2D), &
          points_id)
 
     cpl_send( 1)='sst_feom' ! 1. sea surface temperature [°C]      ->

@@ -188,7 +188,6 @@ SUBROUTINE nemogcmcoup_coupinit( mypeIN, npesIN, icomm, &
    LOGICAL :: lexists
 
    ! associate the mesh, only what is needed here
-   ! #include "associate_mesh.h"
    nod2D              => fesom%mesh%nod2D              
    elem2D             => fesom%mesh%elem2D  
    myDim_nod2D        => fesom%partit%myDim_nod2D
@@ -364,7 +363,6 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
    ! Loop variables
    INTEGER :: n, elem, ierr, jf
 
-   !#include "associate_mesh.h"
    ! associate what is needed only
    myDim_nod2D  => fesom%partit%myDim_nod2D
    eDim_nod2D   => fesom%partit%eDim_nod2D
@@ -584,7 +582,6 @@ SUBROUTINE nemogcmcoup_exflds_get( mype, npes, icomm, &
    ! Loop variables
    INTEGER :: n, elem, ierr, jf
 
-   !#include "associate_mesh.h"
    ! associate what is needed only
    myDim_nod2D  => fesom%partit%myDim_nod2D
    eDim_nod2D   => fesom%partit%eDim_nod2D
@@ -798,7 +795,6 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    REAL(wpIFS), DIMENSION(npoints,maxnfield) :: zsendnf
    REAL(wpIFS), DIMENSION(fesom%partit%myDim_nod2D,maxnfield) :: zrecvnf
 
-   !#include "associate_mesh.h"
    ! associate only the necessary things
    real(kind=wpIFS), dimension(:,:), pointer :: coord_nod2D
    real(kind=wpIFS), dimension(:)  , pointer :: stress_atmice_x, stress_atmice_y

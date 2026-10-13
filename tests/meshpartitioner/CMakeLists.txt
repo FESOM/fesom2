@@ -22,6 +22,29 @@ if(BUILD_MESHPARTITIONER)
         TIMEOUT 300  # 5 minutes
         LABELS "meshpartitioner"
     )
+
+    function(add_pi_partition_fixture PARTITION_NAME NUM_PROCESSES N_PART)
+        add_test(
+            NAME meshpartitioner_partition_local_pi_${PARTITION_NAME}
+            COMMAND ${CMAKE_COMMAND}
+                -DSOURCE_DIR=${FESOM_TESTING_ROOT}
+                -DBUILD_DIR=${CMAKE_BINARY_DIR}
+                -DMESH_NAME=pi
+                -DNUM_PROCESSES=${NUM_PROCESSES}
+                -DN_PART=${N_PART}
+                -DMESH_WORKDIR=${CMAKE_BINARY_DIR}/tests/meshpartitioner/meshes/pi_${PARTITION_NAME}
+                -P ${FESOM_TESTING_ROOT}/tests/integration/mesh_partition.cmake
+        )
+        set_tests_properties(meshpartitioner_partition_local_pi_${PARTITION_NAME} PROPERTIES
+            TIMEOUT 300
+            LABELS "meshpartitioner"
+            FIXTURES_SETUP "partition_pi_${PARTITION_NAME}"
+        )
+    endfunction()
+
+    add_pi_partition_fixture(flat_1 1 "")
+    add_pi_partition_fixture(hier_1x1 1 "1,1")
+    add_pi_partition_fixture(hier_1x2 2 "1,2")
     
     # Test partitioning local PI cavity mesh for 4 processes
     add_test(

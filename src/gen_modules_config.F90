@@ -39,6 +39,7 @@ module g_config
   !_____________________________________________________________________________
   ! *** restart_log ***
   integer                :: logfile_outfreq=1      ! logfile info. outp. freq., # steps
+  real(kind=WP)          :: blowup_eta_max=10.0_WP ! blow-up check: stop if |eta_n| exceeds this [m]
   integer                :: restart_length=1
   character(3)           :: restart_length_unit='m'
   integer                :: raw_restart_length=1
@@ -49,7 +50,7 @@ module g_config
   namelist /restart_log/   restart_length    , restart_length_unit, & 
                            raw_restart_length, raw_restart_length_unit, &
                            bin_restart_length, bin_restart_length_unit, &
-                           logfile_outfreq
+                           logfile_outfreq, blowup_eta_max
   !_____________________________________________________________________________
   ! *** ale_def ***
   ! Which ALE case to use : 'linfs', 'zlevel', 'zstar'
@@ -217,6 +218,7 @@ module g_config
   character(100)                :: which_toy="soufflet" 
   logical                       :: flag_debug=.false.    ! prints name of actual subroutine he is in 
   logical                       :: flag_warn_cflz=.true. ! switches off cflz warning
+  integer                       :: conservation_freq=0   ! print volume, heat and salt budgets every N steps (CONS lines); 0: off
   logical                       :: use_transit=.false.    ! switches off transient tracers
   !_____________________________________________________________________________
   ! *** freshwater hosing experiments ***
@@ -225,20 +227,21 @@ module g_config
   real(kind=WP)                 :: hosing_hSv=0.0_WP      ! freshwater anomaly magnitude [Sv]
   logical                       :: compute_oasis_corners=.false. ! switches on corner calculation for 1st order conserv remapping 
   logical                       :: use_atm_ice_tskin=.false.  ! OpenIFS: receive the ice-tile skin temperature (tsk_ico) and use it as the ice surface temperature
+  logical                       :: use_atm_mslp=.false.       ! OpenIFS: receive mean sea-level pressure (mslp_oce) into press_air, for the air-sea gas exchange (REcoM, transient tracers)
 
 #if defined(__recom) && defined(__usetp)
 ! number of groups for multi FESOM group loop parallelization
   integer                       :: num_fesom_groups=1
-  namelist /run_config/ use_ice,use_floatice, use_sw_pene, use_cavity, &
+  namelist /run_config/ use_ice,use_floatice, use_sw_pene, conservation_freq, use_cavity, &
                         use_cavity_partial_cell, cavity_partial_cell_thresh, &
                         use_cavity_fw2press, cavity_gamma_scale, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso, &
-                        use_transit, compute_oasis_corners, use_atm_ice_tskin, num_fesom_groups, &
+                        use_transit, compute_oasis_corners, use_atm_ice_tskin, use_atm_mslp, num_fesom_groups, &
                         use_hosing, hosing_mode, hosing_hSv
 #else
-  namelist /run_config/ use_ice,use_floatice, use_sw_pene, use_cavity, & 
+  namelist /run_config/ use_ice,use_floatice, use_sw_pene, conservation_freq, use_cavity, & 
                         use_cavity_partial_cell, cavity_partial_cell_thresh, &
                         use_cavity_fw2press, cavity_gamma_scale, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso, &
-                        use_transit, compute_oasis_corners, use_atm_ice_tskin, &
+                        use_transit, compute_oasis_corners, use_atm_ice_tskin, use_atm_mslp, &
                         use_hosing, hosing_mode, hosing_hSv
 #endif
 

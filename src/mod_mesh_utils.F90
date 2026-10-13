@@ -43,7 +43,6 @@ REAL(kind=WP)                       :: x1, x2, gx1, gx2
 INTEGER	                            :: tag
 INTEGER, allocatable                :: elem_data(:)
 INTEGER                             :: i_error
-#include "associate_mesh_ini.h"
 ! ===================
 ! Surface mesh
 ! ===================
@@ -54,7 +53,6 @@ INTEGER                             :: i_error
   open (21,file=trim(meshpath)//'elem2d.out', status='old')
   READ(20,*) mesh%nod2D
   ALLOCATE(mesh%coord_nod2D(2,mesh%nod2D)) 
-  coord_nod2D => mesh%coord_nod2D !required after the allocation, otherwise the pointer remains undefined
     
   do n=1, mesh%nod2D
      read(20,*) nq, x1, x2, tag
@@ -71,7 +69,6 @@ INTEGER                             :: i_error
   CLOSE(20)
   READ(21,*)  mesh%elem2D    
   ALLOCATE(mesh%elem2D_nodes(4,mesh%elem2D))
-  elem2D_nodes => mesh%elem2D_nodes !required after the allocation, otherwise the pointer remains undefined
   ALLOCATE(elem_data(4*mesh%elem2D))
   elem_data(:)=-1
   
@@ -116,7 +113,6 @@ subroutine read_mesh_cavity(mesh)
     integer                             :: node, auxi
     character(len=MAX_PATH)             :: fname
     logical                             :: file_exist=.False.
-#include "associate_mesh_ini.h"
     
     !___________________________________________________________________________    
     print *, achar(27)//'[1m'  //'____________________________________________________________'//achar(27)//'[0m'
@@ -138,7 +134,6 @@ subroutine read_mesh_cavity(mesh)
         else
             allocate(mesh%cavity_depth(mesh%nod2D))
         end if 
-        cavity_depth => mesh%cavity_depth 
     else
         write(*,*) '____________________________________________________________________'
         write(*,*) ' ERROR: could not find cavity file:', fname
@@ -169,14 +164,13 @@ IMPLICIT NONE
 real(kind=WP)                       ::  a(2), b(2), c(2),  r
 integer                             ::  n, nx, elnodes(3)
 type(t_mesh), intent(inout), target :: mesh
-#include "associate_mesh_ini.h"
    
-   DO n=1, elem2D
-      elnodes=elem2D_nodes(1:3,n)
+   DO n=1, mesh%elem2D
+      elnodes=mesh%elem2D_nodes(1:3,n)
 	  
-          a=coord_nod2D(:,elnodes(1))
-	  b=coord_nod2D(:,elnodes(2))-a
-	  c=coord_nod2D(:,elnodes(3))-a
+          a=mesh%coord_nod2D(:,elnodes(1))
+	  b=mesh%coord_nod2D(:,elnodes(2))-a
+	  c=mesh%coord_nod2D(:,elnodes(3))-a
           
 	  if(b(1)>cyclic_length/2.) b(1)=b(1)-cyclic_length
           if(b(1)<-cyclic_length/2.) b(1)=b(1)+cyclic_length
@@ -192,7 +186,7 @@ type(t_mesh), intent(inout), target :: mesh
 	  nx=elnodes(2)
 	  elnodes(2)=elnodes(3)
 	  elnodes(3)=nx
-	  elem2D_nodes(1:3,n)=elnodes
+	  mesh%elem2D_nodes(1:3,n)=elnodes
       end if
    END DO
 END SUBROUTINE  test_tri_ini
@@ -211,7 +205,6 @@ integer                               :: temp(100), node
 real(kind=WP)                         :: xc(2), xe(2), ax(3), amin
 logical                               :: file_exist1, file_exist2, file_exist3
 type(t_mesh), intent(inout), target   :: mesh
-#include "associate_mesh_ini.h"
 ! ====================
 ! (a) find edges. To make the procedure fast 
 ! one needs neighbourhood arrays
@@ -219,10 +212,10 @@ type(t_mesh), intent(inout), target   :: mesh
 print *, achar(27)//'[1m'  //'____________________________________________________________'//achar(27)//'[0m'
 print *, achar(27)//'[7;1m' //' -->: compute edge connectivity                             '//achar(27)//'[0m'
 
-allocate(ne_num(nod2d), ne_pos(MAX_ADJACENT, nod2D), nn_num(nod2D))
+allocate(ne_num(mesh%nod2d), ne_pos(MAX_ADJACENT, mesh%nod2D), nn_num(mesh%nod2D))
 ne_num=0
-DO n=1,elem2D
-    elnodes=elem2D_nodes(:,n)
+DO n=1,mesh%elem2D
+    elnodes=mesh%elem2D_nodes(:,n)
     q1=4
     if(elnodes(1)==elnodes(4)) q1=3
     DO q=1,q1
@@ -239,14 +232,14 @@ END DO                 ! neighbor elements are found
 ! count neighbour nodes				     
 ! In quads we should count the nodes that are 
 ! connected by edges!
-allocate(aux1(nod2D))                   
+allocate(aux1(mesh%nod2D))                   
 aux1=0
 
-DO n=1, nod2D
+DO n=1, mesh%nod2D
     counter=0
     DO k=1, ne_num(n)
         elem=ne_pos(k,n)
-        elnodes=elem2D_nodes(:,elem)        
+        elnodes=mesh%elem2D_nodes(:,elem)        
         if(elnodes(1)==elnodes(4)) then
             DO q=1,3
                 if(elnodes(q)==n) CYCLE 
@@ -278,15 +271,15 @@ DO n=1, nod2D
     aux1(temp(1:counter))=0
 END DO              
  
-allocate(nn_pos(maxval(nn_num)+1,nod2D))
+allocate(nn_pos(maxval(nn_num)+1,mesh%nod2D))
 nn_pos = -1
 aux1=0
  
-DO n=1, nod2D
+DO n=1, mesh%nod2D
     counter=0
     DO k=1, ne_num(n)
         elem=ne_pos(k,n)
-        elnodes=elem2D_nodes(:,elem)        
+        elnodes=mesh%elem2D_nodes(:,elem)        
         if(elnodes(1)==elnodes(4)) then 
             DO q=1,3
                 if(elnodes(q)==n) CYCLE 
@@ -335,18 +328,16 @@ deallocate(aux1)
  ! New edges are added only if neighbor>n  
  ! ====================
  counter = 0
- DO n=1,nod2D
+ DO n=1,mesh%nod2D
     counter = counter + count(nn_pos(2:nn_num(n),n)>nn_pos(1,n))
  end do
- edge2D=counter
+ mesh%edge2D=counter
 
- allocate(mesh%edges   (2, edge2D))
- allocate(mesh%edge_tri(2, edge2D))
- edges    => mesh%edges    !required after the allocation, otherwise the pointer remains undefined
- edge_tri => mesh%edge_tri !required after the allocation, otherwise the pointer remains undefined
+ allocate(mesh%edges   (2, mesh%edge2D))
+ allocate(mesh%edge_tri(2, mesh%edge2D))
  counter_in=0 
 
- DO n=1,nod2D
+ DO n=1,mesh%nod2D
     DO q=2,nn_num(n)
        node=nn_pos(q,n)
        if(node<n) CYCLE
@@ -355,7 +346,7 @@ deallocate(aux1)
        flag=0
        DO k=1, ne_num(n)
           elem=ne_pos(k,n)
-          elnodes=elem2D_nodes(:,elem)
+          elnodes=mesh%elem2D_nodes(:,elem)
           q2=4
           if(elnodes(1)==elnodes(4)) q2=3
           DO q1=1,q2
@@ -368,9 +359,9 @@ deallocate(aux1)
        END DO
        if(flag==2) then
           counter_in=counter_in+1
-          edges(1,counter_in)=n
-          edges(2,counter_in)=node
-          edge_tri(:,counter_in)=elems
+          mesh%edges(1,counter_in)=n
+          mesh%edges(2,counter_in)=node
+          mesh%edge_tri(:,counter_in)=elems
 !          write(10,'(4I10)') n, node, elems
 !       else if (flag==1) then
 !          write(10,'(4I10)') n, node, elems(1), -999
@@ -379,11 +370,11 @@ deallocate(aux1)
        end if
     END DO
  END DO
- edge2D_in=counter_in
+ mesh%edge2D_in=counter_in
 
  ! Repeat to collect boundary edges:   
  counter=0
- DO n=1,nod2D
+ DO n=1,mesh%nod2D
     DO q=2,nn_num(n)
        node=nn_pos(q,n)
        if(node<n) CYCLE
@@ -392,7 +383,7 @@ deallocate(aux1)
        flag=0
        DO k=1, ne_num(n)
           elem=ne_pos(k,n)
-          elnodes=elem2D_nodes(:,elem)
+          elnodes=mesh%elem2D_nodes(:,elem)
           q2=4
           if(elnodes(1)==elnodes(4)) q2=3
           DO q1=1,q2
@@ -405,10 +396,10 @@ deallocate(aux1)
        END DO
        if(flag==1) then
           counter_in=counter_in+1
-          edges(1,counter_in)=n
-          edges(2,counter_in)=node
+          mesh%edges(1,counter_in)=n
+          mesh%edges(2,counter_in)=node
           elems(2)=-999
-          edge_tri(:,counter_in)=elems
+          mesh%edge_tri(:,counter_in)=elems
        end if
     END DO
  END DO
@@ -423,32 +414,32 @@ deallocate(aux1)
  ! If the edge is on the boundary, there is only the first triangle.  
  ! ====================
 
- DO n=1, edge2D
-    ed=edges(:,n)
-    if (edge_tri(1,n)<=0) then
-       elem=edge_tri(1,n)
-       elem1=edge_tri(2,n)
-       edge_tri(1,n)=elem1
-       edge_tri(2,n)=elem
+ DO n=1, mesh%edge2D
+    ed=mesh%edges(:,n)
+    if (mesh%edge_tri(1,n)<=0) then
+       elem=mesh%edge_tri(1,n)
+       elem1=mesh%edge_tri(2,n)
+       mesh%edge_tri(1,n)=elem1
+       mesh%edge_tri(2,n)=elem
     endif
-    call elem_center(edge_tri(1,n), xc(1), xc(2), mesh)
-    xc=xc-coord_nod2D(:,ed(1))
-    xe=coord_nod2D(:,ed(2))-coord_nod2D(:,ed(1))
+    call elem_center(mesh%edge_tri(1,n), xc(1), xc(2), mesh)
+    xc=xc-mesh%coord_nod2D(:,ed(1))
+    xe=mesh%coord_nod2D(:,ed(2))-mesh%coord_nod2D(:,ed(1))
     call trim_cyclic(xe(1))
     call trim_cyclic(xc(1))
     if(xc(1)*xe(2)-xc(2)*xe(1)>0.0_WP) then
        ! Vector drawn to the center of the first triangle is to the right
        ! of the edge vector. Triangles have to be exchanged:
-       elem=edge_tri(1,n)
-       elem1=edge_tri(2,n)
+       elem=mesh%edge_tri(1,n)
+       elem1=mesh%edge_tri(2,n)
        if(elem1>0) then  !TODO
-          edge_tri(1,n)=elem1
-          edge_tri(2,n)=elem
+          mesh%edge_tri(1,n)=elem1
+          mesh%edge_tri(2,n)=elem
        else
           if (elem<=0) write(*,*) '2 neighbouring elems are on the ground.'
-          elem=edges(2,n)         ! change the order of nodes
-          edges(2,n)=edges(1,n)
-          edges(1,n)=elem
+          elem=mesh%edges(2,n)         ! change the order of nodes
+          mesh%edges(2,n)=mesh%edges(1,n)
+          mesh%edges(1,n)=elem
        end if
     end if
  END DO
@@ -457,16 +448,15 @@ deallocate(aux1)
  ! (e) We need an array inverse to edge_tri listing edges
  ! of a given triangle 
  ! ====================
- allocate(mesh%elem_edges(4,elem2D))
- elem_edges => mesh%elem_edges !required after the allocation, otherwise the pointer remains undefined
- allocate(aux1(elem2D))
+ allocate(mesh%elem_edges(4,mesh%elem2D))
+ allocate(aux1(mesh%elem2D))
  aux1=0
- DO n=1, edge2D
+ DO n=1, mesh%edge2D
     DO k=1,2
-       q=edge_tri(k,n)   ! triangle number
+       q=mesh%edge_tri(k,n)   ! triangle number
        if (q>0) then
 	  aux1(q)=aux1(q)+1
-	  elem_edges(aux1(q),q)=n
+	  mesh%elem_edges(aux1(q),q)=n
        end if
     END DO
  END DO
@@ -474,32 +464,32 @@ deallocate(aux1)
  ! We order the edges in this list so that they
  ! are listed in the same rotation sense as nodes.
  ! First is the edge formed by elnodes(1:2), and so on
- DO elem=1,elem2D
-    elnodes=elem2D_nodes(:,elem)
+ DO elem=1,mesh%elem2D
+    elnodes=mesh%elem2D_nodes(:,elem)
     q1=4
     if(elnodes(1)==elnodes(4)) q1=3
-    eledges=elem_edges(:,elem)
+    eledges=mesh%elem_edges(:,elem)
     DO q=1,q1-1
        DO k=1,q1
-          if(((edges(1,eledges(k))==elnodes(q)).and. &
-               (edges(2,eledges(k))==elnodes(q+1))).or. &
-               ((edges(1,eledges(k))==elnodes(q+1)).and. &
-               (edges(2,eledges(k))==elnodes(q)))) then
-             elem_edges(q,elem)=eledges(k)
+          if(((mesh%edges(1,eledges(k))==elnodes(q)).and. &
+               (mesh%edges(2,eledges(k))==elnodes(q+1))).or. &
+               ((mesh%edges(1,eledges(k))==elnodes(q+1)).and. &
+               (mesh%edges(2,eledges(k))==elnodes(q)))) then
+             mesh%elem_edges(q,elem)=eledges(k)
              exit
           end if
        END DO
     END DO
     DO k=1,q1
-       if(((edges(1,eledges(k))==elnodes(q1)).and. &
-            (edges(2,eledges(k))==elnodes(1))).or. &
-            ((edges(1,eledges(k))==elnodes(1)).and. &
-            (edges(2,eledges(k))==elnodes(q1)))) then
-          elem_edges(q1,elem)=eledges(k)
+       if(((mesh%edges(1,eledges(k))==elnodes(q1)).and. &
+            (mesh%edges(2,eledges(k))==elnodes(1))).or. &
+            ((mesh%edges(1,eledges(k))==elnodes(1)).and. &
+            (mesh%edges(2,eledges(k))==elnodes(q1)))) then
+          mesh%elem_edges(q1,elem)=eledges(k)
           exit
        end if
     END DO
-    if(q1==3) elem_edges(4,elem)=elem_edges(1,elem)
+    if(q1==3) mesh%elem_edges(4,elem)=mesh%elem_edges(1,elem)
  END DO
 
  !> The edge and elem lists agree in the sense that edge 1 does not
@@ -517,14 +507,14 @@ deallocate(aux1)
     print *, '          newly computed in-memory edges. Delete the files first to regenerate them.'//achar(27)//'[0m'
  else
     open(11, file=trim(meshpath)//'edgenum.out')
-    write(11,*) edge2D
-    write(11,*) edge2D_in
+    write(11,*) mesh%edge2D
+    write(11,*) mesh%edge2D_in
     close(11)
     open(10, file=trim(meshpath)//'edges.out')
     open(12, file=trim(meshpath)//'edge_tri.out')
-    do n=1,edge2D
-       write(10,*) edges(:,n)
-       write(12,*) edge_tri(:,n)
+    do n=1,mesh%edge2D
+       write(10,*) mesh%edges(:,n)
+       write(12,*) mesh%edge_tri(:,n)
     end do
     close(10)
     close(12)
@@ -548,7 +538,6 @@ subroutine find_levels(mesh)
     character(MAX_PATH) :: file_name
     type(t_mesh), intent(inout), target :: mesh
 
-#include "associate_mesh_ini.h"
 
     print *, achar(27)//'[1m'  //'____________________________________________________________'//achar(27)//'[0m'
     print *, achar(27)//'[7;1m' //' -->: read bottom depth                                     '//achar(27)//'[0m'
@@ -556,11 +545,10 @@ subroutine find_levels(mesh)
     !___________________________________________________________________________
     ! allocate depth
     if (use_depthonelem) then 
-        allocate(mesh%depth(elem2D))
+        allocate(mesh%depth(mesh%elem2D))
     else    
-        allocate(mesh%depth(nod2D))
+        allocate(mesh%depth(mesh%nod2D))
     end if     
-    depth => mesh%depth !required after the allocation, otherwise the pointer remains undefined
     
     !______________________________________________________________________________
     ! read depth from aux3d.out
@@ -577,19 +565,17 @@ subroutine find_levels(mesh)
             open(fileID, file=file_name)
             
             ! read the number of levels 
-            read(fileID,*) nl          
-            allocate(mesh%zbar(nl))         ! their standard depths
+            read(fileID,*) mesh%nl          
+            allocate(mesh%zbar(mesh%nl))         ! their standard depths
             
             ! read full depth levels
-            zbar => mesh%zbar !required after the allocation, otherwise the pointer remains undefined
-            read(fileID,*) zbar
-            if(zbar(2)>0) zbar=-zbar   ! zbar is negative 
+            read(fileID,*) mesh%zbar
+            if(mesh%zbar(2)>0) mesh%zbar=-mesh%zbar   ! zbar is negative 
             
             ! compute mid depth levels
-            allocate(mesh%Z(nl-1))
-            Z => mesh%Z !required after the allocation, otherwise the pointer remains undefined
-            Z=zbar(1:nl-1)+zbar(2:nl)  ! mid-depths of cells
-            Z=0.5_WP*Z
+            allocate(mesh%Z(mesh%nl-1))
+            mesh%Z=mesh%zbar(1:mesh%nl-1)+mesh%zbar(2:mesh%nl)  ! mid-depths of cells
+            mesh%Z=0.5_WP*mesh%Z
         else
             write(*,*) '____________________________________________________________________'
             write(*,*) ' ERROR: You want to use aux3d.out file to define your depth, but '
@@ -616,19 +602,17 @@ subroutine find_levels(mesh)
             open(fileID, file=file_name)
             
             ! read the number of levels 
-            read(fileID,*) nl          
-            allocate(mesh%zbar(nl))         ! their standard depths
+            read(fileID,*) mesh%nl          
+            allocate(mesh%zbar(mesh%nl))         ! their standard depths
             
             ! read full depth levels
-            zbar => mesh%zbar !required after the allocation, otherwise the pointer remains undefined
-            read(fileID,*) zbar
-            if(zbar(2)>0) zbar=-zbar   ! zbar is negative 
+            read(fileID,*) mesh%zbar
+            if(mesh%zbar(2)>0) mesh%zbar=-mesh%zbar   ! zbar is negative 
             
             ! compute mid depth levels
-            allocate(mesh%Z(nl-1))
-            Z => mesh%Z !required after the allocation, otherwise the pointer remains undefined
-            Z=zbar(1:nl-1)+zbar(2:nl)  ! mid-depths of cells
-            Z=0.5_WP*Z
+            allocate(mesh%Z(mesh%nl-1))
+            mesh%Z=mesh%zbar(1:mesh%nl-1)+mesh%zbar(2:mesh%nl)  ! mid-depths of cells
+            mesh%Z=0.5_WP*mesh%Z
             
             close(fileID)
         else
@@ -670,62 +654,60 @@ subroutine find_levels(mesh)
     
     !___________________________________________________________________________
     ! read topography from file
-    auxi = nod2d
-    if (use_depthonelem) auxi = elem2d
+    auxi = mesh%nod2d
+    if (use_depthonelem) auxi = mesh%elem2d
 !     write(*,*) ' use_depthonelem = ',use_depthonelem
 !     write(*,*)  ' auxi =',auxi 
     DO n = 1, auxi
         read(fileID,*) x
         if (x>0) x=-x
-        if (x>zbar(thers_zbar_lev)) x=zbar(thers_zbar_lev) !TODO KK thresholding for depth
-        depth(n)=x
+        if (x>mesh%zbar(thers_zbar_lev)) x=mesh%zbar(thers_zbar_lev) !TODO KK thresholding for depth
+        mesh%depth(n)=x
     END DO
     close(fileID)
-    if(depth(2)>0) depth=-depth  ! depth is negative
+    if(mesh%depth(2)>0) mesh%depth=-mesh%depth  ! depth is negative
 
     !___________________________________________________________________________
     print *, achar(27)//'[1m'  //'____________________________________________________________'//achar(27)//'[0m'
     print *, achar(27)//'[7;1m' //' -->: compute elem, vertice bottom depth index              '//achar(27)//'[0m'
      
-    allocate(mesh%nlevels(elem2D))
-    nlevels => mesh%nlevels             !required after the allocation, otherwise the pointer remains undefined
-    allocate(mesh%nlevels_nod2D(nod2D))
-    nlevels_nod2D => mesh%nlevels_nod2D !required after the allocation, otherwise the pointer remains undefined
+    allocate(mesh%nlevels(mesh%elem2D))
+    allocate(mesh%nlevels_nod2D(mesh%nod2D))
 
     !___________________________________________________________________________
     ! Compute the initial number number of elementa levels, based on the vertice
     ! depth information 
-    do n=1, elem2D
+    do n=1, mesh%elem2D
         
         !_______________________________________________________________________
         if (use_depthonelem) then 
-            dmean = depth(n) ! depth is already defined on elements 
+            dmean = mesh%depth(n) ! depth is already defined on elements 
         else
-            nodes=elem2D_nodes(1:3,n)
+            nodes=mesh%elem2D_nodes(1:3,n)
             !___________________________________________________________________
             ! depth of element is  shallowest depth of sorounding vertices
-            if     (trim(which_depth_n2e) .eq. 'min') then ; dmean=maxval(depth(nodes))
+            if     (trim(which_depth_n2e) .eq. 'min') then ; dmean=maxval(mesh%depth(nodes))
             ! depth of element is deepest depth of sorounding vertices    
-            elseif (trim(which_depth_n2e) .eq. 'max') then ; dmean=minval(depth(nodes))
+            elseif (trim(which_depth_n2e) .eq. 'max') then ; dmean=minval(mesh%depth(nodes))
             ! DEFAULT: depth of element is  mean depth of sorounding vertices
-            elseif (trim(which_depth_n2e) .eq. 'mean') then; dmean=sum(depth(nodes))/3.0
+            elseif (trim(which_depth_n2e) .eq. 'mean') then; dmean=sum(mesh%depth(nodes))/3.0
             end if 
         end if 
         
         !_______________________________________________________________________
         exit_flag=0
-        do nz=1,nl-1
-            if(Z(nz)<dmean) then
+        do nz=1,mesh%nl-1
+            if(mesh%Z(nz)<dmean) then
                 exit_flag=1
-                nlevels(n)=nz
+                mesh%nlevels(n)=nz
                 exit
             end if
         end do
-        if((exit_flag==0).and.(dmean<0)) nlevels(n)=nl
-        if(dmean>=0) nlevels(n)=thers_zbar_lev
+        if((exit_flag==0).and.(dmean<0)) mesh%nlevels(n)=mesh%nl
+        if(dmean>=0) mesh%nlevels(n)=thers_zbar_lev
         
         ! set minimum number of levels to --> thers_lev=5
-        if(nlevels(n)<thers_zbar_lev) nlevels(n)=thers_zbar_lev
+        if(mesh%nlevels(n)<thers_zbar_lev) mesh%nlevels(n)=thers_zbar_lev
     end do ! --> do n=1, elem2D
     
     !___________________________________________________________________________
@@ -738,8 +720,8 @@ subroutine find_levels(mesh)
         print *, achar(27)//'[1;33m'//' WARNING: '//trim(file_name)//' already exists, keeping the existing file'//achar(27)//'[0m'
     else
         open(fileID, file=file_name)
-          do n=1,elem2D
-             write(fileID,*) nlevels(n)
+          do n=1,mesh%elem2D
+             write(fileID,*) mesh%nlevels(n)
           end do
         close(fileID)
     end if
@@ -748,7 +730,7 @@ subroutine find_levels(mesh)
     ! check for isolated cells (cells with at least two boundary faces or three 
     ! boundary vertices) and eliminate them --> FESOM2.0 doesn't like these kind
     ! of cells 
-    do nz=thers_zbar_lev+1,nl
+    do nz=thers_zbar_lev+1,mesh%nl
         exit_flag=0
         count_iter=0
         
@@ -760,11 +742,11 @@ subroutine find_levels(mesh)
             
             !___________________________________________________________________
             ! loop over triangles
-            do n=1,elem2D
+            do n=1,mesh%elem2D
                 ! merge: result = merge(truesource, falsesource, mask)
                 ! --> if elem2D_nodes(1,n) == elem2D_nodes(4,n): True  --> q=3 --> triangular mesh
                 ! --> if elem2D_nodes(1,n) == elem2D_nodes(4,n): False --> q=4 --> quad mesh
-                nneighb = merge(3,4,elem2D_nodes(1,n) == elem2D_nodes(4,n))
+                nneighb = merge(3,4,mesh%elem2D_nodes(1,n) == mesh%elem2D_nodes(4,n))
                 !                       
                 !                         +---isolated bottom cell
                 !   ._______________      |          _______________________.
@@ -774,14 +756,14 @@ subroutine find_levels(mesh)
                 !   |###|###|###|###|###|_v_|###|###|###|###|###|###|###|###|
                 !   |###|###|###|###|###|###|###|###|###|###|###|###|###|###|
                 !
-                if (nlevels(n)>=nz) then
+                if (mesh%nlevels(n)>=nz) then
                     count_neighb_open=0
-                    elems=elem_neighbors(1:3,n)
+                    elems=mesh%elem_neighbors(1:3,n)
                     !___________________________________________________________
                     ! loop over neighbouring triangles
                     do i=1,nneighb
                         if (elems(i)>0) then
-                            if (nlevels(elems(i))>=nz) then
+                            if (mesh%nlevels(elems(i))>=nz) then
                                 !count neighbours
                                 count_neighb_open=count_neighb_open+1
                             endif
@@ -800,13 +782,13 @@ subroutine find_levels(mesh)
                         if (nz-1<thers_zbar_lev) then 
                             do i=1,nneighb
                                 if (elems(i)>0) then
-                                    nlevels(elems(i)) = max(nlevels(elems(i)),nz)
+                                    mesh%nlevels(elems(i)) = max(mesh%nlevels(elems(i)),nz)
                                 end if     
                             end do    
                             
                         !if cell is "isolated" convert to one level shallower bottom cell
                         else
-                            nlevels(n)=nz-1
+                            mesh%nlevels(n)=nz-1
                         end if  
                         !force recheck for all current ocean cells
                         exit_flag=0
@@ -821,13 +803,13 @@ subroutine find_levels(mesh)
     !___________________________________________________________________________
     ! vertical vertice level index of ocean bottom boundary
     write(*,"(A)"                  ) '  -[compu]->: nlevels_nod2D '
-    nlevels_nod2D=0
-    do n=1,elem2D
-        q = merge(3,4,elem2D_nodes(1,n) == elem2D_nodes(4,n))
+    mesh%nlevels_nod2D=0
+    do n=1,mesh%elem2D
+        q = merge(3,4,mesh%elem2D_nodes(1,n) == mesh%elem2D_nodes(4,n))
         do j=1,q
-            node=elem2D_nodes(j,n)
-            if(nlevels_nod2D(node)<nlevels(n)) then
-            nlevels_nod2D(node)=nlevels(n)
+            node=mesh%elem2D_nodes(j,n)
+            if(mesh%nlevels_nod2D(node)<mesh%nlevels(n)) then
+            mesh%nlevels_nod2D(node)=mesh%nlevels(n)
             end if
         end do
     end do
@@ -849,24 +831,24 @@ subroutine find_levels(mesh)
     else
         file_name=trim(meshpath)//'elvls.out'
         open(fileID, file=file_name)
-        do n=1,elem2D
-           write(fileID,*) nlevels(n)
+        do n=1,mesh%elem2D
+           write(fileID,*) mesh%nlevels(n)
         end do
         close(fileID)
 
         file_name=trim(meshpath)//'nlvls.out'
         open(fileID, file=file_name)
-          do n=1,nod2D
-             write(fileID,*) nlevels_nod2D(n)
+          do n=1,mesh%nod2D
+             write(fileID,*) mesh%nlevels_nod2D(n)
           end do
         close(fileID)
     end if
         
     !_______________________________________________________________________
     write(*,*) '========================='
-    write(*,*) 'Mesh is read : ', 'nod2D=', nod2D,' elem2D=', elem2D, ' nl=', nl
-    write(*,*) 'Min/max depth on mype: ',  -zbar(minval(nlevels)),-zbar(maxval(nlevels))
-    write(*,*) '3D tracer nodes on mype ', sum(nlevels_nod2d)-(elem2D)
+    write(*,*) 'Mesh is read : ', 'nod2D=', mesh%nod2D,' elem2D=', mesh%elem2D, ' nl=', mesh%nl
+    write(*,*) 'Min/max depth on mype: ',  -mesh%zbar(minval(mesh%nlevels)),-mesh%zbar(maxval(mesh%nlevels))
+    write(*,*) '3D tracer nodes on mype ', sum(mesh%nlevels_nod2d)-(mesh%elem2D)
     write(*,*) '========================='
 end subroutine find_levels
 
@@ -889,49 +871,46 @@ subroutine find_levels_cavity(mesh)
     integer, allocatable, dimension(:)   :: numelemtonode
     logical, allocatable, dimension(:)   :: elemreducelvl, elemfixlvl
     type(t_mesh), intent(inout), target  :: mesh
-#include "associate_mesh_ini.h"
     !___________________________________________________________________________
     print *, achar(27)//'[1m'  //'____________________________________________________________'//achar(27)//'[0m'
     print *, achar(27)//'[7;1m' //' -->: compute elem, vertice cavity depth index               '//achar(27)//'[0m'
     
     !___________________________________________________________________________
-    allocate(mesh%ulevels(elem2D))
-    ulevels => mesh%ulevels 
-    allocate(mesh%ulevels_nod2D(nod2D))
-    ulevels_nod2D  => mesh%ulevels_nod2D 
+    allocate(mesh%ulevels(mesh%elem2D))
+    allocate(mesh%ulevels_nod2D(mesh%nod2D))
         
     !___________________________________________________________________________
     ! Compute level position of ocean-cavity boundary
     cavity_maxlev=0
-    do elem=1, elem2D
+    do elem=1, mesh%elem2D
         
         !_______________________________________________________________________
         if (use_cavityonelem) then 
-            dmean = cavity_depth(elem)
+            dmean = mesh%cavity_depth(elem)
         else
-            nodes=elem2D_nodes(1:3,elem)
+            nodes=mesh%elem2D_nodes(1:3,elem)
             !_______________________________________________________________________
             ! depth of element is  shallowest depth of sorounding vertices
-            if     (trim(which_depth_n2e) .eq. 'min')  then ; dmean=maxval(cavity_depth(nodes))
+            if     (trim(which_depth_n2e) .eq. 'min')  then ; dmean=maxval(mesh%cavity_depth(nodes))
             ! depth of element is deepest depth of sorounding vertices    
-            elseif (trim(which_depth_n2e) .eq. 'max')  then ; dmean=minval(cavity_depth(nodes))
+            elseif (trim(which_depth_n2e) .eq. 'max')  then ; dmean=minval(mesh%cavity_depth(nodes))
             ! DEFAULT: depth of element is  mean depth of sorounding vertices
-            elseif (trim(which_depth_n2e) .eq. 'mean') then ; dmean=sum(cavity_depth(nodes))/3.0
+            elseif (trim(which_depth_n2e) .eq. 'mean') then ; dmean=sum(mesh%cavity_depth(nodes))/3.0
             end if 
         end if 
         
         !_______________________________________________________________________
         ! vertical elem level index of cavity-ocean boundary
-        ulevels(elem) = 1
-        if (dmean<0.0_WP) ulevels(elem) = 2
+        mesh%ulevels(elem) = 1
+        if (dmean<0.0_WP) mesh%ulevels(elem) = 2
         
-        do nz=1,nlevels(elem)-1
-            if (Z(nz)<dmean .or. nlevels(elem)-nz<=3) then
-                ulevels(elem)=nz         !    to compute shechpetkin PGF
+        do nz=1,mesh%nlevels(elem)-1
+            if (mesh%Z(nz)<dmean .or. mesh%nlevels(elem)-nz<=3) then
+                mesh%ulevels(elem)=nz         !    to compute shechpetkin PGF
                 exit
             end if
         end do
-        cavity_maxlev = max(cavity_maxlev,ulevels(elem))
+        cavity_maxlev = max(cavity_maxlev,mesh%ulevels(elem))
     end do
     
     !___________________________________________________________________________
@@ -945,8 +924,8 @@ subroutine find_levels_cavity(mesh)
         print *, achar(27)//'[1;33m'//' WARNING: '//trim(file_name)//' already exists, keeping the existing file'//achar(27)//'[0m'
     else
         open(20, file=file_name)
-        do elem=1,elem2D
-            write(20,*) ulevels(elem)
+        do elem=1,mesh%elem2D
+            write(20,*) mesh%ulevels(elem)
         enddo
         close(20)
     end if
@@ -955,8 +934,8 @@ subroutine find_levels_cavity(mesh)
     ! Eliminate cells that have two cavity boundary faces --> should not be 
     ! possible in FESOM2.0
     ! loop over all cavity levels
-    allocate(elemreducelvl(elem2d),elemfixlvl(elem2d))
-    allocate(numelemtonode(nl))
+    allocate(elemreducelvl(mesh%elem2d),elemfixlvl(mesh%elem2d))
+    allocate(numelemtonode(mesh%nl))
         
     !___________________________________________________________________________
     ! outer iteration loop    
@@ -979,10 +958,10 @@ subroutine find_levels_cavity(mesh)
                 count_isoelem = 0
                 !_______________________________________________________________
                 ! loop over triangles
-                do elem=1,elem2D
+                do elem=1,mesh%elem2D
                     ! nneighb = 3 --> tri mesh, nneighb = 4 --> quad mesh
-                    nneighb = merge(3,4,elem2D_nodes(1,elem) == elem2D_nodes(4,elem))
-                    elems   = elem_neighbors(1:3,elem)
+                    nneighb = merge(3,4,mesh%elem2D_nodes(1,elem) == mesh%elem2D_nodes(4,elem))
+                    elems   = mesh%elem_neighbors(1:3,elem)
                     !
                     !   .___________________________.~~~~~~~~~~~~~~~~~~~~~~~~~~
                     !   |###|###|###|###|###|###|###|
@@ -995,7 +974,7 @@ subroutine find_levels_cavity(mesh)
                     !___________________________________________________________
                     ! (1st) Ask the Question: is nz at element elem an here an 
                     ! valid layer in the ocean
-                    if ( nz >= ulevels(elem) .and. nz<nlevels(elem)) then
+                    if ( nz >= mesh%ulevels(elem) .and. nz<mesh%nlevels(elem)) then
                         count_neighb_open=0
                         
                         !_______________________________________________________
@@ -1006,8 +985,8 @@ subroutine find_levels_cavity(mesh)
                         do j = 1, nneighb
                             if (elems(j)>0) then ! if its a valid boundary triangle, 0=missing value
                                 ! check for isolated cell
-                                if ( ulevels(elems(j))<= nz .and. & 
-                                     nlevels(elems(j))> nz ) then
+                                if ( mesh%ulevels(elems(j))<= nz .and. & 
+                                     mesh%nlevels(elems(j))> nz ) then
                                     !count the open faces to neighboring cells 
                                     count_neighb_open=count_neighb_open+1
                                 endif
@@ -1026,11 +1005,11 @@ subroutine find_levels_cavity(mesh)
                             ! except when this levels would remain less than 3 valid 
                             ! bottom levels --> in case make the levels of all sorounding
                             ! triangles shallower
-                            if ( (nlevels(elem)-(nz+1))>=3           .and. &
+                            if ( (mesh%nlevels(elem)-(nz+1))>=3           .and. &
                                  (elemreducelvl(elem) .eqv. .False.) .and. &
                                  (elemfixlvl(   elem) .eqv. .False.)       &
                                 ) then 
-                                ulevels(elem)=nz+1
+                                mesh%ulevels(elem)=nz+1
                                 
                             ! (4th.2) can not increase depth anymore to eleminate 
                             ! isolated cell, otherwise lessthan 3 valid layers 
@@ -1042,17 +1021,17 @@ subroutine find_levels_cavity(mesh)
                                 !PS indice -999 conflict in elems, ulevels(-999)
                                 !PS not possible 
                                 !PS idx = minloc(ulevels(elems)-nz, 1, MASK=( (elems>0) .and. ((ulevels(elems)-nz)>0) ) )
-                                val=nl
+                                val=mesh%nl
                                 do j = 1, 3
                                     if (elems(j)>0) then ! if its a valid boundary triangle, 0=missing value
-                                        if (ulevels(elems(j))-nz>0 .and. ulevels(elems(j))-nz<val) then
-                                            val=ulevels(elems(j))-nz
+                                        if (mesh%ulevels(elems(j))-nz>0 .and. mesh%ulevels(elems(j))-nz<val) then
+                                            val=mesh%ulevels(elems(j))-nz
                                             idx=j
                                         end if 
                                     end if 
                                 end do ! --> do i = 1, nneighb
                                 
-                                ulevels(      elems(idx)) = nz
+                                mesh%ulevels(      elems(idx)) = nz
                                 elemreducelvl(elems(idx)) = .True.
                             end if    
                             
@@ -1071,47 +1050,47 @@ subroutine find_levels_cavity(mesh)
         !_______________________________________________________________________
         ! compute vertical vertice level index of cavity_ocean boundary
         write(*,"(A)"                  ) '  -[compu]->: ulevels_nod2D '
-        ulevels_nod2D = nl
-        do elem=1,elem2D
-            nneighb = merge(3,4,elem2D_nodes(1,elem) == elem2D_nodes(4,elem))
+        mesh%ulevels_nod2D = mesh%nl
+        do elem=1,mesh%elem2D
+            nneighb = merge(3,4,mesh%elem2D_nodes(1,elem) == mesh%elem2D_nodes(4,elem))
             !___________________________________________________________________
             ! loop over neighbouring triangles
             do j=1,nneighb
-                node=elem2D_nodes(j,elem)
-                ulevels_nod2D(node)=min(ulevels_nod2D(node),ulevels(elem))
+                node=mesh%elem2D_nodes(j,elem)
+                mesh%ulevels_nod2D(node)=min(mesh%ulevels_nod2D(node),mesh%ulevels(elem))
             end do
         end do ! --> do elem=1,elem2D
         
         !_______________________________________________________________________
         ! check if all constrains for ulevel and ulevels_nod2D is fullfilled
         exit_flag2 = 1
-        do elem=1,elem2D
-            if (ulevels(elem)>=nlevels(elem)) then 
+        do elem=1,mesh%elem2D
+            if (mesh%ulevels(elem)>=mesh%nlevels(elem)) then 
                 write(*,*) ' -[check]->: elem cavity depth deeper or equal bottom depth, elem=',elem                
                 exit_flag2 = 0
             end if 
             
-            if (nlevels(elem)-ulevels(elem)<3) then 
+            if (mesh%nlevels(elem)-mesh%ulevels(elem)<3) then 
                 write(*,*) ' -[check]->: less than three valid elem ocean layers, elem=',elem    
                 exit_flag2 = 0
             end if 
         end do ! --> do elem=1,elem2D
         
-        do node=1,nod2D
-            if (ulevels_nod2D(node)>=nlevels_nod2D(node)) then 
+        do node=1,mesh%nod2D
+            if (mesh%ulevels_nod2D(node)>=mesh%nlevels_nod2D(node)) then 
                 write(*,*) ' -[check]->: vertice cavity depth deeper or equal bottom depth, node=', node
                 exit_flag2 = 0
             end if
             
-            if (nlevels_nod2D(node)-ulevels_nod2D(node)<3) then 
+            if (mesh%nlevels_nod2D(node)-mesh%ulevels_nod2D(node)<3) then 
                 write(*,*) ' -[check]->: less than three valid vertice ocean layers, node=', node
                 exit_flag2 = 0
             end if
         end do ! --> do node=1,nod2D
         
-        do elem=1,elem2D
-            if (ulevels(elem)< maxval(ulevels_nod2D(elem2D_nodes(:,elem))) ) then 
-                write(*,*) ' -[check]->: found elem cavity shallower than its valid maximum cavity vertice depths, elem=', elem2d
+        do elem=1,mesh%elem2D
+            if (mesh%ulevels(elem)< maxval(mesh%ulevels_nod2D(mesh%elem2D_nodes(:,elem))) ) then 
+                write(*,*) ' -[check]->: found elem cavity shallower than its valid maximum cavity vertice depths, elem=', mesh%elem2d
                 exit_flag2 = 0
             end if 
         end do ! --> do elem=1,elem2D
@@ -1151,16 +1130,16 @@ subroutine find_levels_cavity(mesh)
         ! --> Problem here is we want to keep nlevels fixed so what we can do is
         !     to set ulevels(elem1) and ulevels(elem3) towards nlevel(elem2)
         count_iter=0
-        do node=1, nod2D
+        do node=1, mesh%nod2D
             !___________________________________________________________________
             ! check if there is a possible gap as described above that would
             ! allow for node points without neighbors
-            min_nlvl = nl
+            min_nlvl = mesh%nl
             max_ulvl = 1
-            do j=1, nod_in_elem2D_num(node)
-                elem=nod_in_elem2D(j, node)
-                min_nlvl = min(min_nlvl, nlevels(elem))
-                max_ulvl = max(max_ulvl, ulevels(elem))
+            do j=1, mesh%nod_in_elem2D_num(node)
+                elem=mesh%nod_in_elem2D(j, node)
+                min_nlvl = min(min_nlvl, mesh%nlevels(elem))
+                max_ulvl = max(max_ulvl, mesh%ulevels(elem))
             end do    
             
             ! found a potential gap
@@ -1171,16 +1150,16 @@ subroutine find_levels_cavity(mesh)
                 ! every layer check if there are layers where a node point has 
                 ! only one or even zero neighboring triangles.
                 numelemtonode=0
-                do j=1, nod_in_elem2D_num(node)
-                    elem=nod_in_elem2D(j, node)
-                    do nz=ulevels(elem), nlevels(elem)-1
+                do j=1, mesh%nod_in_elem2D_num(node)
+                    elem=mesh%nod_in_elem2D(j, node)
+                    do nz=mesh%ulevels(elem), mesh%nlevels(elem)-1
                         numelemtonode(nz) = numelemtonode(nz) + 1
                     end do
                 end do
                 
                 !_______________________________________________________________
                 ! check in which depth level is an isolated node 
-                nzloop: do nz = ulevels_nod2D(node), nlevels_nod2D(node)-1
+                nzloop: do nz = mesh%ulevels_nod2D(node), mesh%nlevels_nod2D(node)-1
                     !___________________________________________________________
                     ! nodes has zero neighbouring triangles and is completely 
                     ! isolated need to adapt ulevels --> inflicts another 
@@ -1192,11 +1171,11 @@ subroutine find_levels_cavity(mesh)
                         count_iter = count_iter+1
                         write(*,"( A, I1, A, I7, A, I3)") '  -[check]->: node has only ', numelemtonode(nz) ,' neighb. triangle: n=', node, ', nz=',nz
                         !_______________________________________________________
-                        allocate(aux_arr(nod_in_elem2D_num(node)), aux_idx(nod_in_elem2D_num(node)))
-                        aux_arr(:) = ulevels(nod_in_elem2D(1:nod_in_elem2D_num(node),node))
+                        allocate(aux_arr(mesh%nod_in_elem2D_num(node)), aux_idx(mesh%nod_in_elem2D_num(node)))
+                        aux_arr(:) = mesh%ulevels(mesh%nod_in_elem2D(1:mesh%nod_in_elem2D_num(node),node))
                         aux_arr(:) = aux_arr(:) - nz
                         ! fill array with index of element
-                        do j=1, nod_in_elem2D_num(node)
+                        do j=1, mesh%nod_in_elem2D_num(node)
                             aux_idx(j) = j
                         end do
                         ! index of closest elem to nz where ulevel>nz
@@ -1204,10 +1183,10 @@ subroutine find_levels_cavity(mesh)
                         ! index of second closest elem to nz where ulevel>nz
                         idx2 = minloc(aux_arr, 1, MASK=((aux_arr>0) .and. (aux_idx/=idx)) )
                         deallocate(aux_arr, aux_idx)
-                        ulevels(   nod_in_elem2D(idx ,node)) = nz
-                        ulevels(   nod_in_elem2D(idx2,node)) = nz
-                        elemfixlvl(nod_in_elem2D(idx ,node)) = .True.
-                        elemfixlvl(nod_in_elem2D(idx2,node)) = .True.
+                        mesh%ulevels(   mesh%nod_in_elem2D(idx ,node)) = nz
+                        mesh%ulevels(   mesh%nod_in_elem2D(idx2,node)) = nz
+                        elemfixlvl(mesh%nod_in_elem2D(idx ,node)) = .True.
+                        elemfixlvl(mesh%nod_in_elem2D(idx2,node)) = .True.
                         
                         !_______________________________________________________
                         ! inflict another outer iteration loop
@@ -1226,18 +1205,18 @@ subroutine find_levels_cavity(mesh)
                         count_iter = count_iter+1
                         write(*,"( A, I1, A, I7, A, I3)") '  -[check]->: node has only ', numelemtonode(nz) ,'neighb. triangle: n=', node, ', nz=',nz
                         !_______________________________________________________
-                        allocate(aux_arr(nod_in_elem2D_num(node)), aux_idx(nod_in_elem2D_num(node)))
-                        aux_arr(:) = ulevels(nod_in_elem2D(1:nod_in_elem2D_num(node),node))
+                        allocate(aux_arr(mesh%nod_in_elem2D_num(node)), aux_idx(mesh%nod_in_elem2D_num(node)))
+                        aux_arr(:) = mesh%ulevels(mesh%nod_in_elem2D(1:mesh%nod_in_elem2D_num(node),node))
                         aux_arr(:) = aux_arr(:) - nz
                         ! fill array with index of element
-                        do j=1, nod_in_elem2D_num(node)
+                        do j=1, mesh%nod_in_elem2D_num(node)
                             aux_idx(j) = j
                         end do
                         ! index of closest elem to nz where ulevel>nz
                         idx  = minloc(aux_arr, 1, MASK=((aux_arr>0)) )
                         deallocate(aux_arr, aux_idx)
-                        ulevels(   nod_in_elem2D(idx,node)) = nz
-                        elemfixlvl(nod_in_elem2D(idx,node)) = .True.
+                        mesh%ulevels(   mesh%nod_in_elem2D(idx,node)) = nz
+                        elemfixlvl(mesh%nod_in_elem2D(idx,node)) = .True.
                         
                         !_______________________________________________________
                         ! inflict another outer iteration loop
@@ -1297,16 +1276,16 @@ subroutine find_levels_cavity(mesh)
         ! write out elemental cavity-ocean boundary level
         file_name=trim(meshpath)//'cavity_elvls.out'
         open(20, file=file_name)
-        do elem=1,elem2D
-            write(20,*) ulevels(elem)
+        do elem=1,mesh%elem2D
+            write(20,*) mesh%ulevels(elem)
         enddo
         close(20)
 
         ! write out vertice cavity-ocean boundary level + yes/no cavity flag
         file_name=trim(meshpath)//'cavity_nlvls.out'
         open(20, file=file_name)
-        do node=1,nod2D
-            write(20,*) ulevels_nod2D(node)
+        do node=1,mesh%nod2D
+            write(20,*) mesh%ulevels_nod2D(node)
         enddo
         close(20)
     end if
@@ -1324,10 +1303,9 @@ implicit none
 integer       :: n1, n2   ! nodes of the edge
 real(kind=WP) :: x, y, a(2), b(2)
 type(t_mesh), intent(inout), target :: mesh
-#include "associate_mesh_ini.h"
 
-a=coord_nod2D(:,n1)
-b=coord_nod2D(:,n2)
+a=mesh%coord_nod2D(:,n1)
+b=mesh%coord_nod2D(:,n2)
 if(a(1)-b(1)>cyclic_length/2.0) a(1)=a(1)-cyclic_length
 if(a(1)-b(1)<-cyclic_length/2.0) b(1)=b(1)-cyclic_length
 x=0.5_WP*(a(1)+b(1))
@@ -1344,16 +1322,15 @@ integer              ::  elnodes(3), k
 real(kind=WP), intent(out) :: x, y
 real(kind=WP)        ::  ax(3), amin
 type(t_mesh), intent(in), target :: mesh
-#include "associate_mesh_ini.h"
 
-   elnodes=elem2D_nodes(1:3,elem)
-   ax=coord_nod2D(1, elnodes)
+   elnodes=mesh%elem2D_nodes(1:3,elem)
+   ax=mesh%coord_nod2D(1, elnodes)
    amin=minval(ax)
    DO k=1,3
    if(ax(k)-amin>cyclic_length/2.0) ax(k)=ax(k)-cyclic_length
    END DO
    x=sum(ax)/3.0_WP
-   y=sum(coord_nod2D(2,elnodes))/3.0_WP
+   y=sum(mesh%coord_nod2D(2,elnodes))/3.0_WP
    
 end subroutine elem_center
 !=======================================================================
@@ -1362,18 +1339,16 @@ SUBROUTINE find_elem_neighbors_ini(mesh)
 implicit none
 integer    :: elem, eledges(3), elem1, j, n, elnodes(3)
 type(t_mesh), intent(inout), target :: mesh
-#include "associate_mesh_ini.h"
 
-allocate(mesh%elem_neighbors(4,elem2D))
-elem_neighbors => mesh%elem_neighbors !required after the allocation, otherwise the pointer remains undefined
-elem_neighbors=0
-DO elem=1,elem2D
+allocate(mesh%elem_neighbors(4,mesh%elem2D))
+mesh%elem_neighbors=0
+DO elem=1,mesh%elem2D
    
-   eledges=elem_edges(1:3,elem)
+   eledges=mesh%elem_edges(1:3,elem)
    DO j=1,3
-   elem1=edge_tri(1,eledges(j))
-   if(elem1==elem) elem1=edge_tri(2,eledges(j))
-   elem_neighbors(j,elem)=elem1
+   elem1=mesh%edge_tri(1,eledges(j))
+   if(elem1==elem) elem1=mesh%edge_tri(2,eledges(j))
+   mesh%elem_neighbors(j,elem)=elem1
    END DO
    
 END DO
@@ -1383,14 +1358,14 @@ END DO
 
  ! Test that there are at least two neighbors at the surface:
 
-DO elem=1,elem2D
+DO elem=1,mesh%elem2D
    elem1=0
    DO j=1,3
-   if(elem_neighbors(j,elem)>0) elem1=elem1+1
+   if(mesh%elem_neighbors(j,elem)>0) elem1=elem1+1
    END DO
    if (elem1<2) then
     write(*,*) 'find_elem_neighbors_ini:Insufficient number of neighbors ',elem
-    write(*,*) 'find_elem_neighbors_ini:Elem neighbors ',elem_neighbors(:,elem)
+    write(*,*) 'find_elem_neighbors_ini:Elem neighbors ',mesh%elem_neighbors(:,elem)
     write(*,*) '____________________________________________________________________'
     write(*,*) ' ERROR: The mesh you want to partitioning contains triangles that'
     write(*,*) '        have just one neighbor, this was OK for FESOM1.4 but not'
@@ -1423,23 +1398,21 @@ END DO
  ! To facilitate computations the neibourhood
  ! information is assembled
  ! =============	 
- allocate(mesh%nod_in_elem2D_num(nod2D))
- nod_in_elem2D_num => mesh%nod_in_elem2D_num !required after the allocation, otherwise the pointer remains undefined
- nod_in_elem2D_num=0
- do n=1,elem2D
-    elnodes=elem2D_nodes(1:3,n)
-    nod_in_elem2D_num(elnodes)=nod_in_elem2D_num(elnodes)+1
+ allocate(mesh%nod_in_elem2D_num(mesh%nod2D))
+ mesh%nod_in_elem2D_num=0
+ do n=1,mesh%elem2D
+    elnodes=mesh%elem2D_nodes(1:3,n)
+    mesh%nod_in_elem2D_num(elnodes)=mesh%nod_in_elem2D_num(elnodes)+1
  end do
- allocate(mesh%nod_in_elem2D(maxval(nod_in_elem2D_num),nod2D))
- nod_in_elem2D => mesh%nod_in_elem2D
- nod_in_elem2D=0
+ allocate(mesh%nod_in_elem2D(maxval(mesh%nod_in_elem2D_num),mesh%nod2D))
+ mesh%nod_in_elem2D=0
  
- nod_in_elem2D_num=0
- do n=1,elem2D   
-    elnodes=elem2D_nodes(1:3,n)
-    nod_in_elem2D_num(elnodes)=nod_in_elem2D_num(elnodes)+1
+ mesh%nod_in_elem2D_num=0
+ do n=1,mesh%elem2D   
+    elnodes=mesh%elem2D_nodes(1:3,n)
+    mesh%nod_in_elem2D_num(elnodes)=mesh%nod_in_elem2D_num(elnodes)+1
     do j=1, 3
-       nod_in_elem2D(nod_in_elem2D_num(elnodes(j)),elnodes(j))=n
+       mesh%nod_in_elem2D(mesh%nod_in_elem2D_num(elnodes(j)),elnodes(j))=n
     end do
  end do  
 END SUBROUTINE find_elem_neighbors_ini
@@ -1453,25 +1426,23 @@ subroutine stiff_mat_ini(mesh)
   integer, allocatable   :: num_ne(:), ne(:,:)
   !
   type(t_mesh), intent(inout), target :: mesh
-#include "associate_mesh_ini.h"
 
-  ssh_stiff%dim = nod2D   
-  allocate(mesh%ssh_stiff%rowptr(nod2D+1))
-  ssh_stiff => mesh%ssh_stiff !required after the allocation, otherwise the pointer remains undefined
+  mesh%ssh_stiff%dim = mesh%nod2D   
+  allocate(mesh%ssh_stiff%rowptr(mesh%nod2D+1))
 
-  allocate(num_ne(nod2D), ne(MAX_ADJACENT,nod2D))
+  allocate(num_ne(mesh%nod2D), ne(MAX_ADJACENT,mesh%nod2D))
   num_ne(:)           = 0
   ne(:,:)             = -1
  
   ! Check the maximum number of nodes in an element (FESOM triangular meshes = 3, Hybrid meshes = 4)
-  elem_nodes_max = size(elem2D_nodes, 1)
+  elem_nodes_max = size(mesh%elem2D_nodes, 1)
 
   ! Fill node adjacency info
   ! all nodes in an element are adjacent in the sense of being halo nodes
   ! (also the opposite nodes of a quad: no edge, but the indirect connection
   ! should be taken into account by metis domain decomposition)
-  do el=1,elem2D
-     nod(1:elem_nodes_max) = elem2D_nodes(1:elem_nodes_max,el)  ! Fortran-numbering
+  do el=1,mesh%elem2D
+     nod(1:elem_nodes_max) = mesh%elem2D_nodes(1:elem_nodes_max,el)  ! Fortran-numbering
      q = elem_nodes_max
      if (nod(1) == nod(elem_nodes_max)) q = q-1  ! triangle
     
@@ -1494,17 +1465,16 @@ subroutine stiff_mat_ini(mesh)
   end do
 
 ! copy adjacency matrix to CSR-format
-  ssh_stiff%rowptr(1) = 1
-  do n=1,nod2D
-     ssh_stiff%rowptr(n+1) = ssh_stiff%rowptr(n)+num_ne(n)
+  mesh%ssh_stiff%rowptr(1) = 1
+  do n=1,mesh%nod2D
+     mesh%ssh_stiff%rowptr(n+1) = mesh%ssh_stiff%rowptr(n)+num_ne(n)
   end do
 
-  allocate(ssh_stiff%colind(ssh_stiff%rowptr(nod2D+1)-1))  
-  ssh_stiff => mesh%ssh_stiff !required after the allocation, otherwise the pointer remains undefined
+  allocate(mesh%ssh_stiff%colind(mesh%ssh_stiff%rowptr(mesh%nod2D+1)-1))  
 
   !required after the allocation, otherwise the pointer remains undefined
-  do n=1,nod2D
-     ssh_stiff%colind(ssh_stiff%rowptr(n):ssh_stiff%rowptr(n+1)-1) = ne(1:num_ne(n),n)
+  do n=1,mesh%nod2D
+     mesh%ssh_stiff%colind(mesh%ssh_stiff%rowptr(n):mesh%ssh_stiff%rowptr(n+1)-1) = ne(1:num_ne(n),n)
   end do
 
   deallocate(num_ne, ne)
@@ -1522,15 +1492,12 @@ subroutine communication_ini(partit, mesh)
   LOGICAL        :: L_EXISTS
   type(t_mesh),   intent(inout), target :: mesh
   type(t_partit), intent(inout), target :: partit
-#include "associate_part_def.h"
-#include "associate_mesh_ini.h"
-#include "associate_part_ass.h" !only my
 
   print *, achar(27)//'[1m'  //'____________________________________________________________'//achar(27)//'[0m'
   print *, achar(27)//'[7;1m' //' -->: compute communication arrays                          '//achar(27)//'[0m'
  
   ! Create the distributed mesh subdirectory
-  write(npes_string,"(I10)") npes
+  write(npes_string,"(I10)") partit%npes
   dist_mesh_dir=trim(meshpath)//'dist_'//trim(ADJUSTL(npes_string))//'/'
   INQUIRE(file=trim(dist_mesh_dir), EXIST=L_EXISTS)
   if (.not. L_EXISTS) call system('mkdir '//trim(dist_mesh_dir))
@@ -1546,8 +1513,8 @@ subroutine communication_ini(partit, mesh)
 #endif
   
 !$OMP DO
-  do n = 0, npes-1
-     mype = n ! mype is threadprivate and must not be iterator
+  do n = 0, partit%npes-1
+     partit%mype = n ! mype is threadprivate and must not be iterator
      call communication_nodn(partit, mesh)
      call communication_elemn(partit, mesh)
      call save_dist_mesh(partit, mesh)         ! Write out communication file com_infoxxxxx.out
@@ -1576,11 +1543,8 @@ subroutine set_par_support_ini(partit, mesh)
      end subroutine do_partit
   end interface
 
-#include "associate_part_def.h"
-#include "associate_mesh_ini.h"
-#include "associate_part_ass.h"
 
-  if (mype==0) then
+  if (partit%mype==0) then
         print *, achar(27)//'[1m'  //'____________________________________________________________'//achar(27)//'[0m'
         print *, achar(27)//'[7;1m' //' -->: compute partitioning                                  '//achar(27)//'[0m'
   end if 
@@ -1593,26 +1557,25 @@ subroutine set_par_support_ini(partit, mesh)
 
   np(:) = n_part(:)               ! Number of partitions on each hierarchy level
   if (n_part(1) == 0) then        ! Backward compatibility case: Take the number of 
-     np(1) = npes                 ! partitions from the number of MPI processes
+     np(1) = partit%npes                 ! partitions from the number of MPI processes
      n_levels = 1
   end if
   if (n_levels < 10) then         ! 0 is an indicator of the last hierarchy level
      np(n_levels+1) = 0 
   end if
 
-  allocate(partit%part(nod2D))
-  part=>partit%part
-  part=0
+  allocate(partit%part(mesh%nod2D))
+  partit%part=0
 
-  npes = PRODUCT(np(1:n_levels))
-  if(npes<2) then
+  partit%npes = PRODUCT(np(1:n_levels))
+  if(partit%npes<1) then
      print *,'Total number of parallel partitions is less than one! Aborting...'
      stop
   end if
   
   write(*,*) 'Calling partit for npes=', np
-  call do_partit(ssh_stiff%dim, ssh_stiff%rowptr, ssh_stiff%colind, &
-       nlevels_nod2D, np, part)
+  call do_partit(mesh%ssh_stiff%dim, mesh%ssh_stiff%rowptr, mesh%ssh_stiff%colind, &
+       mesh%nlevels_nod2D, np, partit%part)
 
 write(*,*) 'DONE'
 write(*,*) size(partit%part)
@@ -1651,19 +1614,16 @@ subroutine check_partitioning(partit, mesh)
 
   integer :: max_adjacent_nodes
   integer, allocatable :: ne_part(:), ne_part_num(:), ne_part_load(:,:)
-#include "associate_part_def.h"
-#include "associate_mesh_ini.h"
-#include "associate_part_ass.h" !just for partit%part
 
-  if (mype==0) then
+  if (partit%mype==0) then
         print *, achar(27)//'[1m'  //'____________________________________________________________'//achar(27)//'[0m'
         print *, achar(27)//'[7;1m' //' -->: check partitioning                                    '//achar(27)//'[0m'
   end if
 
   ! Check load balancing
-  do i=0, npes-1
-     nod_per_partition(1,i) = count(part(:) == i)
-     nod_per_partition(2,i) = sum(nlevels_nod2D, part(:) == i)
+  do i=0, partit%npes-1
+     nod_per_partition(1,i) = count(partit%part(:) == i)
+     nod_per_partition(2,i) = sum(mesh%nlevels_nod2D, partit%part(:) == i)
   enddo
 
   min_nod_per_part(1) = minval( nod_per_partition(1,:))
@@ -1672,29 +1632,29 @@ subroutine check_partitioning(partit, mesh)
   max_nod_per_part(1) = maxval( nod_per_partition(1,:))
   max_nod_per_part(2) = maxval( nod_per_partition(2,:))
 
-  average_nod_per_part(1) = nod2D / npes
-  average_nod_per_part(2) = sum(nlevels_nod2D(:)) / npes
+  average_nod_per_part(1) = mesh%nod2D / partit%npes
+  average_nod_per_part(2) = sum(mesh%nlevels_nod2D(:)) / partit%npes
 
   ! Now check for isolated nodes (connect by one or even no edge to other
   ! nodes of its partition) and repair, if possible
 
-  max_adjacent_nodes = maxval(ssh_stiff%rowptr(2:nod2D+1) - ssh_stiff%rowptr(1:nod2D))
+  max_adjacent_nodes = maxval(mesh%ssh_stiff%rowptr(2:mesh%nod2D+1) - mesh%ssh_stiff%rowptr(1:mesh%nod2D))
   allocate(ne_part(max_adjacent_nodes), ne_part_num(max_adjacent_nodes), &
        ne_part_load(2,max_adjacent_nodes))
 
   print *,' '
   print *,'Check for isolated nodes ========'
   n_iso = 0
-  checkloop: do n=1,nod2D
-     is = ssh_stiff%rowptr(n)
-     ie = ssh_stiff%rowptr(n+1) -1
+  checkloop: do n=1,mesh%nod2D
+     is = mesh%ssh_stiff%rowptr(n)
+     ie = mesh%ssh_stiff%rowptr(n+1) -1
      cnt = ie-is+1
      
-     node_neighb_part(1:cnt) = part(ssh_stiff%colind(is:ie))
-     if (count(node_neighb_part(1:cnt) == part(n)) <= 1) then
+     node_neighb_part(1:cnt) = partit%part(mesh%ssh_stiff%colind(is:ie))
+     if (count(node_neighb_part(1:cnt) == partit%part(n)) <= 1) then
 
         n_iso = n_iso+1
-        print *,'Isolated node',n, 'in partition', part(n)
+        print *,'Isolated node',n, 'in partition', partit%part(n)
         print *,'Neighbouring nodes are in partitions',  node_neighb_part(1:cnt)
 
         ! count the adjacent nodes of the other PEs
@@ -1703,10 +1663,10 @@ subroutine check_partitioning(partit, mesh)
         ne_part(1) = node_neighb_part(1)
         ne_part_num(1) = 1
         ne_part_load(1,1) = nod_per_partition(1,ne_part(1)) + 1
-        ne_part_load(2,1) = nod_per_partition(2,ne_part(1)) + nlevels_nod2D(n)
+        ne_part_load(2,1) = nod_per_partition(2,ne_part(1)) + mesh%nlevels_nod2D(n)
 
         do i=1,cnt
-           if (node_neighb_part(i)==part(n)) cycle
+           if (node_neighb_part(i)==partit%part(n)) cycle
            already_counted = .false.
            do k=1,np
               if (node_neighb_part(i) == ne_part(k)) then
@@ -1720,7 +1680,7 @@ subroutine check_partitioning(partit, mesh)
               ne_part(np) = node_neighb_part(i)
               ne_part_num(np) = 1
               ne_part_load(1,np) = nod_per_partition(1,ne_part(np)) + 1
-              ne_part_load(2,np) = nod_per_partition(2,ne_part(np)) + nlevels_nod2D(n)
+              ne_part_load(2,np) = nod_per_partition(2,ne_part(np)) + mesh%nlevels_nod2D(n)
            endif
         enddo
 
@@ -1768,13 +1728,13 @@ subroutine check_partitioning(partit, mesh)
         ! Adjust the load balancing
 
         nod_per_partition(1,ne_part(k)) = nod_per_partition(1,ne_part(k)) + 1 
-        nod_per_partition(2,ne_part(k)) = nod_per_partition(2,ne_part(k)) + nlevels_nod2D(n)
-        nod_per_partition(1,part(n))    = nod_per_partition(1,part(n)) - 1
-        nod_per_partition(2,part(n))    = nod_per_partition(2,part(n)) - nlevels_nod2D(n)
+        nod_per_partition(2,ne_part(k)) = nod_per_partition(2,ne_part(k)) + mesh%nlevels_nod2D(n)
+        nod_per_partition(1,partit%part(n))    = nod_per_partition(1,partit%part(n)) - 1
+        nod_per_partition(2,partit%part(n))    = nod_per_partition(2,partit%part(n)) - mesh%nlevels_nod2D(n)
 
         ! And, finally, move nod n to other partition        
-        part(n) = ne_part(k)
-        print *,'Node',n,'is moved to part',part(n)
+        partit%part(n) = ne_part(k)
+        print *,'Node',n,'is moved to part',partit%part(n)
      endif
   enddo checkloop
 

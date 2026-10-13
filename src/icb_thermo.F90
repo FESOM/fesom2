@@ -76,10 +76,6 @@ subroutine iceberg_meltrates(partit, mesh, M_b, M_v, M_e, M_bv, &
 type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(inout), target :: partit
 !==================== MODULES & DECLARATIONS ==========================!= 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
   
 
   !3-eq. formulation for bottom melting [m/s]    
@@ -99,11 +95,11 @@ type(t_partit), intent(inout), target :: partit
   hfl_flux_ib(ib,:)  = 0.0
   hfbv_flux_ib(ib,:) = 0.0
 
-  n2=elem2D_nodes(1,elem)
+  n2=mesh%elem2D_nodes(1,elem)
   do n=1,ib_n_lvls
   !3-eq. formulation for lateral 'basal' melting [m/s]
     lev_up  = mesh%zbar_3d_n(n, n2)
-    if( n==nlevels_nod2D(n2) ) then
+    if( n==mesh%nlevels_nod2D(n2) ) then
         lev_low = mesh%zbar_n_bot(n2)
     else
         lev_low = mesh%zbar_3d_n(n+1, n2)
@@ -130,7 +126,7 @@ type(t_partit), intent(inout), target :: partit
     if(T_d < 0.) T_d = 0.
  
     if (linit_wave_erosion_pot(elem)) then 
-        wave_erosion_potential(elem) = vcpw * T_d * elem_area(elem) * helem(1,elem)
+        wave_erosion_potential(elem) = vcpw * T_d * mesh%elem_area(elem) * mesh%helem(1,elem)
         linit_wave_erosion_pot(elem) = .false.
     end if
     !lateral melt (buoyant convection)
@@ -225,8 +221,6 @@ subroutine iceberg_newdimensions(partit, ib, depth_ib,height_ib,length_ib,width_
   real(kind=WP),parameter ::  L                  = 334000.                   ! [J/Kg]
 
 type(t_partit), intent(inout), target :: partit
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
     !in case the iceberg melts in this step, output has to be written (set to true below)
     force_last_output=.false.
@@ -456,8 +450,6 @@ subroutine iceberg_heat_water_fluxes_3eq(partit, ib, M_b, H_b, T_ib,S_ib,v_rel, 
   real(kind=WP),parameter ::  L    = 334000.                   ! [J/Kg]
 type(t_partit), intent(inout), target :: partit
 !==================== MODULES & DECLARATIONS ==========================!= 
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
      temp = T_ib
      sal = S_ib

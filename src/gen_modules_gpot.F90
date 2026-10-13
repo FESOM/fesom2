@@ -48,17 +48,20 @@ MODULE mo_tidal
 
       mmccdt = 0; jcc = 0; moph = 0
       CALL eph(lyear,lmonth,jcc,moph)
-      mmccdt = (jcc + moph - 0.5_WP) * NINT(86400._WP / dt)
+      ! eph gives the days up to the first day of the month; add the day of the
+      ! month and the time of day from the model clock, so that a run which does
+      ! not start on the first of a month at 00:00 (e.g. a restart) has the right phase
+      mmccdt = (jcc + moph + (day_in_month-1) - 0.5_WP) * NINT(86400._WP / dt) + NINT(timenew / dt)
       ! mmccdt is the number of timesteps since 01.01.2000 00:00:00
       ! bugfix by M.Mueller : substracting 0.5_WP shifts the reference time by -12h to 01.01.2000 12:00:00
       ! This is needed to get the correct sideral time (sbr sidt2)
       ! and calculate the correct hour angle for the tidal potential (->sbr aufb2)
-      ! FIXME : mmccdt = ldtmon-1 + int(jcc + moph - 0.5_WP) * NINT(86400._WP / dt)
       ! FIXME : replace eph by a some to code that directly calculates julian days and
       ! centuries as needed by siderial time and ephemerides
 
       if (partit%mype==0) WRITE(*,*)'tidal: phase relative to 2000 :'    &
-      ,'year= ',lyear, 'month= ',lmonth, 'yearoff= ',jcc,' monoff= ',moph ,'mmccdt= ',mmccdt
+      ,'year= ',lyear, 'month= ',lmonth, 'day= ',day_in_month, 'time= ',timenew, &
+       'yearoff= ',jcc,' monoff= ',moph ,'mmccdt= ',mmccdt
 
       END SUBROUTINE foreph_ini
 
@@ -119,10 +122,6 @@ MODULE mo_tidal
       REAL(WP) :: rkosp,codm,codmq,sids,sidsq,cods,codsq,sidm2
       REAL(WP) :: sids2,hamp,hasp
       INTEGER :: i,j
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
       mmccdt = mmccdt + 1
 
@@ -156,21 +155,21 @@ MODULE mo_tidal
       sids2=Sin(dekls2)
 
 
-      DO i=1, myDim_nod2D+eDim_nod2D
+      DO i=1, partit%myDim_nod2D+partit%eDim_nod2D
 
-         hamp = rektm + geo_coord_nod2D(1,i)
-         hasp = rekts + geo_coord_nod2D(1,i)
+         hamp = rektm + mesh%geo_coord_nod2D(1,i)
+         hasp = rekts + mesh%geo_coord_nod2D(1,i)
 
          ! attention : mpiom uses a negative tidal potential due to negative factor rkomp
          ssh_gp(i) = eef * (erdrad * rkomp * crim3 &
-              * (3._WP * (SIN(geo_coord_nod2D(2,i))**2 - 1._WP/3._WP) * (sidmq - 1._WP/3._WP)&
-              &  + SIN(2._WP * geo_coord_nod2D(2,i)) * sidm2 * COS(hamp) &
-              &  + COS(geo_coord_nod2D(2,i))**2 * codmq * COS(2._WP * hamp))        &
+              * (3._WP * (SIN(mesh%geo_coord_nod2D(2,i))**2 - 1._WP/3._WP) * (sidmq - 1._WP/3._WP)&
+              &  + SIN(2._WP * mesh%geo_coord_nod2D(2,i)) * sidm2 * COS(hamp) &
+              &  + COS(mesh%geo_coord_nod2D(2,i))**2 * codmq * COS(2._WP * hamp))        &
               &  + erdrad * rkosp * cris3 &
-              &    * (3._WP * (SIN(geo_coord_nod2D(2,i))**2 - 1._WP/3._WP) &
+              &    * (3._WP * (SIN(mesh%geo_coord_nod2D(2,i))**2 - 1._WP/3._WP) &
               &       * (sidsq - 1._WP/3._WP) &
-              &       + SIN(2._WP * geo_coord_nod2D(2,i)) * sids2 * COS(hasp) &
-              &       + COS(geo_coord_nod2D(2,i))**2 * codsq * COS(2._WP * hasp)))
+              &       + SIN(2._WP * mesh%geo_coord_nod2D(2,i)) * sids2 * COS(hasp) &
+              &       + COS(mesh%geo_coord_nod2D(2,i))**2 * codsq * COS(2._WP * hasp)))
 
       END DO
 

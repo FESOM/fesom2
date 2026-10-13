@@ -36,12 +36,8 @@ subroutine ssh_solve_preconditioner(solverinfo, partit, mesh)
     real(kind=WP), pointer       :: pr_values(:)
     integer,       pointer       :: rptr(:), cind(:)
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
-    nend=ssh_stiff%rowptr(myDim_nod2D+1)-ssh_stiff%rowptr(1)
+    nend=mesh%ssh_stiff%rowptr(partit%myDim_nod2D+1)-mesh%ssh_stiff%rowptr(1)
     ! Guarded: building the preconditioner twice (a restart path can do this)
     ! otherwise aborts with "allocatable array is already allocated".
     if (.not. allocated(mesh%ssh_stiff%pr_values)) then
@@ -50,20 +46,20 @@ subroutine ssh_solve_preconditioner(solverinfo, partit, mesh)
     pr_values=>mesh%ssh_stiff%pr_values
     cind     =>mesh%ssh_stiff%colind_loc
     rptr     =>mesh%ssh_stiff%rowptr_loc
-    allocate(diag_values(myDim_nod2D+eDim_nod2D)) ! Temporary, will be thrown away
+    allocate(diag_values(partit%myDim_nod2D+partit%eDim_nod2D)) ! Temporary, will be thrown away
 
-    DO row=1, myDim_nod2D
-       offset=ssh_stiff%rowptr(row)- ssh_stiff%rowptr(1)+1
-       diag_values(row)=ssh_stiff%values(offset)
+    DO row=1, partit%myDim_nod2D
+       offset=mesh%ssh_stiff%rowptr(row)- mesh%ssh_stiff%rowptr(1)+1
+       diag_values(row)=mesh%ssh_stiff%values(offset)
     END DO
     call exchange_nod(diag_values, partit)              ! We have diagonal values
     ! ==========
     ! Fill in the preconditioner
     ! ==========
-    DO row=1, myDim_nod2D
-       offset=ssh_stiff%rowptr(row)-ssh_stiff%rowptr(1)
-       nend=ssh_stiff%rowptr(row+1)-ssh_stiff%rowptr(row)
-       pr_values(offset+1)=1.0_WP/ssh_stiff%values(offset+1)
+    DO row=1, partit%myDim_nod2D
+       offset=mesh%ssh_stiff%rowptr(row)-mesh%ssh_stiff%rowptr(1)
+       nend=mesh%ssh_stiff%rowptr(row+1)-mesh%ssh_stiff%rowptr(row)
+       pr_values(offset+1)=1.0_WP/mesh%ssh_stiff%values(offset+1)
        DO n=2, nend   
           node=cind(offset+n)    ! Will be ssh_stiff$colind(offset+n) 
           if (solverinfo%precond_variant == 0) then
@@ -75,20 +71,20 @@ subroutine ssh_solve_preconditioner(solverinfo, partit, mesh)
              ! where a_rr == a_ii, i.e. on a uniform mesh. CG needs an SPD M^-1,
              ! so this is worth measuring rather than assuming -- see the r.z<0
              ! sensor in ssh_solve_cg.
-             pr_values(n+offset)=-0.5_WP*(ssh_stiff%values(n+offset)/ssh_stiff%values(1+offset))/  &
-                                  (ssh_stiff%values(1+offset)+ diag_values(node)) 
+             pr_values(n+offset)=-0.5_WP*(mesh%ssh_stiff%values(n+offset)/mesh%ssh_stiff%values(1+offset))/  &
+                                  (mesh%ssh_stiff%values(1+offset)+ diag_values(node)) 
           else
              ! Textbook symmetrised Jacobi, M^-1 = 2D^-1 - D^-1 A D^-1. The
              ! off-diagonal -a_ri/(a_rr*a_ii) is symmetric by construction, and
              ! its diagonal reduces to 1/a_rr, which is what is coded above.
-             pr_values(n+offset)=-ssh_stiff%values(n+offset)/                                     &
-                                  (ssh_stiff%values(1+offset)*diag_values(node))
+             pr_values(n+offset)=-mesh%ssh_stiff%values(n+offset)/                                     &
+                                  (mesh%ssh_stiff%values(1+offset)*diag_values(node))
           end if
        END DO
     END DO
    deallocate(diag_values)
 
-   n=myDim_nod2D+eDim_nod2D
+   n=partit%myDim_nod2D+partit%eDim_nod2D
    if (.not. allocated(solverinfo%rr)) then
       allocate(solverinfo%rr(n), solverinfo%zz(n), solverinfo%pp(n), solverinfo%App(n))
    end if
@@ -128,10 +124,6 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
   integer,       pointer       :: rptr(:), cind(:)
 
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
   
   pr_values=>mesh%ssh_stiff%pr_values
   cind     =>mesh%ssh_stiff%colind_loc
@@ -147,17 +139,17 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
   ! ============== 
   ! Define working tolerance: 
   ! ==============
- s_old = sum(real(rhs(1:myDim_nod2D), WP_full) * real(rhs(1:myDim_nod2D), WP_full))
+ s_old = sum(real(rhs(1:partit%myDim_nod2D), WP_full) * real(rhs(1:partit%myDim_nod2D), WP_full))
 
-  call MPI_Allreduce(MPI_IN_PLACE, s_old, 1, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
-  rtol=solverinfo%soltol*sqrt(s_old/real(nod2D,WP_full))
+  call MPI_Allreduce(MPI_IN_PLACE, s_old, 1, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+  rtol=solverinfo%soltol*sqrt(s_old/real(mesh%nod2D,WP_full))
   ! ==============
   ! Compute r0
   ! ==============
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row) 
-  DO row=1, myDim_nod2D
+  DO row=1, partit%myDim_nod2D
      rr(row)=real(real(rhs(row),WP_full)                                        &
-              - sum(real(ssh_stiff%values(rptr(row):rptr(row+1)-1),WP_full)*     &
+              - sum(real(mesh%ssh_stiff%values(rptr(row):rptr(row+1)-1),WP_full)*     &
                     real(X(cind(rptr(row):rptr(row+1)-1)),WP_full)), WP)
   END DO
 !$OMP END PARALLEL DO 
@@ -168,7 +160,7 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
   ! pp is the search direction
   ! =============
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row) 
-  DO row=1, myDim_nod2D
+  DO row=1, partit%myDim_nod2D
      zz(row)= real(sum(real(pr_values(rptr(row):rptr(row+1)-1),WP_full)*       &
                        real(rr(cind(rptr(row):rptr(row+1)-1)),WP_full)), WP)
      pp(row)=zz(row)
@@ -178,22 +170,23 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
   ! Scalar product of r*z
   ! ===============
 
-  s_old = sum(real(rr(1:myDim_nod2D), WP_full) * real(zz(1:myDim_nod2D), WP_full))
+  s_old = sum(real(rr(1:partit%myDim_nod2D), WP_full) * real(zz(1:partit%myDim_nod2D), WP_full))
 
-  call MPI_Allreduce(MPI_IN_PLACE, s_old, 1, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+  call MPI_Allreduce(MPI_IN_PLACE, s_old, 1, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
   
   ! ===============
   ! Iterations
   ! ===============
   converged = .false.
+  sprod     = 0.0_WP_full ! defined also if the loop is left before the first residual
   Do iter=1, solverinfo%maxiter
      ! ============
      ! Compute Ap
      ! ============
   call exchange_nod(pp, partit)     !  Update before matrix-vector multiplications
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row) 
-  DO row=1, myDim_nod2D
-     App(row)=real(sum(real(ssh_stiff%values(rptr(row):rptr(row+1)-1),WP_full)* &
+  DO row=1, partit%myDim_nod2D
+     App(row)=real(sum(real(mesh%ssh_stiff%values(rptr(row):rptr(row+1)-1),WP_full)* &
                         real(pp(cind(rptr(row):rptr(row+1)-1)),WP_full)), WP)
   END DO
 !$OMP END PARALLEL DO 
@@ -201,9 +194,9 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
      ! Scalar products for alpha
      ! ============
  
- s_aux = sum(real(pp(1:myDim_nod2D), WP_full) * real(App(1:myDim_nod2D), WP_full))
+ s_aux = sum(real(pp(1:partit%myDim_nod2D), WP_full) * real(App(1:partit%myDim_nod2D), WP_full))
 
-  call MPI_Allreduce(MPI_IN_PLACE, s_aux, 1, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+  call MPI_Allreduce(MPI_IN_PLACE, s_aux, 1, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
 
      ! ===========
      ! Breakdown guard. An equivalent check existed until 4eb2f21d ("Removed
@@ -228,7 +221,7 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
      ! New X and residual r
      ! ===========
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row)
-  DO row=1, myDim_nod2D
+  DO row=1, partit%myDim_nod2D
      X(row) =X(row) +al* pp(row)
      rr(row)=rr(row)-al*App(row)
   END DO
@@ -239,7 +232,7 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
   call exchange_nod(rr, partit)     ! Update before matrix-vector multiplications
 !$OMP BARRIER
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row)
-  DO row=1, myDim_nod2D
+  DO row=1, partit%myDim_nod2D
      zz(row)= real(sum(real(pr_values(rptr(row):rptr(row+1)-1),WP_full)*       &
                        real(rr(cind(rptr(row):rptr(row+1)-1)),WP_full)), WP)
   END DO
@@ -247,16 +240,16 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
      ! ===========
      ! Scalar products for beta
      ! ===========
-    sprod(1) = sum(real(rr(1:myDim_nod2D), WP_full) * real(zz(1:myDim_nod2D), WP_full))
-    sprod(2) = sum(real(rr(1:myDim_nod2D), WP_full) * real(rr(1:myDim_nod2D), WP_full))
+    sprod(1) = sum(real(rr(1:partit%myDim_nod2D), WP_full) * real(zz(1:partit%myDim_nod2D), WP_full))
+    sprod(2) = sum(real(rr(1:partit%myDim_nod2D), WP_full) * real(rr(1:partit%myDim_nod2D), WP_full))
   
-  call MPI_Allreduce(MPI_IN_PLACE, sprod, 2, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+  call MPI_Allreduce(MPI_IN_PLACE, sprod, 2, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
 
 !$OMP BARRIER
      ! ===========
      ! Exit if tolerance is achieved
      ! ===========
-  if (sqrt(sprod(2)/nod2D)< rtol) then
+  if (sqrt(sprod(2)/mesh%nod2D)< rtol) then
      converged = .true.
      exit
   endif
@@ -286,7 +279,7 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
      ! New p
      ! ===========
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row)
-  DO row=1,myDim_nod2D
+  DO row=1,partit%myDim_nod2D
      pp(row)=zz(row)+be*pp(row)
   END DO
 !$OMP END PARALLEL DO
@@ -308,7 +301,7 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
   solverinfo%iters_max  = max(solverinfo%iters_max, solverinfo%iters_last)
   solverinfo%iters_sum  = solverinfo%iters_sum + solverinfo%iters_last
   solverinfo%nsolves    = solverinfo%nsolves + 1
-  solverinfo%resid_last = sqrt(sprod(2)/nod2D)
+  solverinfo%resid_last = sqrt(sprod(2)/mesh%nod2D)
   solverinfo%rtol_last  = rtol
   if (.not. converged) solverinfo%nonconv = solverinfo%nonconv + 1
 

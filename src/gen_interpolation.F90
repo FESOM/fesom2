@@ -357,14 +357,10 @@ subroutine interp_3d_field(num_lon_reg, num_lat_reg, num_lay_reg, &
   real(kind=WP), intent(out)  	:: data_mod(num_mod_z,num_mod)
   type(t_mesh),   intent(in),    target :: mesh  
   type(t_partit), intent(inout), target :: partit
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
   do n=1,num_mod
   !!PS do nz=1,nlevels_nod2D(n)-1
-  do nz=ulevels_nod2D(n),nlevels_nod2D(n)-1
+  do nz=mesh%ulevels_nod2D(n),mesh%nlevels_nod2D(n)-1
 !  do nz=1,num_mod_z-1
      x=lon_mod(n)
      y=lat_mod(n)
@@ -476,10 +472,6 @@ subroutine interp_e2n_3d(data_e, data_n, mesh, partit, do_overz_in)
     integer                                           :: node, elem, nz, nl1, ul1, k
     real(kind=WP)                                     :: vx, vy
     logical                                           :: do_overz
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"     
     !
     !___________________________________________________________________________
     do_overz = .True.
@@ -489,21 +481,21 @@ subroutine interp_e2n_3d(data_e, data_n, mesh, partit, do_overz_in)
     !___________________________________________________________________________
     ! Do interpolation over vertical depth dimension consider bottom topography 
     if (do_overz) then 
-        do node = 1, myDim_nod2D
-            nl1 = nlevels_nod2D(node)-1
-            ul1 = ulevels_nod2D(node)
+        do node = 1, partit%myDim_nod2D
+            nl1 = mesh%nlevels_nod2D(node)-1
+            ul1 = mesh%ulevels_nod2D(node)
             do nz = ul1, nl1
                 vx = 0.0_WP
                 vy = 0.0_WP
-                do k = 1, nod_in_elem2D_num(node)
-                    elem = nod_in_elem2D(k, node)
-                    if( nz.LE.(nlevels(elem)-1) .and. nz.GE.(ulevels(elem))) then
-                        vx = vx + data_e(1, nz, elem) * elem_area(elem)
-                        vy = vy + data_e(2, nz, elem) * elem_area(elem)
+                do k = 1, mesh%nod_in_elem2D_num(node)
+                    elem = mesh%nod_in_elem2D(k, node)
+                    if( nz.LE.(mesh%nlevels(elem)-1) .and. nz.GE.(mesh%ulevels(elem))) then
+                        vx = vx + data_e(1, nz, elem) * mesh%elem_area(elem)
+                        vy = vy + data_e(2, nz, elem) * mesh%elem_area(elem)
                     endif
                 end do
-                data_n(1, nz, node)=vx/3.0_WP/areasvol(nz, node)
-                data_n(2, nz, node)=vy/3.0_WP/areasvol(nz, node)
+                data_n(1, nz, node)=vx/3.0_WP/mesh%areasvol(nz, node)
+                data_n(2, nz, node)=vy/3.0_WP/mesh%areasvol(nz, node)
             end do
         end do
     
@@ -513,17 +505,17 @@ subroutine interp_e2n_3d(data_e, data_n, mesh, partit, do_overz_in)
     else
         ul1=1
         nl1=size(data_e,2)
-        do node = 1, myDim_nod2D
+        do node = 1, partit%myDim_nod2D
             do nz = ul1+1, nl1-1
                 vx = 0.0_WP
                 vy = 0.0_WP
-                do k = 1, nod_in_elem2D_num(node)
-                    elem = nod_in_elem2D(k, node)
-                    vx = vx + data_e(1, nz, elem) * elem_area(elem)
-                    vy = vy + data_e(2, nz, elem) * elem_area(elem)
+                do k = 1, mesh%nod_in_elem2D_num(node)
+                    elem = mesh%nod_in_elem2D(k, node)
+                    vx = vx + data_e(1, nz, elem) * mesh%elem_area(elem)
+                    vy = vy + data_e(2, nz, elem) * mesh%elem_area(elem)
                 end do
-                data_n(1, nz, node)=vx/3.0_WP/areasvol(ulevels_nod2D(node), node)
-                data_n(2, nz, node)=vy/3.0_WP/areasvol(ulevels_nod2D(node), node)
+                data_n(1, nz, node)=vx/3.0_WP/mesh%areasvol(mesh%ulevels_nod2D(node), node)
+                data_n(2, nz, node)=vy/3.0_WP/mesh%areasvol(mesh%ulevels_nod2D(node), node)
             end do
         end do
     end if 
@@ -551,10 +543,6 @@ subroutine interp_e2n_2d(data_e, data_n, mesh, partit, do_overz_in)
     integer                                         :: node, elem, nz, nl1, ul1, k
     real(kind=WP)                                   :: vx, vy
     logical                                         :: do_overz
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"     
     !
     !___________________________________________________________________________
     do_overz = .True.
@@ -563,33 +551,33 @@ subroutine interp_e2n_2d(data_e, data_n, mesh, partit, do_overz_in)
     !___________________________________________________________________________
     ! Do interpolation for 2d vector data e.g 2d gradient (2, elem)
     if (size(data_e, 1) == 2) then
-        do node = 1, myDim_nod2D
+        do node = 1, partit%myDim_nod2D
             vx = 0.0_WP
             vy = 0.0_WP
-            do k = 1, nod_in_elem2D_num(node)
-                elem = nod_in_elem2D(k, node)
-                vx = vx + data_e(1, elem) * elem_area(elem)
-                vy = vy + data_e(2, elem) * elem_area(elem)
+            do k = 1, mesh%nod_in_elem2D_num(node)
+                elem = mesh%nod_in_elem2D(k, node)
+                vx = vx + data_e(1, elem) * mesh%elem_area(elem)
+                vy = vy + data_e(2, elem) * mesh%elem_area(elem)
             end do    
-            data_n(1, node)=vx/3.0_WP/areasvol(ulevels_nod2D(node), node)
-            data_n(2, node)=vy/3.0_WP/areasvol(ulevels_nod2D(node), node)
+            data_n(1, node)=vx/3.0_WP/mesh%areasvol(mesh%ulevels_nod2D(node), node)
+            data_n(2, node)=vy/3.0_WP/mesh%areasvol(mesh%ulevels_nod2D(node), node)
         end do
     
     !___________________________________________________________________________
     ! Do interpolation over vertical depth dimension consider bottom topography (nz,elem)
     else if (do_overz) then 
-        do node = 1, myDim_nod2D
-            nl1 = nlevels_nod2D(node)-1
-            ul1 = ulevels_nod2D(node)
+        do node = 1, partit%myDim_nod2D
+            nl1 = mesh%nlevels_nod2D(node)-1
+            ul1 = mesh%ulevels_nod2D(node)
             do nz = ul1, nl1
                 vx = 0.0_WP
-                do k = 1, nod_in_elem2D_num(node)
-                    elem = nod_in_elem2D(k, node)
-                    if( nz.LE.(nlevels(elem)-1) .and. nz.GE.(ulevels(elem))) then
-                        vx = vx + data_e(nz, elem) * elem_area(elem)
+                do k = 1, mesh%nod_in_elem2D_num(node)
+                    elem = mesh%nod_in_elem2D(k, node)
+                    if( nz.LE.(mesh%nlevels(elem)-1) .and. nz.GE.(mesh%ulevels(elem))) then
+                        vx = vx + data_e(nz, elem) * mesh%elem_area(elem)
                     endif
                 end do
-                data_n(nz, node)=vx/3.0_WP/areasvol(nz, node) 
+                data_n(nz, node)=vx/3.0_WP/mesh%areasvol(nz, node) 
             end do
         end do
     
@@ -598,14 +586,14 @@ subroutine interp_e2n_2d(data_e, data_n, mesh, partit, do_overz_in)
     else
         ul1=1
         nl1=size(data_e,1)
-        do node = 1, myDim_nod2D
+        do node = 1, partit%myDim_nod2D
             do nz = ul1+1, nl1-1
                 vx = 0.0_WP
-                do k = 1, nod_in_elem2D_num(node)
-                    elem = nod_in_elem2D(k, node)
-                    vx = vx + data_e(nz, elem) * elem_area(elem)
+                do k = 1, mesh%nod_in_elem2D_num(node)
+                    elem = mesh%nod_in_elem2D(k, node)
+                    vx = vx + data_e(nz, elem) * mesh%elem_area(elem)
                 end do
-                data_n(nz, node)=vx/3.0_WP/areasvol(ulevels_nod2D(node), node)
+                data_n(nz, node)=vx/3.0_WP/mesh%areasvol(mesh%ulevels_nod2D(node), node)
             end do
         end do
     end if 
@@ -631,19 +619,15 @@ subroutine interp_e2n_1d(data_e, data_n, mesh, partit)
     !___LOCAL VARIABLES_____________________________________________________
     integer                                         :: node, elem, nz, nl1, ul1, k
     real(kind=WP)                                   :: vx
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"     
     !
     !___________________________________________________________________________
     ! Do interpolation for 1d vector data (elem) --> (node)
-    do node = 1, myDim_nod2D
+    do node = 1, partit%myDim_nod2D
         vx = 0.0_WP
-        do k = 1, nod_in_elem2D_num(node)
-            elem = nod_in_elem2D(k, node)
-            vx = vx + data_e(elem) * elem_area(elem)
-            data_n(node)=vx/3.0_WP/areasvol(ulevels_nod2D(node), node)
+        do k = 1, mesh%nod_in_elem2D_num(node)
+            elem = mesh%nod_in_elem2D(k, node)
+            vx = vx + data_e(elem) * mesh%elem_area(elem)
+            data_n(node)=vx/3.0_WP/mesh%areasvol(mesh%ulevels_nod2D(node), node)
         end do
     end do    
 end subroutine interp_e2n_1d

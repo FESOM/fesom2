@@ -42,10 +42,6 @@ subroutine initial_state_dbgyre(dynamics, tracers, partit, mesh)
   real(kind=WP):: v1, v2, sc1, sc2
   real(kind=WP):: swsurf, aux
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
  ! default values
  wind=1
@@ -79,10 +75,10 @@ subroutine initial_state_dbgyre(dynamics, tracers, partit, mesh)
   
   
   if (wind==1) then
-      DO elem=1, myDim_elem2D
-         elnodes=elem2d_nodes(:,elem)
-         lat=sum(coord_nod2D(2,elnodes))/3.0_WP
-         lon=sum(coord_nod2D(1,elnodes))/3.0_WP
+      DO elem=1, partit%myDim_elem2D
+         elnodes=mesh%elem2d_nodes(:,elem)
+         lat=sum(mesh%coord_nod2D(2,elnodes))/3.0_WP
+         lon=sum(mesh%coord_nod2D(1,elnodes))/3.0_WP
 
          stress_surf(1,elem)= ztau * SIN( pi * (lat/rad - 15.0) / (29.0-15.0) )
          
@@ -98,7 +94,7 @@ subroutine initial_state_dbgyre(dynamics, tracers, partit, mesh)
 !  elevation
 ! ========  
   if (elevation==1) then 
-      dynamics%eta_n=0.01*(coord_nod2D(2,:)-30.0*rad)/(15.0*rad)
+      dynamics%eta_n=0.01*(mesh%coord_nod2D(2,:)-30.0*rad)/(15.0*rad)
   end if
   
 ! ========
@@ -110,14 +106,14 @@ subroutine initial_state_dbgyre(dynamics, tracers, partit, mesh)
   !    END DO
   !ENDIF
   if (tprofile==1) then  
-     DO n=1, myDim_nod2D+eDim_nod2D
+     DO n=1, partit%myDim_nod2D+partit%eDim_nod2D
          !lat = coord_nod2D(2,n)/rad
-         DO nz=1, nlevels_nod2D(n)-1
+         DO nz=1, mesh%nlevels_nod2D(n)-1
              
              !tr_arr(nz,n,1) = (1+Z(nz)/4000)*(coord_nod2D(2,n)/rad)
              !tr_arr(nz,n,1)=tr_arr(nz,n,1)-0.95_WP*20*tanh(abs(Z(nz))/300)-abs(Z(nz))/2400.0_WP
-             tracers%data(1)%values(nz,n) = 7.5 * ( 1.-TANH((ABS(Z(nz))-80.)/30.) )   &
-                &               + 10. * ( 5000. - ABS(Z(nz)) ) /5000.   
+             tracers%data(1)%values(nz,n) = 7.5 * ( 1.-TANH((ABS(mesh%Z(nz))-80.)/30.) )   &
+                &               + 10. * ( 5000. - ABS(mesh%Z(nz)) ) /5000.   
              !tr_arr(nz,n,1)=25.0 + .05*tanh((Z(nz) - 300.0)/5.0) - Z(nz)*0.008_WP
          
          END DO
@@ -130,11 +126,11 @@ subroutine initial_state_dbgyre(dynamics, tracers, partit, mesh)
 
 
   if (sprofile==1) then  
-   DO n=1, myDim_nod2D+eDim_nod2D
+   DO n=1, partit%myDim_nod2D+partit%eDim_nod2D
 
-       DO nz=1, nlevels_nod2D(n)-1
+       DO nz=1, mesh%nlevels_nod2D(n)-1
              
-           tracers%data(2)%values(nz,n) = 36. - ABS(Z(nz)) /4000.
+           tracers%data(2)%values(nz,n) = 36. - ABS(mesh%Z(nz)) /4000.
 
          
        END DO
@@ -151,8 +147,8 @@ subroutine initial_state_dbgyre(dynamics, tracers, partit, mesh)
   ztrp = 4.0        ! retroaction term on heat fluxes (W/m2/K)
   
   IF (tflux==1) then 
-      DO n=1, myDim_nod2D+eDim_nod2D 
-          lat = coord_nod2D(2,n)
+      DO n=1, partit%myDim_nod2D+partit%eDim_nod2D 
+          lat = mesh%coord_nod2D(2,n)
           !the function varies from 27C at 50N to 7C at 15N, again the analogy with spring
           t_star(n) = zTstar * cos(pi*((lat / rad - 5.0 ) / 107.0))
           !solar radiation component
@@ -218,19 +214,19 @@ subroutine initial_state_dbgyre(dynamics, tracers, partit, mesh)
  ! Coriolis calculation
  ! =========
 
-  DO n=1,myDim_elem2D
-      elnodes=elem2D_nodes(:,n)
+  DO n=1,partit%myDim_elem2D
+      elnodes=mesh%elem2D_nodes(:,n)
       !dst - change in latitude
-      dst=(sum(coord_nod2D(2, elnodes))/3.0-lat0*rad)*r_earth-ysize/2
+      dst=(sum(mesh%coord_nod2D(2, elnodes))/3.0-lat0*rad)*r_earth-ysize/2
       mesh%coriolis(n)=1.0e-4+dst*1.8e-11	 
   END DO
-  write(*,*) mype, 'COR', maxval(mesh%coriolis*10000.0), minval(mesh%coriolis*10000.0) 
+  write(*,*) partit%mype, 'COR', maxval(mesh%coriolis*10000.0), minval(mesh%coriolis*10000.0) 
   
-  DO n=1,myDim_nod2D+eDim_nod2D
-      dst=(coord_nod2D(2, n)-lat0*rad)*r_earth-ysize/2
+  DO n=1,partit%myDim_nod2D+partit%eDim_nod2D
+      dst=(mesh%coord_nod2D(2, n)-lat0*rad)*r_earth-ysize/2
       mesh%coriolis_node(n)=1.0e-4+dst*1.8e-11	 
   END DO
-  write(*,*) mype, 'COR_n', maxval(mesh%coriolis_node*10000.0), minval(mesh%coriolis_node*10000.0) 
+  write(*,*) partit%mype, 'COR_n', maxval(mesh%coriolis_node*10000.0), minval(mesh%coriolis_node*10000.0) 
 
  
  
@@ -239,14 +235,14 @@ subroutine initial_state_dbgyre(dynamics, tracers, partit, mesh)
  ! =========
   
 if (tpert==1) then
-  do n=1, myDim_nod2D+eDim_nod2D
-     lat=coord_nod2D(2,n)-15.0*rad
-     lon=coord_nod2D(1,n)
+  do n=1, partit%myDim_nod2D+partit%eDim_nod2D
+     lat=mesh%coord_nod2D(2,n)-15.0*rad
+     lon=mesh%coord_nod2D(1,n)
      if (lon>cyclic_length/2) lon=lon-cyclic_length
      if (lon<-cyclic_length/2) lon=lon+cyclic_length
      dst=sqrt((lat)**2+(lon)**2)
      if (dst>1.5*rad) cycle
-     do nz=1, nlevels_nod2D(n)-1 
+     do nz=1, mesh%nlevels_nod2D(n)-1 
         !if(abs(Z(nz)+500)<300) then
         tracers%data(1)%values(nz,n)=tracers%data(1)%values(nz,n)+1.0*cos(pi*dst/2.0/1.5/rad)       !exp(-(dst/(1.5*rad))**2)
 	!end if
