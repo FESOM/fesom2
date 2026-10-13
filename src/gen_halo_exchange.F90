@@ -17,8 +17,18 @@
 module g_comm
 
   use, intrinsic :: ISO_FORTRAN_ENV, only: int16, int32, real32, real64
+  use o_PARAM, only: WP
 
   implicit none
+
+#ifdef ENABLE_OPENACC
+  ! Device-to-device exchange of two nodal 2D fields (exchange_nod2D_2fields_begin with luse_g2g):
+  ! halo values packed into contiguous device buffers in slist/rlist order, unpacked in exchange_nod_end.
+  real(kind=WP), allocatable, target :: g2g_sbuf(:), g2g_rbuf(:)
+  integer,       allocatable         :: g2g_slist(:), g2g_rlist(:)
+  real(kind=WP), pointer             :: g2g_f1(:) => null(), g2g_f2(:) => null()
+  logical                            :: g2g_unpack_pending = .false.
+#endif
 
 contains
 
@@ -236,8 +246,8 @@ USE MOD_PARTIT
 use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
-real(kind=WP),   intent(inout)         :: nod1_array2D(:)
-real(kind=WP),   intent(inout)         :: nod2_array2D(:)
+real(kind=WP),   intent(inout), target :: nod1_array2D(:)
+real(kind=WP),   intent(inout), target :: nod2_array2D(:)
 integer                               :: n, sn, rn
 logical,        intent(in),optional   :: luse_g2g
 logical                               :: lg2g
@@ -259,6 +269,9 @@ if (partit%npes > 1) then
           partit%com_nod2D%rPE, partit%com_nod2D%sPE)
 #endif
   if (lg2g) then 
+#ifdef ENABLE_OPENACC
+    call g2g_exchange_2fields_begin(nod1_array2D, nod2_array2D, partit)
+#else
     !$ACC HOST_DATA USE_DEVICE(nod1_array2D, nod2_array2D) 
   
     DO n=1,rn
@@ -277,6 +290,7 @@ if (partit%npes > 1) then
     END DO
   
     !$ACC END HOST_DATA
+#endif
   else  
     DO n=1,rn
        call MPI_IRECV(nod1_array2D, 1, partit%r_mpitype_nod2D(n), partit%com_nod2D%rPE(n), &
@@ -717,8 +731,84 @@ type(t_partit), intent(inout), target :: partit
 
 if (partit%npes > 1) &
   call MPI_WAITALL(partit%com_nod2D%nreq, partit%com_nod2D%req, MPI_STATUSES_IGNORE, partit%MPIerr)
+#ifdef ENABLE_OPENACC
+if (g2g_unpack_pending) call g2g_unpack_2fields(partit)
+#endif
 
 END SUBROUTINE exchange_nod_end
+
+#ifdef ENABLE_OPENACC
+! Pack the send halo of two device fields, then post contiguous device-buffer messages
+! (same tags as the derived-datatype version). Unpacked by g2g_unpack_2fields.
+SUBROUTINE g2g_exchange_2fields_begin(f1, f2, partit)
+USE MOD_PARTIT
+IMPLICIT NONE
+type(t_partit), intent(inout), target :: partit
+real(kind=WP),  intent(inout), target :: f1(:), f2(:)
+integer :: i, n, sn, rn, ns, nr, a, l
+
+sn=partit%com_nod2D%sPEnum
+rn=partit%com_nod2D%rPEnum
+ns=partit%com_nod2D%sptr(sn+1)-1
+nr=partit%com_nod2D%rptr(rn+1)-1
+if (.not. allocated(g2g_sbuf)) then
+    allocate(g2g_sbuf(max(1,2*ns)), g2g_rbuf(max(1,2*nr)), g2g_slist(max(1,ns)), g2g_rlist(max(1,nr)))
+    g2g_slist(1:ns)=partit%com_nod2D%slist(1:ns)
+    g2g_rlist(1:nr)=partit%com_nod2D%rlist(1:nr)
+    !$ACC ENTER DATA CREATE(g2g_sbuf, g2g_rbuf) COPYIN(g2g_slist, g2g_rlist)
+end if
+
+!$ACC PARALLEL LOOP DEFAULT(PRESENT)
+do i=1, ns
+    g2g_sbuf(i)   =f1(g2g_slist(i))
+    g2g_sbuf(ns+i)=f2(g2g_slist(i))
+end do
+!$ACC END PARALLEL LOOP
+
+!$ACC HOST_DATA USE_DEVICE(g2g_sbuf, g2g_rbuf)
+do n=1, rn
+    a=partit%com_nod2D%rptr(n)
+    l=partit%com_nod2D%rptr(n+1)-a
+    call MPI_IRECV(g2g_rbuf(a),    l, MPI_WP, partit%com_nod2D%rPE(n), partit%com_nod2D%rPE(n), &
+                   partit%MPI_COMM_FESOM, partit%com_nod2D%req(2*n-1), partit%MPIerr)
+    call MPI_IRECV(g2g_rbuf(nr+a), l, MPI_WP, partit%com_nod2D%rPE(n), partit%com_nod2D%rPE(n)+partit%npes, &
+                   partit%MPI_COMM_FESOM, partit%com_nod2D%req(2*n),   partit%MPIerr)
+end do
+do n=1, sn
+    a=partit%com_nod2D%sptr(n)
+    l=partit%com_nod2D%sptr(n+1)-a
+    call MPI_ISEND(g2g_sbuf(a),    l, MPI_WP, partit%com_nod2D%sPE(n), partit%mype, &
+                   partit%MPI_COMM_FESOM, partit%com_nod2D%req(2*rn+2*n-1), partit%MPIerr)
+    call MPI_ISEND(g2g_sbuf(ns+a), l, MPI_WP, partit%com_nod2D%sPE(n), partit%mype+partit%npes, &
+                   partit%MPI_COMM_FESOM, partit%com_nod2D%req(2*rn+2*n),   partit%MPIerr)
+end do
+!$ACC END HOST_DATA
+
+g2g_f1 => f1
+g2g_f2 => f2
+g2g_unpack_pending = .true.
+END SUBROUTINE g2g_exchange_2fields_begin
+
+SUBROUTINE g2g_unpack_2fields(partit)
+USE MOD_PARTIT
+IMPLICIT NONE
+type(t_partit), intent(inout), target :: partit
+real(kind=WP),  pointer               :: f1(:), f2(:)
+integer :: i, nr
+
+nr=partit%com_nod2D%rptr(partit%com_nod2D%rPEnum+1)-1
+f1 => g2g_f1
+f2 => g2g_f2
+!$ACC PARALLEL LOOP DEFAULT(PRESENT)
+do i=1, nr
+    f1(g2g_rlist(i))=g2g_rbuf(i)
+    f2(g2g_rlist(i))=g2g_rbuf(nr+i)
+end do
+!$ACC END PARALLEL LOOP
+g2g_unpack_pending = .false.
+nullify(g2g_f1, g2g_f2)
+END SUBROUTINE g2g_unpack_2fields
+#endif
 
 SUBROUTINE exchange_elem_end(partit)
 use MOD_MESH
