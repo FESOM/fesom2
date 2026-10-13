@@ -18,6 +18,12 @@ module oce_ale_vel_rhs_module
 
     private
     public :: compute_vel_rhs, momentum_adv_scalar
+    ! OpenACC: the momentum rhs of this step is computed on the device (set in
+    ! compute_vel_rhs; .false. for configurations the device path does not cover)
+    logical :: mom_on_device = .false.
+    ! column work arrays of momentum_adv_scalar have this fixed size (private arrays of
+    ! run-time size would come from the per-thread device heap)
+    integer, parameter :: mom_nl_max = 128
 
 contains
 
@@ -37,6 +43,7 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
     logical, save            :: lfirst=.true.
     real(kind=WP)            :: p_ice(3), p_air(3), p_eta(3)
     integer                  :: use_pice
+    integer                  :: ab_ord
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:),   pointer :: UV, UV_rhs
@@ -82,6 +89,55 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
        stop
     END IF 
 
+#ifdef ENABLE_OPENACC
+    ! the device path covers the standard configuration: no kinetic-energy diagnostic,
+    ! no split-explicit subcycling, no ice/air pressure loading, no tides
+    mom_on_device = .not. (dynamics%ldiag_ke .or. dynamics%use_ssh_se_subcycl .or. use_pice>0 &
+                           .or. l_mslp .or. use_global_tides .or. dynamics%momadv_opt/=2)
+    if (mom_on_device) then
+        ! computed on the host earlier in the step (velocity update, pressure, ALE)
+        !$ACC UPDATE DEVICE(UV, eta_n, pgf_x, pgf_y, dynamics%w_e, mesh%hnode)
+    else
+        ! UV_rhsAB lives on the device; the host path below needs it
+        !$ACC UPDATE HOST(UV_rhsAB)
+    end if
+#endif
+    ab_ord = dynamics%AB_order
+    if (mom_on_device) then
+    ! the same as the host loop below for this configuration (p_ice = p_air = 0); the two
+    ! level loops are merged, which keeps the arithmetic per element
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(nz, nzmin, nzmax, elnodes, ff, Fx, Fy, pre)
+    do elem=1, partit%myDim_elem2D
+        nzmax = mesh%nlevels(elem)
+        nzmin = mesh%ulevels(elem)
+        elnodes=mesh%elem2D_nodes(:,elem)
+        pre = -(g*eta_n(elnodes))
+        ff  = mesh%coriolis(elem)*mesh%elem_area(elem)
+        Fx  = sum(mesh%gradient_sca(1:3, elem)*pre)
+        Fy  = sum(mesh%gradient_sca(4:6, elem)*pre)
+        do nz=nzmin, nzmax-1
+            if (ab_ord==2) then
+                UV_rhs(1,nz,elem)=ab1*UV_rhsAB(1,1,nz,elem)
+                UV_rhs(2,nz,elem)=ab1*UV_rhsAB(1,2,nz,elem)
+            else
+                UV_rhs(1,nz,elem)=ab1*UV_rhsAB(2,1,nz,elem)+ab2*UV_rhsAB(1,1,nz,elem)
+                UV_rhs(2,nz,elem)=ab1*UV_rhsAB(2,2,nz,elem)+ab2*UV_rhsAB(1,2,nz,elem)
+            end if
+            UV_rhs(1, nz, elem) = UV_rhs(1, nz, elem) + (Fx-pgf_x(nz, elem))*mesh%elem_area(elem)
+            UV_rhs(2, nz, elem) = UV_rhs(2, nz, elem) + (Fy-pgf_y(nz, elem))*mesh%elem_area(elem)
+            if (ab_ord==2) then
+                UV_rhsAB(1,1,nz,elem) = UV(2,nz,elem)*ff
+                UV_rhsAB(1,2,nz,elem) =-UV(1,nz,elem)*ff
+            else
+                UV_rhsAB(2,1,nz,elem) = UV_rhsAB(1,1,nz,elem)
+                UV_rhsAB(2,2,nz,elem) = UV_rhsAB(1,2,nz,elem)
+                UV_rhsAB(1,1,nz,elem) = UV(2,nz,elem)*ff
+                UV_rhsAB(1,2,nz,elem) =-UV(1,nz,elem)*ff
+            end if
+        end do
+    end do
+!$ACC END PARALLEL LOOP
+    else
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax, elnodes, ff, mm, Fx, Fy, pre, p_ice, p_air, p_eta)
     do elem=1, partit%myDim_elem2D
         nzmax = mesh%nlevels(elem)
@@ -235,6 +291,7 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
 
     end do
 !$OMP END PARALLEL DO
+    end if ! mom_on_device
     
     !___________________________________________________________________________
     ! advection --> add momentum advection to actual timerstep adams-bashfort 
@@ -265,7 +322,11 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
         ff=1.0_WP
         lfirst=.false.
     end if
+#ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax)
+#else
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) IF(mom_on_device) PRIVATE(nz, nzmin, nzmax)
+#endif
     do elem=1, partit%myDim_elem2D
         nzmin = mesh%ulevels(elem)
         nzmax = mesh%nlevels(elem)
@@ -283,7 +344,17 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
             !     call impl_vert_visc_ale      
         end do
     end do
+#ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
+#else
+!$ACC END PARALLEL LOOP
+    if (mom_on_device) then
+        ! viscosity filter and implicit vertical viscosity still run on the host
+        !$ACC UPDATE HOST(UV_rhs)
+    else
+        !$ACC UPDATE DEVICE(UV_rhsAB)
+    end if
+#endif
 
     !___________________________________________________________________________
     if (dynamics%ldiag_ke) then
@@ -317,8 +388,8 @@ subroutine momentum_adv_scalar(dynamics, partit, mesh)
     !___________________________________________________________________________
     integer                  :: n, nz, el1, el2
     integer                  :: nl1, nl2, ul1, ul2, nod(2), el, ed, k, nle, ule
-    real(kind=WP)            :: un1(1:mesh%nl-1), un2(1:mesh%nl-1)
-    real(kind=WP)            :: wu(1:mesh%nl), wv(1:mesh%nl)
+    real(kind=WP)            :: un1(mom_nl_max), un2(mom_nl_max)
+    real(kind=WP)            :: wu(mom_nl_max), wv(mom_nl_max)
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:),   pointer :: UV, UVnode_rhs
@@ -331,8 +402,16 @@ subroutine momentum_adv_scalar(dynamics, partit, mesh)
 
     !___________________________________________________________________________
     ! 1st. compute vertical momentum advection component: w * du/dz, w*dv/dz
+    if (mesh%nl > mom_nl_max) then
+        if (partit%mype==0) write(*,*) 'momentum_adv_scalar: mesh%nl =', mesh%nl, ' > mom_nl_max =', mom_nl_max
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+    end if
+#ifndef ENABLE_OPENACC
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, el1, el2, nl1, nl2, ul1, ul2, nod, el, ed, k, nle, ule, un1, un2, wu, wv)
 !$OMP DO
+#else
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) IF(mom_on_device) PRIVATE(nz, nl1, ul1, el, k, nle, ule, wu, wv)
+#endif
     do n=1,partit%myDim_nod2d
         nl1 = mesh%nlevels_nod2D(n)-1
         ul1 = mesh%ulevels_nod2D(n)
@@ -385,7 +464,11 @@ subroutine momentum_adv_scalar(dynamics, partit, mesh)
         UVnode_rhs(1:2,nl1+1:mesh%nl-1,n) = 0._WP
         UVnode_rhs(1:2,1:ul1-1   ,n) = 0._WP
     end do
+#ifndef ENABLE_OPENACC
 !$OMP END DO
+#else
+!$ACC END PARALLEL LOOP
+#endif
 
     !___________________________________________________________________________
     ! 2nd. compute horizontal advection component: u*du/dx, u*dv/dx & v*du/dy, v*dv/dy
@@ -394,7 +477,11 @@ subroutine momentum_adv_scalar(dynamics, partit, mesh)
     ! (mesh%nod_in_edge2D, ascending edge order), with the sign of the edge
     ! orientation. No thread writes a node it does not own, and the sum is
     ! independent of the number of threads.
+#ifndef ENABLE_OPENACC
 !$OMP DO
+#else
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) IF(mom_on_device) PRIVATE(k, ed, el1, el2, nl1, nl2, ul1, ul2, nz, un1, un2)
+#endif
     do n=1, partit%myDim_nod2D
         do k=1, mesh%nod_in_edge2D_num(n)
             ed  = mesh%nod_in_edge2D(k,n)
@@ -465,36 +552,66 @@ subroutine momentum_adv_scalar(dynamics, partit, mesh)
             endif ! --> if (el2>0) then
         end do ! --> do k=1, mesh%nod_in_edge2D_num(n)
     end do ! --> do n=1, myDim_nod2D
+#ifndef ENABLE_OPENACC
 !$OMP END DO
+#else
+!$ACC END PARALLEL LOOP
+#endif
 
     !___________________________________________________________________________
     ! divide total nodal advection by scalar area
+#ifndef ENABLE_OPENACC
 !$OMP DO
+#else
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) IF(mom_on_device) PRIVATE(nl1, ul1)
+#endif
     do n=1,partit%myDim_nod2d
         nl1 = mesh%nlevels_nod2D(n)-1
         ul1 = mesh%ulevels_nod2D(n)
         UVnode_rhs(1,ul1:nl1,n) = UVnode_rhs(1,ul1:nl1,n) *mesh%areasvol_inv(ul1:nl1,n)
         UVnode_rhs(2,ul1:nl1,n) = UVnode_rhs(2,ul1:nl1,n) *mesh%areasvol_inv(ul1:nl1,n)
     end do !-->do n=1,myDim_nod2d
+#ifndef ENABLE_OPENACC
 !$OMP END DO
+#else
+!$ACC END PARALLEL LOOP
+#endif
     !___________________________________________________________________________
 !$OMP MASTER
-    call exchange_nod(UVnode_rhs, partit)
+    if (mom_on_device) then
+        call exchange_nod(UVnode_rhs, partit, luse_g2g=.true.)
+    else
+        call exchange_nod(UVnode_rhs, partit)
+    end if
 !$OMP END MASTER
 !$OMP BARRIER
     !___________________________________________________________________________
     ! convert total nodal advection from vertice --> elements
+#ifndef ENABLE_OPENACC
 !$OMP DO
+#else
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) IF(mom_on_device) PRIVATE(nl1, ul1, nz, k)
+#endif
     do el=1, partit%myDim_elem2D
         nl1 = mesh%nlevels(el)-1
         ul1 = mesh%ulevels(el)
-        UV_rhsAB(1,1:2,ul1:nl1,el) = UV_rhsAB(1,1:2,ul1:nl1,el) &
-                + mesh%elem_area(el)*(UVnode_rhs(1:2,ul1:nl1,mesh%elem2D_nodes(1,el)) &
-                + UVnode_rhs(1:2,ul1:nl1,mesh%elem2D_nodes(2,el)) & 
-                + UVnode_rhs(1:2,ul1:nl1,mesh%elem2D_nodes(3,el))) / 3.0_WP     
+        ! explicit loops (same arithmetic as the array expression; the array sections
+        ! became temporaries on the per-thread device heap)
+        do nz=ul1, nl1
+            do k=1, 2
+                UV_rhsAB(1,k,nz,el) = UV_rhsAB(1,k,nz,el) &
+                    + mesh%elem_area(el)*(UVnode_rhs(k,nz,mesh%elem2D_nodes(1,el)) &
+                    + UVnode_rhs(k,nz,mesh%elem2D_nodes(2,el)) &
+                    + UVnode_rhs(k,nz,mesh%elem2D_nodes(3,el))) / 3.0_WP
+            end do
+        end do
     
     end do ! --> do el=1, myDim_elem2D
+#ifndef ENABLE_OPENACC
 !$OMP END DO
+#else
+!$ACC END PARALLEL LOOP
+#endif
 
     if (dynamics%ldiag_ke) then !we repeat the computation here and there are multiple ways to speed it up
 !$OMP DO

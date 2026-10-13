@@ -891,6 +891,10 @@ contains
 #endif
     !$ACC ENTER DATA COPYIN (f%dynamics)
     !$ACC ENTER DATA CREATE (f%dynamics%w, f%dynamics%w_e, f%dynamics%uv)
+    ! momentum rhs (compute_vel_rhs): uv_rhsAB holds the Adams-Bashforth history and lives
+    ! on the device from here on (host copy refreshed before restart and blowup output)
+    !$ACC ENTER DATA COPYIN (f%dynamics%work) CREATE (f%dynamics%uv_rhs, f%dynamics%eta_n, f%dynamics%work%uvnode_rhs)
+    !$ACC ENTER DATA COPYIN (f%dynamics%uv_rhsAB, f%mesh%coriolis, f%mesh%areasvol_inv) CREATE (pgf_x, pgf_y)
     !$ACC ENTER DATA CREATE (f%tracers%work%del_ttf)
     !$ACC ENTER DATA CREATE (f%tracers%data, f%tracers%work) 
     do tr_num=1, f%tracers%num_tracers

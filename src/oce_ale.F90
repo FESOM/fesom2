@@ -3184,7 +3184,13 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! force to UV_rhs
     ! UV_rhs = dt*[ (R_advec + R_coriolis)_AB2^n + R_pressure^n ]
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call compute_vel_rhs'//achar(27)//'[0m'
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_start("mom_vel_rhs") ! TEMP sub-timing (step 6 planning)
+#endif
     call compute_vel_rhs(ice, dynamics, partit, mesh)
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_end("mom_vel_rhs")
+#endif
      
     !___________________________________________________________________________
     ! Energy diagnostic contribution
@@ -3220,7 +3226,13 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! UV_rhs = dt*[ (R_advec + R_coriolis)^n + R_pressure + R_hviscos] 
     ! UV_rhs = UV_rhs + dt*R_hviscos
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call viscosity_filter'//achar(27)//'[0m'
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_start("mom_visc_filter") ! TEMP sub-timing
+#endif
     call viscosity_filter(dynamics%opt_visc, dynamics, partit, mesh)
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_end("mom_visc_filter")
+#endif
     
     !___________________________________________________________________________
     ! Energy diagnostic contribution
@@ -3274,7 +3286,13 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call impl_vert_visc_ale'//achar(27)//'[0m'
     if(dynamics%use_ivertvisc) then
         if ( .not. dynamics%use_ssh_se_subcycl ) then
+#if defined (FESOM_PROFILING)
+            call fesom_profiler_start("mom_impl_visc") ! TEMP sub-timing
+#endif
             call impl_vert_visc_ale(dynamics,partit, mesh)
+#if defined (FESOM_PROFILING)
+            call fesom_profiler_end("mom_impl_visc")
+#endif
         else
             call impl_vert_visc_ale_vtransp(dynamics, partit, mesh)
         end if 
