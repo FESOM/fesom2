@@ -551,7 +551,7 @@ subroutine init_Redi_GM_acc(dynamics, partit, mesh)
     type(t_dyn),    intent(inout), target :: dynamics
     type(t_mesh),   intent(in),    target :: mesh
     type(t_partit), intent(inout), target :: partit
-    integer                  :: n, k, nz, nzmax, nzmin, nzmin_last, myDim_nod2D, nl
+    integer                  :: n, k, nz, nzmax, nzmin, myDim_nod2D, nl
     real(kind=WP)            :: reso, c1, cm, rosb, scaling, rr_ratio
     real(kind=WP)            :: x0=1.5_WP, sigma=.15_WP
     real(kind=WP)            :: f_min=1.e-6_WP, r_max=200000._WP
@@ -566,12 +566,6 @@ subroutine init_Redi_GM_acc(dynamics, partit, mesh)
     call gm_create_data(dynamics, mesh)
     myDim_nod2D = partit%myDim_nod2D
     nl          = mesh%nl
-    ! the host version sets Ki(nzmin, n) of every node with the nzmin left over from
-    ! the last node of its first loop when Redi and Fer_GM; keep that
-    nzmin_last = 1
-    do k=1, mesh%nod_in_elem2D_num(myDim_nod2D)
-        nzmin_last=max(nzmin_last, mesh%ulevels(mesh%nod_in_elem2D(k, myDim_nod2D)))
-    end do
     !$ACC UPDATE DEVICE(mesh%hnode_new, mesh%zbar_3d_n)
 
     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) &
@@ -624,13 +618,13 @@ subroutine init_Redi_GM_acc(dynamics, partit, mesh)
             if     (K_GM_resscalorder==1) then
                 Ki(nzmin,n)=K_hor*(reso/refscalresol)**K_GM_resscalorder
             elseif (K_GM_resscalorder==2) then
-                Ki(nzmin,n)=K_hor**(mesh%area(1,n)/(refscalresol**2)*2)**(1/K_GM_resscalorder)
+                Ki(nzmin,n)=K_hor*(mesh%area(1,n)/(refscalresol**2)*2)**(1/K_GM_resscalorder)
             end if
         end if
         !_______________________________________________________________________
         ! second loop
         if (Redi .and. Fer_GM) then
-            Ki(nzmin_last, n)=max(fer_scal(n)*Redi_Kmax, K_GM_min)
+            Ki(mesh%ulevels_nod2D(n), n)=max(fer_scal(n)*Redi_Kmax, K_GM_min)
         end if
         !_______________________________________________________________________
         ! third loop
