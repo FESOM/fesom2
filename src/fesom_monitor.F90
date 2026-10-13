@@ -14,7 +14,7 @@ module fesom_monitor_module
     use MOD_DYN
     use MOD_ICE
     use g_config, only: use_ice
-    use o_ARRAYS, only: water_flux, heat_flux, pgf_x, pgf_y, Av, Kv, density_dmoc
+    use o_ARRAYS, only: water_flux, heat_flux, pgf_x, pgf_y, Av, Kv, density_dmoc, pgf_on_device
     use diagnostics, only: ldiag_dMOC
 
     implicit none
@@ -263,6 +263,9 @@ subroutine monitor_fill_ocean(mon, istep, full, ice, dynamics, tracers, partit, 
     !            14 Kv (levels 1..nl), 15 Av (elements, levels 1..nl)
     lmin = huge(lmin)
     lmax = -huge(lmax)
+    if (pgf_on_device) then
+        !$ACC UPDATE HOST(pgf_x, pgf_y)
+    end if
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, x) REDUCTION(min:lmin) REDUCTION(max:lmax)
     do n=1, partit%myDim_nod2D
         lmin(1) = min(lmin(1), mesh%hbar(n));          lmax(1) = max(lmax(1), mesh%hbar(n))

@@ -33,6 +33,9 @@ module oce_ale_pressure_bv_module
               density_linear, init_ref_density, &
               init_ref_density_advanced
 
+    ! OpenACC: pressure_bv of this step ran on the device (density and layer depths current there)
+    logical :: pbv_on_device = .false.
+
 contains
 
 !
@@ -63,7 +66,8 @@ subroutine pressure_bv(tracers, partit, mesh)
 #ifdef ENABLE_OPENACC
     ! the device version covers the configurations without cavities, linfs, the dMOC
     ! diagnostic, vertical N2 smoothing and the linear equation of state
-    if (.not. (ldiag_dMOC .or. use_cavity .or. trim(which_ale)=='linfs' .or. N2smth_v .or. state_equation/=1)) then
+    pbv_on_device = .not. (ldiag_dMOC .or. use_cavity .or. trim(which_ale)=='linfs' .or. N2smth_v .or. state_equation/=1)
+    if (pbv_on_device) then
         call pressure_bv_acc(tracers, partit, mesh)
         if (N2smth_h) call smooth_nod (bvfreq, N2smth_hidx, partit, mesh)
         return
@@ -1805,6 +1809,25 @@ subroutine pressure_force_4_zxxxx(tracers, partit, mesh)
     type(t_mesh),   intent(in) ,    target :: mesh
     type(t_partit), intent(inout),  target :: partit
     type(t_tracer), intent(in),     target :: tracers
+#ifdef ENABLE_OPENACC
+    logical, save :: thin_elements_checked = .false., no_thin_elements = .false.
+    integer       :: elem
+    ! the device version merges the surface and bottom treatment of the host version,
+    ! which differ for elements with a single layer: those stay on the host
+    if (.not. thin_elements_checked) then
+        no_thin_elements = .true.
+        do elem=1, partit%myDim_elem2D
+            if (mesh%nlevels(elem)-1 <= mesh%ulevels(elem)) no_thin_elements = .false.
+        end do
+        thin_elements_checked = .true.
+    end if
+    ! on the device when the density of this step is there
+    pgf_on_device = (trim(which_pgf)=='shchepetkin') .and. pbv_on_device .and. no_thin_elements
+    if (pgf_on_device) then
+        call pressure_force_4_zxxxx_shchepetkin_acc(partit, mesh)
+        return
+    end if
+#endif
     !___________________________________________________________________________
     if     (trim(which_pgf)=='shchepetkin') then
         call pressure_force_4_zxxxx_shchepetkin(partit, mesh)
@@ -2237,6 +2260,94 @@ subroutine pressure_force_4_zxxxx_shchepetkin(partit, mesh)
 !$OMP END DO
 !$OMP END PARALLEL
 end subroutine pressure_force_4_zxxxx_shchepetkin
+#ifdef ENABLE_OPENACC
+!
+!
+!===============================================================================
+! pressure_force_4_zxxxx_shchepetkin on the device, one element per thread, same arithmetic; the surface,
+! interior and bottom stencils (kb, kb+1, kb+2) are written out per vertex. pgf_x/pgf_y stay on the device.
+subroutine pressure_force_4_zxxxx_shchepetkin_acc(partit, mesh)
+    implicit none
+    type(t_mesh),   intent(in) ,    target :: mesh
+    type(t_partit), intent(inout),  target :: partit
+    ! element mid-depths in a fixed-size work array (no per-thread device heap)
+    integer, parameter                     :: pgf_nl_max = 128
+    integer                                :: elem, n1, n2, n3, nle, ule, nlz, ni, nd, kb
+    real(kind=WP)                          :: int_dp_x, int_dp_y, drho_dx, drho_dy, dz_dx, dz_dy, aux_sum
+    real(kind=WP)                          :: dsum, zb, dx10, dx20, dx21, df10, df21, drz
+    real(kind=WP)                          :: Z_n(pgf_nl_max)
+
+    if (mesh%nl > pgf_nl_max) then
+        if (partit%mype==0) write(*,*) 'pressure_force_4_zxxxx_shchepetkin_acc: mesh%nl =', mesh%nl, ' > pgf_nl_max'
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+    end if
+    ! layer thicknesses from the thickness update at the end of the previous step
+    !$ACC UPDATE DEVICE(mesh%helem)
+
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(Z_n, n1, n2, n3, nle, ule, nlz, ni, nd, kb, int_dp_x, int_dp_y, &
+!$ACC     drho_dx, drho_dy, dz_dx, dz_dy, aux_sum, dsum, zb, dx10, dx20, dx21, df10, df21, drz)
+    do elem=1, partit%myDim_elem2D
+        nle = mesh%nlevels(elem)-1
+        ule = mesh%ulevels(elem)
+        n1  = mesh%elem2D_nodes(1,elem)
+        n2  = mesh%elem2D_nodes(2,elem)
+        n3  = mesh%elem2D_nodes(3,elem)
+        do nlz=1, mesh%nl-1
+            Z_n(nlz) = 0.0_WP
+        end do
+        zb       = mesh%zbar_e_bot(elem)
+        Z_n(nle) = zb + mesh%helem(nle,elem)*0.5_WP
+        do nlz=nle,ule+1,-1
+            zb         = zb + mesh%helem(nlz,elem)
+            Z_n(nlz-1) = zb + mesh%helem(nlz-1,elem)*0.5_WP
+        end do
+
+        int_dp_x = 0.0_WP
+        int_dp_y = 0.0_WP
+        do nlz=ule, nle
+            ! sum of the vertical density gradients at the three vertices
+            dsum = 0.0_WP
+            do ni=1,3
+                if (ni==1) nd=n1
+                if (ni==2) nd=n2
+                if (ni==3) nd=n3
+                if (nlz==ule .and. nlz==mesh%ulevels_nod2D(nd)) then
+                    kb = nlz          ! surface layer of the vertex
+                elseif (nlz==nle .and. nlz==mesh%nlevels_nod2D(nd)-1) then
+                    kb = nlz-2        ! bottom layer of the vertex
+                else
+                    kb = nlz-1
+                end if
+                dx10 = mesh%Z_3d_n(kb+1,nd)-mesh%Z_3d_n(kb  ,nd)
+                dx21 = mesh%Z_3d_n(kb+2,nd)-mesh%Z_3d_n(kb+1,nd)
+                dx20 = mesh%Z_3d_n(kb+2,nd)-mesh%Z_3d_n(kb  ,nd)
+                df10 = density_m_rho0(kb+1,nd)-density_m_rho0(kb  ,nd)
+                df21 = density_m_rho0(kb+2,nd)-density_m_rho0(kb+1,nd)
+                drz  = df10/dx10 + (dx10*df21-dx21*df10)/(dx20*dx21*dx10) &
+                       *((Z_n(nlz)-mesh%Z_3d_n(kb+1,nd)) + (Z_n(nlz)-mesh%Z_3d_n(kb,nd)))
+                dsum = dsum + drz
+            end do
+            ! zonal
+            drho_dx = mesh%gradient_sca(1,elem)*density_m_rho0(nlz,n1) + mesh%gradient_sca(2,elem)*density_m_rho0(nlz,n2) &
+                    + mesh%gradient_sca(3,elem)*density_m_rho0(nlz,n3)
+            dz_dx   = mesh%gradient_sca(1,elem)*mesh%Z_3d_n(nlz,n1) + mesh%gradient_sca(2,elem)*mesh%Z_3d_n(nlz,n2) &
+                    + mesh%gradient_sca(3,elem)*mesh%Z_3d_n(nlz,n3)
+            aux_sum = (drho_dx-dsum/3.0_WP*dz_dx)*mesh%helem(nlz,elem)*g/density_0
+            pgf_x(nlz,elem) = int_dp_x + aux_sum*0.5_WP
+            int_dp_x = int_dp_x + aux_sum
+            ! meridional
+            drho_dy = mesh%gradient_sca(4,elem)*density_m_rho0(nlz,n1) + mesh%gradient_sca(5,elem)*density_m_rho0(nlz,n2) &
+                    + mesh%gradient_sca(6,elem)*density_m_rho0(nlz,n3)
+            dz_dy   = mesh%gradient_sca(4,elem)*mesh%Z_3d_n(nlz,n1) + mesh%gradient_sca(5,elem)*mesh%Z_3d_n(nlz,n2) &
+                    + mesh%gradient_sca(6,elem)*mesh%Z_3d_n(nlz,n3)
+            aux_sum = (drho_dy-dsum/3.0_WP*dz_dy)*mesh%helem(nlz,elem)*g/density_0
+            pgf_y(nlz,elem) = int_dp_y + aux_sum*0.5_WP
+            int_dp_y = int_dp_y + aux_sum
+        end do
+    end do
+!$ACC END PARALLEL LOOP
+end subroutine pressure_force_4_zxxxx_shchepetkin_acc
+#endif
 !
 !
 !

@@ -341,6 +341,8 @@ real(kind=WP), allocatable,dimension(:,:)   :: density_m_rho0_slev
 real(kind=WP), allocatable,dimension(:,:)   :: density_ref
 real(kind=WP), allocatable,dimension(:,:)   :: density_dmoc
 real(kind=WP), allocatable,dimension(:,:)   :: pgf_x, pgf_y
+! OpenACC: pgf_x/pgf_y of this step were computed on the device (host copy not current)
+logical                                     :: pgf_on_device = .false.
 
 !_______________________________________________________________________________
 !!PS ! dummy arrays
