@@ -25,11 +25,12 @@ module oce_ale_module
     USE oce_ale_vel_rhs_module, only: compute_vel_rhs
     USE oce_ale_tracer_module, only: solve_tracers_ale
     USE ieee_arithmetic
-    use oce_fer_gm_module, only: fer_solve_Gamma, fer_gamma2vel, init_Redi_GM
+    use oce_fer_gm_module, only: fer_solve_Gamma, fer_gamma2vel, init_Redi_GM, gm_device_ok, &
+                                 init_Redi_GM_acc, fer_solve_Gamma_acc, fer_gamma2vel_acc
     use oce_mle_module, only: mle_add_gamma
     use oce_ale_ssh_splitexpl_subcycl_module, only: impl_vert_visc_ale_vtransp
     use oce_dyn_module, only: update_vel, viscosity_filter, check_viscopt, compute_ke_wrho, compute_apegen, compute_PePm, mom_on_device
-    use oce_ale_pressure_bv_module, only: sw_alpha_beta, compute_sigma_xy, compute_neutral_slope
+    use oce_ale_pressure_bv_module, only: sw_alpha_beta, compute_sigma_xy, compute_neutral_slope, sxy_on_device
     use par_support_module, only: status_check
 #if defined (__cvmix)
     use g_cvmix_tke
@@ -3543,6 +3544,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     integer           :: nz, elem, nzmin, nzmax !for KE diagnostic
     integer           :: tr_num  ! for cavity NaN cleanup
     integer           :: n_cavity_nan  ! NaN count reported by the cavity cleanup
+    logical           :: gm_on_dev = .false.  ! GM/Redi coefficients and bolus velocity on the device
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer :: eta_n
@@ -4017,7 +4019,14 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
 #if defined (FESOM_PROFILING)
         call fesom_profiler_start("gm_init_redi")
 #endif
-        call init_Redi_GM(partit, mesh)
+#if defined(_OPENACC)
+        gm_on_dev = sxy_on_device .and. gm_device_ok(mesh)
+#endif
+        if (gm_on_dev) then
+            call init_Redi_GM_acc(dynamics, partit, mesh)
+        else
+            call init_Redi_GM(partit, mesh)
+        end if
 #if defined (FESOM_PROFILING)
         call fesom_profiler_end("gm_init_redi")
 #endif
@@ -4031,7 +4040,11 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
 #if defined (FESOM_PROFILING)
             call fesom_profiler_start("gm_solve_gamma")
 #endif
-            call fer_solve_Gamma(partit, mesh)
+            if (gm_on_dev) then
+                call fer_solve_Gamma_acc(dynamics, partit, mesh)
+            else
+                call fer_solve_Gamma(partit, mesh)
+            end if
 #if defined (FESOM_PROFILING)
             call fesom_profiler_end("gm_solve_gamma")
 #endif
@@ -4046,7 +4059,11 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
 #if defined (FESOM_PROFILING)
         call fesom_profiler_start("gm_gamma2vel")
 #endif
-        call fer_gamma2vel(dynamics, partit, mesh)
+        if (gm_on_dev) then
+            call fer_gamma2vel_acc(dynamics, partit, mesh)
+        else
+            call fer_gamma2vel(dynamics, partit, mesh)
+        end if
 #if defined (FESOM_PROFILING)
         call fesom_profiler_end("gm_gamma2vel")
 #endif
