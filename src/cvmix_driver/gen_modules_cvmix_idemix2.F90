@@ -296,7 +296,7 @@ module g_cvmix_idemix2
     ! --- support variables ---
     real(kind=WP), allocatable, dimension(:)    :: vol_nodB2T
     real(kind=WP), allocatable, dimension(:,:)  :: vol_wcelli
-    real(kind=WP), allocatable, dimension(:)    :: iwe2_grady_coriol, aux
+    real(kind=WP), allocatable, dimension(:)    :: iwe2_gradx_coriol, iwe2_grady_coriol, aux
     real(kind=WP), allocatable, dimension(:,:,:):: iwe2_gradxy_e, iwe2_gradxy_n
     real(kind=WP), allocatable, dimension(:,:  ):: iwe2_flx_uv, iwe2_flx_w
     integer                                     :: iwe2_ti=1, iwe2_tip1=2
@@ -679,10 +679,12 @@ module g_cvmix_idemix2
         iwe2_topo_dist(:)    = 0.0_WP
         
         ! support gradient variables 
-        allocate(  iwe2_grady_coriol(      elem_size)   &   
+        allocate(  iwe2_gradx_coriol(      elem_size)   &
+                 , iwe2_grady_coriol(      elem_size)   &   
                  , iwe2_gradxy_e(2, nfbin, elem_size)   &
                  , iwe2_gradxy_n(2, nfbin, node_size)   &
                  )
+        iwe2_gradx_coriol(:) = 0.0_WP
         iwe2_grady_coriol(:) = 0.0_WP
         iwe2_gradxy_e(:,:,:) = 0.0_WP
         iwe2_gradxy_n(:,:,:) = 0.0_WP
@@ -1070,6 +1072,8 @@ module g_cvmix_idemix2
         ! compute d/dy of coriolis 
         do elem = 1, partit%myDim_elem2D
             elnodes = mesh%elem2d_nodes(:,elem)
+            ! on a rotated mesh f also varies along the grid x direction
+            iwe2_gradx_coriol(elem) = sum(mesh%gradient_sca(1:3, elem)*mesh%coriolis_node(elnodes))
             iwe2_grady_coriol(elem) = sum(mesh%gradient_sca(4:6, elem)*mesh%coriolis_node(elnodes))
         end do       
         
@@ -1508,6 +1512,7 @@ module g_cvmix_idemix2
                     call cvmix_idemix2_compute_compart_groupvel(     &
                           nfbin        = idemix2_nfbin               & !IN:  number of spectral angular bins
                         , coriolis     = mesh%coriolis(        elem) & !IN:  Coriolis parameter at element (1/s)
+                        , coriol_gradx = iwe2_gradx_coriol(    elem) & !IN:  zonal      gradient of Coriolis (1/(m·s))
                         , coriol_grady = iwe2_grady_coriol(    elem) & !IN:  meridional gradient of Coriolis (1/(m·s))
                         , coslat       = mesh%elem_cos(        elem) & !IN:  cosine of latitude at element
                         , cn           = cn_e                        & !IN:  first baroclinic mode speed at element (m/s)
@@ -1531,6 +1536,7 @@ module g_cvmix_idemix2
                     call cvmix_idemix2_compute_compart_groupvel(      &
                           nfbin        = idemix2_nfbin                & !IN:  number of spectral angular bins
                         , coriolis     = mesh%coriolis(        elem)  & !IN:  Coriolis parameter at element (1/s)
+                        , coriol_gradx = iwe2_gradx_coriol(    elem) & !IN:  zonal      gradient of Coriolis (1/(m·s))
                         , coriol_grady = iwe2_grady_coriol(    elem)  & !IN:  meridional gradient of Coriolis (1/(m·s))
                         , coslat       = mesh%elem_cos(        elem)  & !IN:  cosine of latitude at element
                         , cn           = cn_e                         & !IN:  first baroclinic mode speed at element (m/s)
