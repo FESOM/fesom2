@@ -59,6 +59,20 @@ module oce_ale_tracer_module
     ! OpenACC: the diffusion of this tracer runs on the device; .false. when a diagnostic or recom
     ! reads del_ttf or values on the host in between (then the whole diffusion runs on the host)
     logical :: diff_on_device = .false.
+    ! ... and its implicit vertical diffusion (diff_ver_part_impl_ale): T and S without the
+    ! features that need host data inside the column loop (icebergs, depth hosing, toy forcing)
+    logical :: impl_on_device = .false.
+    ! column work arrays of diff_ver_part_impl_ale have this fixed size: as private arrays of
+    ! run-time size they would come from the per-thread device heap
+    integer, parameter :: impl_nl_max = 128
+    ! surface boundary term per node (and per level for the depth hosing tracer), computed
+    ! before the column loop of diff_ver_part_impl_ale
+    real(kind=WP), allocatable :: impl_bc(:), impl_bcz(:,:)
+    ! device copies of the inputs of diff_ver_part_impl_ale, created on the first call
+    logical :: impl_inputs_created = .false.
+    ! horizontal tracer gradient at nodes in diff_ver_part_redi_expl; allocated (and created
+    ! on the device) once: an automatic array in a device data region is not reliably present
+    real(kind=WP), allocatable :: tr_xynodes(:,:,:)
 
 contains
 
@@ -164,6 +178,24 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 !!!     !$ACC UPDATE DEVICE(tracers%work%fct_ttf_min, tracers%work%fct_ttf_max, tracers%work%fct_plus, tracers%work%fct_minus)
         !$ACC UPDATE DEVICE (mesh%helem, mesh%hnode, mesh%hnode_new, mesh%zbar_3d_n, mesh%z_3d_n)
         !$ACC UPDATE DEVICE (Ki, slope_tapered) ! computed on the host (GM/Redi); used by the diffusion
+#ifdef ENABLE_OPENACC
+        ! inputs of the implicit vertical diffusion, computed on the host (mixing, forcing,
+        ! vertical velocity split); unallocated ones (e.g. the KPP arrays of another
+        ! scheme) are skipped by the data directives
+        if (.not. impl_inputs_created) then
+            !$ACC ENTER DATA CREATE(Kv, sw_3d, heat_flux, water_flux, virtual_salt, relax_salt, real_salt_flux)
+            !$ACC ENTER DATA CREATE(dynamics%w_i, ghats, blmc)
+#if defined (__cvmix)
+            !$ACC ENTER DATA CREATE(kpp_nonlcltranspT, kpp_nonlcltranspS, kpp_oblmixc)
+#endif
+            impl_inputs_created = .true.
+        end if
+        !$ACC UPDATE DEVICE(Kv, sw_3d, heat_flux, water_flux, virtual_salt, relax_salt, real_salt_flux)
+        !$ACC UPDATE DEVICE(dynamics%w_i, ghats, blmc)
+#if defined (__cvmix)
+        !$ACC UPDATE DEVICE(kpp_nonlcltranspT, kpp_nonlcltranspS, kpp_oblmixc)
+#endif
+#endif
 
 #if defined(__recom) && defined(__usetp)
     call calc_slice(num_tracers, num_fesom_groups, partit%my_fesom_group, tr_num_start, tr_num_end, tr_num_in_group_dummy, has_one_added_tracer)
@@ -507,6 +539,11 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     if (.not. diff_on_device) then
         !$ACC UPDATE HOST(tracers%work%del_ttf)
     end if
+    ! the implicit vertical diffusion runs on the device for T and S unless a feature reads
+    ! host-only data inside its column loop
+    impl_on_device = diff_on_device .and. (tracers%data(tr_num)%ID==1 .or. tracers%data(tr_num)%ID==2) &
+                     .and. .not. (use_icebergs .and. .not. turn_off_hf) .and. .not. toy_ocean &
+                     .and. (.not. use_kpp_nonlclflx .or. any(mix_scheme_nmb == (/1, 18, 3, 38/)))
 #endif
 
     if (tracers%data(tr_num)%ltra_diag) then
@@ -692,7 +729,10 @@ endif
             end do
         end do
 !$ACC END PARALLEL LOOP
-        !$ACC UPDATE HOST(tracers%data(tr_num)%values)
+        ! the implicit vertical diffusion reads values: on the host unless it runs on the device
+        if (.not. impl_on_device) then
+            !$ACC UPDATE HOST(tracers%data(tr_num)%values)
+        end if
     else
 #endif
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax, acc, tnew)
@@ -750,6 +790,9 @@ endif
         ! (w/out Redi)
         if (conservation_freq > 0) call conservation_probe('divided', 'b', tr_num, tracers, partit, mesh)
         call diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
+        if (impl_on_device) then
+            !$ACC UPDATE HOST(tracers%data(tr_num)%values)
+        end if
         if (conservation_freq > 0) call conservation_probe('vert_impl+bc', 'b', tr_num, tracers, partit, mesh)
 
         if (ldiag_diapmix .and. tr_num<=2) &
@@ -901,16 +944,18 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     type(t_ice)   , intent(in)   , target :: ice
 
     !___________________________________________________________________________
-    real(kind=WP_full)        :: a(mesh%nl), b(mesh%nl), c(mesh%nl), tr(mesh%nl)
-    real(kind=WP_full)        :: cp(mesh%nl), tp(mesh%nl)
+    real(kind=WP_full)        :: a(impl_nl_max), b(impl_nl_max), c(impl_nl_max), tr(impl_nl_max)
+    real(kind=WP_full)        :: cp(impl_nl_max), tp(impl_nl_max)
     integer                  :: nz, n, nzmax, nzmin
     real(kind=WP_full)        :: m, zinv, dz
     real(kind=WP_full)        :: rsss, Ty, Ty1, c1, zinv1, zinv2, v_adv
     real(kind=WP_full)        :: isredi=0._WP_full
     logical                  :: do_wimpl=.true.
-    real(kind=WP_full)        :: zbar_n(mesh%nl), z_n(mesh%nl-1)
+    real(kind=WP_full)        :: zbar_n(impl_nl_max), z_n(impl_nl_max)
     real(kind=WP_full)        :: acc
     real(kind=WP)            :: tnew
+    integer                  :: tr_id
+    logical                  :: sw_dbgyre, hosing_depth
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:,:), pointer :: trarr
@@ -928,6 +973,53 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     if (Redi) isredi=1._WP
     Ty    =0.0_WP
     Ty1   =0.0_WP
+    if (mesh%nl > impl_nl_max) then
+        if (partit%mype==0) write(*,*) 'diff_ver_part_impl_ale: mesh%nl =', mesh%nl, ' > impl_nl_max =', impl_nl_max
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+    end if
+    tr_id        = tracers%data(tr_num)%ID
+    sw_dbgyre    = use_sw_pene .and. tr_id==1 .and. toy_ocean .and. TRIM(which_toy)=="dbgyre"
+    hosing_depth = tr_id==304 .and. use_hosing .and. trim(hosing_mode)=='depth'
+    ! fills sw_3d for all nodes once, before the column loop
+    if (sw_dbgyre) call cal_shortwave_rad_dbgyre(ice, tracers, partit, mesh)
+
+    !___________________________________________________________________________
+    ! surface boundary term (heat, freshwater, salt, relaxation fluxes; transient tracers),
+    ! computed per node before the column loop, which only adds it
+    if (.not. allocated(impl_bc)) then
+        allocate(impl_bc(partit%myDim_nod2D))
+        !$ACC ENTER DATA CREATE(impl_bc)
+    end if
+    if (impl_on_device) then
+        ! T and S only (see diff_tracers_ale)
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(nzmin)
+        do n=1, partit%myDim_nod2D
+            nzmin=mesh%ulevels_nod2D(n)
+            ! the CASE (1) and CASE (2) terms of bc_surface
+            if (tr_id==1) then
+                impl_bc(n)=-dt*(heat_flux(n)/vcpw + trarr(nzmin,n)*water_flux(n)*is_nonlinfs)
+            else
+                impl_bc(n)= dt*(virtual_salt(n) &
+                            + relax_salt(n) + (real_salt_flux(n) + S_ref_anomaly*water_flux(n))*is_nonlinfs)
+            end if
+        end do
+!$ACC END PARALLEL LOOP
+    elseif (hosing_depth) then
+        ! the hosing passive tracer (ID 304) receives its source over the whole column
+        if (.not. allocated(impl_bcz)) allocate(impl_bcz(mesh%nl, partit%myDim_nod2D))
+        do n=1, partit%myDim_nod2D
+            nzmax=mesh%nlevels_nod2D(n)
+            nzmin=mesh%ulevels_nod2D(n)
+            do nz=nzmin,nzmax
+                impl_bcz(nz,n)=bc_surface(n, tr_id, trarr(nz,n), nz, partit, mesh, sst(nz,n), sss(nz,n), a_ice(n))
+            end do
+        end do
+    else
+        do n=1, partit%myDim_nod2D
+            nzmin=mesh%ulevels_nod2D(n)
+            impl_bc(n)=bc_surface(n, tr_id, trarr(nzmin,n), nzmin, partit, mesh, sst(nzmin,n), sss(nzmin,n), a_ice(n))
+        end do
+    end if
     
     ! solve equation diffusion equation implicite part:
     ! -->   h^(n+0.5)* (T^(n+0.5)-Tstar) = dt*( K_33*d/dz*(T^(n+0.5)-Tstar) + K_33*d/dz*Tstar )
@@ -1031,9 +1123,14 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     !___________________________________________________________________________
     ! loop over local nodes
 
+#ifndef ENABLE_OPENACC
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, nzmax, nzmin, a, b, c, tr, cp, tp, m, zinv, dz, &
 !$OMP                                         rsss, Ty, Ty1, c1, zinv1, zinv2, v_adv, zbar_n, z_n, acc, tnew)
 !$OMP DO
+#else
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) IF(impl_on_device) &
+!$ACC PRIVATE(nz, nzmax, nzmin, a, b, c, tr, cp, tp, m, zinv, dz, rsss, Ty, Ty1, c1, zinv1, zinv2, v_adv, zbar_n, z_n, acc, tnew)
+#endif
     do n=1,partit%myDim_nod2D
         ! initialise
         a  = 0.0_WP
@@ -1201,15 +1298,15 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
         ! mixing or windmixing which are to much for nonlocal
         ! transports and lead to instability of the model
         if (use_kpp_nonlclflx) then
-            if (tracers%data(tr_num)%ID==2) then
+            if (tr_id==2) then
                 rsss=ref_sss
-                if (ref_sss_local) rsss=tracers%data(tr_num)%values(1,n)
+                if (ref_sss_local) rsss=trarr(1,n)
             end if
 
             !___________________________________________________________________
             ! use fesom1.4 KPP
             if     (mix_scheme_nmb==1 .or. mix_scheme_nmb==18) then
-                if     (tracers%data(tr_num)%ID==1) then ! temperature
+                if     (tr_id==1) then ! temperature
                     ! --> no fluxes to the top out of the surface, no fluxes
                     !     downwards out of the bottom
                     !___surface_________________________________________________
@@ -1230,7 +1327,7 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
                                +( MIN(ghats(nz  ,n)*blmc(nz  ,n,2), 1.0_WP)*(mesh%area(nz  ,n)/mesh%areasvol(nz,n)) &
                                 ) * heat_flux(n) / vcpw * dt
 
-                elseif (tracers%data(tr_num)%ID==2) then ! salinity
+                elseif (tr_id==2) then ! salinity
                     ! --> no fluxes to the top out of the surface, no fluxes
                     !     downwards out of the bottom
                     !___surface_________________________________________________
@@ -1255,7 +1352,7 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
             !___________________________________________________________________
             ! use cvmix KPP
             elseif (mix_scheme_nmb==3 .or. mix_scheme_nmb==38) then
-                if     (tracers%data(tr_num)%ID==1) then ! temperature
+                if     (tr_id==1) then ! temperature
                     !___surface_________________________________________________
                     nz = nzmin
                     tr(nz)=tr(nz) &
@@ -1274,7 +1371,7 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
                                +( MIN(kpp_nonlcltranspT(nz  ,n)*kpp_oblmixc(nz  ,n,2), 1.0_WP)*(mesh%area(nz  ,n)/mesh%areasvol(nz,n)) &
                                 ) * heat_flux(n) / vcpw * dt
 
-                elseif (tracers%data(tr_num)%ID==2) then ! salinity
+                elseif (tr_id==2) then ! salinity
                     !___surface_________________________________________________
                     nz = nzmin
                     tr(nz)=tr(nz) &
@@ -1299,15 +1396,13 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
         
         !_______________________________________________________________________
         ! case of activated shortwave penetration into the ocean, ad 3d contribution
-        if (use_sw_pene .and. tracers%data(tr_num)%ID==1 .and. .not. toy_ocean) then
+        if (use_sw_pene .and. tr_id==1 .and. .not. toy_ocean) then
             do nz=nzmin, nzmax-1
                 zinv=1.0_WP*dt  !/(zbar(nz)-zbar(nz+1)) ale!
                 !!PS tr(nz)=tr(nz)+(sw_3d(nz, n)-sw_3d(nz+1, n) * ( area(nz+1,n)/areasvol(nz,n)) ) * zinv
                 tr(nz)=tr(nz)+(sw_3d(nz, n)-sw_3d(nz+1, n) * mesh%area(nz+1,n)/mesh%areasvol(nz,n)) * zinv
             end do
-        elseif (use_sw_pene .and. (tracers%data(tr_num)%ID==1) .and. toy_ocean .and. TRIM(which_toy)=="dbgyre") then
-
-            call cal_shortwave_rad_dbgyre(ice, tracers, partit, mesh)
+        elseif (sw_dbgyre) then
             do nz=nzmin, nzmax-1
                 zinv=1.0_WP*dt  !/(zbar(nz)-zbar(nz+1)) ale!
                 tr(nz)=tr(nz)+(sw_3d(nz, n)-sw_3d(nz+1, n)*mesh%area(nz+1,n)/mesh%area(nz,n))*zinv
@@ -1317,7 +1412,7 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
         
         !_______________________________________________________________________
         ! case of activated shortwave penetration into the ocean, ad 3d contribution
-        if (use_icebergs .and. (.not. turn_off_hf) .and. tracers%data(tr_num)%ID==1) then
+        if (use_icebergs .and. (.not. turn_off_hf) .and. tr_id==1) then
             do nz=nzmin, nzmax-1
                 zinv=1.0_WP*dt  !/(zbar(nz)-zbar(nz+1)) ale!
                 tr(nz)=tr(nz) + ibhf_n(nz, n) * zinv / vcpw * (mesh%area(nz,n)/mesh%areasvol(nz,n))
@@ -1340,12 +1435,12 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
         ! The hosing passive tracer (ID 304) receives its source over the whole
         ! column when the anomaly is applied at depth; every other tracer, and
         ! 304 itself in surface mode, gets the usual single surface term.
-        if (tracers%data(tr_num)%ID==304 .and. use_hosing .and. trim(hosing_mode)=='depth') then
+        if (hosing_depth) then
             do nz=nzmin,nzmax
-                tr(nz)= tr(nz)+bc_surface(n, tracers%data(tr_num)%ID, trarr(nz,n), nz, partit, mesh, sst(nz,n), sss(nz,n), a_ice(n))
+                tr(nz)= tr(nz)+impl_bcz(nz,n)
             end do
         else
-            tr(nzmin)= tr(nzmin)+bc_surface(n, tracers%data(tr_num)%ID, trarr(nzmin,n), nzmin, partit, mesh, sst(nzmin,n), sss(nzmin,n), a_ice(n))
+            tr(nzmin)= tr(nzmin)+impl_bc(n)
         end if
 
         !_______________________________________________________________________
@@ -1406,8 +1501,12 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
         end if
 
     end do ! --> do n=1,myDim_nod2D
+#ifndef ENABLE_OPENACC
 !$OMP END DO
 !$OMP END PARALLEL
+#else
+!$ACC END PARALLEL LOOP
+#endif
 end subroutine diff_ver_part_impl_ale
 !
 !
@@ -1421,17 +1520,19 @@ subroutine diff_ver_part_redi_expl(tracers, partit, mesh)
     integer                  :: n, k, elem, nz
     integer                  :: n2, nl1, ul1, nl2
     real(kind=WP)            :: Tx, Ty, flux, flux_below, zb, zb_below, zn, zn_up
-    real(kind=WP)            :: tr_xynodes(2,mesh%nl-1,partit%myDim_nod2D+partit%eDim_nod2D)
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP_full), pointer   :: del_ttf(:,:)
     del_ttf => tracers%work%del_ttf
+    if (.not. allocated(tr_xynodes)) then
+        allocate(tr_xynodes(2,mesh%nl-1,partit%myDim_nod2D+partit%eDim_nod2D))
+        !$ACC ENTER DATA CREATE(tr_xynodes)
+    end if
 
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, k, elem, nz, n2, nl1, ul1, nl2, Tx, Ty, flux, flux_below, zb, zb_below, zn, zn_up)
 !$OMP DO
 #else
-!$ACC DATA CREATE(tr_xynodes) IF(diff_on_device)
 !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) IF(diff_on_device) PRIVATE(k, elem, nz, nl1, ul1, Tx, Ty)
 #endif
     !___________________________________________________________________________
@@ -1493,7 +1594,6 @@ subroutine diff_ver_part_redi_expl(tracers, partit, mesh)
 !$OMP END PARALLEL
 #else
 !$ACC END PARALLEL LOOP
-!$ACC END DATA
 #endif
 end subroutine diff_ver_part_redi_expl
 !
