@@ -35,6 +35,10 @@ module oce_ale_pressure_bv_module
 
     ! OpenACC: pressure_bv of this step ran on the device (density and layer depths current there)
     logical :: pbv_on_device = .false.
+    ! ... and sw_alpha_beta, compute_sigma_xy (their results current on the device)
+    logical :: ab_on_device = .false., sxy_on_device = .false.
+    ! work arrays of smooth_nod3D_acc
+    real(kind=WP), allocatable :: smth_vol(:,:), smth_work(:,:)
 
 contains
 
@@ -69,7 +73,9 @@ subroutine pressure_bv(tracers, partit, mesh)
     pbv_on_device = .not. (ldiag_dMOC .or. use_cavity .or. trim(which_ale)=='linfs' .or. N2smth_v .or. state_equation/=1)
     if (pbv_on_device) then
         call pressure_bv_acc(tracers, partit, mesh)
-        if (N2smth_h) call smooth_nod (bvfreq, N2smth_hidx, partit, mesh)
+        if (N2smth_h) call smooth_nod3D_acc(bvfreq, N2smth_hidx, partit, mesh)
+        ! the mixing scheme (host) needs N2
+        !$ACC UPDATE HOST(bvfreq)
         return
     end if
 #endif
@@ -504,7 +510,7 @@ subroutine pressure_bv_acc(tracers, partit, mesh)
     end do
 !$ACC END PARALLEL LOOP
     ! host copies of the results
-    !$ACC UPDATE HOST(density_m_rho0, density_sigma0, bvfreq, MLD1, MLD2, MLD3, MLD1_ind, MLD2_ind, MLD3_ind)
+    !$ACC UPDATE HOST(density_m_rho0, density_sigma0, MLD1, MLD2, MLD3, MLD1_ind, MLD2_ind, MLD3_ind)
     if (mixing_kpp) then
         !$ACC UPDATE HOST(dbsfc)
     end if
@@ -2745,6 +2751,14 @@ subroutine sw_alpha_beta(TF1,SF1, partit, mesh)
   real(kind=WP), parameter               :: p_diap_3 = p_diap*p_diap*p_diap
   real(kind=WP)                          :: a_over_b_diap, beta_diap
   real(kind=WP)                          :: TF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D),SF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+#ifdef ENABLE_OPENACC
+  ! on the device after pressure_bv_acc (full equation of state, no diapycnal diagnostic)
+  ab_on_device = pbv_on_device .and. state_equation==1 .and. .not. ldiag_diapmix
+  if (ab_on_device) then
+     call sw_alpha_beta_acc(TF1, SF1, partit, mesh)
+     return
+  end if
+#endif
 
 
   ! For state_equation==0 (linear EOS, "toy" configs) alpha/beta are constant
@@ -2899,6 +2913,13 @@ subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
   real(kind=WP),  intent(IN)             :: TF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D), SF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
   real(kind=WP)                          :: tx(mesh%nl-1), ty(mesh%nl-1), sx(mesh%nl-1), sy(mesh%nl-1), vol(mesh%nl-1), testino(2)
   integer                                :: n, nz, elnodes(3),el, k, nln, uln, nle, ule
+#ifdef ENABLE_OPENACC
+  sxy_on_device = ab_on_device
+  if (sxy_on_device) then
+     call compute_sigma_xy_acc(TF1, SF1, partit, mesh)
+     return
+  end if
+#endif
 
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(tx, ty, sx, sy, vol, testino, n, nz, elnodes, el, k, nln, uln, nle, ule)
@@ -2985,6 +3006,12 @@ subroutine compute_neutral_slope(partit, mesh)
     real(kind=WP)                          :: c, ro_z_inv, eps !PS, S_cr, S_d
     real(kind=WP)                          :: f_min=1.0e-6_WP, dep_scale, rssby
     real(kind=WP), dimension(:)            :: c1(mesh%nl-1), c2(mesh%nl-1)
+#ifdef ENABLE_OPENACC
+    if (sxy_on_device) then
+        call compute_neutral_slope_acc(partit, mesh)
+        return
+    end if
+#endif
     
 
     !if sigma_xy is not computed
@@ -3083,6 +3110,258 @@ subroutine compute_neutral_slope(partit, mesh)
     call exchange_nod(neutral_slope, partit)
     call exchange_nod(slope_tapered, partit)
 end subroutine compute_neutral_slope
+#ifdef ENABLE_OPENACC
+!
+!
+!===============================================================================
+! smooth_nod3D on the device for a nodal field that is current there: the same patch sums per level
+! in the same element order; the inverse patch volume and the sums are device work arrays of this module.
+subroutine smooth_nod3D_acc(arr, N_smooth, partit, mesh)
+    IMPLICIT NONE
+    type(t_mesh),   intent(in),    target :: mesh
+    type(t_partit), intent(inout), target :: partit
+    integer,        intent(in)            :: N_smooth
+    real(kind=WP),  intent(inout)         :: arr(:,:)
+    integer                               :: n, q, el, nz, j, nlev, uln, nln, ule, nle
+    real(kind=WP)                         :: v, w
+
+    nlev=ubound(arr,1)
+    if (.not. allocated(smth_vol)) then
+        allocate(smth_vol(nlev, partit%myDim_nod2D), smth_work(nlev, partit%myDim_nod2D))
+        !$ACC ENTER DATA CREATE(smth_vol, smth_work)
+    end if
+    do q=1, N_smooth
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(uln, nln, nz, j, el, ule, nle, v, w)
+        DO n=1, partit%myDim_nod2D
+            uln = mesh%ulevels_nod2d(n)
+            nln = min(nlev,mesh%nlevels_nod2d(n))
+            DO nz=uln, nln
+                v = 0._WP
+                w = 0._WP
+                DO j=1, mesh%nod_in_elem2D_num(n)
+                    el = mesh%nod_in_elem2D(j,n)
+                    ule = max( uln, mesh%ulevels(el) )
+                    nle = min( nln, min(nlev,mesh%nlevels(el)) )
+                    if (nz>=ule .and. nz<=nle) then
+                        v = v + mesh%elem_area(el)
+                        w = w + mesh%elem_area(el) * (arr(nz, mesh%elem2D_nodes(1,el)) &
+                                                    + arr(nz, mesh%elem2D_nodes(2,el)) &
+                                                    + arr(nz, mesh%elem2D_nodes(3,el)))
+                    end if
+                END DO
+                ! the patch volume (inverse, scaled by 1/3) is computed in the first sweep
+                if (q==1) smth_vol(nz,n) = 1._WP / (3._WP * v)
+                smth_work(nz,n) = w
+            END DO
+        END DO
+!$ACC END PARALLEL LOOP
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(uln, nln, nz)
+        DO n=1, partit%myDim_nod2D
+            uln = mesh%ulevels_nod2d(n)
+            nln = min(nlev,mesh%nlevels_nod2d(n))
+            DO nz=uln,nln
+                arr(nz, n) = smth_work(nz, n) * smth_vol(nz,n)
+            END DO
+        END DO
+!$ACC END PARALLEL LOOP
+        call exchange_nod(arr, partit, luse_g2g=.true.)
+    end do
+end subroutine smooth_nod3D_acc
+!
+!
+!===============================================================================
+! sw_alpha_beta on the device for the full equation of state (see sw_alpha_beta)
+subroutine sw_alpha_beta_acc(TF1, SF1, partit, mesh)
+    implicit none
+    type(t_mesh),   intent(in) ,    target :: mesh
+    type(t_partit), intent(inout),  target :: partit
+    real(kind=WP)                          :: TF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D), SF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    integer                                :: n, nz, nzmin, nzmax
+    real(kind=WP)                          :: t1, t1_2, t1_3, t1_4, p1, p1_2, p1_3, s1, s35, s35_2, a_over_b, sref
+    logical, save                          :: data_created = .false.
+
+    if (.not. data_created) then
+        !$ACC ENTER DATA CREATE(sw_alpha, sw_beta)
+        data_created = .true.
+    end if
+    sref = S_ref_anomaly
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(nz, nzmin, nzmax, t1, t1_2, t1_3, t1_4, p1, p1_2, p1_3, s1, s35, s35_2, a_over_b)
+    do n = 1,partit%myDim_nod2d
+        nzmin = mesh%ulevels_nod2d(n)
+        nzmax = mesh%nlevels_nod2d(n)
+        do nz=nzmin, nzmax-1
+            t1 = TF1(nz,n)*1.00024_WP
+            s1 = SF1(nz,n) + sref
+            p1 = abs(mesh%Z_3d_n(nz,n))
+            t1_2 = t1*t1
+            t1_3 = t1_2*t1
+            t1_4 = t1_3*t1
+            p1_2 = p1*p1
+            p1_3 = p1_2*p1
+            s35 = s1-35.0_WP
+            s35_2 = s35*s35
+            sw_beta(nz,n) = 0.785567e-3_WP - 0.301985e-5_WP*t1 &
+                 + 0.555579e-7_WP*t1_2 - 0.415613e-9_WP*t1_3 &
+                 + s35*(-0.356603e-6_WP + 0.788212e-8_WP*t1 &
+                 + 0.408195e-10_WP*p1 - 0.602281e-15_WP*p1_2) &
+                 + s35_2*(0.515032e-8_WP) &
+                 + p1*(-0.121555e-7_WP + 0.192867e-9_WP*t1 - 0.213127e-11_WP*t1_2) &
+                 + p1_2*(0.176621e-12_WP - 0.175379e-14_WP*t1) &
+                 + p1_3*(0.121551e-17_WP)
+            a_over_b = 0.665157e-1_WP + 0.170907e-1_WP*t1 &
+                 - 0.203814e-3_WP*t1_2 + 0.298357e-5_WP*t1_3 &
+                 - 0.255019e-7_WP*t1_4 &
+                 + s35*(0.378110e-2_WP - 0.846960e-4_WP*t1 &
+                 - 0.164759e-6_WP*p1 - 0.251520e-11_WP*p1_2) &
+                 + s35_2*(-0.678662e-5_WP) &
+                 + p1*(0.380374e-4_WP - 0.933746e-6_WP*t1 + 0.791325e-8_WP*t1_2) &
+                 + p1_2*t1_2*(0.512857e-12_WP) &
+                 - p1_3*(0.302285e-13_WP)
+            sw_alpha(nz,n) = a_over_b*sw_beta(nz,n)
+        end do
+    end do
+!$ACC END PARALLEL LOOP
+    call exchange_nod(sw_alpha, partit, luse_g2g=.true.)
+    call exchange_nod(sw_beta, partit, luse_g2g=.true.)
+end subroutine sw_alpha_beta_acc
+!
+!
+!===============================================================================
+! compute_sigma_xy on the device: per node and level the element sums in the same
+! element order as the host version
+subroutine compute_sigma_xy_acc(TF1, SF1, partit, mesh)
+    implicit none
+    type(t_mesh),   intent(in) ,    target :: mesh
+    type(t_partit), intent(inout),  target :: partit
+    real(kind=WP),  intent(IN)             :: TF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D), SF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP)                          :: tx, ty, sx, sy, vol
+    integer                                :: n, nz, el, k, nln, uln, nle, ule, e1, e2, e3
+    logical, save                          :: data_created = .false.
+
+    if (.not. data_created) then
+        !$ACC ENTER DATA CREATE(sigma_xy)
+        data_created = .true.
+    end if
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(tx, ty, sx, sy, vol, nz, el, k, nln, uln, nle, ule, e1, e2, e3)
+    DO n=1, partit%myDim_nod2D
+        nln = mesh%nlevels_nod2D(n)-1
+        uln = mesh%ulevels_nod2D(n)
+        DO nz=uln, nln
+            vol = 0.0_WP
+            tx  = 0.0_WP
+            ty  = 0.0_WP
+            sx  = 0.0_WP
+            sy  = 0.0_WP
+            DO k=1, mesh%nod_in_elem2D_num(n)
+                el  = mesh%nod_in_elem2D(k, n)
+                nle = mesh%nlevels(el)-1
+                ule = mesh%ulevels(el)
+                if (nz>=ule .and. nz<=nle) then
+                    e1 = mesh%elem2D_nodes(1,el)
+                    e2 = mesh%elem2D_nodes(2,el)
+                    e3 = mesh%elem2D_nodes(3,el)
+                    vol = vol+mesh%elem_area(el)
+                    tx = tx+(mesh%gradient_sca(1,el)*TF1(nz,e1) + mesh%gradient_sca(2,el)*TF1(nz,e2) &
+                           + mesh%gradient_sca(3,el)*TF1(nz,e3))*mesh%elem_area(el)
+                    ty = ty+(mesh%gradient_sca(4,el)*TF1(nz,e1) + mesh%gradient_sca(5,el)*TF1(nz,e2) &
+                           + mesh%gradient_sca(6,el)*TF1(nz,e3))*mesh%elem_area(el)
+                    sx = sx+(mesh%gradient_sca(1,el)*SF1(nz,e1) + mesh%gradient_sca(2,el)*SF1(nz,e2) &
+                           + mesh%gradient_sca(3,el)*SF1(nz,e3))*mesh%elem_area(el)
+                    sy = sy+(mesh%gradient_sca(4,el)*SF1(nz,e1) + mesh%gradient_sca(5,el)*SF1(nz,e2) &
+                           + mesh%gradient_sca(6,el)*SF1(nz,e3))*mesh%elem_area(el)
+                end if
+            END DO
+            sigma_xy(1,nz,n) = (-sw_alpha(nz,n)*tx+sw_beta(nz,n)*sx)/vol*density_0
+            sigma_xy(2,nz,n) = (-sw_alpha(nz,n)*ty+sw_beta(nz,n)*sy)/vol*density_0
+        END DO
+    END DO
+!$ACC END PARALLEL LOOP
+    call exchange_nod(sigma_xy, partit, luse_g2g=.true.)
+end subroutine compute_sigma_xy_acc
+!
+!
+!===============================================================================
+! compute_neutral_slope on the device (see compute_neutral_slope)
+subroutine compute_neutral_slope_acc(partit, mesh)
+    IMPLICIT NONE
+    type(t_mesh),   intent(in) ,    target :: mesh
+    type(t_partit), intent(inout),  target :: partit
+    integer                                :: n, nz, nl1, ul1, i
+    real(kind=WP)                          :: ro_z_inv, eps, c1, c2, dep_scale, rssby, f_min
+    real(kind=WP)                          :: scr, sd, ldd_c, ldd_min, ldd_max
+    logical                                :: odm95, ldd97, taper_k
+    logical, save                          :: data_created = .false.
+
+    if (.not. data_created) then
+        !$ACC ENTER DATA CREATE(neutral_slope)
+        if (allocated(fer_tapfac)) then
+            !$ACC ENTER DATA CREATE(fer_tapfac)
+        end if
+        data_created = .true.
+    end if
+    eps     = 5.0e-6_WP
+    f_min   = 1.0e-6_WP
+    odm95   = scaling_ODM95
+    ldd97   = scaling_LDD97
+    taper_k = Fer_GM .and. Redi .and. Redi_Ktaper
+    scr     = ODM95_Scr
+    sd      = ODM95_Sd
+    ldd_c   = LDD97_c
+    ldd_min = LDD97_rmin
+    ldd_max = LDD97_rmax
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(nz, nl1, ul1, i, ro_z_inv, c1, c2, dep_scale, rssby)
+    do n=1, partit%myDim_nod2D
+        do nz=1, size(slope_tapered,2)
+            do i=1, 3
+                slope_tapered(i, nz, n)=0._WP
+            end do
+        end do
+        nl1=mesh%nlevels_nod2d(n)-1
+        ul1=mesh%ulevels_nod2d(n)
+        rssby = 0._WP
+        if (ldd97) then
+            rssby = ldd_c/max(abs(mesh%coriolis_node(n)), f_min)
+            rssby = min(ldd_max, max(ldd_min, rssby))
+        end if
+        do nz = ul1, nl1
+            ro_z_inv=2._WP*g/density_0/max(bvfreq(nz,n)+bvfreq(nz+1,n), eps**2)
+            neutral_slope(1,nz,n)=sigma_xy(1,nz,n)*ro_z_inv
+            neutral_slope(2,nz,n)=sigma_xy(2,nz,n)*ro_z_inv
+            neutral_slope(3,nz,n)=sqrt(neutral_slope(1,nz,n)**2+neutral_slope(2,nz,n)**2)
+            c1 = 1.0_WP
+            if (odm95) then
+                c1=0.5_WP*(1.0_WP + tanh((scr - neutral_slope(3,nz,n))/sd))
+                if ((bvfreq(nz,n) <= 0.0_WP) .or. (bvfreq(nz+1,n) <= 0.0_WP)) c1=0.0_WP
+            end if
+            c2 = 1.0_WP
+            if (ldd97) then
+                dep_scale = rssby*neutral_slope(3,nz,n)
+                if (abs(mesh%Z_3d_n(nz, n))< dep_scale) then
+                    c2 = 0.5_WP * (1.0_WP + sin(pi*abs(mesh%Z_3d_n(nz, n))/dep_scale - pi/2.0_WP    ))
+                end if
+            end if
+            if (taper_k) then
+                fer_tapfac(nz, n) = c1 * c2
+                do i=1, 3
+                    slope_tapered(i, nz, n)=neutral_slope(i, nz, n) * sqrt(c1 * c2)
+                end do
+            else
+                do i=1, 3
+                    slope_tapered(i, nz, n)=neutral_slope(i, nz, n) * c1 * c2
+                end do
+            end if
+        end do
+    enddo
+!$ACC END PARALLEL LOOP
+    call exchange_nod(neutral_slope, partit, luse_g2g=.true.)
+    call exchange_nod(slope_tapered, partit, luse_g2g=.true.)
+    ! host copies of the results
+    !$ACC UPDATE HOST(sw_alpha, sw_beta, sigma_xy, neutral_slope, slope_tapered)
+    if (taper_k) then
+        !$ACC UPDATE HOST(fer_tapfac)
+    end if
+end subroutine compute_neutral_slope_acc
+#endif
 !
 !
 !
