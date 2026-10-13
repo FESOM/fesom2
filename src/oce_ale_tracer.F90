@@ -245,7 +245,6 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         ! advect tracers
         if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[37m'//'         --> call adv_tracers_ale'//achar(27)//'[0m'
 	!here update only those initialized in the init_tracers. (values, valuesAB, edge_up_dn_grad, ...)
-        !$ACC  UPDATE DEVICE(tracers%work%edge_up_dn_grad) !!&
         ! it will update del_ttf with contributions from horizontal and vertical advection parts (del_ttf_advhoriz and del_ttf_advvert)
 	!$ACC wait(1)
         call do_oce_adv_tra(dt, UV, Wvel, Wvel_i, Wvel_e, tr_num, dynamics, tracers, partit, mesh)
@@ -299,7 +298,6 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         ! diffuse tracers
         if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[37m'//'         --> call diff_tracers_ale'//achar(27)//'[0m'
         if (conservation_freq > 0) call conservation_probe('advection', 'a', tr_num, tracers, partit, mesh)
-        !$ACC UPDATE DEVICE(tr_xy, tr_z) ! tracer gradients are computed on the host (init_tracers_AB)
         call diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
 
         !___________________________________________________________________________
@@ -537,7 +535,8 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     diff_on_device = .false.
 #endif
     if (.not. diff_on_device) then
-        !$ACC UPDATE HOST(tracers%work%del_ttf)
+        ! (the tracer gradients are computed on the device in init_tracers_AB)
+        !$ACC UPDATE HOST(tracers%work%del_ttf, tr_xy, tr_z)
     end if
     ! the implicit vertical diffusion runs on the device for T and S unless a feature reads
     ! host-only data inside its column loop

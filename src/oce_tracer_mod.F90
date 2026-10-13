@@ -125,15 +125,30 @@ end do
 
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_elements'//achar(27)//'[0m'
 !PS     call tracer_gradient_elements(tracers%data(tr_num)%valuesAB, partit, mesh)
+#ifndef ENABLE_OPENACC
     call tracer_gradient_elements(tracers%data(tr_num)%values, tr_xy, partit, mesh)
     call exchange_elem_begin(tr_xy, partit)
+#else
+    ! values is current on the device here; the gradients stay there (advection,
+    ! fill_up_dn_grad and the diffusion use them on the device)
+    call tracer_gradient_elements(tracers%data(tr_num)%values, tr_xy, partit, mesh, on_device_in=.true.)
+    call exchange_elem_begin(tr_xy, partit, luse_g2g=.true.)
+#endif
 
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_z'//achar(27)//'[0m'
+#ifndef ENABLE_OPENACC
     call tracer_gradient_z(tracers%data(tr_num)%values, tr_z, partit, mesh)    !WHY NOT AB HERE? DSIDOREN!
+#else
+    call tracer_gradient_z(tracers%data(tr_num)%values, tr_z, partit, mesh, on_device_in=.true.)
+#endif
     call exchange_elem_end(partit)      ! tr_xy used in fill_up_dn_grad
 !$OMP BARRIER
 
+#ifndef ENABLE_OPENACC
     call exchange_nod_begin(tr_z, partit) ! not used in fill_up_dn_grad 
+#else
+    call exchange_nod_begin(tr_z, partit, luse_g2g=.true.) ! not used in fill_up_dn_grad
+#endif
 
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[38m'//'             --> call fill_up_dn_grad'//achar(27)//'[0m'
     call fill_up_dn_grad(tracers%work, partit, mesh)
@@ -145,7 +160,7 @@ END SUBROUTINE init_tracers_AB
 !
 !
 !=======================================================================
-SUBROUTINE tracer_gradient_elements(ttf, ttf_grad, partit, mesh, do_overz_in)
+SUBROUTINE tracer_gradient_elements(ttf, ttf_grad, partit, mesh, do_overz_in, on_device_in)
     !computes elemental gradient of tracer
     USE MOD_MESH
     USE MOD_PARTIT
@@ -160,6 +175,9 @@ SUBROUTINE tracer_gradient_elements(ttf, ttf_grad, partit, mesh, do_overz_in)
     type(t_mesh)  , intent(in)   , target           :: mesh
     type(t_partit), intent(inout), target           :: partit
     logical       , intent(in)   , optional         :: do_overz_in
+    ! OpenACC: compute on the device (ttf and ttf_grad present there); default host
+    logical       , intent(in)   , optional         :: on_device_in
+    logical                                         :: on_device
     integer                                         :: elem,  elnodes(3)
     integer                                         :: nz, nzmin, nzmax
     logical                                         :: do_overz
@@ -169,6 +187,8 @@ SUBROUTINE tracer_gradient_elements(ttf, ttf_grad, partit, mesh, do_overz_in)
     !___________________________________________________________________________
     do_overz = .True.
     if (present(do_overz_in)) do_overz = do_overz_in
+    on_device = .false.
+    if (present(on_device_in)) on_device = on_device_in
 
     !
     !___________________________________________________________________________
@@ -176,7 +196,7 @@ SUBROUTINE tracer_gradient_elements(ttf, ttf_grad, partit, mesh, do_overz_in)
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, elnodes, nz, nzmin, nzmax)
 #else
-!ACC PARALLEL LOOP DEFAULT(PRESENT) PRIVATE(elnodes)
+!$ACC PARALLEL LOOP DEFAULT(PRESENT) PRIVATE(elnodes, nz, nzmin, nzmax) IF(on_device)
 #endif
         do elem=1, partit%myDim_elem2D
             elnodes=mesh%elem2D_nodes(:,elem)
@@ -190,7 +210,7 @@ SUBROUTINE tracer_gradient_elements(ttf, ttf_grad, partit, mesh, do_overz_in)
 #ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
 #else
-!ACC END PARALLEL LOOP
+!$ACC END PARALLEL LOOP
 #endif
 
     !
@@ -201,7 +221,7 @@ SUBROUTINE tracer_gradient_elements(ttf, ttf_grad, partit, mesh, do_overz_in)
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, elnodes, nz)
 #else
-!ACC PARALLEL LOOP DEFAULT(PRESENT) PRIVATE(elnodes)
+!$ACC PARALLEL LOOP DEFAULT(PRESENT) PRIVATE(elnodes, nz) IF(on_device)
 #endif
         do elem=1, partit%myDim_elem2D
             elnodes=mesh%elem2D_nodes(:,elem)
@@ -213,14 +233,14 @@ SUBROUTINE tracer_gradient_elements(ttf, ttf_grad, partit, mesh, do_overz_in)
 #ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
 #else
-!ACC END PARALLEL LOOP
+!$ACC END PARALLEL LOOP
 #endif        
     end if
 END SUBROUTINE tracer_gradient_elements
 !
 !
 !========================================================================================
-SUBROUTINE tracer_gradient_z(ttf, ttf_grad, partit, mesh)
+SUBROUTINE tracer_gradient_z(ttf, ttf_grad, partit, mesh, on_device_in)
     !computes vertical gradient of tracer
     USE MOD_MESH
     USE MOD_PARTIT
@@ -236,13 +256,18 @@ SUBROUTINE tracer_gradient_z(ttf, ttf_grad, partit, mesh)
     type(t_partit), intent(inout), target         :: partit
     type(t_mesh),   intent(in),    target         :: mesh
     
+    ! OpenACC: compute on the device (ttf and ttf_grad present there); default host
+    logical, intent(in), optional                 :: on_device_in
+    logical                  :: on_device
     real(kind=WP)            :: dz
     integer                  :: n, nz, nzmin, nzmax
 
+    on_device = .false.
+    if (present(on_device_in)) on_device = on_device_in
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax, dz)
 #else
-!ACC PARALLEL LOOP DEFAULT(PRESENT)
+!$ACC PARALLEL LOOP DEFAULT(PRESENT) PRIVATE(nz, nzmin, nzmax, dz) IF(on_device)
 #endif
     DO n=1, partit%myDim_nod2D+partit%eDim_nod2D
         nzmax=mesh%nlevels_nod2D(n)
@@ -257,7 +282,7 @@ SUBROUTINE tracer_gradient_z(ttf, ttf_grad, partit, mesh)
 #ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
 #else
-!ACC END PARALLEL LOOP
+!$ACC END PARALLEL LOOP
 #endif
 END SUBROUTINE tracer_gradient_z
 !

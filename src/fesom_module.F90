@@ -901,6 +901,7 @@ contains
     !$ACC ENTER DATA CREATE (f%tracers%work%fct_ttf_min, f%tracers%work%fct_ttf_max, f%tracers%work%fct_plus, f%tracers%work%fct_minus)
     !$ACC ENTER DATA CREATE (f%tracers%work%adv_flux_hor, f%tracers%work%adv_flux_ver, f%tracers%work%fct_LO, f%tracers%work%fct_LO_tend)
     !$ACC ENTER DATA CREATE (f%tracers%work%del_ttf_advvert, f%tracers%work%del_ttf_advhoriz, f%tracers%work%edge_up_dn_grad)
+    !$ACC ENTER DATA COPYIN (f%tracers%work%edge_up_dn_tri) ! fill_up_dn_grad on the device
     !$ACC ENTER DATA CREATE (tr_xy, tr_z, relax2clim, Sclim, Tclim)
     !$ACC ENTER DATA CREATE (Ki, slope_tapered)   ! Redi inputs, updated every step in solve_tracers_ale
     !$ACC ENTER DATA COPYIN (f%mesh%zbar_n_bot)
