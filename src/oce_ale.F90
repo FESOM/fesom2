@@ -3763,6 +3763,9 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
 #if defined (FESOM_PROFILING)
         call fesom_profiler_start("mix_kpp")
 #endif
+#if defined(_OPENACC)
+        kpp_on_device = sxy_on_device .and. kpp_device_ok(mesh)
+#endif
         call oce_mixing_KPP(Av, Kv_double, dynamics, tracers, partit, mesh)
 #if defined (FESOM_PROFILING)
         call fesom_profiler_end("mix_kpp")
