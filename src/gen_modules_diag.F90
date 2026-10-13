@@ -533,6 +533,7 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
   type(t_tracer), intent(in)   , target   :: tracers
   type(t_dyn)   , intent(in)   , target   :: dynamics
   integer                                 :: nz, snz, elem, nzmax, nzmin, elnodes(3), is, ie
+  real(kind=WP)                           :: alpha_srf(3), beta_srf(3)
   integer                                 :: e, edge, enodes(2), eelems(2)
   real(kind=WP)                           :: div, deltaX, deltaY
   integer                                 :: jj
@@ -595,13 +596,19 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
      dens(nzmin)    =dens(nzmin+1)      +(dens(nzmin+1)-dens(nzmin+2))            *mesh%helem(nzmin, elem)/mesh%helem(nzmin+1,elem)
 
      ! heat, freshwater and restoring at density classes
-     is=minloc(abs(std_dens-dens(1)),1)
-     std_dens_flux(1, is,elem)=std_dens_flux(1, is,elem)+mesh%elem_area(elem)*sum(sw_alpha(1,elnodes) * heat_flux_in(elnodes   ))/3./vcpw
-     std_dens_flux(2, is,elem)=std_dens_flux(2, is,elem)+mesh%elem_area(elem)*sum(sw_beta (1,elnodes) * relax_salt  (elnodes   ))/3.
+     ! use the first wet level: the density of the element, and the expansion
+     ! coefficients of each node (level 1 is not ocean under an ice shelf)
+     is=minloc(abs(std_dens-dens(nzmin)),1)
+     do jj=1,3
+        alpha_srf(jj)=sw_alpha(mesh%ulevels_nod2D(elnodes(jj)), elnodes(jj))
+        beta_srf(jj) =sw_beta (mesh%ulevels_nod2D(elnodes(jj)), elnodes(jj))
+     end do
+     std_dens_flux(1, is,elem)=std_dens_flux(1, is,elem)+mesh%elem_area(elem)*sum(alpha_srf * heat_flux_in(elnodes   ))/3./vcpw
+     std_dens_flux(2, is,elem)=std_dens_flux(2, is,elem)+mesh%elem_area(elem)*sum(beta_srf  * relax_salt  (elnodes   ))/3.
      
      dd = 0.0_WP
      do jj=1,3
-        dd = dd + (sw_beta (1,elnodes(jj)) * water_flux(elnodes(jj)) * salt(mesh%ulevels_nod2D(elnodes(jj)),  elnodes(jj)))
+        dd = dd + (beta_srf(jj) * water_flux(elnodes(jj)) * salt(mesh%ulevels_nod2D(elnodes(jj)),  elnodes(jj)))
      end do
      std_dens_flux(3, is,elem)=std_dens_flux(3, is,elem)+mesh%elem_area(elem)*dd/3.
   end do
