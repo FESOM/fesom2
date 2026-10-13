@@ -1654,7 +1654,9 @@ contains
         END DO
      END DO
      !$ACC END PARALLEL LOOP
-     !$ACC UPDATE HOST(diffK, ghats, blmc, hbl, kbl, Bo, ustar, bfsfc, stable, caseA)
+     ! ghats and blmc stay on the device for the tracer diffusion (the caller brings
+     ! them back for the DVD diagnostic)
+     !$ACC UPDATE HOST(diffK, hbl, kbl, Bo, ustar, bfsfc, stable, caseA)
      call exchange_nod(diffK(:,:,1), partit)
      call exchange_nod(diffK(:,:,2), partit)
      call exchange_nod(ghats, partit)

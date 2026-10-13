@@ -3767,6 +3767,12 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         kpp_on_device = sxy_on_device .and. kpp_device_ok(mesh)
 #endif
         call oce_mixing_KPP(Av, Kv_double, dynamics, tracers, partit, mesh)
+#if defined(_OPENACC)
+        ! the DVD diagnostic reads the nonlocal KPP terms on the host
+        if (kpp_on_device .and. ldiag_DVD) then
+            !$ACC UPDATE HOST(ghats, blmc)
+        end if
+#endif
 #if defined (FESOM_PROFILING)
         call fesom_profiler_end("mix_kpp")
 #endif

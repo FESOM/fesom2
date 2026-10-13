@@ -230,7 +230,11 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
             impl_inputs_created = .true.
         end if
         !$ACC UPDATE DEVICE(Kv, sw_3d, heat_flux, water_flux, virtual_salt, relax_salt, real_salt_flux)
-        !$ACC UPDATE DEVICE(dynamics%w_i, ghats, blmc)
+        !$ACC UPDATE DEVICE(dynamics%w_i)
+        ! with KPP on the device ghats and blmc are current there
+        if (.not. kpp_on_device) then
+            !$ACC UPDATE DEVICE(ghats, blmc)
+        end if
 #if defined (__cvmix)
         !$ACC UPDATE DEVICE(kpp_nonlcltranspT, kpp_nonlcltranspS, kpp_oblmixc)
 #endif
