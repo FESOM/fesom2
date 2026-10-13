@@ -833,10 +833,9 @@ subroutine compute_destinE(mode, dynamics, tracers, partit, mesh)
        nzmin=mesh%ulevels_nod2D(n)
        zint=0.0_WP
        do nz=nzmin, nzmax-1
+          ! zint is the top of layer nz; take the part of the layer above each target depth
+          heatcontent(n,:)=heatcontent(n,:)+temp(nz,n)*max(min(mesh%hnode(nz,n), whichdepth-zint), 0.0_WP)
           zint=zint+mesh%hnode(nz, n)
-          where (whichdepth>zint)
-              heatcontent(n,:)=heatcontent(n,:)+temp(nz,n)*mesh%hnode(nz,n)
-          end where
        end do
        heatcontent(n,:)=1025.*3990.*heatcontent(n,:) 
     END DO
