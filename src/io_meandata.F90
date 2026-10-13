@@ -2024,6 +2024,71 @@ CASE ('NPPp3D         ')
    endif
 
 ! =====================================================================
+! REMINERALIZATION & DISSOLUTION (3D)
+! Description: Degradation of POM to DOM and Remineralization from DOM to DIM
+! =====================================================================
+
+CASE ('REMOC3D         ')
+    ! =====================================================================
+    ! Variable: REMOC3D
+    ! Description: Total remineralization of DOC
+    ! Units: mmolC/(m²*d)
+    ! =====================================================================
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'REMOC3D','Total remineralization of DOC', 'mmolC/(m2*d)',REMOC3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) 
+   endif
+
+CASE ('REMOCt3D         ')
+    ! =====================================================================
+    ! Variable: REMOCt3D
+    ! Description: Total remineralization of terrigenous DOC
+    ! Units: mmolC/(m²*d)
+    ! =====================================================================
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'REMOCt3D','Total remineralization of terrigenous DOC', 'mmolC/(m2*d)',REMOCt3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) 
+   endif
+
+CASE ('REMON3D         ')
+    ! =====================================================================
+    ! Variable: REMON3D
+    ! Description: Total remineralization of DON
+    ! Units: mmolC/(m²*d)
+    ! =====================================================================
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'REMON3D','Total remineralization of DON', 'mmolN/(m2*d)',REMON3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('DISSOC3D         ')
+    ! =====================================================================
+    ! Variable: DISSOC3D
+    ! Description: Dissolution of POC
+    ! Units: mmolC/(m²*d)
+    ! =====================================================================
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'DISSOC3D','Dissolution of POC', 'mmolC/(m2*d)',DISSOC3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('DISSON3D         ')
+    ! =====================================================================
+    ! Variable: DISSON3D
+    ! Description: Dissolution of PON
+    ! Units: mmolN/(m²*d)
+    ! =====================================================================
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'DISSON3D','Dissolution of PON', 'mmolN/(m2*d)',DISSON3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('DISSOSi3D         ')
+    ! =====================================================================
+    ! Variable: DISSOSi3D
+    ! Description: Dissolution of Si
+    ! Units: mmolSi/(m²*d)
+    ! =====================================================================
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'DISSOSi3D','Dissolution of Si', 'mmolSi/(m2*d)',DISSOSi3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+! =====================================================================
 ! TEMPERATURE EFFECTS ON PHOTOSYNTHESIS
 ! Description: Temperature-dependent growth rate modifiers
 ! =====================================================================
@@ -2365,6 +2430,114 @@ CASE ('TSi_assimDia          ')
     if (use_REcoM) then
         call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), &
                        'TSi_assimDia', 'Silicate assimilation', 'per day', TSi_assimDia(:,:), &
+                       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('DINlim_n              ')
+    ! =====================================================================
+    ! Variable: DINlim_n
+    ! Description: DIN limitation of Small Phytoplankton
+    ! Units: n.d.
+    ! =====================================================================
+    if (use_REcoM) then    
+        call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), &
+                       'DINlim_n', 'DIN limitation of small phytoplankton growth', 'n.d.', DINlim_n(:,:), &
+                       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('DINlim_d              ')
+    ! =====================================================================
+    ! Variable: DINlim_d
+    ! Description: DIN limitation of Diatoms
+    ! Units: n.d.
+    ! =====================================================================
+    if (use_REcoM) then    
+        call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), &
+                       'DINlim_d', 'DIN limitation of diatom growth', 'n.d.', DINlim_d(:,:), &
+                       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('DINlim_c              ')
+    ! =====================================================================
+    ! Variable: DINlim_c
+    ! Description: DIN limitation of Coccolithophores
+    ! Units: n.d.
+    ! =====================================================================
+    if (use_REcoM) then    
+        call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), &
+                       'DINlim_c', 'DIN limitation of cocclithophore growth', 'n.d.', DINlim_c(:,:), &
+                       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('DINlim_p              ')
+    ! =====================================================================
+    ! Variable: DINlim_p
+    ! Description: DIN limitation of Phaeocystis
+    ! Units: n.d.
+    ! =====================================================================
+    if (use_REcoM) then    
+        call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), &
+                       'DINlim_p', 'DIN limitation of phaeocystis growth', 'n.d.', DINlim_p(:,:), &
+                       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('Felim_n              ')
+    ! =====================================================================
+    ! Variable: Felim_n
+    ! Description: Fe limitation of Small Phytoplankton
+    ! Units: n.d.
+    ! =====================================================================
+    if (use_REcoM) then    
+        call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), &
+                       'Felim_n', 'Fe limitation of small phytoplankton growth', 'n.d.', Felim_n(:,:), &
+                       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('Felim_d              ')
+    ! =====================================================================
+    ! Variable: Felim_d
+    ! Description: Fe limitation of Diatoms
+    ! Units: n.d.
+    ! =====================================================================
+    if (use_REcoM) then
+        call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), &
+                       'Felim_d', 'Fe limitation of diatom growth', 'n.d.', Felim_d(:,:), &
+                       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('Felim_c              ')
+    ! =====================================================================
+    ! Variable: Felim_c
+    ! Description: Fe limitation of Coccolithophores
+    ! Units: n.d.
+    ! =====================================================================
+    if (use_REcoM) then
+        call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), &
+                       'Felim_c', 'Fe limitation of coccolithophore growth', 'n.d.', Felim_c(:,:), &
+                       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('Felim_p              ')
+    ! =====================================================================
+    ! Variable: Felim_p
+    ! Description: Fe limitation of Phaeocystis
+    ! Units: n.d.
+    ! =====================================================================
+    if (use_REcoM) then
+        call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), &
+                       'Felim_p', 'Fe limitation of phaeocystis growth', 'n.d.', Felim_p(:,:), &
+                       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('Silim_d              ')
+    ! =====================================================================
+    ! Variable: Silim_d
+    ! Description: DSi limitation of Diatoms
+    ! Units: n.d.
+    ! =====================================================================
+    if (use_REcoM) then
+        call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), &
+                       'Silim_d', 'DSi limitation of diatom growth', 'n.d.', Silim_d(:,:), &
                        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     endif
 

@@ -1368,6 +1368,16 @@ Module REcoM_declarations
   Real(kind=8),allocatable,dimension(:)  :: VTCphot_phyto, VTCphot_diatoms, VTCphot_cocco, VTCphot_phaeo
   Real(kind=8),allocatable,dimension(:)  :: VTSi_assimDia
 
+  Real(kind=8),allocatable,dimension(:)     :: vDINlim_n
+  Real(kind=8),allocatable,dimension(:)     :: vFelim_n
+  Real(kind=8),allocatable,dimension(:)     :: vDINlim_d
+  Real(kind=8),allocatable,dimension(:)     :: vSilim_d
+  Real(kind=8),allocatable,dimension(:)     :: vFelim_d
+  Real(kind=8),allocatable,dimension(:)     :: vDINlim_c
+  Real(kind=8),allocatable,dimension(:)     :: vFelim_c
+  Real(kind=8),allocatable,dimension(:)     :: vDINlim_p
+  Real(kind=8),allocatable,dimension(:)     :: vFelim_p
+
 !!------------------------------------------------------------------------------
 !! *** Iron chemistry ***
   Real(kind=8),external :: iron_chemistry, iron_chemistry_2ligands
@@ -1700,6 +1710,13 @@ Module REcoM_GloVar
   Real(kind=8),allocatable,dimension(:,:)   :: microcdis
   Real(kind=8),allocatable,dimension(:,:)   :: macrocdis
 
+  Real(kind=8),allocatable,dimension(:,:)   :: DISSOC3D
+  Real(kind=8),allocatable,dimension(:,:)   :: DISSON3D
+  Real(kind=8),allocatable,dimension(:,:)   :: DISSOSi3D
+  Real(kind=8),allocatable,dimension(:,:)   :: REMOC3D
+  Real(kind=8),allocatable,dimension(:,:)   :: REMOCt3D
+  Real(kind=8),allocatable,dimension(:,:)   :: REMON3D
+
   Real(kind=8),allocatable,dimension(:,:)   :: TTemp_diatoms ! my new variables to track
   Real(kind=8),allocatable,dimension(:,:)   :: TTemp_phyto ! new Temperature effect
   Real(kind=8),allocatable,dimension(:,:)   :: TTemp_cocco ! new
@@ -1721,6 +1738,16 @@ Module REcoM_GloVar
   Real(kind=8),allocatable,dimension(:,:)   :: TCphotLigLim_phaeo ! new light limitation
   Real(kind=8),allocatable,dimension(:,:)   :: TCphot_phaeo
   Real(kind=8),allocatable,dimension(:,:)   :: TSi_assimDia ! tracking the assimilation of Si by Diatoms
+
+  Real(kind=8),allocatable,dimension(:,:)   :: DINlim_n
+  Real(kind=8),allocatable,dimension(:,:)   :: Felim_n
+  Real(kind=8),allocatable,dimension(:,:)   :: DINlim_d
+  Real(kind=8),allocatable,dimension(:,:)   :: Silim_d
+  Real(kind=8),allocatable,dimension(:,:)   :: Felim_d
+  Real(kind=8),allocatable,dimension(:,:)   :: DINlim_c
+  Real(kind=8),allocatable,dimension(:,:)   :: Felim_c
+  Real(kind=8),allocatable,dimension(:,:)   :: DINlim_p
+  Real(kind=8),allocatable,dimension(:,:)   :: Felim_p
 
   Real(kind=8),allocatable,dimension(:)     :: DenitBen         ! Benthic denitrification Field in 2D [n2d 1]
 
@@ -2324,6 +2351,13 @@ subroutine allocate_and_init_diags(nl)
         allocate(VTSi_assimDia(nl-1))
         VTSi_assimDia = 0.d0
 
+        allocate(vDINlim_n(nl-1), vFelim_n(nl-1), vDINlim_d(nl-1), vSilim_d(nl-1), vFelim_d(nl-1))
+        vDINlim_n = 0.d0
+        vFelim_n  = 0.d0
+        vDINlim_d = 0.d0
+        vSilim_d  = 0.d0
+        vFelim_d  = 0.d0
+
     if (enable_coccos) then    
         ! --------------------------------------------------------------------------
         ! Coccolithophores and Phaeocystis Tracking (if enabled)
@@ -2349,6 +2383,12 @@ subroutine allocate_and_init_diags(nl)
         VTCphot_cocco = 0.d0
         VTCphot_phaeo = 0.d0
 
+        allocate(vDINlim_c(nl-1), vFelim_c(nl-1), vDINlim_p(nl-1), vFelim_p(nl-1))
+        vDINlim_c = 0.d0
+        vFelim_c  = 0.d0
+        vDINlim_p = 0.d0
+        vFelim_p  = 0.d0
+    
     endif
 
 end subroutine allocate_and_init_diags
@@ -2511,12 +2551,31 @@ subroutine update_3d_diags(n, nzmax)
         respmicro(1:nzmax,n) = vertrespmicro(1:nzmax)
     endif
 
+    ! --------------------------------------------------------------------------
+    ! 3D Degradation (POM to DOM) and remineralization (DOM to DIM)
+    ! --------------------------------------------------------------------------
+
+    DISSOC3D(1:nzmax,n)  = vertDISSOC(1:nzmax)
+    DISSON3D(1:nzmax,n)  = vertDISSON(1:nzmax)
+    DISSOSi3D(1:nzmax,n) = vertDISSOSi(1:nzmax)
+    REMOC3D(1:nzmax,n)   = vertREMOC(1:nzmax)
+    REMOCt3D(1:nzmax,n)  = vertREMOCt(1:nzmax)
+    REMON3D(1:nzmax,n)   = vertREMON(1:nzmax)
+
+
+
     TPhyCO2(1:nzmax,n)             = VTPhyCO2(1:nzmax)
     TDiaCO2(1:nzmax,n)             = VTDiaCO2(1:nzmax)
     TCphotLigLim_phyto(1:nzmax,n)  = VTCphotLigLim_phyto(1:nzmax)
     TCphot_phyto(1:nzmax,n)        = VTCphot_phyto(1:nzmax)
     TCphotLigLim_diatoms(1:nzmax,n)= VTCphotLigLim_diatoms(1:nzmax)
     TCphot_diatoms(1:nzmax,n)      = VTCphot_diatoms(1:nzmax)
+
+    DINlim_n(1:nzmax,n)     = vDINlim_n(1:nzmax)
+    Felim_n(1:nzmax,n)      = vFelim_n(1:nzmax)
+    DINlim_d(1:nzmax,n)     = vDINlim_d(1:nzmax)
+    Silim_d(1:nzmax,n)      = vSilim_d(1:nzmax)
+    Felim_d(1:nzmax,n)      = vFelim_d(1:nzmax)
 
     if (enable_coccos) then
         ! --------------------------------------------------------------------------
@@ -2547,6 +2606,12 @@ subroutine update_3d_diags(n, nzmax)
         TqlimitFac_phaeo(1:nzmax,n)    = VTqlimitFac_phaeo(1:nzmax)
         TCphotLigLim_phaeo(1:nzmax,n)  = VTCphotLigLim_phaeo(1:nzmax)
         TCphot_phaeo(1:nzmax,n)        = VTCphot_phaeo(1:nzmax)
+    
+        DINlim_c(1:nzmax,n)     = vDINlim_c(1:nzmax)
+        Felim_c(1:nzmax,n)      = vFelim_c(1:nzmax)
+        DINlim_p(1:nzmax,n)     = vDINlim_p(1:nzmax)
+        Felim_p(1:nzmax,n)      = vFelim_p(1:nzmax)
+
     endif
     
 end subroutine update_3d_diags
@@ -2566,6 +2631,7 @@ subroutine deallocate_diags()
         deallocate(vertNPPn, vertGPPn, vertNNAn, vertChldegn)
         deallocate(vertaggn, vertdocexn, vertrespn)
         deallocate(VTPhyCO2, VTCphotLigLim_phyto, VTCphot_phyto)
+        deallocate(vDINlim_n,vFelim_n)
     
         ! --------------------------------------------------------------------------
         ! Diatoms
@@ -2573,12 +2639,13 @@ subroutine deallocate_diags()
         deallocate(vertNPPd, vertGPPd, vertNNAd, vertChldegd)
         deallocate(vertaggd, vertdocexd, vertrespd)
         deallocate(VTDiaCO2, VTCphotLigLim_diatoms, VTCphot_diatoms)
+        deallocate(vDINlim_d, vSilim_d, vFelim_d)
 
         deallocate(VTTemp_phyto, VTqlimitFac_phyto)
         deallocate(VTTemp_diatoms, VTqlimitFac_diatoms)
         deallocate(VTSi_assimDia)
         deallocate(vertcalcdiss, vertcalcif)
-
+        
     if (enable_coccos) then
         ! --------------------------------------------------------------------------
         ! Coccolithophores and Phaeocystis (if enabled)
@@ -2587,11 +2654,13 @@ subroutine deallocate_diags()
         deallocate(vertaggc, vertdocexc, vertrespc)
         deallocate(VTTemp_cocco, VTCoccoCO2, VTqlimitFac_cocco)
         deallocate(VTCphotLigLim_cocco, VTCphot_cocco)
+        deallocate(vDINlim_c, vFelim_c)
 
         deallocate(vertNPPp, vertGPPp, vertNNAp, vertChldegp)
         deallocate(vertaggp, vertdocexp, vertrespp)
         deallocate(VTTemp_phaeo, VTPhaeoCO2, VTqlimitFac_phaeo)
         deallocate(VTCphotLigLim_phaeo, VTCphot_phaeo)
+        deallocate(vDINlim_p, vFelim_p)
     endif
     
     ! --------------------------------------------------------------------------

@@ -325,6 +325,13 @@ subroutine recom_init(tracers, partit, mesh)
     allocate(microcdis    ( nl-1, node_size ))
     allocate(macrocdis    ( nl-1, node_size ))
 
+    allocate(DISSOC3D     ( nl-1, node_size ))
+    allocate(DISSON3D     ( nl-1, node_size ))
+    allocate(DISSOSi3D    ( nl-1, node_size ))
+    allocate(REMOC3D      ( nl-1, node_size ))
+    allocate(REMOCt3D     ( nl-1, node_size ))
+    allocate(REMON3D      ( nl-1, node_size ))
+
     respmeso     = 0.d0
     respmacro    = 0.d0
     respmicro    = 0.d0
@@ -361,6 +368,13 @@ subroutine recom_init(tracers, partit, mesh)
     mesocdis    = 0.d0
     microcdis   = 0.d0
     macrocdis   = 0.d0
+
+    DISSOC3D    = 0.d0
+    DISSON3D    = 0.d0
+    DISSOSi3D   = 0.d0
+    REMOC3D     = 0.d0
+    REMOCt3D    = 0.d0
+    REMON3D     = 0.d0
 
 !! From Hannahs new temperature function (not sure if needed as diagnostic):
 
@@ -400,7 +414,6 @@ subroutine recom_init(tracers, partit, mesh)
   allocate(TCphotLigLim_cocco      (nl-1,node_size))
   allocate(TCphotLigLim_phaeo      (nl-1,node_size))
 
-
   TCphotLigLim_diatoms  (:,:) = 0.d0
   TCphotLigLim_phyto    (:,:) = 0.d0
   TCphotLigLim_cocco    (:,:) = 0.d0
@@ -420,7 +433,31 @@ subroutine recom_init(tracers, partit, mesh)
 
   TSi_assimDia          (:,:) = 0.d0
 
-    end if
+  allocate(DINlim_n(nl-1,node_size))
+  allocate(DINlim_d(nl-1,node_size))
+  allocate(DINlim_c(nl-1,node_size))
+  allocate(DINlim_p(nl-1,node_size))
+
+  DINlim_n(:,:) = 0.d0
+  DINlim_d(:,:) = 0.d0
+  DINlim_c(:,:) = 0.d0
+  DINlim_p(:,:) = 0.d0
+
+  allocate(Felim_n(nl-1,node_size))
+  allocate(Felim_d(nl-1,node_size))
+  allocate(Felim_c(nl-1,node_size))
+  allocate(Felim_p(nl-1,node_size))
+
+  Felim_n(:,:) = 0.d0
+  Felim_d(:,:) = 0.d0
+  Felim_c(:,:) = 0.d0
+  Felim_p(:,:) = 0.d0
+
+  allocate(Silim_d(nl-1,node_size))
+
+  Silim_d(:,:) = 0.d0
+  
+   end if
 
 !! *** Allocate 3D mocsy ***
     allocate(CO23D        ( nl-1, node_size ))

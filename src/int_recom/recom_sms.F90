@@ -1970,11 +1970,11 @@ real(kind=8) :: &
 
             ! Nitrogen limitation based on intracellular N:C quota
             qlimitFac = recom_limiter(NMinSlope, NCmin, quota)
-
+            vDINlim_n(k) = qlimitFac
             ! Iron limitation using Michaelis-Menten kinetics
             ! Iron is often the limiting micronutrient in HNLC regions
             feLimitFac = Fe / (k_Fe + Fe)
-
+            vFelim_n(k)  = feLimitFac
             ! Apply Liebig's law: most limiting nutrient controls photosynthesis
             qlimitFac = min(qlimitFac, feLimitFac)
 
@@ -1998,14 +1998,16 @@ real(kind=8) :: &
 
             ! Nitrogen limitation
             qlimitFac = recom_limiter(NMinSlope, NCmin_d, quota_dia)
-
+            vDINlim_d(k) = qlimitFac
             ! Silicon limitation (unique to diatoms)
             ! Required for frustule formation - critical for diatom growth
             qlimitFacTmp = recom_limiter(SiMinSlope, SiCmin, qSiC)
+            vSilim_d(k)  = qlimitFacTmp
             qlimitFac = min(qlimitFac, qlimitFacTmp)
 
             ! Iron limitation
             feLimitFac = Fe / (k_Fe_d + Fe)
+            vFelim_d(k)  = feLimitFac
             qlimitFac = min(qlimitFac, feLimitFac)
 
             ! Track limitation
@@ -2028,9 +2030,10 @@ real(kind=8) :: &
 
                 ! Nitrogen limitation
                 qlimitFac = recom_limiter(NMinSlope, NCmin_c, quota_cocco)
-
+                vDINlim_c  = qlimitFac
                 ! Iron limitation
                 feLimitFac = Fe / (k_Fe_c + Fe)
+                vFelim_c   = feLimitFac
                 qlimitFac = min(qlimitFac, feLimitFac)
 
                 ! Track limitation
@@ -2047,9 +2050,10 @@ real(kind=8) :: &
 
                 ! Nitrogen limitation
                 qlimitFac = recom_limiter(NMinSlope, NCmin_p, quota_phaeo)
-
+                vDINlim_p  = qlimitFac
                 ! Iron limitation
                 feLimitFac = Fe / (k_Fe_p + Fe)
+                vFelim_c   = feLimitFac
                 qlimitFac = min(qlimitFac, feLimitFac)
 
                 ! Track limitation
