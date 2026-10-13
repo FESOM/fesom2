@@ -48,7 +48,7 @@ end do
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO
 #else
-!ACC PARALLEL LOOP DEFAULT(PRESENT)
+!$ACC PARALLEL LOOP DEFAULT(PRESENT)
 #endif
        do n=1, partit%myDim_nod2D+partit%eDim_nod2D
            tracers%data(tr_num)%valuesAB(:, n)  =-(0.5_WP+epsilon)*tracers%data(tr_num)%valuesold(1, :, n)+(1.5_WP+epsilon)*tracers%data(tr_num)%values(:, n)
@@ -56,13 +56,13 @@ end do
 #ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
 #else
-!ACC END PARALLEL LOOP
+!$ACC END PARALLEL LOOP
 #endif
     elseif (tracers%data(tr_num)%AB_order==3) then
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO
 #else
-!ACC PARALLEL LOOP DEFAULT(PRESENT)
+!$ACC PARALLEL LOOP DEFAULT(PRESENT)
 #endif
        do n=1, partit%myDim_nod2D+partit%eDim_nod2D
            tracers%data(tr_num)%valuesAB(:, n)  =5.0_WP*tracers%data(tr_num)%valuesold(2, :, n)-16.0_WP*tracers%data(tr_num)%valuesold(1, :, n)+23.0_WP*tracers%data(tr_num)%values(:, n)
@@ -71,7 +71,7 @@ end do
 #ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
 #else
-!ACC END PARALLEL LOOP
+!$ACC END PARALLEL LOOP
 #endif
     else
        write(*,*)
@@ -96,7 +96,7 @@ end do
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO
 #else
-!ACC PARALLEL LOOP DEFAULT(PRESENT)
+!$ACC PARALLEL LOOP DEFAULT(PRESENT)
 #endif
        do n=1, partit%myDim_nod2d+partit%eDim_nod2D
           tracers%data(tr_num)%valuesold(1, :, n)=tracers%data(tr_num)%values(:, n)
@@ -104,13 +104,13 @@ end do
 #ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
 #else
-!ACC END PARALLEL LOOP
+!$ACC END PARALLEL LOOP
 #endif
     elseif (tracers%data(tr_num)%AB_order==3) then
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO
 #else
-!ACC PARALLEL LOOP DEFAULT(PRESENT)
+!$ACC PARALLEL LOOP DEFAULT(PRESENT)
 #endif
        do n=1, partit%myDim_nod2d+partit%eDim_nod2D
           tracers%data(tr_num)%valuesold(2, :, n)=tracers%data(tr_num)%valuesold(1, :, n)
@@ -119,7 +119,7 @@ end do
 #ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
 #else
-!ACC END PARALLEL LOOP
+!$ACC END PARALLEL LOOP
 #endif
     end if
 

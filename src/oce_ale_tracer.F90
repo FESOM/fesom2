@@ -200,13 +200,15 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         ! do tracer AB (Adams-Bashfort) interpolation only for advectiv part
         ! needed
         if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[37m'//'         --> call init_tracers_AB'//achar(27)//'[0m'
+        ! values were last changed on the host (diffusion, surface fluxes); valuesold
+        ! and valuesAB stay on the device, where init_tracers_AB updates them.
+        !$ACC UPDATE DEVICE(tracers%data(tr_num)%values)
         call init_tracers_AB(tr_num, tracers, partit, mesh)
         if (conservation_freq > 0) call conservation_probe('start', 'a', tr_num, tracers, partit, mesh)
  
         ! advect tracers
         if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[37m'//'         --> call adv_tracers_ale'//achar(27)//'[0m'
 	!here update only those initialized in the init_tracers. (values, valuesAB, edge_up_dn_grad, ...)
-        !$ACC UPDATE DEVICE(tracers%data(tr_num)%values, tracers%data(tr_num)%valuesAB, tracers%data(tr_num)%valuesold)
         !$ACC  UPDATE DEVICE(tracers%work%edge_up_dn_grad) !!&
         ! it will update del_ttf with contributions from horizontal and vertical advection parts (del_ttf_advhoriz and del_ttf_advvert)
 	!$ACC wait(1)
