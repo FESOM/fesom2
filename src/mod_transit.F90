@@ -239,28 +239,21 @@ MODULE mod_transit
       real(kind=WP), intent(in) :: windstr_x, windstr_y
 
 !     Internal variables and parameters
-!     Zonal and meridional velocities at 10 m height
-      real(kind=WP) :: u_10, v_10
-!     Zonal and meridional friction velocities
-      real(kind=WP) :: u_fric, v_fric
-!     Zonal and meridional roughness lengths
-      real(kind=WP) :: l_rough_x, l_rough_y
+!     Friction velocity and roughness length
+      real(kind=WP) :: u_fric, l_rough
 !     Inverse von-Karman constant (0.4), Charnock constant (0.018) divided by g, inverse density of air (1.3), log(10)
       real(kind=WP), parameter :: inv_karm = 2.5, charn_g = 0.00173, inv_dens_air = 0.76923, log_10 = 2.30258
 
-!     Calculate friction velocities (Peixoto & Oort, 1992, Eq. (10.28))
-      u_fric = sqrt(abs(windstr_x) * inv_dens_air)
-      v_fric = sqrt(abs(windstr_y) * inv_dens_air)
+!     Calculate the friction velocity from the magnitude of the stress
+!     (Peixoto & Oort, 1992, Eq. (10.28)), so that the result does not
+!     depend on the direction of the stress relative to the grid
+      u_fric = sqrt(sqrt(windstr_x**2 + windstr_y**2) * inv_dens_air)
 
-!     Calculate roughness lengths (MPI report 349, 2003, Eq. (5.7), quoting Charnock, 1955)
-      l_rough_x = max((charn_g * u_fric**2), 1.5e-5)
-      l_rough_y = max((charn_g * v_fric**2), 1.5e-5)
+!     Calculate roughness length (MPI report 349, 2003, Eq. (5.7), quoting Charnock, 1955)
+      l_rough = max((charn_g * u_fric**2), 1.5e-5)
 
-!     Calculate wind speed at 10 m (Peixoto & Oort, 1992, Eq. (10.29))
-      u_10 = inv_karm * u_fric * (log_10 - log(l_rough_x))
-      v_10 = inv_karm * v_fric * (log_10 - log(l_rough_y))
-
-      speed_2 = u_10**2 + v_10**2
+!     Calculate squared wind speed at 10 m (Peixoto & Oort, 1992, Eq. (10.29))
+      speed_2 = (inv_karm * u_fric * (log_10 - log(l_rough)))**2
 
       return
     end function speed_2

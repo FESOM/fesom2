@@ -1126,6 +1126,9 @@ subroutine compute_dvd(mode, dynamics, tracers, partit, mesh)
     integer                                   :: tr_num, node, elem
     real(kind=WP),  dimension(:,:)  , pointer :: trflx_h, trflx_v, tr, trold, Wvel, dump, fer_Wvel
     real(kind=WP),  dimension(:,:,:), pointer :: UV, fer_UV
+    ! residual (resolved + bolus) velocities, so that the model velocities stay untouched
+    real(kind=WP),  dimension(:,:,:), allocatable, target :: UV_res
+    real(kind=WP),  dimension(:,:)  , allocatable, target :: Wvel_res
     if (firstcall) then  !allocate the stuff at the first call
         allocate(trstar(                mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D))
         allocate(dvd_KK_tot(            mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D, 2))
@@ -1181,20 +1184,34 @@ subroutine compute_dvd(mode, dynamics, tracers, partit, mesh)
     end if
     
     !___________________________________________________________________________
-    ! update 3D velocities with the bolus velocities:
+    ! advect with the residual velocities (resolved + bolus):
     ! 1. bolus velocities are computed according to GM implementation after R. Ferrari et al., 2010
-    ! 2. bolus velocities are used only for advecting tracers and shall be subtracted back afterwards
+    ! 2. the sum is built in local arrays, dynamics is intent(in) and the model
+    !    velocities must not be changed by a diagnostic
     if (Fer_GM) then
+        allocate(UV_res(size(UV,1), size(UV,2), size(UV,3)), Wvel_res(size(Wvel,1), size(Wvel,2)))
+!$OMP PARALLEL DO
+        do elem=1, size(UV,3)
+           UV_res(:, :, elem) = UV(:, :, elem)
+        end do
+!$OMP END PARALLEL DO
 !$OMP PARALLEL DO
         do elem=1, partit%myDim_elem2D+partit%eDim_elem2D
-           UV(:, :, elem) = UV(:, :, elem) + fer_UV(:, :, elem)
+           UV_res(:, :, elem) = UV(:, :, elem) + fer_UV(:, :, elem)
+        end do
+!$OMP END PARALLEL DO
+!$OMP PARALLEL DO
+        do node=1, size(Wvel,2)
+            Wvel_res(:, node) = Wvel(:, node)
         end do
 !$OMP END PARALLEL DO
 !$OMP PARALLEL DO
         do node=1, partit%myDim_nod2D+partit%eDim_nod2D
-            Wvel(:, node) = Wvel(:, node) + fer_Wvel(:, node)
+            Wvel_res(:, node) = Wvel(:, node) + fer_Wvel(:, node)
         end do
 !$OMP END PARALLEL DO
+        UV   => UV_res
+        Wvel => Wvel_res
     end if
     
     !___________________________________________________________________________
@@ -1242,12 +1259,18 @@ subroutine compute_dvd(mode, dynamics, tracers, partit, mesh)
         if (Redi) then
             call dvd_add_difflux_horexplredi( .false., tr_num, dvd_KK_tot, trold, Ki, slope_tapered, tr_z, dump, partit, mesh)
             call dvd_add_difflux_vertexplredi(.false., tr_num, dvd_KK_tot, trold, Ki, slope_tapered, tr_xy, partit, mesh)
-            call dvd_add_difflux_vertimplredi(.false., tr_num, dvd_KK_tot, tr, trold, Ki, slope_tapered, partit, mesh)
+            if (tracers%data(tr_num)%i_vert_diff) then
+                call dvd_add_difflux_vertimplredi(.false., tr_num, dvd_KK_tot, tr, trold, Ki, slope_tapered, partit, mesh)
+            end if
         end if     
         
-        call dvd_add_difflux_vertimpl(.false., tr_num, dvd_KK_tot, tr, trold, Kv, partit, mesh)
+        ! the implicit vertical diffusion only acts with i_vert_diff; without it
+        ! dvd_add_difflux_vertexpl above already contains the surface fluxes
+        if (tracers%data(tr_num)%i_vert_diff) then
+            call dvd_add_difflux_vertimpl(.false., tr_num, dvd_KK_tot, tr, trold, Kv, partit, mesh)
         
-        call dvd_add_difflux_sbc(.false., tr_num, dvd_KK_tot, tr, trold, partit, mesh)
+            call dvd_add_difflux_sbc(.false., tr_num, dvd_KK_tot, tr, trold, partit, mesh)
+        end if
         
         ! add contribution from horizontal biharmonic diffusion flux if applied
         if (tracers%data(tr_num)%smooth_bh_tra) then
@@ -1288,10 +1311,14 @@ subroutine compute_dvd(mode, dynamics, tracers, partit, mesh)
         if (Redi) then
             call dvd_add_difflux_horexplredi( .true., tr_num, dvd_SD_chi_dif_heR, trstar, Ki, slope_tapered, tr_z, dump, partit, mesh)
             call dvd_add_difflux_vertexplredi(.true., tr_num, dvd_SD_chi_dif_veR, trstar, Ki, slope_tapered, tr_xy, partit, mesh)
-            call dvd_add_difflux_vertimplredi(.true., tr_num, dvd_SD_chi_dif_viR, tr, trstar, Ki, slope_tapered, partit, mesh)
+            if (tracers%data(tr_num)%i_vert_diff) then
+                call dvd_add_difflux_vertimplredi(.true., tr_num, dvd_SD_chi_dif_viR, tr, trstar, Ki, slope_tapered, partit, mesh)
+            end if
         end if     
         
-        call dvd_add_difflux_vertimpl(.true., tr_num, dvd_SD_chi_dif_vi, tr, trstar, Kv, partit, mesh)
+        if (tracers%data(tr_num)%i_vert_diff) then
+            call dvd_add_difflux_vertimpl(.true., tr_num, dvd_SD_chi_dif_vi, tr, trstar, Kv, partit, mesh)
+        end if
         
         call dvd_add_difflux_sbc(.true., tr_num, dvd_SD_chi_dif_sbc, tr, trstar, partit, mesh)
         
@@ -1323,19 +1350,7 @@ subroutine compute_dvd(mode, dynamics, tracers, partit, mesh)
     end do !--> do tr_num=1,2 
     
     !___________________________________________________________________________
-    ! subtract the the bolus velocities back from 3D velocities:
-    if (Fer_GM) then
-!$OMP PARALLEL DO
-        do elem=1, partit%myDim_elem2D+partit%eDim_elem2D
-           UV(:, :, elem) = UV(:, :, elem) - fer_UV(:, :, elem)
-        end do
-!$OMP END PARALLEL DO
-!$OMP PARALLEL DO
-        do node=1, partit%myDim_nod2D+partit%eDim_nod2D
-           Wvel(:, node) = Wvel(:, node) - fer_Wvel(:, node)
-        end do
-!$OMP END PARALLEL DO
-    end if
+    ! the residual velocities are local and are released on return
     
 end subroutine compute_dvd
 !
