@@ -28,7 +28,7 @@ module oce_ale_module
     use oce_fer_gm_module, only: fer_solve_Gamma, fer_gamma2vel, init_Redi_GM
     use oce_mle_module, only: mle_add_gamma
     use oce_ale_ssh_splitexpl_subcycl_module, only: impl_vert_visc_ale_vtransp
-    use oce_dyn_module, only: update_vel, viscosity_filter, check_viscopt, compute_ke_wrho, compute_apegen, compute_PePm
+    use oce_dyn_module, only: update_vel, viscosity_filter, check_viscopt, compute_ke_wrho, compute_apegen, compute_PePm, mom_on_device
     use oce_ale_pressure_bv_module, only: sw_alpha_beta, compute_sigma_xy, compute_neutral_slope
     use par_support_module, only: status_check
 #if defined (__cvmix)
@@ -2827,6 +2827,12 @@ subroutine impl_vert_visc_ale(dynamics, partit, mesh)
     UV     =>dynamics%uv(:,:,:)
     UV_rhs =>dynamics%uv_rhs(:,:,:)
     Wvel_i =>dynamics%w_i(:,:)
+#ifdef ENABLE_OPENACC
+    if (mom_on_device) then
+        call impl_vert_visc_ale_acc(dynamics, partit, mesh)
+        return
+    end if
+#endif
 
     !___________________________________________________________________________
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(a, b, c, ur, vr, cp, up, vp, elem, nz, nzmin, nzmax, elnodes, &
@@ -3010,6 +3016,149 @@ subroutine impl_vert_visc_ale(dynamics, partit, mesh)
 !$OMP END DO
 !$OMP END PARALLEL
 end subroutine impl_vert_visc_ale
+#ifdef ENABLE_OPENACC
+!
+!
+!_______________________________________________________________________________
+! impl_vert_visc_ale on the device: one water column per thread, same arithmetic as the host version,
+! column work arrays of fixed size visc_nl_max.
+subroutine impl_vert_visc_ale_acc(dynamics, partit, mesh)
+    IMPLICIT NONE
+    type(t_dyn)   , intent(inout), target :: dynamics
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(inout), target :: mesh
+    !___________________________________________________________________________
+    integer, parameter         ::  visc_nl_max = 128
+    real(kind=WP)              ::  a(visc_nl_max), b(visc_nl_max), c(visc_nl_max), ur(visc_nl_max), vr(visc_nl_max)
+    real(kind=WP)              ::  cp(visc_nl_max), up(visc_nl_max), vp(visc_nl_max)
+    real(kind=WP)              ::  zbar_n(visc_nl_max), Z_n(visc_nl_max)
+    integer                    ::  nz, elem, nzmin, nzmax, n1, n2, n3
+    real(kind=WP)              ::  zinv, m, friction, wu, wd
+    logical                    ::  constant_drag
+    !___________________________________________________________________________
+    real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
+    real(kind=WP), dimension(:,:)  , pointer :: Wvel_i
+    UV     =>dynamics%uv(:,:,:)
+    UV_rhs =>dynamics%uv_rhs(:,:,:)
+    Wvel_i =>dynamics%w_i(:,:)
+
+    if (mesh%nl > visc_nl_max) then
+        if (partit%mype==0) write(*,*) 'impl_vert_visc_ale_acc: mesh%nl =', mesh%nl, ' > visc_nl_max =', visc_nl_max
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+    end if
+    ! toy configurations with a linear bottom drag
+    constant_drag = toy_ocean .and. ((TRIM(which_toy)=="dbgyre") .or. (TRIM(which_toy)=="neverworld2") &
+                                     .or. (TRIM(which_toy)=="soufflet"))
+    ! computed on the host in this step (mixing, forcing) or last updated on the device
+    ! in the tracer part of the previous step
+    !$ACC UPDATE DEVICE(Av, stress_surf, mesh%helem, dynamics%w_i)
+
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(a, b, c, ur, vr, cp, up, vp, zbar_n, Z_n, &
+!$ACC                                                    nz, nzmin, nzmax, n1, n2, n3, zinv, m, friction, wu, wd)
+    DO elem=1,partit%myDim_elem2D
+        n1 = mesh%elem2D_nodes(1,elem)
+        n2 = mesh%elem2D_nodes(2,elem)
+        n3 = mesh%elem2D_nodes(3,elem)
+        nzmin = mesh%ulevels(elem)
+        nzmax = mesh%nlevels(elem)
+        do nz=1, mesh%nl
+            zbar_n(nz)=0.0_WP
+        end do
+        do nz=1, mesh%nl-1
+            Z_n(nz)=0.0_WP
+        end do
+        zbar_n(nzmax)=mesh%zbar_e_bot(elem)
+        Z_n(nzmax-1)=zbar_n(nzmax) + mesh%helem(nzmax-1,elem)/2.0_WP
+        do nz=nzmax-1,nzmin+1,-1
+            zbar_n(nz) = zbar_n(nz+1) + mesh%helem(nz,elem)
+            Z_n(nz-1) = zbar_n(nz) + mesh%helem(nz-1,elem)/2.0_WP
+        end do
+        zbar_n(nzmin) = zbar_n(nzmin+1) + mesh%helem(nzmin,elem)
+
+        ! operator, regular part
+        do nz=nzmin+1, nzmax-2
+            zinv=1.0_WP*dt/(zbar_n(nz)-zbar_n(nz+1))
+            a(nz)=-Av(nz,elem)/(Z_n(nz-1)-Z_n(nz))*zinv
+            c(nz)=-Av(nz+1,elem)/(Z_n(nz)-Z_n(nz+1))*zinv
+            b(nz)=-a(nz)-c(nz)+1.0_WP
+            wu=(Wvel_i(nz,  n1)+Wvel_i(nz,  n2)+Wvel_i(nz,  n3))/3._WP
+            wd=(Wvel_i(nz+1,n1)+Wvel_i(nz+1,n2)+Wvel_i(nz+1,n3))/3._WP
+            a(nz)=a(nz)+min(0._WP, wu)*zinv
+            b(nz)=b(nz)+max(0._WP, wu)*zinv
+            b(nz)=b(nz)-min(0._WP, wd)*zinv
+            c(nz)=c(nz)-max(0._WP, wd)*zinv
+        end do
+        ! the last row
+        zinv=1.0_WP*dt/(zbar_n(nzmax-1)-zbar_n(nzmax))
+        a(nzmax-1)=-Av(nzmax-1,elem)/(Z_n(nzmax-2)-Z_n(nzmax-1))*zinv
+        b(nzmax-1)=-a(nzmax-1)+1.0_WP
+        c(nzmax-1)=0.0_WP
+        wu=(Wvel_i(nzmax-1,n1)+Wvel_i(nzmax-1,n2)+Wvel_i(nzmax-1,n3))/3._WP
+        a(nzmax-1)=a(nzmax-1)+min(0._WP, wu)*zinv
+        b(nzmax-1)=b(nzmax-1)+max(0._WP, wu)*zinv
+        ! the first row
+        zinv=1.0_WP*dt/(zbar_n(nzmin)-zbar_n(nzmin+1))
+        c(nzmin)=-Av(nzmin+1,elem)/(Z_n(nzmin)-Z_n(nzmin+1))*zinv
+        a(nzmin)=0.0_WP
+        b(nzmin)=-c(nzmin)+1.0_WP
+        wu=(Wvel_i(nzmin,  n1)+Wvel_i(nzmin,  n2)+Wvel_i(nzmin,  n3))/3._WP
+        wd=(Wvel_i(nzmin+1,n1)+Wvel_i(nzmin+1,n2)+Wvel_i(nzmin+1,n3))/3._WP
+        b(nzmin)=b(nzmin)+wu*zinv
+        b(nzmin)=b(nzmin)-min(0._WP, wd)*zinv
+        c(nzmin)=c(nzmin)-max(0._WP, wd)*zinv
+
+        ! rhs, surface forcing in the first row
+        do nz=nzmin, nzmax-1
+            ur(nz)=UV_rhs(1,nz,elem)
+            vr(nz)=UV_rhs(2,nz,elem)
+        end do
+        ur(nzmin)= ur(nzmin)+zinv*stress_surf(1,elem)/density_0
+        vr(nzmin)= vr(nzmin)+zinv*stress_surf(2,elem)/density_0
+
+        ! bottom friction in the last row
+        zinv=1.0_WP*dt/(zbar_n(nzmax-1)-zbar_n(nzmax))
+        if (constant_drag) then
+            friction=-C_d
+        else
+            friction=-C_d*sqrt(UV(1,nzmax-1,elem)**2+UV(2,nzmax-1,elem)**2)
+        end if
+        ur(nzmax-1)=ur(nzmax-1)+zinv*friction*UV(1,nzmax-1,elem)
+        vr(nzmax-1)=vr(nzmax-1)+zinv*friction*UV(2,nzmax-1,elem)
+
+        ! solve for the difference to time step n
+        do nz=nzmin+1, nzmax-2
+            ur(nz)=ur(nz)-a(nz)*UV(1,nz-1,elem)-(b(nz)-1.0_WP)*UV(1,nz,elem)-c(nz)*UV(1,nz+1,elem)
+            vr(nz)=vr(nz)-a(nz)*UV(2,nz-1,elem)-(b(nz)-1.0_WP)*UV(2,nz,elem)-c(nz)*UV(2,nz+1,elem)
+        end do
+        ur(nzmin)=ur(nzmin)-(b(nzmin)-1.0_WP)*UV(1,nzmin,elem)-c(nzmin)*UV(1,nzmin+1,elem)
+        vr(nzmin)=vr(nzmin)-(b(nzmin)-1.0_WP)*UV(2,nzmin,elem)-c(nzmin)*UV(2,nzmin+1,elem)
+        ur(nzmax-1)=ur(nzmax-1)-a(nzmax-1)*UV(1,nzmax-2,elem)-(b(nzmax-1)-1.0_WP)*UV(1,nzmax-1,elem)
+        vr(nzmax-1)=vr(nzmax-1)-a(nzmax-1)*UV(2,nzmax-2,elem)-(b(nzmax-1)-1.0_WP)*UV(2,nzmax-1,elem)
+
+        ! sweep
+        cp(nzmin) = c(nzmin)/b(nzmin)
+        up(nzmin) = ur(nzmin)/b(nzmin)
+        vp(nzmin) = vr(nzmin)/b(nzmin)
+        do nz = nzmin+1,nzmax-1
+            m = b(nz)-cp(nz-1)*a(nz)
+            cp(nz) = c(nz)/m
+            up(nz) = (ur(nz)-up(nz-1)*a(nz))/m
+            vp(nz) = (vr(nz)-vp(nz-1)*a(nz))/m
+        enddo
+        ur(nzmax-1) = up(nzmax-1)
+        vr(nzmax-1) = vp(nzmax-1)
+        do nz = nzmax-2, nzmin, -1
+            ur(nz) = up(nz)-cp(nz)*ur(nz+1)
+            vr(nz) = vp(nz)-cp(nz)*vr(nz+1)
+        end do
+        do nz=nzmin,nzmax-1
+            UV_rhs(1,nz,elem)=ur(nz)
+            UV_rhs(2,nz,elem)=vr(nz)
+        end do
+    end do
+!$ACC END PARALLEL LOOP
+end subroutine impl_vert_visc_ale_acc
+#endif
 !
 !
 !===============================================================================
@@ -3297,6 +3446,13 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
             call impl_vert_visc_ale_vtransp(dynamics, partit, mesh)
         end if 
     end if
+#ifdef ENABLE_OPENACC
+    ! UV_rhs stays on the device through the momentum rhs, the viscosity filter and the implicit
+    ! viscosity; update_vel and the SSH rhs read it on the host
+    if (mom_on_device) then
+        !$ACC UPDATE HOST(dynamics%uv_rhs)
+    end if
+#endif
     
     !___________________________________________________________________________
     if (dynamics%ldiag_ke) then

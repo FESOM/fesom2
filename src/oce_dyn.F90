@@ -214,9 +214,9 @@ subroutine viscosity_filter(option, dynamics, partit, mesh)
             call par_abort(partit%MPI_COMM_FESOM, partit%mype)
             stop
     END SELECT
-    ! the implicit vertical viscosity still runs on the host
-    if (mom_on_device .and. option==5) then
-        !$ACC UPDATE HOST(dynamics%uv_rhs)
+    ! UV_rhs stays on the device for the implicit vertical viscosity
+    if (mom_on_device .and. option/=5) then
+        !$ACC UPDATE DEVICE(dynamics%uv_rhs)
     end if
 end subroutine viscosity_filter  
 !
