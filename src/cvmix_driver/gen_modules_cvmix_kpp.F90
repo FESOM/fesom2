@@ -697,7 +697,7 @@ module g_cvmix_kpp
                         sfc_v    = 0.0_WP
                         htot     = 0.0_WP
                         do nztmp = nun, nzsfc
-                            delh     = min( max(0.0_WP,sldepth-htot), mesh%hnode(nztmp,node) )
+                            delh     = min( max(0.0_WP,sldepth-htot), real(mesh%hnode(nztmp,node), WP) )
                             htot     = htot+delh
                             sfc_temp = sfc_temp + temp(nztmp,node)*delh
                             sfc_salt = sfc_salt + salt(nztmp,node)*delh
@@ -727,7 +727,7 @@ module g_cvmix_kpp
                         sfc_v    = 0.0_WP
                         htot     = 0.0_WP
                         do nztmp = nun, nzsfc
-                            delh     = min( max(0.0_WP,sldepth-htot), mesh%hnode(nztmp,node) )
+                            delh     = min( max(0.0_WP,sldepth-htot), real(mesh%hnode(nztmp,node), WP) )
                             htot     = htot+delh
                             sfc_temp = sfc_temp + temp(nztmp,node)*delh
                             sfc_salt = sfc_salt + salt(nztmp,node)*delh

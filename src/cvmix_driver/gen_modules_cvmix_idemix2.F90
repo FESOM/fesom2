@@ -1444,7 +1444,7 @@ module g_cvmix_idemix2
             if ((idemix2_enable_M2) .and. (idemix2_enable_niw)) then 
                 call cvmix_idemix2_compute_vert_struct_fct(          &
                       nlev        = nln-uln+1                        & !IN:    number of active levels
-                    , dzw         = mesh%hnode(          uln:nln-1, node) & !IN:    layer thickness (m)
+                    , dzw         = real(mesh%hnode(uln:nln-1, node), WP) & !IN:    layer thickness (m)
                     , coriolis    = mesh%coriolis_node(        node) & !IN:    Coriolis parameter (1/s)
                     , cn          = cn                               & !IN:    first baroclinic mode speed (m/s)
                     , Nsqr        = bvfreq(           uln:nln, node) & !IN:    buoyancy frequency squared (1/s²)
@@ -1457,7 +1457,7 @@ module g_cvmix_idemix2
             else if (idemix2_enable_M2) then 
                 call cvmix_idemix2_compute_vert_struct_fct(          &
                       nlev        = nln-uln+1                        & !IN:    number of active levels
-                    , dzw         = mesh%hnode(          uln:nln-1, node) & !IN:    layer thickness (m)
+                    , dzw         = real(mesh%hnode(uln:nln-1, node), WP) & !IN:    layer thickness (m)
                     , coriolis    = mesh%coriolis_node(        node) & !IN:    Coriolis parameter (1/s)
                     , cn          = cn                               & !IN:    first baroclinic mode speed (m/s)
                     , Nsqr        = bvfreq(           uln:nln, node) & !IN:    buoyancy frequency squared (1/s²)
@@ -1468,7 +1468,7 @@ module g_cvmix_idemix2
             else if (idemix2_enable_niw) then 
                 call cvmix_idemix2_compute_vert_struct_fct(          &
                       nlev        = nln-uln+1                        & !IN:    number of active levels
-                    , dzw         = mesh%hnode(          uln:nln-1, node) & !IN:    layer thickness (m)
+                    , dzw         = real(mesh%hnode(uln:nln-1, node), WP) & !IN:    layer thickness (m)
                     , coriolis    = mesh%coriolis_node(        node) & !IN:    Coriolis parameter (1/s)
                     , cn          = cn                               & !IN:    first baroclinic mode speed (m/s)
                     , Nsqr        = bvfreq(           uln:nln, node) & !IN:    buoyancy frequency squared (1/s²)
@@ -1741,7 +1741,7 @@ module g_cvmix_idemix2
             if (idemix2_diag_Eiw .and. node <= partit%myDim_nod2D) then
                 call cvmix_idemix2_compute_vdiff_vdiss_Eiw(             &
                       nlev     = nln-uln+1                              & !IN:    number of active levels
-                    , dzw      = mesh%hnode(           uln:nln-1, node)      & !IN:    layer thickness (m)
+                    , dzw      = real(mesh%hnode(uln:nln-1, node), WP)      & !IN:    layer thickness (m)
                     , dt       = dt                                     & !IN:    time step (s)
                     , c0       = iwe2_c0(         uln:nln  , node)      & !IN:    first baroclinic mode speed (m/s)
                     , alpha_c  = iwe2_alpha_c(    uln:nln  , node)      & !IN:    wave-wave dissipation rate (1/s)
@@ -1759,7 +1759,7 @@ module g_cvmix_idemix2
             else
                 call cvmix_idemix2_compute_vdiff_vdiss_Eiw(             &
                       nlev     = nln-uln+1                              & !IN:    number of active levels
-                    , dzw      = mesh%hnode(           uln:nln-1, node)      & !IN:    layer thickness (m)
+                    , dzw      = real(mesh%hnode(uln:nln-1, node), WP)      & !IN:    layer thickness (m)
                     , dt       = dt                                     & !IN:    time step (s)
                     , c0       = iwe2_c0(         uln:nln  , node)      & !IN:    first baroclinic mode speed (m/s)
                     , alpha_c  = iwe2_alpha_c(    uln:nln  , node)      & !IN:    wave-wave dissipation rate (1/s)
@@ -1856,7 +1856,7 @@ module g_cvmix_idemix2
                         call cvmix_idemix2_compute_Eiw_waveinteract(                  &
                               nlev          = nln-uln+1                               & !IN:    number of active levels
                             , nfbin         = idemix2_nfbin                           & !IN:    number of spectral angular bins
-                            , dzw           = mesh%hnode(                uln:nln-1, node)  & !IN:    layer thickness (m)
+                            , dzw           = real(mesh%hnode(uln:nln-1, node), WP)  & !IN:    layer thickness (m)
                             , dphi          = iwe2_dphit                              & !IN:    angular bin widths
                             , dt            = dt                                      & !IN:    time step (s)
                             , flag_posdef   = .True.                                  & !IN:    enforce positive-definiteness
@@ -1881,7 +1881,7 @@ module g_cvmix_idemix2
                         call cvmix_idemix2_compute_Eiw_waveinteract(                  &
                               nlev          = nln-uln+1                               & !IN:    number of active levels
                             , nfbin         = idemix2_nfbin                           & !IN:    number of spectral angular bins
-                            , dzw           = mesh%hnode(                uln:nln-1, node)  & !IN:    layer thickness (m)
+                            , dzw           = real(mesh%hnode(uln:nln-1, node), WP)  & !IN:    layer thickness (m)
                             , dphi          = iwe2_dphit                              & !IN:    angular bin widths
                             , dt            = dt                                      & !IN:    time step (s)
                             , flag_posdef   = .True.                                  & !IN:    enforce positive-definiteness
@@ -1904,7 +1904,7 @@ module g_cvmix_idemix2
                         call cvmix_idemix2_compute_Eiw_waveinteract(                  &
                               nlev          = nln-uln+1                               & !IN:    number of active levels
                             , nfbin         = idemix2_nfbin                           & !IN:    number of spectral angular bins
-                            , dzw           = mesh%hnode(                uln:nln-1, node)  & !IN:    layer thickness (m)
+                            , dzw           = real(mesh%hnode(uln:nln-1, node), WP)  & !IN:    layer thickness (m)
                             , dphi          = iwe2_dphit                              & !IN:    angular bin widths
                             , dt            = dt                                      & !IN:    time step (s)
                             , flag_posdef   = .True.                                  & !IN:    enforce positive-definiteness
@@ -1924,7 +1924,7 @@ module g_cvmix_idemix2
                         call cvmix_idemix2_compute_Eiw_waveinteract(                  &
                               nlev          = nln-uln+1                               & !IN:    number of active levels
                             , nfbin         = idemix2_nfbin                           & !IN:    number of spectral angular bins
-                            , dzw           = mesh%hnode(                uln:nln-1, node)  & !IN:    layer thickness (m)
+                            , dzw           = real(mesh%hnode(uln:nln-1, node), WP)  & !IN:    layer thickness (m)
                             , dphi          = iwe2_dphit                              & !IN:    angular bin widths
                             , dt            = dt                                      & !IN:    time step (s)
                             , flag_posdef   = .True.                                  & !IN:    enforce positive-definiteness
@@ -1942,7 +1942,7 @@ module g_cvmix_idemix2
                         call cvmix_idemix2_compute_Eiw_waveinteract(                  &
                               nlev          = nln-uln+1                               & !IN:    number of active levels
                             , nfbin         = idemix2_nfbin                           & !IN:    number of spectral angular bins
-                            , dzw           = mesh%hnode(                uln:nln-1, node)  & !IN:    layer thickness (m)
+                            , dzw           = real(mesh%hnode(uln:nln-1, node), WP)  & !IN:    layer thickness (m)
                             , dphi          = iwe2_dphit                              & !IN:    angular bin widths
                             , dt            = dt                                      & !IN:    time step (s)
                             , flag_posdef   = .True.                                  & !IN:    enforce positive-definiteness
@@ -1959,7 +1959,7 @@ module g_cvmix_idemix2
                         call cvmix_idemix2_compute_Eiw_waveinteract(                  &
                               nlev          = nln-uln+1                               & !IN:    number of active levels
                             , nfbin         = idemix2_nfbin                           & !IN:    number of spectral angular bins
-                            , dzw           = mesh%hnode(                uln:nln-1, node)  & !IN:    layer thickness (m)
+                            , dzw           = real(mesh%hnode(uln:nln-1, node), WP)  & !IN:    layer thickness (m)
                             , dphi          = iwe2_dphit                              & !IN:    angular bin widths
                             , dt            = dt                                      & !IN:    time step (s)
                             , flag_posdef   = .True.                                  & !IN:    enforce positive-definiteness

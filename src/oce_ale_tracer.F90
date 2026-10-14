@@ -106,7 +106,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UV, fer_UV
     real(kind=WP), dimension(:,:)  , pointer :: Wvel, Wvel_e, Wvel_i, fer_Wvel
-    real(kind=WP), dimension(:,:)  , pointer :: del_ttf
+    real(kind=WP_full), dimension(:,:)  , pointer :: del_ttf
     UV     => dynamics%uv(:,:,:)
     Wvel   => dynamics%w(:,:)
     Wvel_e => dynamics%w_e(:,:)
@@ -465,7 +465,9 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
 #endif
     !___________________________________________________________________________
     ! pointer on necessary derived types
-    real(kind=WP), pointer                :: del_ttf(:,:)
+    real(kind=WP_full), pointer                :: del_ttf(:,:)
+    real(kind=WP_full)                         :: acc
+    real(kind=WP)                             :: tnew
 
     del_ttf => tracers%work%del_ttf
 #if defined(__recom)
@@ -644,14 +646,24 @@ endif
     !___________________________________________________________________________
     ! Update tracers --> calculate T* see Danilov et al. (2017)
     ! T* =  (dt*R_T^n + h^(n-0.5)*T^(n-0.5))/h^(n+0.5)
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nzmin, nzmax)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax, acc, tnew)
     do n=1, partit%myDim_nod2D
         nzmax=mesh%nlevels_nod2D(n)-1
         nzmin=mesh%ulevels_nod2D(n)
+        if (use_tracer_carry) then
+            do nz=nzmin, nzmax
+                acc  = tracers%data(tr_num)%values(nz,n)*real(mesh%hnode(nz,n), WP_full) + del_ttf(nz,n) + tracers%work%carry(nz,n,tr_num)
+                tnew = real(acc/mesh%hnode_new(nz,n), WP)
+                tracers%work%carry(nz,n,tr_num) = real(acc - tnew*real(mesh%hnode_new(nz,n), WP_full), WP)
+                del_ttf(nz,n) = del_ttf(nz,n) + tracers%data(tr_num)%values(nz,n)*real(mesh%hnode(nz,n)-mesh%hnode_new(nz,n), WP_full)
+                tracers%data(tr_num)%values(nz,n) = tnew
+            end do
+        else
         del_ttf(nzmin:nzmax,n)=del_ttf(nzmin:nzmax,n)+tracers%data(tr_num)%values(nzmin:nzmax,n)* &
                                     (mesh%hnode(nzmin:nzmax,n)-mesh%hnode_new(nzmin:nzmax,n))
         tracers%data(tr_num)%values(nzmin:nzmax,n)=tracers%data(tr_num)%values(nzmin:nzmax,n)+ &
                                     del_ttf(nzmin:nzmax,n)/mesh%hnode_new(nzmin:nzmax,n)
+        end if
         ! WHY NOT ??? --> whats advantage of above --> tested it --> the upper
         ! equation has a 30% smaller nummerical drift
         ! tr_arr(1:nzmax,n,tr_num)=(hnode(1:nzmax,n)*tr_arr(1:nzmax,n,tr_num)+ &
@@ -724,7 +736,7 @@ endif
 contains
 
 subroutine backup_ttf_rhs(del_ttf, ttf_rhs_bak, ulevels_nod2D, nlevels_nod2D, myDim_nod2D, eDim_nod2D)
-    real(kind=WP), intent(in)    :: del_ttf(:,:)
+    real(kind=WP_full), intent(in)    :: del_ttf(:,:)
     real(kind=WP), intent(inout) :: ttf_rhs_bak(:,:)
     integer      , intent(in)    :: ulevels_nod2D(:)
     integer      , intent(in)    :: nlevels_nod2D(:)
@@ -743,9 +755,9 @@ subroutine backup_ttf_rhs(del_ttf, ttf_rhs_bak, ulevels_nod2D, nlevels_nod2D, my
 end subroutine backup_ttf_rhs
 
 subroutine store_diag_component(del_ttf, ttf_rhs_bak, hnode_new, ulevels_nod2D, nlevels_nod2D, myDim_nod2D, eDim_nod2D, target_field)
-    real(kind=WP), intent(in)    :: del_ttf(:,:)
+    real(kind=WP_full), intent(in)    :: del_ttf(:,:)
     real(kind=WP), intent(in)    :: ttf_rhs_bak(:,:)
-    real(kind=WP), intent(in)    :: hnode_new(:,:)
+    real(kind=WP_full), intent(in)  :: hnode_new(:,:)
     integer      , intent(in)    :: ulevels_nod2D(:)
     integer      , intent(in)    :: nlevels_nod2D(:)
     integer      , intent(in)    :: myDim_nod2D
@@ -781,7 +793,7 @@ subroutine diff_ver_part_expl_ale(tr_num, tracers, partit, mesh)
     real(kind=WP)            :: zinv1
     !___________________________________________________________________________
     ! pointer on necessary derived types
-    real(kind=WP), pointer   :: del_ttf(:,:)
+    real(kind=WP_full), pointer   :: del_ttf(:,:)
     del_ttf => tracers%work%del_ttf
 
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nl1, ul1, vd_flux, rdata, flux, rlx, zinv1)
@@ -837,14 +849,16 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     type(t_ice)   , intent(in)   , target :: ice
 
     !___________________________________________________________________________
-    real(kind=WP)            :: a(mesh%nl), b(mesh%nl), c(mesh%nl), tr(mesh%nl)
-    real(kind=WP)            :: cp(mesh%nl), tp(mesh%nl)
+    real(kind=WP_full)        :: a(mesh%nl), b(mesh%nl), c(mesh%nl), tr(mesh%nl)
+    real(kind=WP_full)        :: cp(mesh%nl), tp(mesh%nl)
     integer                  :: nz, n, nzmax, nzmin
-    real(kind=WP)            :: m, zinv, dz
-    real(kind=WP)            :: rsss, Ty, Ty1, c1, zinv1, zinv2, v_adv
-    real(kind=WP)            :: isredi=0._WP
+    real(kind=WP_full)        :: m, zinv, dz
+    real(kind=WP_full)        :: rsss, Ty, Ty1, c1, zinv1, zinv2, v_adv
+    real(kind=WP_full)        :: isredi=0._WP_full
     logical                  :: do_wimpl=.true.
-    real(kind=WP)            :: zbar_n(mesh%nl), z_n(mesh%nl-1)
+    real(kind=WP_full)        :: zbar_n(mesh%nl), z_n(mesh%nl-1)
+    real(kind=WP_full)        :: acc
+    real(kind=WP)            :: tnew
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:,:), pointer :: trarr
@@ -966,7 +980,7 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     ! loop over local nodes
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, nzmax, nzmin, a, b, c, tr, cp, tp, m, zinv, dz, &
-!$OMP                                         rsss, Ty, Ty1, c1, zinv1, zinv2, v_adv, zbar_n, z_n)
+!$OMP                                         rsss, Ty, Ty1, c1, zinv1, zinv2, v_adv, zbar_n, z_n, acc, tnew)
 !$OMP DO
     do n=1,partit%myDim_nod2D
         ! initialise
@@ -1324,10 +1338,20 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
         !_______________________________________________________________________
         ! update tracer
         ! tr ... dTnew = T^(n+0.5) - T*
+        if (use_tracer_carry) then
+            do nz=nzmin,nzmax-1
+                acc  = trarr(nz,n) + tr(nz)
+                tnew = real(acc, WP)
+                tracers%work%carry(nz,n,tr_num) = tracers%work%carry(nz,n,tr_num) &
+                                                + real((acc - tnew)*mesh%hnode_new(nz,n), WP)
+                trarr(nz,n) = tnew
+            end do
+        else
         do nz=nzmin,nzmax-1
             ! trarr - before ... T*
             trarr(nz,n)=trarr(nz,n)+tr(nz)
         end do
+        end if
 
     end do ! --> do n=1,myDim_nod2D
 !$OMP END DO
@@ -1349,7 +1373,7 @@ subroutine diff_ver_part_redi_expl(tracers, partit, mesh)
     real(kind=WP)            :: zbar_n(mesh%nl), z_n(mesh%nl-1)
     !___________________________________________________________________________
     ! pointer on necessary derived types
-    real(kind=WP), pointer   :: del_ttf(:,:)
+    real(kind=WP_full), pointer   :: del_ttf(:,:)
     del_ttf => tracers%work%del_ttf
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, k, elem, nz, n2, nl1, ul1, nl2, Tx, Ty, vd_flux, zbar_n, z_n)
@@ -1426,7 +1450,7 @@ subroutine diff_part_hor_redi(tracers, partit, mesh)
     real(kind=WP)            :: isredi=0._WP
     !___________________________________________________________________________
     ! pointer on necessary derived types
-    real(kind=WP), pointer   :: del_ttf(:,:)
+    real(kind=WP_full), pointer   :: del_ttf(:,:)
     del_ttf => tracers%work%del_ttf
     if (.not. allocated(tracers%work%edge_flux)) allocate(tracers%work%edge_flux(mesh%nl-1, partit%myDim_edge2D))
     edge_flux => tracers%work%edge_flux
@@ -1591,6 +1615,7 @@ SUBROUTINE diff_part_bh(tr_num, dynamics, tracers, partit, mesh)
     integer                                  :: elnodes1(3), elnodes2(3)
     real(kind=WP)                            :: u1, v1, len, vi, ww, tt(mesh%nl-1)
     real(kind=WP), pointer                   :: temporary_ttf(:,:)
+    real(kind=WP), allocatable, target, save :: bh_ws(:,:)
     real(kind=WP), pointer                   :: edge_flux(:,:)
     real(kind=WP), pointer                   :: UV(:,:,:)
     real(kind=WP), pointer                   :: ttf(:,:)
@@ -1598,7 +1623,8 @@ SUBROUTINE diff_part_bh(tr_num, dynamics, tracers, partit, mesh)
 
     UV            => dynamics%uv(:,:,:)
     ttf           => tracers%data(tr_num)%values
-    temporary_ttf => tracers%work%del_ttf !use already allocated working array. could be fct_LO instead etc.
+    if (.not. allocated(bh_ws)) allocate(bh_ws(size(tracers%work%del_ttf,1), size(tracers%work%del_ttf,2)))
+    temporary_ttf => bh_ws
     if (.not. allocated(tracers%work%edge_flux)) allocate(tracers%work%edge_flux(mesh%nl-1, partit%myDim_edge2D))
     edge_flux => tracers%work%edge_flux
 

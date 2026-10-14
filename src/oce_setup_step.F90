@@ -474,9 +474,13 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
     end do
     allocate(tracers%work%del_ttf(mesh%nl-1,node_size))
     allocate(tracers%work%del_ttf_advhoriz(mesh%nl-1,node_size),tracers%work%del_ttf_advvert(mesh%nl-1,node_size))
-    tracers%work%del_ttf          = 0.0_WP
-    tracers%work%del_ttf_advhoriz = 0.0_WP
-    tracers%work%del_ttf_advvert  = 0.0_WP
+    tracers%work%del_ttf          = 0.0_WP_full
+    tracers%work%del_ttf_advhoriz = 0.0_WP_full
+    tracers%work%del_ttf_advvert  = 0.0_WP_full
+    if (use_tracer_carry) then
+        allocate(tracers%work%carry(mesh%nl-1,node_size,tracers%num_tracers))
+        tracers%work%carry = 0.0_WP
+    end if
     if (ldiag_DVD) then
         allocate(tracers%work%dvd_trflx_hor(mesh%nl-1, partit%myDim_edge2D, 2))
         allocate(tracers%work%dvd_trflx_ver(mesh%nl  , partit%myDim_nod2D , 2))

@@ -2058,9 +2058,17 @@ CASE ('pgf_y     ')
 !___________________________________________________________________________________________________________________________________
 ! ALE layer thickness 
 CASE ('hnode     ')    
+#if defined(USE_SINGLE_PRECISION)
+    call def_stream((/mesh%nl-1, mesh%nod2D/) , (/mesh%nl-1, partit%myDim_nod2D/) , 'hnode'    , 'vertice layer thickness'  , 'm', mesh%hnode_wp(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+#else
     call def_stream((/mesh%nl-1, mesh%nod2D/) , (/mesh%nl-1, partit%myDim_nod2D/) , 'hnode'    , 'vertice layer thickness'  , 'm', mesh%hnode(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+#endif
 CASE ('hnode_new  ')
+#if defined(USE_SINGLE_PRECISION)
+    call def_stream((/mesh%nl-1, mesh%nod2D/),  (/mesh%nl-1, partit%myDim_nod2D/) , 'hnode_new', 'hnode_new'                , 'm', mesh%hnode_new_wp(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)    
+#else
     call def_stream((/mesh%nl-1, mesh%nod2D/),  (/mesh%nl-1, partit%myDim_nod2D/) , 'hnode_new', 'hnode_new'                , 'm', mesh%hnode_new(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)    
+#endif
 CASE ('helem     ')    
     call def_stream((/mesh%nl-1, mesh%elem2D/), (/mesh%nl-1, partit%myDim_elem2D/), 'helem'    , 'elemental layer thickness', 'm', mesh%helem(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     

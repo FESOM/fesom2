@@ -47,6 +47,7 @@ MODULE io_BLOWUP
 	! id will keep the IDs of all required dimentions and variables
 	type(nc_file), save       :: bid
 	integer,       save       :: globalstep=0
+	real(kind=WP), allocatable, target, save :: hnode_bu(:,:)   ! WP copy of mesh%hnode (kind WP_full)
 	real(kind=WP)             :: ctime !current time in seconds from the beginning of the year
 	
 	PRIVATE
@@ -120,7 +121,8 @@ MODULE io_BLOWUP
 		end if 
 		
 		!___Define the netCDF variables for 3D fields_______________________________
-		call def_variable(bid, 'hnode'		, (/mesh%nl-1,  mesh%nod2D/)	, 'ALE stuff', '?', mesh%hnode);
+		hnode_bu = real(mesh%hnode, WP)
+		call def_variable(bid, 'hnode'		, (/mesh%nl-1,  mesh%nod2D/)	, 'ALE stuff', '?', hnode_bu);
 		call def_variable(bid, 'helem'		, (/mesh%nl-1, mesh%elem2D/)	, 'Element layer thickness', 'm/s', mesh%helem(:,:));
 		call def_variable(bid, 'u'			, (/mesh%nl-1, mesh%elem2D/)	, 'zonal velocity', 'm/s', dynamics%uv(1,:,:));
 		call def_variable(bid, 'v'			, (/mesh%nl-1, mesh%elem2D/)	, 'meridional velocity', 'm/s', dynamics%uv(2,:,:));
