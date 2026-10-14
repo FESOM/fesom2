@@ -68,6 +68,8 @@ module oce_ale_tracer_module
     logical :: impl_on_device = .false.
     ! device copy of T (1) and S (2) equal to the host copy at the end of diff_tracers_ale
     logical :: tr_dev_current(2) = .false.
+    ! device-only advecting velocity UV + bolus velocity (GM on the device)
+    real(kind=WP), allocatable, target :: uv_tr(:,:,:)
     ! column work arrays of diff_ver_part_impl_ale have this fixed size: as private arrays of
     ! run-time size they would come from the per-thread device heap
     integer, parameter :: impl_nl_max = 128
@@ -130,10 +132,11 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     ! pointer on necessary derived types
     logical :: gm_on_device = .false.
     integer :: nlu, nlw
-    real(kind=WP), dimension(:,:,:), pointer :: UV, fer_UV
+    real(kind=WP), dimension(:,:,:), pointer :: UV, fer_UV, UVadv
     real(kind=WP), dimension(:,:)  , pointer :: Wvel, Wvel_e, Wvel_i, fer_Wvel
     real(kind=WP_full), dimension(:,:)  , pointer :: del_ttf
     UV     => dynamics%uv(:,:,:)
+    UVadv  => UV
     Wvel   => dynamics%w(:,:)
     Wvel_e => dynamics%w_e(:,:)
     Wvel_i => dynamics%w_i(:,:)
@@ -203,19 +206,23 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         end if
 #ifdef ENABLE_OPENACC
         if (gm_on_device) then
-            ! the bolus velocity is added to the device copy of UV for the tracer step
-            ! (not removed again): the next step uploads UV from the host
-            uv_dev_current = .false.
+            ! the advecting velocity UV + bolus velocity goes to a device-only array, so
+            ! UV itself stays unchanged on the device (no upload in the next step)
             nlu = size(UV,2)
             nlw = size(Wvel,1)
+            if (.not. allocated(uv_tr)) then
+                allocate(uv_tr(2, nlu, partit%myDim_elem2D+partit%eDim_elem2D))
+                !$ACC ENTER DATA CREATE(uv_tr)
+            end if
             !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(nz)
             do elem=1, partit%myDim_elem2D+partit%eDim_elem2D
                 do nz=1, nlu
-                    UV(1, nz, elem)=UV(1, nz, elem) + fer_UV(1, nz, elem)
-                    UV(2, nz, elem)=UV(2, nz, elem) + fer_UV(2, nz, elem)
+                    uv_tr(1, nz, elem)=UV(1, nz, elem) + fer_UV(1, nz, elem)
+                    uv_tr(2, nz, elem)=UV(2, nz, elem) + fer_UV(2, nz, elem)
                 end do
             end do
             !$ACC END PARALLEL LOOP
+            UVadv => uv_tr
             !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(nz)
             do node=1, partit%myDim_nod2D+partit%eDim_nod2D
                 do nz=1, nlw
@@ -319,7 +326,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 #if defined (FESOM_PROFILING)
         call fesom_profiler_start("tr_adv")
 #endif
-        call do_oce_adv_tra(dt, UV, Wvel, Wvel_i, Wvel_e, tr_num, dynamics, tracers, partit, mesh)
+        call do_oce_adv_tra(dt, UVadv, Wvel, Wvel_i, Wvel_e, tr_num, dynamics, tracers, partit, mesh)
 #if defined (FESOM_PROFILING)
         call fesom_profiler_end("tr_adv")
 #endif
