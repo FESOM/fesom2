@@ -3189,16 +3189,19 @@ subroutine compute_sigma_xy_acc(TF1, SF1, partit, mesh)
         !$ACC ENTER DATA CREATE(sigma_xy)
         data_created = .true.
     end if
-!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(tx, ty, sx, sy, vol, nz, el, k, nln, uln, nle, ule, e1, e2, e3)
+    ! one gang per node, the levels over the vector lanes (coalesced column access)
+!$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) PRIVATE(nln, uln) VECTOR_LENGTH(32)
     DO n=1, partit%myDim_nod2D
         nln = mesh%nlevels_nod2D(n)-1
         uln = mesh%ulevels_nod2D(n)
+!$ACC LOOP VECTOR PRIVATE(tx, ty, sx, sy, vol, el, k, nle, ule, e1, e2, e3)
         DO nz=uln, nln
             vol = 0.0_WP
             tx  = 0.0_WP
             ty  = 0.0_WP
             sx  = 0.0_WP
             sy  = 0.0_WP
+!$ACC LOOP SEQ
             DO k=1, mesh%nod_in_elem2D_num(n)
                 el  = mesh%nod_in_elem2D(k, n)
                 nle = mesh%nlevels(el)-1

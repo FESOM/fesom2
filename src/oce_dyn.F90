@@ -394,8 +394,9 @@ SUBROUTINE visc_filt_bcksct_acc(dynamics, partit, mesh)
     easybsreturn = dynamics%visc_easybsreturn
     nl1          = size(U_b, 1)
 
-!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(nz)
+!$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(32)
     DO elem=1, partit%myDim_elem2D+partit%eDim_elem2D
+!$ACC LOOP VECTOR
         DO nz=1, nl1
             U_b(nz, elem) = 0.0_WP
             V_b(nz, elem) = 0.0_WP
@@ -408,7 +409,8 @@ SUBROUTINE visc_filt_bcksct_acc(dynamics, partit, mesh)
     !___________________________________________________________________________
     ! each owned element gathers the contributions of its three edges in ascending
     ! edge order, as on the host
-!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(e1, e2, e3, q, ed, el1, el2, len, nzmin, nzmax, nz, u1, v1, vi)
+    ! one gang per element, the levels over the vector lanes; each level adds its three edges in edge order
+!$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) PRIVATE(e1, e2, e3, q) VECTOR_LENGTH(32)
     DO elem=1, partit%myDim_elem2D
         e1=mesh%elem_edges(1,elem)
         e2=mesh%elem_edges(2,elem)
@@ -416,17 +418,20 @@ SUBROUTINE visc_filt_bcksct_acc(dynamics, partit, mesh)
         if (e1>e2) then; q=e1; e1=e2; e2=q; end if
         if (e2>e3) then; q=e2; e2=e3; e3=q; end if
         if (e1>e2) then; q=e1; e1=e2; e2=q; end if
-        DO q=1,3
-            if (q==1) ed=e1
-            if (q==2) ed=e2
-            if (q==3) ed=e3
-            if(partit%myList_edge2D(ed)>mesh%edge2D_in) cycle
-            el1=mesh%edge_tri(1,ed)
-            el2=mesh%edge_tri(2,ed)
-            len=sqrt(mesh%elem_area(el1)+mesh%elem_area(el2))
-            nzmax = min(mesh%nlevels(el1), mesh%nlevels(el2))
-            nzmin = max(mesh%ulevels(el1), mesh%ulevels(el2))
-            DO  nz=nzmin,nzmax-1
+!$ACC LOOP VECTOR PRIVATE(q, ed, el1, el2, len, nzmin, nzmax, u1, v1, vi)
+        DO nz=1, nl1
+!$ACC LOOP SEQ
+            DO q=1,3
+                if (q==1) ed=e1
+                if (q==2) ed=e2
+                if (q==3) ed=e3
+                if(partit%myList_edge2D(ed)>mesh%edge2D_in) cycle
+                el1=mesh%edge_tri(1,ed)
+                el2=mesh%edge_tri(2,ed)
+                nzmax = min(mesh%nlevels(el1), mesh%nlevels(el2))
+                nzmin = max(mesh%ulevels(el1), mesh%ulevels(el2))
+                if (nz<nzmin .or. nz>nzmax-1) cycle
+                len=sqrt(mesh%elem_area(el1)+mesh%elem_area(el2))
                 u1=UV(1,nz,el1)-UV(1,nz,el2)
                 v1=UV(2,nz,el1)-UV(2,nz,el2)
                 vi=dt*max(gamma0, max(gamma1*sqrt(u1*u1+v1*v1), gamma2*(u1*u1+v1*v1)))*len
@@ -446,14 +451,16 @@ SUBROUTINE visc_filt_bcksct_acc(dynamics, partit, mesh)
 
     !___________________________________________________________________________
     ! smooth from elements to nodes
-!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(nzmin, nzmax, nz, k, elem, vi, u1, v1)
+!$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) PRIVATE(nzmin, nzmax) VECTOR_LENGTH(32)
     DO ed=1, partit%myDim_nod2D
         nzmin = mesh%ulevels_nod2D(ed)
         nzmax = mesh%nlevels_nod2D(ed)
+!$ACC LOOP VECTOR PRIVATE(k, elem, vi, u1, v1)
         DO nz=nzmin, nzmax-1
             vi=0.0_WP
             u1=0.0_WP
             v1=0.0_WP
+!$ACC LOOP SEQ
             DO k=1, mesh%nod_in_elem2D_num(ed)
                 elem=mesh%nod_in_elem2D(k,ed)
                 vi=vi+mesh%elem_area(elem)
@@ -469,13 +476,14 @@ SUBROUTINE visc_filt_bcksct_acc(dynamics, partit, mesh)
 
     !___________________________________________________________________________
     ! back to elements: unsmoothed term minus the backscatter part of the smoothed one
-!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(nzmin, nzmax, nz, e1, e2, e3)
+!$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) PRIVATE(nzmin, nzmax, e1, e2, e3) VECTOR_LENGTH(32)
     DO ed=1, partit%myDim_elem2D
         e1 = mesh%elem2D_nodes(1,ed)
         e2 = mesh%elem2D_nodes(2,ed)
         e3 = mesh%elem2D_nodes(3,ed)
         nzmin = mesh%ulevels(ed)
         nzmax = mesh%nlevels(ed)
+!$ACC LOOP VECTOR
         DO nz=nzmin, nzmax-1
             UV_rhs(1,nz,ed)=UV_rhs(1,nz,ed)+U_b(nz,ed) -easybsreturn*(U_c(nz,e1)+U_c(nz,e2)+U_c(nz,e3))/3.0_WP
             UV_rhs(2,nz,ed)=UV_rhs(2,nz,ed)+V_b(nz,ed) -easybsreturn*(V_c(nz,e1)+V_c(nz,e2)+V_c(nz,e3))/3.0_WP
