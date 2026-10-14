@@ -4,7 +4,7 @@ module oce_ale_vel_rhs_module
     USE MOD_PARTIT
     use par_support_module, only: par_abort
     USE MOD_MESH
-    USE o_ARRAYS, only: ssh_gp, pgf_x, pgf_y, pgf_on_device, geom_on_device, uv_dev_current
+    USE o_ARRAYS, only: ssh_gp, pgf_x, pgf_y, pgf_on_device, geom_on_device, uv_dev_current, vv_on_device
     USE o_PARAM
     USE g_CONFIG
     USE g_forcing_param, only: use_virt_salt
@@ -92,8 +92,12 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
     mom_on_device = .not. (dynamics%ldiag_ke .or. dynamics%use_ssh_se_subcycl .or. use_pice>0 &
                            .or. l_mslp .or. use_global_tides .or. dynamics%momadv_opt/=2)
     if (mom_on_device) then
-        ! computed on the host earlier in the step (velocity update, pressure, ALE)
-        !$ACC UPDATE DEVICE(eta_n, dynamics%w_e)
+        ! computed on the host earlier in the step (velocity update, pressure, ALE);
+        ! w_e is current on the device after vert_vel_ale_acc of the previous step
+        !$ACC UPDATE DEVICE(eta_n)
+        if (.not. vv_on_device) then
+            !$ACC UPDATE DEVICE(dynamics%w_e)
+        end if
         if (.not. uv_dev_current) then
             !$ACC UPDATE DEVICE(UV)
         end if
