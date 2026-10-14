@@ -317,7 +317,8 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
     !___________________________________________________________________________
     ! define tracer namelist parameter
     integer        :: num_tracers
-    logical        :: i_vert_diff, smooth_bh_tra , ltra_diag
+    logical        :: i_vert_diff, smooth_bh_tra
+    logical        :: ltra_diag = .false. ! not set in the shipped namelist.tra; was read uninitialised
     real(kind=WP)  :: gamma0_tra, gamma1_tra, gamma2_tra
     integer        :: AB_order = 2
     namelist /tracer_listsize/ num_tracers
