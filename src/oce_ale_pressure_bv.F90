@@ -7,7 +7,7 @@ module oce_ale_pressure_bv_module
     use par_support_module, only: par_abort
     USE o_ARRAYS
     USE g_support
-    USE o_mixing_KPP_mod, only: dbsfc
+    USE o_mixing_KPP_mod, only: dbsfc, kpp_on_device
     USE diagnostics, only: ldiag_dMOC, dmoc_is_due, ldiag_diapmix, sw_alpha_diap, sw_beta_diap
     USE g_comm_auto
     USE Toy_Neverworld2, only: thermal_alpha, do_cabbeling, cabbeling_Cb, do_thermobar, &
@@ -3302,10 +3302,14 @@ subroutine compute_neutral_slope_acc(partit, mesh)
 !$ACC END PARALLEL LOOP
     call exchange_nod(neutral_slope, partit, luse_g2g=.true.)
     call exchange_nod(slope_tapered, partit, luse_g2g=.true.)
-    ! host copies of the results
-    !$ACC UPDATE HOST(sw_alpha, sw_beta, sigma_xy, neutral_slope, slope_tapered)
-    if (taper_k) then
-        !$ACC UPDATE HOST(fer_tapfac)
+    ! the surface expansion coefficients are read on the host every step; the 3-D fields only by host
+    ! versions of KPP and GM/Redi, the toy configurations and output streams
+    !$ACC UPDATE HOST(sw_alpha(1,:), sw_beta(1,:))
+    if (slope_out_needed .or. toy_ocean .or. use_mle .or. .not. (kpp_on_device .and. redi_on_device)) then
+        !$ACC UPDATE HOST(sw_alpha, sw_beta, sigma_xy, neutral_slope, slope_tapered)
+        if (taper_k) then
+            !$ACC UPDATE HOST(fer_tapfac)
+        end if
     end if
 end subroutine compute_neutral_slope_acc
 #endif

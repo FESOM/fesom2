@@ -2382,6 +2382,13 @@ CASE DEFAULT
     if (partit%mype==0) write(*,*) 'stream ', io_list(i)%id, ' is not defined !'
 END SELECT ! --> SELECT CASE (trim(io_list(i)%id))
 END DO ! --> DO i=1, io_listsize
+    ! OpenACC: these fields are computed on the device and copied back only when needed
+    do i=1, io_listsize
+        select case (trim(io_list(i)%id))
+        case ('sigma_x', 'sigma_y', 'slope_x', 'slope_y', 'slope_z', 'slopetap_x', 'slopetap_y', 'slopetap_z', 'fer_tapfac')
+            slope_out_needed = .true.
+        end select
+    end do
 
     if (lnextGEMS) then        
         call def_stream((/nlev_upper,   mesh%nod2D/),  (/nlev_upper,   partit%myDim_nod2D/),  'temp_upper',  'temperature', 'C',         tracers%data(1)%values(:nlev_upper,:),  3, 'h', 4, partit, mesh)

@@ -351,6 +351,8 @@ logical                                     :: ts_on_device = .false.
 ! OpenACC: the layer geometry (hnode, hnode_new, helem, zbar_3d_n, Z_3d_n) on the device is
 ! current (zstar thickness update on the device); its uploads are skipped
 logical                                     :: geom_on_device = .false.
+! an output stream reads sigma_xy, neutral_slope, slope_tapered or fer_tapfac on the host
+logical                                     :: slope_out_needed = .false.
 
 !_______________________________________________________________________________
 !!PS ! dummy arrays
