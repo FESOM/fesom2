@@ -975,7 +975,7 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     Ty1   =0.0_WP
     if (mesh%nl > impl_nl_max) then
         if (partit%mype==0) write(*,*) 'diff_ver_part_impl_ale: mesh%nl =', mesh%nl, ' > impl_nl_max =', impl_nl_max
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     end if
     tr_id        = tracers%data(tr_num)%ID
     sw_dbgyre    = use_sw_pene .and. tr_id==1 .and. toy_ocean .and. TRIM(which_toy)=="dbgyre"
