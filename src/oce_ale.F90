@@ -3044,7 +3044,7 @@ subroutine impl_vert_visc_ale_acc(dynamics, partit, mesh)
 
     if (mesh%nl > visc_nl_max) then
         if (partit%mype==0) write(*,*) 'impl_vert_visc_ale_acc: mesh%nl =', mesh%nl, ' > visc_nl_max =', visc_nl_max
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     end if
     ! toy configurations with a linear bottom drag
     constant_drag = toy_ocean .and. ((TRIM(which_toy)=="dbgyre") .or. (TRIM(which_toy)=="neverworld2") &

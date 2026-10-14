@@ -399,7 +399,7 @@ subroutine momentum_adv_scalar(dynamics, partit, mesh)
     ! 1st. compute vertical momentum advection component: w * du/dz, w*dv/dz
     if (mesh%nl > mom_nl_max) then
         if (partit%mype==0) write(*,*) 'momentum_adv_scalar: mesh%nl =', mesh%nl, ' > mom_nl_max =', mom_nl_max
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     end if
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, el1, el2, nl1, nl2, ul1, ul2, nod, el, ed, k, nle, ule, un1, un2, wu, wv)
