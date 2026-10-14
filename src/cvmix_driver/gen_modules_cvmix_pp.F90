@@ -77,12 +77,8 @@ module g_cvmix_pp
         logical                          :: nmlfile_exist=.False.
         integer                          :: node_size
         integer fileunit
-#include "../associate_part_def.h"
-#include "../associate_mesh_def.h"
-#include "../associate_part_ass.h"
-#include "../associate_mesh_ass.h"
         !_______________________________________________________________________
-        if(mype==0) then
+        if(partit%mype==0) then
             write(*,*) '____________________________________________________________'
             write(*,*) ' --> initialise CVMIX_PP'
             write(*,*)
@@ -90,12 +86,12 @@ module g_cvmix_pp
         
         !_______________________________________________________________________
         ! allocate + initialse all pp arrays
-        node_size=myDim_nod2D+eDim_nod2D
-        allocate(pp_Av(nl,node_size),pp_Kv(nl,node_size))
+        node_size=partit%myDim_nod2D+partit%eDim_nod2D
+        allocate(pp_Av(mesh%nl,node_size),pp_Kv(mesh%nl,node_size))
         pp_Av         = 0.0_WP
         pp_Kv         = 0.0_WP
         
-        allocate(pp_richardnmb(nl,node_size))
+        allocate(pp_richardnmb(mesh%nl,node_size))
         pp_richardnmb = 0.0_WP
         allocate(pp_monob_mixl(node_size))
         pp_monob_mixl = 0.0_WP
@@ -122,7 +118,7 @@ module g_cvmix_pp
         
         !_______________________________________________________________________
         ! write info to log file 
-        if (mype==0) then
+        if (partit%mype==0) then
             write(*,*) "     pp_Av0             = ", pp_Av0
             write(*,*) "     pp_alpha           = ", pp_alpha
             write(*,*) "     pp_exp             = ", pp_exp
@@ -178,24 +174,20 @@ module g_cvmix_pp
         ! double-precision (cvmix_r8) buffers for the CVMix call boundary
         real(cvmix_r8) :: av_r8(mesh%nl), kv_r8(mesh%nl), rich_r8(mesh%nl)
         real(kind=WP), dimension(:,:,:), pointer :: UVnode
-#include "../associate_part_def.h"
-#include "../associate_mesh_def.h"
-#include "../associate_part_ass.h"
-#include "../associate_mesh_ass.h"
         UVnode=>dynamics%uvnode(:,:,:)
-        node_size = myDim_nod2D
+        node_size = partit%myDim_nod2D
         !_______________________________________________________________________
         do node = 1,node_size
             !___________________________________________________________________
             ! number of above bottom levels at node
-            nln = nlevels_nod2D(node)-1
-            nun = ulevels_nod2D(node)
+            nln = mesh%nlevels_nod2D(node)-1
+            nun = mesh%ulevels_nod2D(node)
             
             !___________________________________________________________________
             ! calculate Richardson number
             !!PS do nz=2,nln
             do nz=nun+1,nln
-                dz2     = (Z_3d_n( nz-1,node)-Z_3d_n( nz,node))**2
+                dz2     = (mesh%Z_3d_n( nz-1,node)-mesh%Z_3d_n( nz,node))**2
                 vshear2 = (UVnode(1,nz-1,node)-UVnode(1,nz,node))**2 +&
                           (UVnode(2,nz-1,node)-UVnode(2,nz,node))**2 
                 vshear2 = vshear2/dz2
@@ -223,7 +215,7 @@ module g_cvmix_pp
                                     Tdiff_out = kv_r8,                  &
                                     RICH      = rich_r8,               &
                                     nlev      = nln,                   &
-                                    max_nlev  = nl-1)
+                                    max_nlev  = mesh%nl-1)
             pp_Av(:,node) = real(av_r8, WP)
             pp_Kv(:,node) = real(kv_r8, WP)
             
@@ -247,10 +239,10 @@ module g_cvmix_pp
             ! diffusivity of Q. Wang from FESOM1.4
             if (pp_use_fesompp .and. pp_use_nonconstKvb) then   
                 !!PS do nz = 2,nlevels_nod2D(node)-1
-                do nz = nun+1,nlevels_nod2D(node)-1
+                do nz = nun+1,mesh%nlevels_nod2D(node)-1
                     call Kv0_background_qiang(Kvb,                       &
-                                                geo_coord_nod2D(2,node)/rad, &
-                                                abs(zbar_3d_n(nz,node))      &
+                                                mesh%geo_coord_nod2D(2,node)/rad, &
+                                                abs(mesh%zbar_3d_n(nz,node))      &
                                                 )
                     pp_Kv(nz,node) = pp_Kv(nz,node) + Kvb
                 end do
@@ -277,10 +269,10 @@ module g_cvmix_pp
         ! defined on elements --> interpolate therefor from nodes to elements
         call exchange_nod(pp_Av, partit)
         Av = 0.0_WP
-        do elem=1, myDim_elem2D
-            elnodes=elem2D_nodes(:,elem)
+        do elem=1, partit%myDim_elem2D
+            elnodes=mesh%elem2D_nodes(:,elem)
             !!PS do nz=2,nlevels(elem)-1
-            do nz=ulevels(elem)+1,nlevels(elem)-1
+            do nz=mesh%ulevels(elem)+1,mesh%nlevels(elem)-1
                 Av(nz,elem) = sum(pp_Av(nz,elnodes))/3.0_WP    ! (elementwise)                
             end do
         end do

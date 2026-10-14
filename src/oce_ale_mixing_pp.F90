@@ -29,23 +29,19 @@ type(t_dyn), intent(inout), target :: dynamics
 real(kind=WP)                    :: dz_inv, bv, shear, a, rho_up, rho_dn, t, s, Kv0_b
 integer                          :: node, nz, nzmax, nzmin, elem, elnodes(3), i
 real(kind=WP), dimension(:,:,:), pointer :: UVnode
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 UVnode=>dynamics%uvnode(:,:,:)
 
 
     !___________________________________________________________________________
-    do node=1, myDim_nod2D+eDim_nod2D
-        nzmin = ulevels_nod2d(node)
-        nzmax = nlevels_nod2d(node)
+    do node=1, partit%myDim_nod2D+partit%eDim_nod2D
+        nzmin = mesh%ulevels_nod2d(node)
+        nzmax = mesh%nlevels_nod2d(node)
         
         !_______________________________________________________________________
         ! implement changing ALE zlevel at every node in PP mxing 
         !!PS do nz=2,nlevels_nod2d(node)-1
         do nz=nzmin+1,nzmax-1
-            dz_inv=1.0_WP/(Z_3d_n(nz-1,node)-Z_3d_n(nz,node))
+            dz_inv=1.0_WP/(mesh%Z_3d_n(nz-1,node)-mesh%Z_3d_n(nz,node))
             shear = (UVnode(1,nz-1,node)-UVnode(1,nz,node))**2 +&
                     (UVnode(2,nz-1,node)-UVnode(2,nz,node))**2 
             shear = shear*dz_inv*dz_inv
@@ -55,10 +51,10 @@ UVnode=>dynamics%uvnode(:,:,:)
     
     !_______________________________________________________________________
     ! viscosity
-    DO elem=1, myDim_elem2D
-        elnodes=elem2D_nodes(:,elem)
-        nzmin = ulevels(elem)
-        nzmax = nlevels(elem)
+    DO elem=1, partit%myDim_elem2D
+        elnodes=mesh%elem2D_nodes(:,elem)
+        nzmin = mesh%ulevels(elem)
+        nzmax = mesh%nlevels(elem)
         !!PS DO nz=2,nlevels(elem)-1
         DO nz=nzmin+1,nzmax-1
             Av(nz,elem)= mix_coeff_PP*sum(Kv(nz,elnodes)**2)/3.0_WP+A_ver
@@ -67,9 +63,9 @@ UVnode=>dynamics%uvnode(:,:,:)
     
     !_______________________________________________________________________
     ! diffusivity
-    do node=1,myDim_nod2D+eDim_nod2D
-        nzmin = ulevels_nod2D(node)
-        nzmax = nlevels_nod2D(node)
+    do node=1,partit%myDim_nod2D+partit%eDim_nod2D
+        nzmin = mesh%ulevels_nod2D(node)
+        nzmax = mesh%nlevels_nod2D(node)
         !___________________________________________________________________
         ! set constant background diffusivity with namelist value K_ver
         if(Kv0_const) then
@@ -83,7 +79,7 @@ UVnode=>dynamics%uvnode(:,:,:)
         else
             !!PS do nz=2,nlevels_nod2d(node)-1
             do nz=nzmin+1,nzmax-1 
-                call Kv0_background_qiang(Kv0_b,geo_coord_nod2D(2,node)/rad,abs(zbar_3d_n(nz,node)))
+                call Kv0_background_qiang(Kv0_b,mesh%geo_coord_nod2D(2,node)/rad,abs(mesh%zbar_3d_n(nz,node)))
                 Kv(nz,node) = mix_coeff_PP*Kv(nz,node)**3+Kv0_b
             end do
         end if

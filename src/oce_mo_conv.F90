@@ -18,10 +18,6 @@ subroutine mo_convect(ice, partit, mesh)
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: u_ice, v_ice, a_ice
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h" 
     u_ice => ice%uice(:)
     v_ice => ice%vice(:)
     a_ice => ice%data(1)%values(:)
@@ -32,13 +28,13 @@ subroutine mo_convect(ice, partit, mesh)
     ! Computes the mixing length derived from the Monin
     if (use_momix) then
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax)
-        do node=1, myDim_nod2D+eDim_nod2D
+        do node=1, partit%myDim_nod2D+partit%eDim_nod2D
             mo(:, node) = 0._WP
-            nzmax = nlevels_nod2d(node)
-            nzmin = ulevels_nod2d(node)
+            nzmax = mesh%nlevels_nod2d(node)
+            nzmin = mesh%ulevels_nod2d(node)
             !___________________________________________________________________
             ! apply Monin Obukov only below certain latitude momix_lat
-            if (geo_coord_nod2D(2,node)>momix_lat*rad) cycle
+            if (mesh%geo_coord_nod2D(2,node)>momix_lat*rad) cycle
             
             ! apply Monin Obukov only when there is no cavity
             if (nzmin>1) cycle
@@ -60,7 +56,7 @@ subroutine mo_convect(ice, partit, mesh)
             ! very strong vertical mixing within mixlength
             !!PS do nz = 2,nlevels_nod2d(node)-1
             do nz = nzmin+1,nzmax-1
-                if(abs(zbar_3d_n(nz,node)) <= mixlength(node)) then
+                if(abs(mesh%zbar_3d_n(nz,node)) <= mixlength(node)) then
                     ! write in vertice array to also apply to viscosity
                     mo(nz,node)=momix_kv    ! Potentialy bad place 
                     
@@ -75,9 +71,9 @@ subroutine mo_convect(ice, partit, mesh)
     !___________________________________________________________________________
     ! apply mixing enhancements to vertical diffusivity
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax)
-    do node=1, myDim_nod2D+eDim_nod2D
-        nzmax = nlevels_nod2d(node)
-        nzmin = ulevels_nod2d(node)
+    do node=1, partit%myDim_nod2D+partit%eDim_nod2D
+        nzmax = mesh%nlevels_nod2d(node)
+        nzmin = mesh%ulevels_nod2d(node)
         !!PS do nz=2, nlevels_nod2d(node)-1
         do nz=nzmin+1, nzmax-1
             ! force on convection if unstable 
@@ -96,10 +92,10 @@ subroutine mo_convect(ice, partit, mesh)
     ! apply mixing enhancements to vertical viscosity
     ! elem2D_nodes has no dimension until +eDim_elem2D
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, elnodes, nz, nzmin, nzmax)
-    do elem=1, myDim_elem2D
-        elnodes=elem2D_nodes(:,elem)
-        nzmax = nlevels(elem)
-        nzmin = ulevels(elem)
+    do elem=1, partit%myDim_elem2D
+        elnodes=mesh%elem2D_nodes(:,elem)
+        nzmax = mesh%nlevels(elem)
+        nzmin = mesh%ulevels(elem)
         !!PS do nz=2,nlevels(elem)-1
         do nz=nzmin+1,nzmax-1
             
@@ -110,7 +106,7 @@ subroutine mo_convect(ice, partit, mesh)
             ! if cavity dont apply any monin obukov or wind mixing 
             if (nzmin>1) cycle
                 ! apply monin-obukov mixing to viscosity
-                if (use_momix .and. sum(geo_coord_nod2D(2,elnodes))/3.0<=momix_lat*rad) Av(nz,elem)=Av(nz,elem)+sum(mo(nz,elnodes))/3.0_WP
+                if (use_momix .and. sum(mesh%geo_coord_nod2D(2,elnodes))/3.0<=momix_lat*rad) Av(nz,elem)=Av(nz,elem)+sum(mo(nz,elnodes))/3.0_WP
                 
                 ! force enhanced wind mixing --> from original fesom1.4 pp mixing
                 if (use_windmix .and. nz<=windmix_nl+1) Av(nz,elem)=max(Av(nz,elem), windmix_kv)

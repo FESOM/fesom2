@@ -217,10 +217,6 @@ MODULE Toy_Neverworld2
         ! do_Tseasonal recompute, so it must survive past this subroutine's return.
         real(kind=WP)                         :: ynorm, t_base, cold_weight   ! used by trelax_opt=2
         real(kind=WP), allocatable            :: lat_tau(:), val_tau(:)
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
         ! default values
         stress_surf   = 0.0_WP !make sure how it works (y-component is 0)
@@ -232,11 +228,11 @@ MODULE Toy_Neverworld2
         ! the temperature profile below, but anchored at 35 psu at depth rather than
         ! decaying toward the unphysical zero-salinity limit -- see do_Sstrat.
         if (do_Sstrat) then
-            do node = 1, myDim_nod2D+eDim_nod2D
-                nzmin = ulevels_nod2D(node)
-                nzmax = nlevels_nod2D(node)-1
+            do node = 1, partit%myDim_nod2D+partit%eDim_nod2D
+                nzmin = mesh%ulevels_nod2D(node)
+                nzmax = mesh%nlevels_nod2D(node)-1
                 do nz = nzmin, nzmax
-                    tracers%data(2)%values(nz,node) = 35.0_WP + Sstrat_amp*exp(-abs(Z(nz))/1000.0_WP)
+                    tracers%data(2)%values(nz,node) = 35.0_WP + Sstrat_amp*exp(-abs(mesh%Z(nz))/1000.0_WP)
                 end do
             end do
         else
@@ -247,8 +243,8 @@ MODULE Toy_Neverworld2
         
         !___________________________________________________________________________
         ! determine latitudinal domain size from mesh
-        loc_Ly=omp_min_max_sum1(geo_coord_nod2D(2,:), 1, myDim_nod2D, 'max', partit)
-        call MPI_AllREDUCE(loc_Ly, Ly, 1, MPI_WP, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+        loc_Ly=omp_min_max_sum1(mesh%geo_coord_nod2D(2,:), 1, partit%myDim_nod2D, 'max', partit)
+        call MPI_AllREDUCE(loc_Ly, Ly, 1, MPI_WP, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
         
         !___________________________________________________________________________
         ! Do windprofile input (momentum flux):
@@ -273,9 +269,9 @@ MODULE Toy_Neverworld2
                 dlat_tau = (lat_tau(2)-lat_tau(1))
                 
                 ! linear interpolate windstress profile data to our elem locations
-                do elem=1, myDim_elem2D
-                    elnodes = elem2d_nodes(:,elem)
-                    lat     = sum(geo_coord_nod2D(2,elnodes))/3.0_WP
+                do elem=1, partit%myDim_elem2D
+                    elnodes = mesh%elem2d_nodes(:,elem)
+                    lat     = sum(mesh%geo_coord_nod2D(2,elnodes))/3.0_WP
                     lat     = lat*180/pi    ! We return to degrees
                     idx     = int((lat+lat_tau(1))/dlat_tau)+1
                     stress_surf(1,elem) = val_tau(idx) + (val_tau(idx+1)-val_tau(idx))* (lat-lat_tau(idx))/dlat_tau
@@ -298,10 +294,10 @@ MODULE Toy_Neverworld2
 
             ! Option (2) read already to elements interpoalted windprofile file
             elseif (wind_opt == 2) then
-                allocate(val_tau(elem2d))
+                allocate(val_tau(mesh%elem2d))
                 open(20, file=trim(meshpath)//'windstress@elem.out', status='old')
                 read(20, *) val_tau
-                stress_surf(1,:)=val_tau(myList_elem2D(1:myDim_elem2D))
+                stress_surf(1,:)=val_tau(partit%myList_elem2D(1:partit%myDim_elem2D))
                 deallocate(val_tau)
 
             else
@@ -317,11 +313,11 @@ MODULE Toy_Neverworld2
         
         !___________________________________________________________________________
         !  Initial temperature stratification
-        do node = 1, myDim_nod2D+eDim_nod2D
-            nzmin = ulevels_nod2D(node)
-            nzmax = nlevels_nod2D(node)-1
+        do node = 1, partit%myDim_nod2D+partit%eDim_nod2D
+            nzmin = mesh%ulevels_nod2D(node)
+            nzmax = mesh%nlevels_nod2D(node)-1
             do nz = nzmin, nzmax
-                tracers%data(1)%values(nz,node) = 28.0 * exp(-abs(Z(nz))/1000.0)
+                tracers%data(1)%values(nz,node) = 28.0 * exp(-abs(mesh%Z(nz))/1000.0)
             end do
         end do
         ! In order to be consistent with Neverworld2, we need to take a linear equation 
@@ -340,8 +336,8 @@ MODULE Toy_Neverworld2
             select case(trelax_opt)
             case(1)
                 ! original: symmetric cosine target, ~18-28C, lat in degrees
-                do node = 1, myDim_nod2D+eDim_nod2D
-                    lat          = geo_coord_nod2D(2,node)/rad
+                do node = 1, partit%myDim_nod2D+partit%eDim_nod2D
+                    lat          = mesh%geo_coord_nod2D(2,node)/rad
                     Tsurf(node) = 18.0+10.0*cos(pi*lat/Ly)
                 end do
             case(2)
@@ -350,8 +346,8 @@ MODULE Toy_Neverworld2
                 ! cold patch(es) that pull the target down to north_pole_target /
                 ! south_pole_target near the northern (ynorm=lat/Ly -> 1) and/or
                 ! southern (ynorm -> -1) edge, independently switchable.
-                do node = 1, myDim_nod2D+eDim_nod2D
-                    lat   = geo_coord_nod2D(2,node)
+                do node = 1, partit%myDim_nod2D+partit%eDim_nod2D
+                    lat   = mesh%geo_coord_nod2D(2,node)
                     ynorm = lat/Ly
                     t_base = 5.0_WP + (equator_target-5.0_WP)*cos(0.5_WP*pi*lat/Ly)
                     if (do_north_cold_patch .and. ynorm>0.0_WP) then
@@ -378,8 +374,8 @@ MODULE Toy_Neverworld2
         ! declaration above for the full rationale. Actual restoring flux is applied
         ! every timestep by relax_2_ssurf(), not here.
         if (do_Srelax) then
-            do node = 1, myDim_nod2D+eDim_nod2D
-                lat = geo_coord_nod2D(2,node)
+            do node = 1, partit%myDim_nod2D+partit%eDim_nod2D
+                lat = mesh%geo_coord_nod2D(2,node)
                 if (lat>=0.0_WP) then
                     Ssurf(node) = s_north + (s_equator-s_north)*cos(0.5_WP*pi*lat/Ly)
                 else
@@ -391,12 +387,12 @@ MODULE Toy_Neverworld2
         !___________________________________________________________________________
         ! Temperature perturbation to trigger instabilities
         if (do_Tpert) then
-            do node = 1, myDim_nod2D+eDim_nod2D
+            do node = 1, partit%myDim_nod2D+partit%eDim_nod2D
                 ! inject surface perturbations (in the upper two layers) in the 
                 ! middle of the ocean @[30°E, -50°S] in a
                 ! distance radius of 5deg around tha point
-                lat=geo_coord_nod2D(2,node)+50.0*rad
-                lon=geo_coord_nod2D(1,node)-30.0*rad
+                lat=mesh%geo_coord_nod2D(2,node)+50.0*rad
+                lon=mesh%geo_coord_nod2D(1,node)-30.0*rad
                 lat=sqrt(lat*lat+lon*lon)
                 if (lat<=5*rad) then
                     tracers%data(1)%values(1:2,node)=tracers%data(1)%values(1:2,node)+0.5*cos(pi*lat/2.0/5.0/rad)
@@ -421,15 +417,11 @@ MODULE Toy_Neverworld2
         real(kind=WP)                               :: lat, ynorm, t_base, cold_weight  ! used by do_Tseasonal
         real(kind=WP)                               :: frac_year, d_dino, seasonal_phase
         real(kind=WP)                               :: north_pole_target_now, south_pole_target_now
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
         if (do_Trelax) then
             select case(trelax_opt)
             case(1)
                 ! original: nudge the tracer directly towards Tsurf
-                do node=1, myDim_nod2D
+                do node=1, partit%myDim_nod2D
                     tdata%values(1,node)  = tdata%values(1,node)+dt*tau_inv*(Tsurf(node)-tdata%values(1,node))
                 end do
             case(2)
@@ -459,8 +451,8 @@ MODULE Toy_Neverworld2
                     north_pole_target_now = north_pole_target
                     south_pole_target_now = south_pole_target
                 end if
-                do node = 1, myDim_nod2D+eDim_nod2D
-                    lat   = geo_coord_nod2D(2,node)
+                do node = 1, partit%myDim_nod2D+partit%eDim_nod2D
+                    lat   = mesh%geo_coord_nod2D(2,node)
                     ynorm = lat/Ly
                     t_base = 5.0_WP + (equator_target-5.0_WP)*cos(0.5_WP*pi*lat/Ly)
                     if (do_north_cold_patch .and. ynorm>0.0_WP) then
@@ -474,7 +466,7 @@ MODULE Toy_Neverworld2
                     end if
                 end do
                 heat_flux = 0.0_WP
-                do node=1, myDim_nod2D
+                do node=1, partit%myDim_nod2D
                     t_surface = tdata%values(1,node)
                     t_target  = Tsurf(node)
                     heat_flux(node) = gamma_restore*(t_surface-t_target)
@@ -509,22 +501,18 @@ MODULE Toy_Neverworld2
         type(t_tracer_data), intent(inout), target  :: tdata
         integer                                     :: node
         real(kind=WP)                               :: net
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
         if (do_Srelax) then
             ! Apply salinity restoring as a flux into relax_salt, mirroring FESOM2's
             ! generic SSS-relaxation mechanism (ice_oce_coupling.F90:504) including its
             ! domain-mean subtraction (enforces zero net domain-integrated salt input at
             ! every timestep) -- per Kamm et al. 2025 Appendix B, this is exactly what
             ! makes DINO's own two-phase E-P-climatology spin-up trick unnecessary here.
-            do node = 1, myDim_nod2D+eDim_nod2D
+            do node = 1, partit%myDim_nod2D+partit%eDim_nod2D
                 relax_salt(node) = surf_relax_S*(Ssurf(node)-tdata%values(1,node))
             end do
             call integrate_nod(relax_salt, net, partit, mesh)
-            net = net/ocean_area
-            do node = 1, myDim_nod2D+eDim_nod2D
+            net = net/mesh%ocean_area
+            do node = 1, partit%myDim_nod2D+partit%eDim_nod2D
                 relax_salt(node) = relax_salt(node)-net
             end do
         end if
@@ -548,16 +536,12 @@ MODULE Toy_Neverworld2
         type(t_mesh),   intent(in),    target :: mesh
         type(t_partit), intent(inout), target :: partit
         integer                               :: node, nz, nzmax, nzmin, elem, elnodes(3)    
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
         !
         !___________________________________________________________________________
     !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax)
-        do node=1, myDim_nod2D+eDim_nod2D
-            nzmax = nlevels_nod2d(node)
-            nzmin = ulevels_nod2d(node)
+        do node=1, partit%myDim_nod2D+partit%eDim_nod2D
+            nzmax = mesh%nlevels_nod2d(node)
+            nzmin = mesh%ulevels_nod2d(node)
             do nz=nzmin+1, nzmax-1
                 ! set vertical background diffusivity
                 Kv(nz,node) = K_ver
@@ -571,10 +555,10 @@ MODULE Toy_Neverworld2
         !
         !___________________________________________________________________________
     !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, elnodes, nz, nzmin, nzmax)
-        do elem=1, myDim_elem2D
-            elnodes=elem2D_nodes(:,elem)
-            nzmax = nlevels(elem)
-            nzmin = ulevels(elem)
+        do elem=1, partit%myDim_elem2D
+            elnodes=mesh%elem2D_nodes(:,elem)
+            nzmax = mesh%nlevels(elem)
+            nzmin = mesh%ulevels(elem)
             do nz=nzmin+1,nzmax-1
                  ! set vertical background viscosity
                 Av(nz,elem) = A_ver
