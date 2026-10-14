@@ -72,6 +72,9 @@ module io_MEANDATA
     ! output precision and accumulation precision are separate concerns. Narrowing
     ! happens once, into local_values_r4_copy, on the way to the file.
     real(real64), allocatable, dimension(:,:) :: local_values_r8
+    ! OpenACC: the sum is accumulated on the device while the source field is
+    ! current there (see stream_src_on_device), and copied to the host only to write
+    logical :: acc_on_dev = .false., acc_dev_created = .false.
     real(real64), allocatable :: aux_r8(:)
     real(real32), allocatable :: aux_r4(:)
     integer                                            :: addcounter =0
@@ -3466,6 +3469,9 @@ subroutine update_means
 
     DO n=1, io_NSTREAMS
         entry=>io_stream(n)%p
+#ifdef ENABLE_OPENACC
+        if (update_means_acc(entry)) cycle
+#endif
 
         !_____________ accumulate in real64, always _____________________________
         ! `accuracy` selects the on-disk type only -- see note_output_precision.
@@ -3505,6 +3511,100 @@ subroutine update_means
         io_stream0D(n)%addcounter = io_stream0D(n)%addcounter + 1
     END DO
 end subroutine
+#ifdef ENABLE_OPENACC
+!
+!
+!_______________________________________________________________________________
+! .true. when the source of the stream is computed on the device and its device copy is current at
+! output time (host and device copy are equal while the per-step downloads exist)
+logical function stream_src_on_device(entry)
+    use o_ARRAYS, only: ts_on_device, vv_on_device
+    use o_mixing_KPP_mod, only: kpp_on_device
+    use oce_ale_pressure_bv_module, only: pbv_on_device
+    use o_PARAM, only: Fer_GM
+    implicit none
+    type(Meandata), intent(in) :: entry
+
+    stream_src_on_device = .false.
+    if (vec_autorotate) return
+    select case (trim(entry%name))
+    case ('temp', 'salt', 'sst', 'sss')
+        stream_src_on_device = ts_on_device
+    case ('N2', 'MLD1', 'MLD2', 'MLD3')
+        stream_src_on_device = pbv_on_device
+    case ('Kv', 'Av')
+        stream_src_on_device = kpp_on_device
+    case ('w')
+        ! with GM the tracer step adds the bolus part to the device copy of w
+        stream_src_on_device = vv_on_device .and. .not. Fer_GM
+    case ('bolus_w')
+        stream_src_on_device = vv_on_device .and. Fer_GM
+    end select
+end function
+!
+!
+!_______________________________________________________________________________
+! accumulate one stream on the device; .false. leaves it to the host loop.
+! The sum moves between host and device when the source changes side.
+logical function update_means_acc(entry)
+    implicit none
+    type(Meandata), pointer, intent(inout) :: entry
+    real(real64),  pointer :: acc8(:,:)
+    real(kind=WP), pointer :: src(:,:), src1(:)
+    integer                :: I, J, ni, nj
+    logical                :: on_dev
+
+    on_dev = stream_src_on_device(entry)
+    if (on_dev .and. .not. entry%acc_dev_created) then
+        !$ACC ENTER DATA CREATE(entry%local_values_r8)
+        entry%acc_dev_created = .true.
+        entry%acc_on_dev = .false.
+    end if
+    if (entry%acc_dev_created .and. (on_dev .neqv. entry%acc_on_dev)) then
+        if (on_dev) then
+            !$ACC UPDATE DEVICE(entry%local_values_r8)
+        else
+            !$ACC UPDATE HOST(entry%local_values_r8)
+        end if
+    end if
+    entry%acc_on_dev = on_dev
+    update_means_acc = on_dev
+    if (.not. on_dev) return
+
+    acc8 => entry%local_values_r8
+    ni = size(acc8, dim=1)
+    nj = size(acc8, dim=2)
+    if (associated(entry%ptr1)) then
+        src1 => entry%ptr1
+        !$ACC PARALLEL LOOP GANG VECTOR PRESENT(acc8, src1)
+        DO J=1, nj
+            acc8(1,J)=acc8(1,J)+real(src1(J), real64)
+        END DO
+        !$ACC END PARALLEL LOOP
+        entry%addcounter=entry%addcounter+1
+        return
+    end if
+    src  => entry%ptr3
+    if (entry%flip) then
+        !$ACC PARALLEL LOOP GANG VECTOR COLLAPSE(2) PRESENT(acc8, src)
+        DO J=1, nj
+            DO I=1, ni
+                acc8(I,J)=acc8(I,J)+real(src(J,I), real64)
+            END DO
+        END DO
+        !$ACC END PARALLEL LOOP
+    else
+        !$ACC PARALLEL LOOP GANG VECTOR COLLAPSE(2) PRESENT(acc8, src)
+        DO J=1, nj
+            DO I=1, ni
+                acc8(I,J)=acc8(I,J)+real(src(I,J), real64)
+            END DO
+        END DO
+        !$ACC END PARALLEL LOOP
+    end if
+    entry%addcounter=entry%addcounter+1
+end function
+#endif
 !
 !
 !_______________________________________________________________________________
@@ -3690,6 +3790,12 @@ ctime=timenew+(daynew-1.)*86400
             ! start of this entry's accumulation interval, in this year's time
             ! units; must be taken BEFORE the tracker is reset further down
             t_start = accum_start_this_year(entry%t_accum_start, entry%t_accum_year)
+#ifdef ENABLE_OPENACC
+            ! the sum is written (and reset) on the host
+            if (entry%acc_on_dev) then
+                !$ACC UPDATE HOST(entry%local_values_r8)
+            end if
+#endif
             if (vec_autorotate) call io_r2g(n, partit, mesh) ! automatically detect if a vector field and rotate if makes sense!
 #if !defined(__MULTIO)
             if(entry%thread_running) call entry%thread%join()
@@ -3846,6 +3952,11 @@ ctime=timenew+(daynew-1.)*86400
                 END DO ! --> DO J=1, size(entry%local_values_r8,dim=2)
 !$OMP END PARALLEL DO
             end if ! --> if (entry%accuracy == i_real8) then
+#ifdef ENABLE_OPENACC
+            if (entry%acc_on_dev) then
+                !$ACC UPDATE DEVICE(entry%local_values_r8)
+            end if
+#endif
             !___________________________________________________________________
             entry%lastcounter=entry%addcounter
             entry%addcounter   = 0  ! clean_meanarrays

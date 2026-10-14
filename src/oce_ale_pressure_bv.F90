@@ -31,7 +31,7 @@ module oce_ale_pressure_bv_module
               ptheta, atg, sw_alpha_beta, &
               compute_sigma_xy, compute_neutral_slope, insitu2pot, &
               density_linear, init_ref_density, &
-              init_ref_density_advanced, sxy_on_device
+              init_ref_density_advanced, sxy_on_device, pbv_on_device
 
     ! OpenACC: pressure_bv of this step ran on the device (density and layer depths current there)
     logical :: pbv_on_device = .false.
