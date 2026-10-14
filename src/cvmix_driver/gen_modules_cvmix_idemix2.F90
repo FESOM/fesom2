@@ -35,7 +35,7 @@ module g_cvmix_idemix2
     use o_param           
     use MOD_MESH
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     use o_arrays
     use o_tracers
     use g_comm_auto 
@@ -296,7 +296,7 @@ module g_cvmix_idemix2
     ! --- support variables ---
     real(kind=WP), allocatable, dimension(:)    :: vol_nodB2T
     real(kind=WP), allocatable, dimension(:,:)  :: vol_wcelli
-    real(kind=WP), allocatable, dimension(:)    :: iwe2_grady_coriol, aux
+    real(kind=WP), allocatable, dimension(:)    :: iwe2_gradx_coriol, iwe2_grady_coriol, aux
     real(kind=WP), allocatable, dimension(:,:,:):: iwe2_gradxy_e, iwe2_gradxy_n
     real(kind=WP), allocatable, dimension(:,:  ):: iwe2_flx_uv, iwe2_flx_w
     integer                                     :: iwe2_ti=1, iwe2_tip1=2
@@ -344,12 +344,8 @@ module g_cvmix_idemix2
                                        fbin_i, elnodes(3), nzmax, nlu, nln, nz
         real(kind=WP)               :: loc_Etot=0.0_WP, glb_Etot=0.0_WP
         real(kind=WP)               :: t0, t1
-#include "../associate_part_def.h"
-#include "../associate_mesh_def.h"
-#include "../associate_part_ass.h"
-#include "../associate_mesh_ass.h"
         !_______________________________________________________________________
-        if(mype==0) then
+        if(partit%mype==0) then
             write(*,*) '____________________________________________________________'
             write(*,*) ' --> initialise CVMIX_IDEMIX2'
             write(*,*)
@@ -369,7 +365,7 @@ module g_cvmix_idemix2
         end if    
         
         !_______________________________________________________________________
-        if (mype==0) then
+        if (partit%mype==0) then
             write(*,*) "     IDEMIX2:"
             write(*,*) "     ├> parameter                     "
             write(*,*) "     │  ┌──────────────────────────── "
@@ -445,8 +441,8 @@ module g_cvmix_idemix2
         
         !_______________________________________________________________________
         ! allocate + initialse idemix arrays --> with size myDim_nod2D+eDim_nod2D
-        node_size=myDim_nod2D+eDim_nod2D
-        elem_size=myDim_elem2D+eDim_elem2D
+        node_size=partit%myDim_nod2D+partit%eDim_nod2D
+        elem_size=partit%myDim_elem2D+partit%eDim_elem2D
         nfbin    =idemix2_nfbin
         
         ! Build MPI datatypes for spectral bin halo exchange
@@ -454,7 +450,7 @@ module g_cvmix_idemix2
         
         ! 3d vertical group velocities (m/s) for the continuous internal wave spectrum
         ! 3d horizontal group velocities (m/s) for the continuous internal wave spectrum
-        allocate(iwe2_c0(nl,node_size), iwe2_v0(nl,node_size))
+        allocate(iwe2_c0(mesh%nl,node_size), iwe2_v0(mesh%nl,node_size))
         iwe2_c0(:,:)         = 0.0_WP
         iwe2_v0(:,:)         = 0.0_WP
         
@@ -463,29 +459,29 @@ module g_cvmix_idemix2
         iwe2_cn(:)           = 0.0_WP
         
         ! Eiw 3d enery dissipation coefficient 
-        allocate(iwe2_alpha_c(nl,node_size))
+        allocate(iwe2_alpha_c(mesh%nl,node_size))
         iwe2_alpha_c(:,:)    = 0.0_WP
         
         ! initialise Eiw - internal wave energy variables
         ! index (..., 1:3) timestep index E^(n-1), E^(n), E^(n+1)
-        allocate(iwe2_E_iw(   nl, node_size, 2))
+        allocate(iwe2_E_iw(   mesh%nl, node_size, 2))
         iwe2_E_iw(     :,:,:)= 0.0_WP
         
-        allocate(iwe2_E_iw_diss(nl, node_size))
+        allocate(iwe2_E_iw_diss(mesh%nl, node_size))
         iwe2_E_iw_diss(  :,:)= 0.0_WP ! Eiw production from disspation
 
         ! pre-sweep snapshot for the iterative-implicit horizontal diffusion (Jacobi sweep)
         if (idemix2_enable_hor_diff_impl_iter) then
-            allocate(iwe2_E_iw_snap(nl, node_size))
+            allocate(iwe2_E_iw_snap(mesh%nl, node_size))
             iwe2_E_iw_snap(:,:) = 0.0_WP
         end if
 
         ! Diagnostics (sized myDim_nod2D: IO-only, never need halo)
         if (idemix2_diag_Eiw) then
-            allocate( iwe2_E_iw_fbot(nl, myDim_nod2D) &
-                    , iwe2_E_iw_vdif(nl, myDim_nod2D) &
-                    , iwe2_E_iw_hdif(nl, myDim_nod2D) &
-                    , iwe2_E_iw_fsrf(    myDim_nod2D) &
+            allocate( iwe2_E_iw_fbot(mesh%nl, partit%myDim_nod2D) &
+                    , iwe2_E_iw_vdif(mesh%nl, partit%myDim_nod2D) &
+                    , iwe2_E_iw_hdif(mesh%nl, partit%myDim_nod2D) &
+                    , iwe2_E_iw_fsrf(    partit%myDim_nod2D) &
                     )
             iwe2_E_iw_fbot(  :,:)= 0.0_WP
             iwe2_E_iw_hdif(  :,:)= 0.0_WP
@@ -493,7 +489,7 @@ module g_cvmix_idemix2
             iwe2_E_iw_fsrf(    :)= 0.0_WP
         end if
         if (idemix2_diag_Eiw .or. idemix2_diag_WWI) then
-            allocate( iwe2_E_iw_dt(  nl, myDim_nod2D))
+            allocate( iwe2_E_iw_dt(  mesh%nl, partit%myDim_nod2D))
             iwe2_E_iw_dt(    :,:)= 0.0_WP
         end if
         
@@ -533,17 +529,17 @@ module g_cvmix_idemix2
             iwe2_E_M2_divs( :,:,:)= 0.0_WP
             
             ! structure function for M2 energy
-            allocate(iwe2_E_M2_struct(nl, node_size))
+            allocate(iwe2_E_M2_struct(mesh%nl, node_size))
             iwe2_E_M2_struct(:,:) = 0.0_WP
             
             ! Diagnostics
             if (idemix2_diag_Ecompart) then
                 ! diagnostic for M2 spectral energy advection
-                allocate( iwe2_E_M2_advh(nfbin, myDim_nod2D) &
-                        , iwe2_E_M2_advs(nfbin, myDim_nod2D) &
-                        , iwe2_E_M2_diss(nfbin, myDim_nod2D) &
-                        , iwe2_E_M2_forc(nfbin, myDim_nod2D) )
-                allocate( iwe2_E_M2_refl(       myDim_nod2D) )
+                allocate( iwe2_E_M2_advh(nfbin, partit%myDim_nod2D) &
+                        , iwe2_E_M2_advs(nfbin, partit%myDim_nod2D) &
+                        , iwe2_E_M2_diss(nfbin, partit%myDim_nod2D) &
+                        , iwe2_E_M2_forc(nfbin, partit%myDim_nod2D) )
+                allocate( iwe2_E_M2_refl(       partit%myDim_nod2D) )
                 iwe2_E_M2_advh(:,:) = 0.0_WP
                 iwe2_E_M2_advs(:,:) = 0.0_WP
                 iwe2_E_M2_diss(:,:) = 0.0_WP
@@ -552,14 +548,14 @@ module g_cvmix_idemix2
             end if
 
             if (idemix2_diag_Ecompart .or. idemix2_diag_WWI) then
-                allocate( iwe2_E_M2_dt(nfbin, myDim_nod2D) )
+                allocate( iwe2_E_M2_dt(nfbin, partit%myDim_nod2D) )
                 iwe2_E_M2_dt(:,:) = 0.0_WP
             end if
 
             if (idemix2_diag_WWI) then
                 ! diagnostic for M2 wave-wave interaction
-                allocate( iwe2_E_iw_diss_M2(nl,    myDim_nod2D) &
-                        , iwe2_E_M2_diss_wwi(nfbin, myDim_nod2D) )
+                allocate( iwe2_E_iw_diss_M2(mesh%nl,    partit%myDim_nod2D) &
+                        , iwe2_E_M2_diss_wwi(nfbin, partit%myDim_nod2D) )
                 iwe2_E_iw_diss_M2( :,:) = 0.0_WP
                 iwe2_E_M2_diss_wwi(:,:) = 0.0_WP
             end if
@@ -601,17 +597,17 @@ module g_cvmix_idemix2
             iwe2_E_niw_divs( :,:,:)= 0.0_WP
             
             ! structure function for niw energy
-            allocate(iwe2_E_niw_struct(nl, node_size))
+            allocate(iwe2_E_niw_struct(mesh%nl, node_size))
             iwe2_E_niw_struct(:,:) = 0.0_WP
             
             ! Diagnostics
             if (idemix2_diag_Ecompart) then
                 ! diagnostic for niw spectral energy advection
-                allocate( iwe2_E_niw_advh(nfbin, myDim_nod2D) &
-                        , iwe2_E_niw_advs(nfbin, myDim_nod2D) &
-                        , iwe2_E_niw_diss(nfbin, myDim_nod2D) &
-                        , iwe2_E_niw_forc(nfbin, myDim_nod2D) )
-                allocate( iwe2_E_niw_refl(       myDim_nod2D) )
+                allocate( iwe2_E_niw_advh(nfbin, partit%myDim_nod2D) &
+                        , iwe2_E_niw_advs(nfbin, partit%myDim_nod2D) &
+                        , iwe2_E_niw_diss(nfbin, partit%myDim_nod2D) &
+                        , iwe2_E_niw_forc(nfbin, partit%myDim_nod2D) )
+                allocate( iwe2_E_niw_refl(       partit%myDim_nod2D) )
                 iwe2_E_niw_advh(:,:) = 0.0_WP
                 iwe2_E_niw_advs(:,:) = 0.0_WP
                 iwe2_E_niw_diss(:,:) = 0.0_WP
@@ -620,24 +616,24 @@ module g_cvmix_idemix2
             end if
 
             if (idemix2_diag_Ecompart .or. idemix2_diag_WWI) then
-                allocate( iwe2_E_niw_dt(nfbin, myDim_nod2D) )
+                allocate( iwe2_E_niw_dt(nfbin, partit%myDim_nod2D) )
                 iwe2_E_niw_dt(:,:) = 0.0_WP
             end if
 
             if (idemix2_diag_WWI) then
                 ! diagnostic for niw wave-wave interaction
-                allocate( iwe2_E_iw_diss_niw(nl, myDim_nod2D) )
+                allocate( iwe2_E_iw_diss_niw(mesh%nl, partit%myDim_nod2D) )
                 iwe2_E_iw_diss_niw(:,:) = 0.0_WP
             end if
         end if 
         
         ! reflected boundary condition (only needed when M2 or NIW compartments are active)
         if (idemix2_enable_M2 .or. idemix2_enable_niw) then
-            allocate(iwe2_refl_bin(myDim_edge2D))
-            allocate(iwe2_refl_sgn(myDim_edge2D))
-            allocate(iwe2_refl_src(idemix2_nfbin, myDim_nod2D))
-            allocate(iwe2_refl_node(myDim_nod2D+eDim_nod2D))
-            allocate(iwe2_coast_node(myDim_nod2D+eDim_nod2D))
+            allocate(iwe2_refl_bin(partit%myDim_edge2D))
+            allocate(iwe2_refl_sgn(partit%myDim_edge2D))
+            allocate(iwe2_refl_src(idemix2_nfbin, partit%myDim_nod2D))
+            allocate(iwe2_refl_node(partit%myDim_nod2D+partit%eDim_nod2D))
+            allocate(iwe2_coast_node(partit%myDim_nod2D+partit%eDim_nod2D))
             iwe2_refl_bin(:)  = 0
             iwe2_refl_sgn(:)  = 0
             iwe2_refl_src(:,:)= 0.0_WP
@@ -658,13 +654,13 @@ module g_cvmix_idemix2
                 
         ! internal wave related vertical viscosity and diffusivity
         if(mix_scheme_nmb==7) then 
-            allocate(iwe2_Av(nl,elem_size))
+            allocate(iwe2_Av(mesh%nl,elem_size))
             iwe2_Av(:,:)     = 0.0_WP
         endif 
         
         ! forcing fields, M2 tidal forcing (spectral) and NIW forcing (spectral)
         allocate(  iwe2_fbot_n(    node_size)     &
-                 , iwe2_fbot(nl, node_size)       &
+                 , iwe2_fbot(mesh%nl, node_size)       &
                  , iwe2_fsrf(    node_size)       &
 !                  , iwe2_fleew(   myDim_elem2D)    &
                  )
@@ -683,10 +679,12 @@ module g_cvmix_idemix2
         iwe2_topo_dist(:)    = 0.0_WP
         
         ! support gradient variables 
-        allocate(  iwe2_grady_coriol(      elem_size)   &   
+        allocate(  iwe2_gradx_coriol(      elem_size)   &
+                 , iwe2_grady_coriol(      elem_size)   &   
                  , iwe2_gradxy_e(2, nfbin, elem_size)   &
                  , iwe2_gradxy_n(2, nfbin, node_size)   &
                  )
+        iwe2_gradx_coriol(:) = 0.0_WP
         iwe2_grady_coriol(:) = 0.0_WP
         iwe2_gradxy_e(:,:,:) = 0.0_WP
         iwe2_gradxy_n(:,:,:) = 0.0_WP
@@ -699,7 +697,7 @@ module g_cvmix_idemix2
         iwe2_flx_w( :,:)     = 0.0
         
         ! support inverse volume of wcell
-        allocate(vol_wcelli(nl, node_size))
+        allocate(vol_wcelli(mesh%nl, node_size))
         vol_wcelli(:,:)     = 0.0_WP
         allocate(vol_nodB2T(node_size))
         vol_nodB2T(:)     = 0.0_WP
@@ -759,7 +757,7 @@ module g_cvmix_idemix2
             file_exist=.False.
             inquire(file=trim(idemix2_M2forc_file),exist=file_exist) 
             if (file_exist) then
-                if (mype==0) write(*,*) '     ├> read IDEMIX2 M2 wave forcing'
+                if (partit%mype==0) write(*,*) '     ├> read IDEMIX2 M2 wave forcing'
                 call read_other_NetCDF_3d(                             &
                                           trim(idemix2_M2forc_file)  , & 
                                           trim(idemix2_M2forc_vname) , & 
@@ -773,7 +771,7 @@ module g_cvmix_idemix2
                     iwe2_fM2(fbin_i,:) = iwe2_fM2(fbin_i,:)/density_0/iwe2_dphit(fbin_i)
                 end do    
             else
-                if (mype==0) then
+                if (partit%mype==0) then
                     print *, achar(27)//'[33m'
                     write(*,*) '____________________________________________________________________'
                     write(*,*) ' ERROR: IDEMIX2 M2 forcing file not found! Cant apply IDEMIX2'
@@ -783,12 +781,12 @@ module g_cvmix_idemix2
                     write(*,*) '____________________________________________________________________'
                     print *, achar(27)//'[0m'
                     write(*,*)
-                    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+                    call par_abort(partit%MPI_COMM_FESOM, partit%mype)
                 end if
             end if 
             
             t1=MPI_Wtime()
-            if (mype==0) write(*,*) '     │  └> elapsed time:', t1-t0
+            if (partit%mype==0) write(*,*) '     │  └> elapsed time:', t1-t0
         end if ! --> if (idemix2_enable_M2) then
         
         !_______________________________________________________________________
@@ -809,7 +807,7 @@ module g_cvmix_idemix2
         ! (and/or bottom tidal forcing) active.
         t0=MPI_Wtime()
         if (.not. idemix2_enable_srf) then
-            if (mype==0) then
+            if (partit%mype==0) then
                 write(*,*) '     ├> idemix2_enable_srf=.false. -- skipping surface/NIW forcing read'
                 write(*,*) '     │  └> iwe2_fsrf / iwe2_fniw remain zero'
             end if
@@ -843,24 +841,24 @@ module g_cvmix_idemix2
                 ! much is lossed during interpolation and compare with value of the
                 ! original files
                 loc_Etot = 0.0_WP
-                do node=1, myDim_nod2D
-                    loc_Etot = loc_Etot + area(1,node)*iwe2_fsrf(node)*density_0
+                do node=1, partit%myDim_nod2D
+                    loc_Etot = loc_Etot + mesh%area(1,node)*iwe2_fsrf(node)*density_0
                 end do
-                call MPI_AllREDUCE(loc_Etot, glb_Etot, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+                call MPI_AllREDUCE(loc_Etot, glb_Etot, 1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
 
                 if (idemix2_enable_niw) then
-                    if (mype==0) write(*,*) '     ├> read IDEMIX2 niw wave forcing'
+                    if (partit%mype==0) write(*,*) '     ├> read IDEMIX2 niw wave forcing'
                     do fbin_i =2, nfbin-1
                         iwe2_fniw(fbin_i, :) = iwe2_fsrf(:)/(2.0_WP*pi)
                     end do
                     iwe2_fsrf(:) = 0.0_WP
                 else
-                    if (mype==0) write(*,*) '     ├> read IDEMIX2 surface wave forcing'
+                    if (partit%mype==0) write(*,*) '     ├> read IDEMIX2 surface wave forcing'
                 end if
-                if (mype==0) write(*,*) '     ├> IDEMIX2 total srf. energy Etot_srf =', glb_Etot*1.0e-12, ' TW'
+                if (partit%mype==0) write(*,*) '     ├> IDEMIX2 total srf. energy Etot_srf =', glb_Etot*1.0e-12, ' TW'
 
             else
-                if (mype==0) then
+                if (partit%mype==0) then
                     print *, achar(27)//'[33m'
                     write(*,*) '____________________________________________________________________'
                     write(*,*) ' ERROR: IDEMIX2 surface forcing file not found! '
@@ -877,7 +875,7 @@ module g_cvmix_idemix2
                     write(*,*) '____________________________________________________________________'
                     print *, achar(27)//'[0m'
                     write(*,*)
-                    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+                    call par_abort(partit%MPI_COMM_FESOM, partit%mype)
                 end if
             end if
         end if
@@ -889,12 +887,12 @@ module g_cvmix_idemix2
         ! from background flows. Physical Context: NIWs are generated by wind events and have frequencies 
         ! close to f. They can only propagate as internal waves if ω > |f|.
         if (idemix2_enable_niw) then
-            do node = 1, myDim_nod2D+eDim_nod2D
+            do node = 1, partit%myDim_nod2D+partit%eDim_nod2D
                 iwe2_omega_niw(node) = max(1.0e-8_WP, abs( 1.05 * mesh%coriolis_node(node) ) )
             end do
         end if 
         t1=MPI_Wtime()
-        if (mype==0) write(*,*) '     │  └> elapsed time:', t1-t0
+        if (partit%mype==0) write(*,*) '     │  └> elapsed time:', t1-t0
         
         !_______________________________________________________________________
         ! read idemix bottom near tidal forcing from cesm data set --> file 
@@ -904,7 +902,7 @@ module g_cvmix_idemix2
             file_exist=.False.
             inquire(file=trim(idemix2_botforc_file),exist=file_exist) 
             if (file_exist) then
-                if (mype==0) write(*,*) '     ├> read IDEMIX2 near tidal bottom forcing'
+                if (partit%mype==0) write(*,*) '     ├> read IDEMIX2 near tidal bottom forcing'
                 call read_other_NetCDF(trim(idemix2_botforc_file), trim(idemix2_botforc_vname), 1, iwe2_fbot_n, .true., .true., partit, mesh)                !                                                                                                |       |
                 !                                                   .true.=NN for missing values ----------------+       |
                 !                                                   .true.=interpolate to vertices ----------------------+
@@ -914,11 +912,11 @@ module g_cvmix_idemix2
 
                 ! check for total tidal energy that is infused through the bottom
                 loc_Etot = 0.0_WP
-                do node=1, myDim_nod2D
-                    loc_Etot = loc_Etot + area(1,node)*iwe2_fbot_n(node)
+                do node=1, partit%myDim_nod2D
+                    loc_Etot = loc_Etot + mesh%area(1,node)*iwe2_fbot_n(node)
                 end do
-                call MPI_AllREDUCE(loc_Etot, glb_Etot, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-                if (mype==0) write(*,*) "     │  └> IDEMIX2 total tidal energy Etot_bot =", glb_Etot*1.0e-12, ' TW'
+                call MPI_AllREDUCE(loc_Etot, glb_Etot, 1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+                if (partit%mype==0) write(*,*) "     │  └> IDEMIX2 total tidal energy Etot_bot =", glb_Etot*1.0e-12, ' TW'
 
                 ! normalize total tidal energy at bottom with respect to the total
                 ! tidal energy that is e.g in the original forcing files to accomodate
@@ -928,18 +926,18 @@ module g_cvmix_idemix2
                     iwe2_fbot_n = iwe2_fbot_n * idemix2_botforc_Etot/glb_Etot
 
                     loc_Etot = 0.0_WP
-                    do node=1, myDim_nod2D
-                        loc_Etot = loc_Etot + area(1,node)*iwe2_fbot_n(node)
+                    do node=1, partit%myDim_nod2D
+                        loc_Etot = loc_Etot + mesh%area(1,node)*iwe2_fbot_n(node)
                     end do
-                    call MPI_AllREDUCE(loc_Etot, glb_Etot, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-                    if (mype==0) write(*,*) "     │  └> IDEMIX2 Etot_bot after normalizing =", glb_Etot*1.0e-12, ' TW'
+                    call MPI_AllREDUCE(loc_Etot, glb_Etot, 1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+                    if (partit%mype==0) write(*,*) "     │  └> IDEMIX2 Etot_bot after normalizing =", glb_Etot*1.0e-12, ' TW'
                 end if
 
                 ! divide by density_0 --> convert from W/m^2 to m^3/s^3
                 iwe2_fbot_n = iwe2_fbot_n/density_0
                 
             else
-                if (mype==0) then
+                if (partit%mype==0) then
                     print *, achar(27)//'[33m'
                     write(*,*) '____________________________________________________________________'
                     write(*,*) ' ERROR: IDEMIX2 bottom forcing file not found! Cant apply IDEMIX'
@@ -949,11 +947,11 @@ module g_cvmix_idemix2
                     write(*,*) '____________________________________________________________________'
                     print *, achar(27)//'[0m'
                     write(*,*)
-                    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+                    call par_abort(partit%MPI_COMM_FESOM, partit%mype)
                 end if 
             end if 
             t1=MPI_Wtime()
-            if (mype==0) write(*,*) '     │  └> elapsed time:', t1-t0
+            if (partit%mype==0) write(*,*) '     │  └> elapsed time:', t1-t0
         end if !--> if (idemix2_enable_bot) then
         
 !         !_______________________________________________________________________
@@ -981,7 +979,7 @@ module g_cvmix_idemix2
 !                     write(*,*) '____________________________________________________________________'
 !                     print *, achar(27)//'[0m'
 !                     write(*,*)
-!                     call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+!                     call par_abort(partit%MPI_COMM_FESOM, partit%mype)
 !                 end if
 !             end if 
 !         end if ! --> if (idemix2_enable_leew) then 
@@ -996,10 +994,10 @@ module g_cvmix_idemix2
             file_exist=.False.
             inquire(file=trim(idemix2_hrmsforc_file),exist=file_exist) 
             if (file_exist) then
-                if (mype==0) write(*,*) '     ├> read IDEMIX2 HRMS forcing'
+                if (partit%mype==0) write(*,*) '     ├> read IDEMIX2 HRMS forcing'
                 call read_other_NetCDF(trim(idemix2_hrmsforc_file), trim(idemix2_hrmsforc_vname), 1, iwe2_topo_hrms, .true., .true., partit, mesh)
             else
-                if (mype==0) then
+                if (partit%mype==0) then
                     print *, achar(27)//'[33m'
                     write(*,*) '____________________________________________________________________'
                     write(*,*) ' ERROR: IDEMIX2 HRMS forcing file not found! Cant apply IDEMIX2'
@@ -1009,7 +1007,7 @@ module g_cvmix_idemix2
                     write(*,*) '____________________________________________________________________'
                     print *, achar(27)//'[0m'
                     write(*,*)
-                    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+                    call par_abort(partit%MPI_COMM_FESOM, partit%mype)
                 end if
             end if 
             
@@ -1018,10 +1016,10 @@ module g_cvmix_idemix2
             file_exist=.False.
             inquire(file=trim(idemix2_hlamforc_file),exist=file_exist) 
             if (file_exist) then
-                if (mype==0) write(*,*) '     ├> read IDEMIX2 HLAM forcing'
+                if (partit%mype==0) write(*,*) '     ├> read IDEMIX2 HLAM forcing'
                 call read_other_NetCDF(trim(idemix2_hlamforc_file), trim(idemix2_hlamforc_vname), 1, iwe2_topo_hlam, .true., .true., partit, mesh)
             else
-                if (mype==0) then
+                if (partit%mype==0) then
                     print *, achar(27)//'[33m'
                     write(*,*) '____________________________________________________________________'
                     write(*,*) ' ERROR: IDEMIX2 HLAM forcing file not found! Cant apply IDEMIX2'
@@ -1031,7 +1029,7 @@ module g_cvmix_idemix2
                     write(*,*) '____________________________________________________________________'
                     print *, achar(27)//'[0m'
                     write(*,*)
-                    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+                    call par_abort(partit%MPI_COMM_FESOM, partit%mype)
                 end if
             end if
             
@@ -1046,18 +1044,18 @@ module g_cvmix_idemix2
             ! waves over rough topography.
             
             t1=MPI_Wtime()
-            if (mype==0) write(*,*) '     │  └> elapsed time:', t1-t0
+            if (partit%mype==0) write(*,*) '     │  └> elapsed time:', t1-t0
         
         end if ! --> if (idemix2_enable_M2 .or. idemix2_enable_niw ) then
         
         !_______________________________________________________________________
         ! distribute nodal bottom flux across staircase depth levels using cap
         ! area fractions: iwe2_fbot(nz,n) = fbot_n * (area(nz-1,n)-area(nz,n)) / area(1,n)
-        do node = 1, myDim_nod2D+eDim_nod2D
-            nlu = nlevels_nod2D_min(node)
-            nln = nlevels_nod2D(node)
+        do node = 1, partit%myDim_nod2D+partit%eDim_nod2D
+            nlu = mesh%nlevels_nod2D_min(node)
+            nln = mesh%nlevels_nod2D(node)
             do nz = nlu, nln
-                iwe2_fbot(nz, node) = iwe2_fbot_n(node) * (area(nz-1, node) - area(nz, node)) / area(1, node)
+                iwe2_fbot(nz, node) = iwe2_fbot_n(node) * (mesh%area(nz-1, node) - mesh%area(nz, node)) / mesh%area(1, node)
             end do
         end do
         
@@ -1072,9 +1070,11 @@ module g_cvmix_idemix2
         end if 
         !_______________________________________________________________________
         ! compute d/dy of coriolis 
-        do elem = 1, myDim_elem2D
-            elnodes = elem2d_nodes(:,elem)
-            iwe2_grady_coriol(elem) = sum(gradient_sca(4:6, elem)*mesh%coriolis_node(elnodes))
+        do elem = 1, partit%myDim_elem2D
+            elnodes = mesh%elem2d_nodes(:,elem)
+            ! on a rotated mesh f also varies along the grid x direction
+            iwe2_gradx_coriol(elem) = sum(mesh%gradient_sca(1:3, elem)*mesh%coriolis_node(elnodes))
+            iwe2_grady_coriol(elem) = sum(mesh%gradient_sca(4:6, elem)*mesh%coriolis_node(elnodes))
         end do       
         
         !_______________________________________________________________________
@@ -1145,10 +1145,6 @@ module g_cvmix_idemix2
         logical, allocatable :: is_coast_node(:)
         real(kind=WP), allocatable :: coast_flag(:)
         integer       :: loc_cnt(3), glb_cnt(3)
-#include "../associate_part_def.h"
-#include "../associate_mesh_def.h"
-#include "../associate_part_ass.h"
-#include "../associate_mesh_ass.h"
         nfbin = idemix2_nfbin
     
         ! > refl_bin(edge) stores the MIRROR SPECTRAL BIN for a flagged
@@ -1217,23 +1213,23 @@ module g_cvmix_idemix2
         ! a node is a coast node if it belongs to at least one boundary edge.
         ! exchange_nod propagates coast status to halo nodes whose coast edge
         ! lives on a neighbouring MPI task (no logical overload → real proxy).
-        allocate(is_coast_node(myDim_nod2D+eDim_nod2D))
-        allocate(coast_flag(myDim_nod2D+eDim_nod2D))
+        allocate(is_coast_node(partit%myDim_nod2D+partit%eDim_nod2D))
+        allocate(coast_flag(partit%myDim_nod2D+partit%eDim_nod2D))
         coast_flag(:) = 0.0_WP
-        do edge = 1, myDim_edge2D
-            if (edge_tri(2, edge) == 0) then
-                coast_flag(edges(1, edge)) = 1.0_WP
-                coast_flag(edges(2, edge)) = 1.0_WP
+        do edge = 1, partit%myDim_edge2D
+            if (mesh%edge_tri(2, edge) == 0) then
+                coast_flag(mesh%edges(1, edge)) = 1.0_WP
+                coast_flag(mesh%edges(2, edge)) = 1.0_WP
             end if
         end do
         call exchange_nod(coast_flag, partit)
         is_coast_node = (coast_flag > 0.5_WP)
         deallocate(coast_flag)
 
-        do edge = 1, myDim_edge2D
-            if (edge_tri(2, edge) == 0) cycle   ! skip coast-parallel boundary edges
-            n1 = edges(1, edge)
-            n2 = edges(2, edge)
+        do edge = 1, partit%myDim_edge2D
+            if (mesh%edge_tri(2, edge) == 0) cycle   ! skip coast-parallel boundary edges
+            n1 = mesh%edges(1, edge)
+            n2 = mesh%edges(2, edge)
             ! only process edges with exactly one coast node
             if (is_coast_node(n1) .eqv. is_coast_node(n2)) cycle
             
@@ -1242,8 +1238,8 @@ module g_cvmix_idemix2
             ! the spectral bins phit(k) are in the rotated frame because
             ! u_compart = cg*cos(phit) is projected onto edge_cross_dxdy,
             ! which is built from coord_nod2D with cos(rotated_lat) metric.
-            lon1 = coord_nod2D(1, n1);  lat1 = coord_nod2D(2, n1)
-            lon2 = coord_nod2D(1, n2);  lat2 = coord_nod2D(2, n2)
+            lon1 = mesh%coord_nod2D(1, n1);  lat1 = mesh%coord_nod2D(2, n1)
+            lon2 = mesh%coord_nod2D(1, n2);  lat2 = mesh%coord_nod2D(2, n2)
             lat_mean = 0.5_WP*(lat1 + lat2)
             
             ! edge direction FROM coast node BACK TO interior node (the reflection direction)
@@ -1278,21 +1274,21 @@ module g_cvmix_idemix2
 
         ! create logical array if node is a reflected boudnary node
         refl_node(:) = .false.
-        do edge = 1, myDim_edge2D
+        do edge = 1, partit%myDim_edge2D
             if (refl_bin(edge) == 0) cycle
-            n_int = merge(edges(2,edge), edges(1,edge), refl_sgn(edge) == +1)
-            if (n_int <= myDim_nod2D) refl_node(n_int) = .true.
+            n_int = merge(mesh%edges(2,edge), mesh%edges(1,edge), refl_sgn(edge) == +1)
+            if (n_int <= partit%myDim_nod2D) refl_node(n_int) = .true.
         end do
 
         coast_node = is_coast_node
         deallocate(is_coast_node)
 
         ! global diagnostic: reduce counts across all MPI ranks and print on rank 0
-        loc_cnt(1) = count(edge_tri(2, 1:myDim_edge2D) == 0)
-        loc_cnt(2) = count(refl_bin(1:myDim_edge2D)    >  0)
-        loc_cnt(3) = count(refl_node(1:myDim_nod2D))
-        call MPI_AllREDUCE(loc_cnt, glb_cnt, 3, MPI_INTEGER, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-        if (mype==0) then
+        loc_cnt(1) = count(mesh%edge_tri(2, 1:partit%myDim_edge2D) == 0)
+        loc_cnt(2) = count(refl_bin(1:partit%myDim_edge2D)    >  0)
+        loc_cnt(3) = count(refl_node(1:partit%myDim_nod2D))
+        call MPI_AllREDUCE(loc_cnt, glb_cnt, 3, MPI_INTEGER, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+        if (partit%mype==0) then
             write(*,*) '     ├> IDEMIX2 reflective coastal BC lookup table built'
             write(*,*) '     │    boundary edges  (edge_tri(2)==0)  [global] : ', glb_cnt(1)
             write(*,*) '     │    coast-adj. interior edges flagged [global] : ', glb_cnt(2)
@@ -1324,12 +1320,8 @@ module g_cvmix_idemix2
         real(kind=WP) :: time_params, time_groupvel, time_M2_integ, time_niw_integ
         real(kind=WP) :: time_Eiw_vdiff=0.0, time_Eiw_hdiff=0.0, time_waveint=0.0, time_Kv_Av=0.0, time_total=0.0
 
-#include "../associate_part_def.h"
-#include "../associate_mesh_def.h"
-#include "../associate_part_ass.h"
-#include "../associate_mesh_ass.h"
-        node_size  = myDim_nod2D
-        elem_size  = myDim_elem2D
+        node_size  = partit%myDim_nod2D
+        elem_size  = partit%myDim_elem2D
         nfbin      = idemix2_nfbin
         
         !_______________________________________________________________________
@@ -1358,10 +1350,10 @@ module g_cvmix_idemix2
         ! 1. Compute IDEMIX2 parameters (cn, alpha_c, v0, c0, tau, struct functions)
         t0 = MPI_Wtime()
 !$OMP PARALLEL DO PRIVATE(node, lat_n_deg, nln, uln, nz, cn, topo_shelf)
-        do node=1, myDim_nod2D+eDim_nod2D
+        do node=1, partit%myDim_nod2D+partit%eDim_nod2D
             !___________________________________________________________________
-            uln = ulevels_nod2D(node)
-            nln = nlevels_nod2D(node)
+            uln = mesh%ulevels_nod2D(node)
+            nln = mesh%nlevels_nod2D(node)
             
             !___________________________________________________________________
             ! re-initialse cross spectral velocites, for later accumulation through 
@@ -1370,13 +1362,13 @@ module g_cvmix_idemix2
             if (idemix2_enable_niw) iwe2_niw_w(:,node) = 0.0_WP
             
             !___________________________________________________________________
-            lat_n_deg = geo_coord_nod2D(2,node) / rad
+            lat_n_deg = mesh%geo_coord_nod2D(2,node) / rad
             
             !___________________________________________________________________
             ! compute baroclinic gravity wave speed            
             cn=0.0_WP
             do nz=uln, nln-1
-                cn=cn+hnode(nz,node)*(sqrt(max(bvfreq(nz,node), 0._WP)) + sqrt(max(bvfreq(nz+1,node), 0._WP)))/2._WP
+                cn=cn+mesh%hnode(nz,node)*(sqrt(max(bvfreq(nz,node), 0._WP)) + sqrt(max(bvfreq(nz+1,node), 0._WP)))/2._WP
             end do
             cn = cn/pi * idemix2_scal_cn
             cn = max(cn, idemix2_cn_min)
@@ -1413,7 +1405,7 @@ module g_cvmix_idemix2
                         , lat          = lat_n_deg                   & !IN:  latitude (degrees)
                         , coriolis     = mesh%coriolis_node(   node) & !IN:  Coriolis parameter (1/s)
                         , cn           = cn                          & !IN:  first baroclinic mode speed (m/s)
-                        , zbottom      = -zbar_n_bot(          node) & !IN:  bottom depth, positive (m)
+                        , zbottom      = -mesh%zbar_n_bot(          node) & !IN:  bottom depth, positive (m)
                         , topo_hrms    = iwe2_topo_hrms(       node) & !IN:  RMS topographic height (m)
                         , topo_hlam    = iwe2_topo_hlam(       node) & !IN:  characteristic topographic length scale (m)
                         , topo_shelf   = topo_shelf                  & !IN:  .true. if node is on shelf
@@ -1424,7 +1416,7 @@ module g_cvmix_idemix2
                     call cvmix_idemix2_compute_M2_dissipation(       &
                           lat          = lat_n_deg                   & !IN:  latitude (degrees)
                         , cn           = cn                          & !IN:  first baroclinic mode speed (m/s)
-                        , zbottom      = -zbar_n_bot(          node) & !IN:  bottom depth, positive (m)
+                        , zbottom      = -mesh%zbar_n_bot(          node) & !IN:  bottom depth, positive (m)
                         , alpha_M2_c   = iwe2_alpha_M2_c(      node) & !OUT: M2 continuous (PSI) dissipation rate (1/s)
                         )
                 end if 
@@ -1434,7 +1426,7 @@ module g_cvmix_idemix2
                         , lat          = lat_n_deg                   & !IN:  latitude (degrees)
                         , coriolis     = mesh%coriolis_node(   node) & !IN:  Coriolis parameter (1/s)
                         , cn           = cn                          & !IN:  first baroclinic mode speed (m/s)
-                        , zbottom      = -zbar_n_bot(          node) & !IN:  bottom depth, positive (m)
+                        , zbottom      = -mesh%zbar_n_bot(          node) & !IN:  bottom depth, positive (m)
                         , topo_hrms    = iwe2_topo_hrms(       node) & !IN:  RMS topographic height (m)
                         , topo_hlam    = iwe2_topo_hlam(       node) & !IN:  characteristic topographic length scale (m)
                         , topo_shelf   = topo_shelf                  & !IN:  .true. if node is on shelf
@@ -1452,7 +1444,7 @@ module g_cvmix_idemix2
             if ((idemix2_enable_M2) .and. (idemix2_enable_niw)) then 
                 call cvmix_idemix2_compute_vert_struct_fct(          &
                       nlev        = nln-uln+1                        & !IN:    number of active levels
-                    , dzw         = hnode(          uln:nln-1, node) & !IN:    layer thickness (m)
+                    , dzw         = real(mesh%hnode(uln:nln-1, node), WP) & !IN:    layer thickness (m)
                     , coriolis    = mesh%coriolis_node(        node) & !IN:    Coriolis parameter (1/s)
                     , cn          = cn                               & !IN:    first baroclinic mode speed (m/s)
                     , Nsqr        = bvfreq(           uln:nln, node) & !IN:    buoyancy frequency squared (1/s²)
@@ -1465,7 +1457,7 @@ module g_cvmix_idemix2
             else if (idemix2_enable_M2) then 
                 call cvmix_idemix2_compute_vert_struct_fct(          &
                       nlev        = nln-uln+1                        & !IN:    number of active levels
-                    , dzw         = hnode(          uln:nln-1, node) & !IN:    layer thickness (m)
+                    , dzw         = real(mesh%hnode(uln:nln-1, node), WP) & !IN:    layer thickness (m)
                     , coriolis    = mesh%coriolis_node(        node) & !IN:    Coriolis parameter (1/s)
                     , cn          = cn                               & !IN:    first baroclinic mode speed (m/s)
                     , Nsqr        = bvfreq(           uln:nln, node) & !IN:    buoyancy frequency squared (1/s²)
@@ -1476,7 +1468,7 @@ module g_cvmix_idemix2
             else if (idemix2_enable_niw) then 
                 call cvmix_idemix2_compute_vert_struct_fct(          &
                       nlev        = nln-uln+1                        & !IN:    number of active levels
-                    , dzw         = hnode(          uln:nln-1, node) & !IN:    layer thickness (m)
+                    , dzw         = real(mesh%hnode(uln:nln-1, node), WP) & !IN:    layer thickness (m)
                     , coriolis    = mesh%coriolis_node(        node) & !IN:    Coriolis parameter (1/s)
                     , cn          = cn                               & !IN:    first baroclinic mode speed (m/s)
                     , Nsqr        = bvfreq(           uln:nln, node) & !IN:    buoyancy frequency squared (1/s²)
@@ -1495,12 +1487,12 @@ module g_cvmix_idemix2
             !_______________________________________________________________________
             ! 2. Compute idemix2 group velocites for M2 an NIW
             t1 = MPI_Wtime()
-            do elem = 1, myDim_elem2D
-                nln        = nlevels(elem)-1
-                uln        = ulevels(elem)
-                elnodes    = elem2d_nodes(:,elem)
-                lat_e_deg  = sum(geo_coord_nod2D(2,elnodes)) / (3.0_WP*rad)
-                area_third = elem_area(elem) / 3.0_WP
+            do elem = 1, partit%myDim_elem2D
+                nln        = mesh%nlevels(elem)-1
+                uln        = mesh%ulevels(elem)
+                elnodes    = mesh%elem2d_nodes(:,elem)
+                lat_e_deg  = sum(mesh%geo_coord_nod2D(2,elnodes)) / (3.0_WP*rad)
+                area_third = mesh%elem_area(elem) / 3.0_WP
                 if (idemix2_enable_M2)  w_M2_e(:)  = 0.0_WP
                 if (idemix2_enable_niw) w_niw_e(:) = 0.0_WP
                 
@@ -1509,8 +1501,8 @@ module g_cvmix_idemix2
                 cn_e        = sum(iwe2_cn(elnodes))/3.0
                 
                 ! compute gradient of  baroclionic gkdot_x_M2 = sqrt(fxa)/omega_M2*cn_gradxravity wave speed on elements
-                cn_gradx_e  = sum(gradient_sca(1:3,elem)*iwe2_cn(elnodes))
-                cn_grady_e  = sum(gradient_sca(4:6,elem)*iwe2_cn(elnodes))
+                cn_gradx_e  = sum(mesh%gradient_sca(1:3,elem)*iwe2_cn(elnodes))
+                cn_grady_e  = sum(mesh%gradient_sca(4:6,elem)*iwe2_cn(elnodes))
                                 
                 ! average iwe2_omega_niw to elem
                 if (idemix2_enable_niw) omega_niw_e = sum(iwe2_omega_niw(elnodes))/3.0
@@ -1520,6 +1512,7 @@ module g_cvmix_idemix2
                     call cvmix_idemix2_compute_compart_groupvel(     &
                           nfbin        = idemix2_nfbin               & !IN:  number of spectral angular bins
                         , coriolis     = mesh%coriolis(        elem) & !IN:  Coriolis parameter at element (1/s)
+                        , coriol_gradx = iwe2_gradx_coriol(    elem) & !IN:  zonal      gradient of Coriolis (1/(m·s))
                         , coriol_grady = iwe2_grady_coriol(    elem) & !IN:  meridional gradient of Coriolis (1/(m·s))
                         , coslat       = mesh%elem_cos(        elem) & !IN:  cosine of latitude at element
                         , cn           = cn_e                        & !IN:  first baroclinic mode speed at element (m/s)
@@ -1543,6 +1536,7 @@ module g_cvmix_idemix2
                     call cvmix_idemix2_compute_compart_groupvel(      &
                           nfbin        = idemix2_nfbin                & !IN:  number of spectral angular bins
                         , coriolis     = mesh%coriolis(        elem)  & !IN:  Coriolis parameter at element (1/s)
+                        , coriol_gradx = iwe2_gradx_coriol(    elem) & !IN:  zonal      gradient of Coriolis (1/(m·s))
                         , coriol_grady = iwe2_grady_coriol(    elem)  & !IN:  meridional gradient of Coriolis (1/(m·s))
                         , coslat       = mesh%elem_cos(        elem)  & !IN:  cosine of latitude at element
                         , cn           = cn_e                         & !IN:  first baroclinic mode speed at element (m/s)
@@ -1573,8 +1567,8 @@ module g_cvmix_idemix2
                 call exchange_elem_fbin(iwe2_M2_uv, partit)
                 call exchange_nod_fbin(iwe2_M2_w, partit)
     !$OMP PARALLEL DO PRIVATE(node, inv_area)
-                do node=1, myDim_nod2D+eDim_nod2D
-                    inv_area = 1.0_WP / area(1, node)
+                do node=1, partit%myDim_nod2D+partit%eDim_nod2D
+                    inv_area = 1.0_WP / mesh%area(1, node)
                     iwe2_M2_w(:, node) = iwe2_M2_w(:, node) * inv_area
                 end do
     !$OMP END PARALLEL DO
@@ -1584,8 +1578,8 @@ module g_cvmix_idemix2
                 call exchange_elem_fbin(iwe2_niw_uv, partit)
                 call exchange_nod_fbin(iwe2_niw_w, partit)
     !$OMP PARALLEL DO PRIVATE(node, inv_area)
-                do node=1, myDim_nod2D+eDim_nod2D
-                    inv_area = 1.0_WP / area(1, node)
+                do node=1, partit%myDim_nod2D+partit%eDim_nod2D
+                    inv_area = 1.0_WP / mesh%area(1, node)
                     iwe2_niw_w(:, node) = iwe2_niw_w(:, node) * inv_area
                 end do
     !$OMP END PARALLEL DO
@@ -1741,13 +1735,13 @@ module g_cvmix_idemix2
         !                           - alpha_c*Eiw^(t+1)
         !                           + Forc^(t) ]
 !$OMP PARALLEL DO PRIVATE(node, uln, nln)
-        do node = 1, myDim_nod2D+eDim_nod2D
-            uln = ulevels_nod2D(node)
-            nln = nlevels_nod2D(node)
-            if (idemix2_diag_Eiw .and. node <= myDim_nod2D) then
+        do node = 1, partit%myDim_nod2D+partit%eDim_nod2D
+            uln = mesh%ulevels_nod2D(node)
+            nln = mesh%nlevels_nod2D(node)
+            if (idemix2_diag_Eiw .and. node <= partit%myDim_nod2D) then
                 call cvmix_idemix2_compute_vdiff_vdiss_Eiw(             &
                       nlev     = nln-uln+1                              & !IN:    number of active levels
-                    , dzw      = hnode(           uln:nln-1, node)      & !IN:    layer thickness (m)
+                    , dzw      = real(mesh%hnode(uln:nln-1, node), WP)      & !IN:    layer thickness (m)
                     , dt       = dt                                     & !IN:    time step (s)
                     , c0       = iwe2_c0(         uln:nln  , node)      & !IN:    first baroclinic mode speed (m/s)
                     , alpha_c  = iwe2_alpha_c(    uln:nln  , node)      & !IN:    wave-wave dissipation rate (1/s)
@@ -1765,7 +1759,7 @@ module g_cvmix_idemix2
             else
                 call cvmix_idemix2_compute_vdiff_vdiss_Eiw(             &
                       nlev     = nln-uln+1                              & !IN:    number of active levels
-                    , dzw      = hnode(           uln:nln-1, node)      & !IN:    layer thickness (m)
+                    , dzw      = real(mesh%hnode(uln:nln-1, node), WP)      & !IN:    layer thickness (m)
                     , dt       = dt                                     & !IN:    time step (s)
                     , c0       = iwe2_c0(         uln:nln  , node)      & !IN:    first baroclinic mode speed (m/s)
                     , alpha_c  = iwe2_alpha_c(    uln:nln  , node)      & !IN:    wave-wave dissipation rate (1/s)
@@ -1795,7 +1789,7 @@ module g_cvmix_idemix2
         ! Diagnostic: capture negated pre-diffusion iwe2_tip1 state, needed for both
         ! modes since neither compute_hdiff_Eiw call below directly returns a tendency.
         if ((idemix2_enable_hor_diff_expl .or. idemix2_enable_hor_diff_impl_iter) .and. idemix2_diag_Eiw) then
-            iwe2_E_iw_hdif = -iwe2_E_iw(:, 1:myDim_nod2D, iwe2_tip1)
+            iwe2_E_iw_hdif = -iwe2_E_iw(:, 1:partit%myDim_nod2D, iwe2_tip1)
         end if
 
         if (idemix2_enable_hor_diff_expl) then
@@ -1836,9 +1830,9 @@ module g_cvmix_idemix2
 
         ! Diagnostic: iwe2_E_iw_hdif = (Eiw_after - Eiw_before) / dt  [m²/s³]
         if ((idemix2_enable_hor_diff_expl .or. idemix2_enable_hor_diff_impl_iter) .and. idemix2_diag_Eiw) then
-            do node = 1, myDim_nod2D
-                uln = ulevels_nod2D(node)
-                nln = nlevels_nod2D(node)
+            do node = 1, partit%myDim_nod2D
+                uln = mesh%ulevels_nod2D(node)
+                nln = mesh%nlevels_nod2D(node)
                 iwe2_E_iw_hdif(uln:nln, node) = (iwe2_E_iw_hdif(uln:nln, node) &
                                                 + iwe2_E_iw(uln:nln, node, iwe2_tip1)) / dt
                 iwe2_E_iw_dt(uln:nln, node)   =  iwe2_E_iw_dt(uln:nln, node) &
@@ -1853,16 +1847,16 @@ module g_cvmix_idemix2
         t8 = MPI_Wtime() 
         if (idemix2_enable_M2 .or. idemix2_enable_niw) then
 !$OMP PARALLEL DO PRIVATE(node, uln, nln)
-            do node = 1, myDim_nod2D+eDim_nod2D
-                uln = ulevels_nod2D(node)
-                nln = nlevels_nod2D(node)
+            do node = 1, partit%myDim_nod2D+partit%eDim_nod2D
+                uln = mesh%ulevels_nod2D(node)
+                nln = mesh%nlevels_nod2D(node)
                 !_______________________________________________________________
                 if (idemix2_enable_M2 .and. idemix2_enable_niw) then
-                    if (idemix2_diag_WWI .and. node <= myDim_nod2D) then
+                    if (idemix2_diag_WWI .and. node <= partit%myDim_nod2D) then
                         call cvmix_idemix2_compute_Eiw_waveinteract(                  &
                               nlev          = nln-uln+1                               & !IN:    number of active levels
                             , nfbin         = idemix2_nfbin                           & !IN:    number of spectral angular bins
-                            , dzw           = hnode(                uln:nln-1, node)  & !IN:    layer thickness (m)
+                            , dzw           = real(mesh%hnode(uln:nln-1, node), WP)  & !IN:    layer thickness (m)
                             , dphi          = iwe2_dphit                              & !IN:    angular bin widths
                             , dt            = dt                                      & !IN:    time step (s)
                             , flag_posdef   = .True.                                  & !IN:    enforce positive-definiteness
@@ -1887,7 +1881,7 @@ module g_cvmix_idemix2
                         call cvmix_idemix2_compute_Eiw_waveinteract(                  &
                               nlev          = nln-uln+1                               & !IN:    number of active levels
                             , nfbin         = idemix2_nfbin                           & !IN:    number of spectral angular bins
-                            , dzw           = hnode(                uln:nln-1, node)  & !IN:    layer thickness (m)
+                            , dzw           = real(mesh%hnode(uln:nln-1, node), WP)  & !IN:    layer thickness (m)
                             , dphi          = iwe2_dphit                              & !IN:    angular bin widths
                             , dt            = dt                                      & !IN:    time step (s)
                             , flag_posdef   = .True.                                  & !IN:    enforce positive-definiteness
@@ -1906,11 +1900,11 @@ module g_cvmix_idemix2
                     end if
                     
                 elseif (idemix2_enable_M2) then
-                    if (idemix2_diag_WWI .and. node <= myDim_nod2D) then
+                    if (idemix2_diag_WWI .and. node <= partit%myDim_nod2D) then
                         call cvmix_idemix2_compute_Eiw_waveinteract(                  &
                               nlev          = nln-uln+1                               & !IN:    number of active levels
                             , nfbin         = idemix2_nfbin                           & !IN:    number of spectral angular bins
-                            , dzw           = hnode(                uln:nln-1, node)  & !IN:    layer thickness (m)
+                            , dzw           = real(mesh%hnode(uln:nln-1, node), WP)  & !IN:    layer thickness (m)
                             , dphi          = iwe2_dphit                              & !IN:    angular bin widths
                             , dt            = dt                                      & !IN:    time step (s)
                             , flag_posdef   = .True.                                  & !IN:    enforce positive-definiteness
@@ -1930,7 +1924,7 @@ module g_cvmix_idemix2
                         call cvmix_idemix2_compute_Eiw_waveinteract(                  &
                               nlev          = nln-uln+1                               & !IN:    number of active levels
                             , nfbin         = idemix2_nfbin                           & !IN:    number of spectral angular bins
-                            , dzw           = hnode(                uln:nln-1, node)  & !IN:    layer thickness (m)
+                            , dzw           = real(mesh%hnode(uln:nln-1, node), WP)  & !IN:    layer thickness (m)
                             , dphi          = iwe2_dphit                              & !IN:    angular bin widths
                             , dt            = dt                                      & !IN:    time step (s)
                             , flag_posdef   = .True.                                  & !IN:    enforce positive-definiteness
@@ -1944,11 +1938,11 @@ module g_cvmix_idemix2
                             )
                     end if
                 elseif (idemix2_enable_niw) then
-                    if (idemix2_diag_WWI .and. node <= myDim_nod2D) then
+                    if (idemix2_diag_WWI .and. node <= partit%myDim_nod2D) then
                         call cvmix_idemix2_compute_Eiw_waveinteract(                  &
                               nlev          = nln-uln+1                               & !IN:    number of active levels
                             , nfbin         = idemix2_nfbin                           & !IN:    number of spectral angular bins
-                            , dzw           = hnode(                uln:nln-1, node)  & !IN:    layer thickness (m)
+                            , dzw           = real(mesh%hnode(uln:nln-1, node), WP)  & !IN:    layer thickness (m)
                             , dphi          = iwe2_dphit                              & !IN:    angular bin widths
                             , dt            = dt                                      & !IN:    time step (s)
                             , flag_posdef   = .True.                                  & !IN:    enforce positive-definiteness
@@ -1965,7 +1959,7 @@ module g_cvmix_idemix2
                         call cvmix_idemix2_compute_Eiw_waveinteract(                  &
                               nlev          = nln-uln+1                               & !IN:    number of active levels
                             , nfbin         = idemix2_nfbin                           & !IN:    number of spectral angular bins
-                            , dzw           = hnode(                uln:nln-1, node)  & !IN:    layer thickness (m)
+                            , dzw           = real(mesh%hnode(uln:nln-1, node), WP)  & !IN:    layer thickness (m)
                             , dphi          = iwe2_dphit                              & !IN:    angular bin widths
                             , dt            = dt                                      & !IN:    time step (s)
                             , flag_posdef   = .True.                                  & !IN:    enforce positive-definiteness
@@ -1993,9 +1987,9 @@ module g_cvmix_idemix2
             !___________________________________________________________________
             ! write out diffusivity --> convert from elem to vertices
 !$OMP PARALLEL DO PRIVATE(node, uln, nln)
-            do node=1, myDim_nod2D
-                uln = ulevels_nod2D(node)
-                nln = nlevels_nod2D(node)
+            do node=1, partit%myDim_nod2D
+                uln = mesh%ulevels_nod2D(node)
+                nln = mesh%nlevels_nod2D(node)
                 !_______________________________________________________________
                 ! convert Eiw disspation into Kv and Av on vertices 
                 call cvmix_idemix2_compute_Eiw_diss2KvAv(         &
@@ -2012,10 +2006,10 @@ module g_cvmix_idemix2
             
             !___________________________________________________________________
             ! more idemix2 viscosity from vertices to elements
-            do elem=1,myDim_elem2D+eDim_elem2D
-                uln = ulevels(elem)
-                nln = nlevels(elem)
-                elnodes = elem2d_nodes(:,elem)
+            do elem=1,partit%myDim_elem2D+partit%eDim_elem2D
+                uln = mesh%ulevels(elem)
+                nln = mesh%nlevels(elem)
+                elnodes = mesh%elem2d_nodes(:,elem)
                 do nz=uln, nln
                     Av(nz, elem) = sum(iwe2_Av(nz, elnodes))/3.0_WP
                 end do
@@ -2030,7 +2024,7 @@ module g_cvmix_idemix2
         t_end = MPI_Wtime()
         time_total = t_end - t_start
         
-        if (mype==0 .and. mod(istep, logfile_outfreq)==0) then
+        if (partit%mype==0 .and. mod(istep, logfile_outfreq)==0) then
             write(*,*)
             write(*,'(A)') ' ___IDEMIX2 EXECUTION TIMES_____________________________'
             write(*,'(A, ES10.3, A, F6.2, A)') '     Params (cn,tau,struct)    : ', time_params,    ' s  (', 100.0*time_params/time_total,    '%)'
@@ -2083,10 +2077,6 @@ module g_cvmix_idemix2
         real(kind=WP)                           :: R, ttfp2, ttfm1, ttf0, ttfp1, dttf0p1, Tmean1, Tmean2, Cr, vflux, vfabs
         integer                                 :: el(2), el2, ednodes(2), edge, fbini, nfbin, nln, uln, nz
         logical, parameter                      :: flag_volfix=.True.
-#include "../associate_part_def.h"
-#include "../associate_mesh_def.h"
-#include "../associate_part_ass.h"
-#include "../associate_mesh_ass.h"
         
         !_______________________________________________________________________
         nfbin=idemix2_nfbin
@@ -2098,32 +2088,32 @@ module g_cvmix_idemix2
 !$OMP                                  u1, v1, u2, v2, Ue, CFL, vflux, vfabs, &
 !$OMP                                  ttf0, ttfp1, dttf0p1, ttfp2, ttfm1, R, Cr, Tmean1, Tmean2)
 !$OMP DO        
-        do edge=1, myDim_edge2D
+        do edge=1, partit%myDim_edge2D
             !___________________________________________________________________
             ! local indice of nodes that span up edge ed
-            ednodes= edges(:,edge)
+            ednodes= mesh%edges(:,edge)
             
             ! local index of element that contribute to edge
-            el     = edge_tri(:,edge)
+            el     = mesh%edge_tri(:,edge)
             
             ! edge_cross_dxdy(1:2,ed)... dx,dy distance from center of edge to
             ! element centroid el(1) --> needed to calc flux perpedicular to edge from elem el(1)
-            dx1    = edge_cross_dxdy(1,edge)
-            dy1    = edge_cross_dxdy(2,edge)
+            dx1    = mesh%edge_cross_dxdy(1,edge)
+            dy1    = mesh%edge_cross_dxdy(2,edge)
             
             ! length of edge dx dy
-            dxdy12 = edge_dxdy(:,edge)*r_earth  
+            dxdy12 = mesh%edge_dxdy(:,edge)*r_earth  
             
             ! compute elemental local bottom depth for volume flux computation 
             if (flag_volfix) then 
-                nln = nlevels(el(1))
-                dh1 = abs(zbar(nln))
+                nln = mesh%nlevels(el(1))
+                dh1 = abs(mesh%zbar(nln))
             else
-                uln = ulevels(el(1))
-                nln = nlevels(el(1))-1
+                uln = mesh%ulevels(el(1))
+                nln = mesh%nlevels(el(1))-1
                 dh1  = 0.0_WP
                 do nz=uln,nln
-                    dh1 = dh1 + helem(nz, el(1))
+                    dh1 = dh1 + mesh%helem(nz, el(1))
                 end do
             end if 
             
@@ -2136,22 +2126,22 @@ module g_cvmix_idemix2
             el2    = el(1) ! --> just a dummy index here is vel(el2) are multiplied with 0.0_WP
             if(el(2)>0) then
                 el2      = el(2) ! --> dummy replaced with valid el(2), dx2 and dy2
-                dx2      = edge_cross_dxdy(3,edge)
-                dy2      = edge_cross_dxdy(4,edge)
+                dx2      = mesh%edge_cross_dxdy(3,edge)
+                dy2      = mesh%edge_cross_dxdy(4,edge)
                 
                 ! compute elemental local bottom depth for volume flux computation 
                 if (flag_volfix) then 
-                    nln = nlevels(el2)
-                    dh2 = abs(zbar(nln))
+                    nln = mesh%nlevels(el2)
+                    dh2 = abs(mesh%zbar(nln))
                 else
-                    uln = ulevels(el2)
-                    nln = nlevels(el2)-1
+                    uln = mesh%ulevels(el2)
+                    nln = mesh%nlevels(el2)-1
                     do nz=uln,nln
-                        dh2 = dh2 + helem(nz, el2)
+                        dh2 = dh2 + mesh%helem(nz, el2)
                     end do
                 end if 
                 
-                dxdy12(1)= dxdy12(1) * (elem_cos(el(1)) + elem_cos(el2)) * 0.5_WP
+                dxdy12(1)= dxdy12(1) * (mesh%elem_cos(el(1)) + mesh%elem_cos(el2)) * 0.5_WP
                 
                 ! compute mean edge-segment normal vector
                 !                         (dx1,dy1)
@@ -2170,7 +2160,7 @@ module g_cvmix_idemix2
                 n_y      = ((-dx1) +   dx2 )/2
                 
             else
-                dxdy12(1)= dxdy12(1) * elem_cos(el(1))   
+                dxdy12(1)= dxdy12(1) * mesh%elem_cos(el(1))   
                 ! compute edge-segment normal vector
                 n_x      =  dy1
                 n_y      = -dx1
@@ -2408,10 +2398,6 @@ module g_cvmix_idemix2
         !___LOCAL VARIABLES_____________________________________________________
         integer       :: edge, fbini, kk, nfbin, sgn, n_int
         real(kind=WP) :: outflux, ivols_int
-#include "../associate_part_def.h"
-#include "../associate_mesh_def.h"
-#include "../associate_part_ass.h"
-#include "../associate_mesh_ass.h"
 
         nfbin = idemix2_nfbin
 
@@ -2425,7 +2411,7 @@ module g_cvmix_idemix2
         ! Net: energy is redistributed fbini→kk at n_int with zero total change.
         ! Applied to Edivh after adv_Ecompart_flx2tra_spctrl in hsintegrate_Ecompart.
 !$OMP PARALLEL DO PRIVATE(edge, fbini, kk, sgn, n_int, outflux, ivols_int)
-        do edge = 1, myDim_edge2D
+        do edge = 1, partit%myDim_edge2D
             kk  = refl_bin(edge)
             ! edge is not connected to coast
             if (kk == 0) cycle
@@ -2437,7 +2423,7 @@ module g_cvmix_idemix2
             sgn   = refl_sgn(edge)
             
             ! which one is interior coastal edge node
-            n_int = merge(edges(2, edge), edges(1, edge), sgn == +1)
+            n_int = merge(mesh%edges(2, edge), mesh%edges(1, edge), sgn == +1)
 
             ! local scaler volume
             ivols_int = 1.0_WP/vol_s(n_int)
@@ -2447,7 +2433,7 @@ module g_cvmix_idemix2
                 if (sgn * outflux > 0.0_WP) then
                     ! block flux towards coast by setting to zero
                     flux(fbini, edge) = 0.0_WP
-                    if (n_int <= myDim_nod2D) then
+                    if (n_int <= partit%myDim_nod2D) then
 !$OMP ATOMIC
                         refl_src(kk,    n_int) = refl_src(kk,    n_int) + sgn * outflux
 !$OMP ATOMIC
@@ -2496,10 +2482,6 @@ module g_cvmix_idemix2
         integer                              :: node, fbini, nfbin
         real(kind=WP)                        :: R, ttf0, ttfp1, dttf0p1, Tmean1, Tmean2, Cr, vflux, vfabs
         real(kind=WP)                        :: CFL !, cflmax=0.50_WP
-#include "../associate_part_def.h"
-#include "../associate_mesh_def.h"
-#include "../associate_part_ass.h"
-#include "../associate_mesh_ass.h"
 
         !_______________________________________________________________________
         nfbin=idemix2_nfbin
@@ -2516,7 +2498,7 @@ module g_cvmix_idemix2
         !_______________________________________________________________________
         ! this advection does !!! NOT !!! go over the vertical dimension it goes 
         ! over the domain of the spectral bins 
-        do node = 1, myDim_nod2D
+        do node = 1, partit%myDim_nod2D
             
             !___________________________________________________________________
             !loop over spectral bins 
@@ -2645,10 +2627,6 @@ module g_cvmix_idemix2
         integer                               :: node, edge, fbini, nfbin, ednodes(2), k
         real(kind=WP)                         :: inv_dphi(idemix2_nfbin), ivols_lcl
         
-#include "../associate_part_def.h"
-#include "../associate_mesh_def.h"
-#include "../associate_part_ass.h"
-#include "../associate_mesh_ass.h"
         
         nfbin = idemix2_nfbin
         !
@@ -2659,7 +2637,7 @@ module g_cvmix_idemix2
 #else
         !$ACC PARALLEL LOOP GANG VECTOR COLLAPSE(2) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 #endif
-        do node=1, myDim_nod2D+eDim_nod2D
+        do node=1, partit%myDim_nod2D+partit%eDim_nod2D
             do fbini=1, nfbin
                 div_h(fbini, node)=0.0_WP
                 div_v(fbini, node)=0.0_WP
@@ -2683,7 +2661,7 @@ module g_cvmix_idemix2
 #else
        !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 #endif
-        do node=1, myDim_nod2d
+        do node=1, partit%myDim_nod2d
             !$ACC LOOP VECTOR
             do fbini=2,nfbin-1
                 ! Cross-spectral divergence: (flux(fbini) - flux(fbini-1))/dphi
@@ -2703,12 +2681,15 @@ module g_cvmix_idemix2
         !
         !_______________________________________________________________________
         ! Horizontal part
-#ifndef ENABLE_OPENACC
         ! Each owned node gathers the fluxes of its incident edges in ascending
         ! edge order (mesh%nod_in_edge2D): + where it is the first edge node,
         ! - where it is the second.
+#ifndef ENABLE_OPENACC
        !$OMP DO
-        do node=1, myDim_nod2d
+#else
+       !$ACC PARALLEL LOOP GANG VECTOR PRIVATE(k, edge, fbini) DEFAULT(PRESENT)
+#endif
+        do node=1, partit%myDim_nod2d
             do k=1, mesh%nod_in_edge2D_num(node)
                 edge = mesh%nod_in_edge2D(k,node)
                 if (mesh%nod_in_edge2D_sgn(k,node) > 0) then
@@ -2723,47 +2704,11 @@ module g_cvmix_idemix2
                 end if
             end do
         end do
+#ifndef ENABLE_OPENACC
        !$OMP END DO
        !$OMP END PARALLEL
 #else
-#   if !defined(DISABLE_OPENACC_ATOMICS)
-       !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
-#   else
-       !$ACC UPDATE SELF(dttf_h, flux_h)
-#   endif
-        do edge=1, myDim_edge2D 
-            ednodes  = edges(:,edge)
-#   if !defined(DISABLE_OPENACC_ATOMICS)
-           !$ACC LOOP VECTOR
-#   endif
-            !
-            !___________________________________________________________________
-            ! horizontal flux contribution to ednode_1
-            do fbini=2, nfbin-1
-#if !defined(DISABLE_OPENACC_ATOMICS)
-               !$ACC ATOMIC UPDATE
-#endif
-                ! Horizontal divergence: flux/area (NO inv_dphi - that's only for cross-spectral!)
-                div_h(fbini, ednodes(1))=div_h(fbini, ednodes(1))+flx_h(fbini, edge)
-                
-                
-#   if !defined(DISABLE_OPENACC_ATOMICS)
-                !$ACC ATOMIC UPDATE
-#   endif                
-                ! Horizontal divergence: flux/area (NO inv_dphi - that's only for cross-spectral!)
-                div_h(fbini,ednodes(2))=div_h(fbini,ednodes(2))-flx_h(fbini,edge)
-            end do
-            
-#   if !defined(DISABLE_OPENACC_ATOMICS)
-            !$ACC END LOOP
-#   endif
-        end do
-
-#   if !defined(DISABLE_OPENACC_ATOMICS)
-   !$ACC END PARALLEL LOOP
-#   else
-   !$ACC UPDATE DEVICE(dttf_h)
-#   endif
+       !$ACC END PARALLEL LOOP
 #endif
         !_______________________________________________________________________
         ! normalize with total volume of scalar cell from top to bottom
@@ -2771,7 +2716,7 @@ module g_cvmix_idemix2
         ! precompute reciprocal outside inner loop: FP division is ~6x more expensive
         ! than multiply on CPU, and the outer loop already saturates thread count
         !$OMP PARALLEL DO PRIVATE(ivols_lcl)
-        do node=1, myDim_nod2d! +eDim_nod2D
+        do node=1, partit%myDim_nod2d! +eDim_nod2D
             ivols_lcl = 1/vol_s(node)
             do fbini=2,nfbin-1
                 div_h(fbini, node) = div_h(fbini,node)*ivols_lcl
@@ -2783,7 +2728,7 @@ module g_cvmix_idemix2
         ! bandwidth dominates; inline division to keep loops perfectly nested for
         ! COLLAPSE(2), which gives a flat warp-filling iteration space
         !$ACC PARALLEL LOOP GANG VECTOR COLLAPSE(2) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
-        do node=1, myDim_nod2d! +eDim_nod2D
+        do node=1, partit%myDim_nod2d! +eDim_nod2D
             do fbini=2,nfbin-1
                 div_h(fbini, node) = div_h(fbini,node)/vol_s(node)
             end do
@@ -2795,7 +2740,7 @@ module g_cvmix_idemix2
         ! inject blocked coast fluxes as source at interior nodes in mirror bin
 #ifndef ENABLE_OPENACC
         !$OMP PARALLEL DO
-        do node = 1, myDim_nod2D
+        do node = 1, partit%myDim_nod2D
             if (.not. refl_node(node)) cycle
             do fbini = 2, nfbin-1
                 div_h(fbini, node) = div_h(fbini, node) + refl_src(fbini, node)
@@ -2807,7 +2752,7 @@ module g_cvmix_idemix2
         ! space (would cycle fbini, not node); condition moved inside inner loop —
         ! a predicated assignment is GPU-friendly and restores perfect nesting
         !$ACC PARALLEL LOOP GANG VECTOR COLLAPSE(2) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
-        do node = 1, myDim_nod2D
+        do node = 1, partit%myDim_nod2D
             do fbini = 2, nfbin-1
                 if (refl_node(node)) div_h(fbini, node) = div_h(fbini, node) + refl_src(fbini, node)
             end do
@@ -2889,10 +2834,6 @@ module g_cvmix_idemix2
         integer                                  :: node, fbini, nfbin
         real(kind=WP)                            :: inv_denom
         real(kind=WP)                            :: refl_flux(partit%myDim_nod2D)
-#include "../associate_part_def.h"
-#include "../associate_mesh_def.h"
-#include "../associate_part_ass.h"
-#include "../associate_mesh_ass.h"        
         !_______________________________________________________________________
         nfbin=idemix2_nfbin
 
@@ -2977,7 +2918,7 @@ module g_cvmix_idemix2
         !_______________________________________________________________________
         ! Adams-Bashforth 2nd order + implicit dissipation
         if (flag_AB2) then
-            do node= 1, myDim_nod2d
+            do node= 1, partit%myDim_nod2d
                 inv_denom = 1.0_WP / (1.0_WP + dt*tauE(node))
                 do fbini=2,nfbin-1
                     E(fbini, node, tip1) = ( E(fbini, node, ti) &
@@ -2996,7 +2937,7 @@ module g_cvmix_idemix2
         !_______________________________________________________________________
         ! Forward Euler + implicit dissipation
         else
-            do node= 1, myDim_nod2d
+            do node= 1, partit%myDim_nod2d
                 inv_denom = 1.0_WP / (1.0_WP + dt*tauE(node))
                 do fbini=2,nfbin-1
                     E(fbini, node, tip1) = ( E(fbini, node, ti) &
@@ -3014,35 +2955,35 @@ module g_cvmix_idemix2
 
         !_______________________________________________________________________
         ! additional diagnostics
-        if (present(Edt))   Edt(:,:)   =  (E(:, 1:myDim_nod2D, tip1)-E(:, 1:myDim_nod2D, ti)) / dt
+        if (present(Edt))   Edt(:,:)   =  (E(:, 1:partit%myDim_nod2D, tip1)-E(:, 1:partit%myDim_nod2D, ti)) / dt
 
         if (present(Eadvh)) then
             if (flag_AB2) then
-                Eadvh(:,:) =  ((1.5+idemix2_AB_epsilon)*Edivh(:, 1:myDim_nod2D, ti  ) &
-                            - (0.5+idemix2_AB_epsilon)*Edivh(:, 1:myDim_nod2D, tip1))
+                Eadvh(:,:) =  ((1.5+idemix2_AB_epsilon)*Edivh(:, 1:partit%myDim_nod2D, ti  ) &
+                            - (0.5+idemix2_AB_epsilon)*Edivh(:, 1:partit%myDim_nod2D, tip1))
             else
-                Eadvh(:,:) = Edivh(:, 1:myDim_nod2D, ti)
+                Eadvh(:,:) = Edivh(:, 1:partit%myDim_nod2D, ti)
             end if
         end if
 
         if (present(Eadvs)) then
             if (flag_AB2) then
-                Eadvs(:,:) =  ((1.5+idemix2_AB_epsilon)*Edivs(:, 1:myDim_nod2D, ti  ) &
-                            - (0.5+idemix2_AB_epsilon)*Edivs(:, 1:myDim_nod2D, tip1))
+                Eadvs(:,:) =  ((1.5+idemix2_AB_epsilon)*Edivs(:, 1:partit%myDim_nod2D, ti  ) &
+                            - (0.5+idemix2_AB_epsilon)*Edivs(:, 1:partit%myDim_nod2D, tip1))
             else
-                Eadvs(:,:) = Edivs(:, 1:myDim_nod2D, ti)
+                Eadvs(:,:) = Edivs(:, 1:partit%myDim_nod2D, ti)
             end if
         end if
 
         if (present(Ediss)) then
-            do node= 1, myDim_nod2d
+            do node= 1, partit%myDim_nod2d
                 Ediss(:,node) =  - tauE(node)*E(:, node, tip1)
             end do
         end if
 
-        if (present(Eforc)) Eforc(:,:) = forc(:, 1:myDim_nod2D)
+        if (present(Eforc)) Eforc(:,:) = forc(:, 1:partit%myDim_nod2D)
 
-        if (present(Erefl)) Erefl(:) = refl_flux(1:myDim_nod2D)
+        if (present(Erefl)) Erefl(:) = refl_flux(1:partit%myDim_nod2D)
 
     end subroutine hsintegrate_Ecompart
     
@@ -3074,29 +3015,25 @@ module g_cvmix_idemix2
         !___LOCAL VARIABLES_____________________________________________________
         integer                                 :: node, nz, nln, uln
         real(kind=WP)                           :: dz_trr(mesh%nl)
-#include "../associate_part_def.h"
-#include "../associate_mesh_def.h"
-#include "../associate_part_ass.h"
-#include "../associate_mesh_ass.h"   
-        do node = 1, myDim_nod2D + eDim_nod2D
+        do node = 1, partit%myDim_nod2D + partit%eDim_nod2D
             ! number of above bottom levels at node
-            nln = nlevels_nod2D(node)-1
-            uln = ulevels_nod2D(node)
+            nln = mesh%nlevels_nod2D(node)-1
+            uln = mesh%ulevels_nod2D(node)
                 
             ! thickness of mid-level to mid-level interface at node
             dz_trr             = 0.0_WP
-            dz_trr(uln+1:nln)  = Z_3d_n(uln:nln-1,node)-Z_3d_n(uln+1:nln,node)
-            dz_trr(uln)        = hnode(uln,node)/2.0_WP
-            dz_trr(nln+1)      = hnode(nln,node)/2.0_WP
+            dz_trr(uln+1:nln)  = mesh%Z_3d_n(uln:nln-1,node)-mesh%Z_3d_n(uln+1:nln,node)
+            dz_trr(uln)        = mesh%hnode(uln,node)/2.0_WP
+            dz_trr(nln+1)      = mesh%hnode(nln,node)/2.0_WP
                 
             ! surface cell 
-            vol_wcelli(uln,node)   = 1/areasvol(uln,node)/dz_trr(uln)
+            vol_wcelli(uln,node)   = 1/mesh%areasvol(uln,node)/dz_trr(uln)
             do nz=uln+1,nln
                 ! inverse volumne centered around full depth levels
-                vol_wcelli(nz,node)= 1/areasvol(nz-1,node)/dz_trr(nz)
+                vol_wcelli(nz,node)= 1/mesh%areasvol(nz-1,node)/dz_trr(nz)
             end do 
             ! bottom cell 
-            vol_wcelli(nln+1,node) = 1/areasvol(nln,node)/dz_trr(nln+1)
+            vol_wcelli(nln+1,node) = 1/mesh%areasvol(nln,node)/dz_trr(nln+1)
             
         end do !-->do node = 1,node_size
     end subroutine compute_vol_wcell
@@ -3130,18 +3067,14 @@ module g_cvmix_idemix2
         !___LOCAL VARIABLES_____________________________________________________
         integer                                 :: node, elem, nz, nln, uln, elnodes(3)
 !         real(kind=WP)                           :: lcl_sumvol, glb_sumvol, vol
-#include "../associate_part_def.h"
-#include "../associate_mesh_def.h"
-#include "../associate_part_ass.h"
-#include "../associate_mesh_ass.h"   
         vol_nodB2T = 0.0_WP
 !         lcl_sumvol = 0.0_WP
-        do node = 1, myDim_nod2D
-            nln = nlevels_nod2D(node)-1
-            uln = ulevels_nod2D(node)
+        do node = 1, partit%myDim_nod2D
+            nln = mesh%nlevels_nod2D(node)-1
+            uln = mesh%ulevels_nod2D(node)
             do nz=uln,nln
 !                 lcl_sumvol       = lcl_sumvol       + areasvol(nz,node)*abs(zbar(nz)-zbar(nz+1))
-                vol_nodB2T(node) = vol_nodB2T(node) + areasvol(nz,node)*abs(zbar(nz)-zbar(nz+1))
+                vol_nodB2T(node) = vol_nodB2T(node) + mesh%areasvol(nz,node)*abs(mesh%zbar(nz)-mesh%zbar(nz+1))
             end do
         end do !-->do node = 1,node_size
         ! call MPI_Allreduce(lcl_sumvol, glb_sumvol, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
@@ -3200,18 +3133,14 @@ module g_cvmix_idemix2
         !___LOCAL VARIABLES_____________________________________________________
         integer                                 :: node, elem, nz, nln, uln
 !         real(kind=WP)                           :: lcl_sumvol, glb_sumvol, vol
-#include "../associate_part_def.h"
-#include "../associate_mesh_def.h"
-#include "../associate_part_ass.h"
-#include "../associate_mesh_ass.h"   
         vol_nodB2T = 0.0_WP
         ! lcl_sumvol = 0.0_WP
-        do node = 1, myDim_nod2D
-            nln = nlevels_nod2D(node)-1
-            uln = ulevels_nod2D(node)
+        do node = 1, partit%myDim_nod2D
+            nln = mesh%nlevels_nod2D(node)-1
+            uln = mesh%ulevels_nod2D(node)
             do nz=uln,nln
                 ! lcl_sumvol       = lcl_sumvol       + areasvol(nz,node)*hnode(nz,node)
-                vol_nodB2T(node) = vol_nodB2T(node) + areasvol(nz,node)*hnode(nz,node)
+                vol_nodB2T(node) = vol_nodB2T(node) + mesh%areasvol(nz,node)*mesh%hnode(nz,node)
             end do
         end do !-->do node = 1,node_size
         ! call MPI_Allreduce(lcl_sumvol, glb_sumvol, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
@@ -3281,16 +3210,12 @@ module g_cvmix_idemix2
         real(kind=WP)                           :: dz_trr1(mesh%nl), dz_trr2(mesh%nl), &
                                                    grad_v0Eiw(2)
         real(kind=WP)                           :: dx1, dx2, dy1, dy2, vflux
-#include "../associate_part_def.h"
-#include "../associate_mesh_def.h"
-#include "../associate_part_ass.h"
-#include "../associate_mesh_ass.h"
         !_______________________________________________________________________
         ! calculate horizontal diffusion term div( grad(Eiw*v0) * tau_h*v0) 
-        do edge=1,myDim_edge2D
+        do edge=1,partit%myDim_edge2D
             !___________________________________________________________________
             ! ednode ... vertices that form the edge
-            ednodes  = edges(:,edge)
+            ednodes  = mesh%edges(:,edge)
             
             ! deltaX1,deltaY1 ... cross edge dx and dy for the two elements 
             ! that contribute to the edge
@@ -3308,24 +3233,24 @@ module g_cvmix_idemix2
             !                \ /
             !                 o
             !                 
-            dx1      = edge_cross_dxdy(1,edge)
-            dy1      = edge_cross_dxdy(2,edge)
+            dx1      = mesh%edge_cross_dxdy(1,edge)
+            dy1      = mesh%edge_cross_dxdy(2,edge)
             ! el ... elements that contribute to edge
-            edel     = edge_tri(:,edge)
+            edel     = mesh%edge_tri(:,edge)
             ! elnodes1 ... nodes that contribute to element el(1) 
-            elnodes1 = elem2d_nodes(:,edel(1))
+            elnodes1 = mesh%elem2d_nodes(:,edel(1))
             ! nl1 ... number of layers at element el(1)
-            nl1      = nlevels(edel(1))
+            nl1      = mesh%nlevels(edel(1))
             ! nu1 ... upper index of ocean default = 1 but can consider cavity !=1
-            nu1      = ulevels(edel(1))
+            nu1      = mesh%ulevels(edel(1))
                     
             ! thickness of mid-level to mid-level interface of element el(1)
             dz_trr1         = 0.0_WP
-            dz_trr1(nu1)    = helem(nu1  ,edel(1))/2.0_WP
+            dz_trr1(nu1)    = mesh%helem(nu1  ,edel(1))/2.0_WP
             do nz = nu1+1, nl1-1
-                dz_trr1(nz) = helem(nz-1 ,edel(1))/2.0_WP + helem(nz,edel(1))/2.0_WP
+                dz_trr1(nz) = mesh%helem(nz-1 ,edel(1))/2.0_WP + mesh%helem(nz,edel(1))/2.0_WP
             end do
-            dz_trr1(nl1)    = helem(nl1-1,edel(1))/2.0_WP
+            dz_trr1(nl1)    = mesh%helem(nl1-1,edel(1))/2.0_WP
                     
             !___________________________________________________________________
             ! the same as above but for el(2)--> if el(2)==0 than this edge 
@@ -3333,19 +3258,19 @@ module g_cvmix_idemix2
             nl2=0
             nu2=0
             if (edel(2)>0) then 
-                dx2      = edge_cross_dxdy(3,edge)
-                dy2      = edge_cross_dxdy(4,edge)
-                elnodes2 = elem2d_nodes(:,edel(2))
-                nl2      = nlevels(edel(2))
-                nu2      = ulevels(edel(2))
+                dx2      = mesh%edge_cross_dxdy(3,edge)
+                dy2      = mesh%edge_cross_dxdy(4,edge)
+                elnodes2 = mesh%elem2d_nodes(:,edel(2))
+                nl2      = mesh%nlevels(edel(2))
+                nu2      = mesh%ulevels(edel(2))
                         
                 ! thickness of mid-level to mid-level interface of element el(2)
                 dz_trr2         = 0.0_WP
-                dz_trr2(nu2)    = helem(nu2  ,edel(2))/2.0_WP
+                dz_trr2(nu2)    = mesh%helem(nu2  ,edel(2))/2.0_WP
                 do nz = nu2+1, nl2-1
-                    dz_trr2(nz) = helem(nz-1 ,edel(2))/2.0_WP + helem(nz,edel(2))/2.0_WP
+                    dz_trr2(nz) = mesh%helem(nz-1 ,edel(2))/2.0_WP + mesh%helem(nz,edel(2))/2.0_WP
                 end do
-                dz_trr2(nl2)    = helem(nl2-1,edel(2))/2.0_WP
+                dz_trr2(nl2)    = mesh%helem(nl2-1,edel(2))/2.0_WP
             endif
             
             !___________________________________________________________________
@@ -3362,8 +3287,8 @@ module g_cvmix_idemix2
                 ! --> calc: grad_h(v_0*E_iw)
                 ! calculate flux from el(1) with respect to edge mid 
                 ! point
-                grad_v0Eiw(1) = sum(gradient_sca(1:3,edel(1))*v0(nz,elnodes1)*Eiw_old(nz,elnodes1))
-                grad_v0Eiw(2) = sum(gradient_sca(4:6,edel(1))*v0(nz,elnodes1)*Eiw_old(nz,elnodes1))
+                grad_v0Eiw(1) = sum(mesh%gradient_sca(1:3,edel(1))*v0(nz,elnodes1)*Eiw_old(nz,elnodes1))
+                grad_v0Eiw(2) = sum(mesh%gradient_sca(4:6,edel(1))*v0(nz,elnodes1)*Eiw_old(nz,elnodes1))
                 
                 ! calculate flux --> grad_v0Eiw is now located on elements
                 vflux = (grad_v0Eiw(1)*dy1-grad_v0Eiw(2)*dx1)*dz_trr1(nz)
@@ -3392,8 +3317,8 @@ module g_cvmix_idemix2
                     ! --> calc: grad_h(v_0*E_iw)
                     ! first calculate flux from el(1) with respect to edge mid 
                     ! point
-                    grad_v0Eiw(1) = sum(gradient_sca(1:3,edel(2))*v0(nz,elnodes2)*Eiw_old(nz,elnodes2))
-                    grad_v0Eiw(2) = sum(gradient_sca(4:6,edel(2))*v0(nz,elnodes2)*Eiw_old(nz,elnodes2))
+                    grad_v0Eiw(1) = sum(mesh%gradient_sca(1:3,edel(2))*v0(nz,elnodes2)*Eiw_old(nz,elnodes2))
+                    grad_v0Eiw(2) = sum(mesh%gradient_sca(4:6,edel(2))*v0(nz,elnodes2)*Eiw_old(nz,elnodes2))
                     
                     ! calculate flux 
                     vflux = -(grad_v0Eiw(1)*dy2-grad_v0Eiw(2)*dx2)*dz_trr2(nz)
@@ -3423,16 +3348,16 @@ module g_cvmix_idemix2
                 !_______________________________________________________________
                 ! --> calc: grad_h(v_0*E_iw)
                 ! calculate grad(iwe*iwe_v0) for el(1)
-                grad_v0Eiw(1) = sum(gradient_sca(1:3,edel(1))*v0(nz,elnodes1)*Eiw_old(nz,elnodes1))
-                grad_v0Eiw(2) = sum(gradient_sca(4:6,edel(1))*v0(nz,elnodes1)*Eiw_old(nz,elnodes1))
+                grad_v0Eiw(1) = sum(mesh%gradient_sca(1:3,edel(1))*v0(nz,elnodes1)*Eiw_old(nz,elnodes1))
+                grad_v0Eiw(2) = sum(mesh%gradient_sca(4:6,edel(1))*v0(nz,elnodes1)*Eiw_old(nz,elnodes1))
                 
                 ! calculate flux --> grad_v0Eiw is now located on elements
                 vflux = (grad_v0Eiw(1)*dy1-grad_v0Eiw(2)*dx1)*dz_trr1(nz)
                 
                 ! calculate grad(iwe*iwe_v0) for el(2) and average for el(1)
                 ! and el(2)
-                grad_v0Eiw(1) = sum(gradient_sca(1:3,edel(2))*v0(nz,elnodes2)*Eiw_old(nz,elnodes2))
-                grad_v0Eiw(2) = sum(gradient_sca(4:6,edel(2))*v0(nz,elnodes2)*Eiw_old(nz,elnodes2))
+                grad_v0Eiw(1) = sum(mesh%gradient_sca(1:3,edel(2))*v0(nz,elnodes2)*Eiw_old(nz,elnodes2))
+                grad_v0Eiw(2) = sum(mesh%gradient_sca(4:6,edel(2))*v0(nz,elnodes2)*Eiw_old(nz,elnodes2))
                 
                 ! calculate flux 
                 vflux = vflux + -(grad_v0Eiw(1)*dy2-grad_v0Eiw(2)*dx2)*dz_trr2(nz)
@@ -3458,8 +3383,8 @@ module g_cvmix_idemix2
                 ! --> calc: grad_h(v_0*E_iw)
                 ! calculate flux from el(1) with respect to edge mid 
                 ! point
-                grad_v0Eiw(1) = sum(gradient_sca(1:3,edel(1))*v0(nz,elnodes1)*Eiw_old(nz,elnodes1))
-                grad_v0Eiw(2) = sum(gradient_sca(4:6,edel(1))*v0(nz,elnodes1)*Eiw_old(nz,elnodes1))
+                grad_v0Eiw(1) = sum(mesh%gradient_sca(1:3,edel(1))*v0(nz,elnodes1)*Eiw_old(nz,elnodes1))
+                grad_v0Eiw(2) = sum(mesh%gradient_sca(4:6,edel(1))*v0(nz,elnodes1)*Eiw_old(nz,elnodes1))
                 
                 ! calculate flux 
                 vflux = (grad_v0Eiw(1)*dy1-grad_v0Eiw(2)*dx1)*dz_trr1(nz)
@@ -3485,8 +3410,8 @@ module g_cvmix_idemix2
                 ! --> calc: grad_h(v_0*E_iw)
                 ! first calculate flux from el(1) with respect to edge mid 
                 ! point
-                grad_v0Eiw(1) = sum(gradient_sca(1:3,edel(2))*v0(nz,elnodes2)*Eiw_old(nz,elnodes2))
-                grad_v0Eiw(2) = sum(gradient_sca(4:6,edel(2))*v0(nz,elnodes2)*Eiw_old(nz,elnodes2))
+                grad_v0Eiw(1) = sum(mesh%gradient_sca(1:3,edel(2))*v0(nz,elnodes2)*Eiw_old(nz,elnodes2))
+                grad_v0Eiw(2) = sum(mesh%gradient_sca(4:6,edel(2))*v0(nz,elnodes2)*Eiw_old(nz,elnodes2))
                 
                 ! calculate flux 
                 vflux = -(grad_v0Eiw(1)*dy2-grad_v0Eiw(2)*dx2)*dz_trr2(nz)
@@ -3526,15 +3451,11 @@ module g_cvmix_idemix2
         real(kind=WP)                         :: local_div_sum, global_div_sum, global_div_max
         real(kind=WP)                         :: u_neighbor(idemix2_nfbin), v_neighbor(idemix2_nfbin)
         
-#include "../associate_part_def.h"
-#include "../associate_mesh_def.h"
-#include "../associate_part_ass.h"
-#include "../associate_mesh_ass.h"
         
         ! Compute divergence of velocity field using gradient_vec operator
         ! gradient_vec(1:3, elem) are coefficients for ∂/∂x
         ! gradient_vec(4:6, elem) are coefficients for ∂/∂y
-        do elem = 1, myDim_elem2D
+        do elem = 1, partit%myDim_elem2D
         
             ! Initialize divergence arrays
             div_uv(:, elem) = 0.0_WP
@@ -3584,15 +3505,11 @@ module g_cvmix_idemix2
         real(kind=WP)                         :: lcl_divh_sum, lcl_divs_sum
         real(kind=WP)                         :: glb_divh_sum, glb_divs_sum
         
-#include "../associate_part_def.h"
-#include "../associate_mesh_def.h"
-#include "../associate_part_ass.h"
-#include "../associate_mesh_ass.h"
         
         ! Compute local sum: div * area * dphi
         ! For a closed domain with no sources/sinks, this should sum to zero
         lcl_divh_sum = 0.0_WP
-        do node = 1, myDim_nod2D + eDim_nod2D  ! Full extended domain: telescoping holds locally per rank
+        do node = 1, partit%myDim_nod2D + partit%eDim_nod2D  ! Full extended domain: telescoping holds locally per rank
             do fbini = 2, idemix2_nfbin-1  ! Exclude ghost bins
                 lcl_divh_sum = lcl_divh_sum + div_h(fbini, node, ti)*vol_s(node)
             end do
@@ -3600,7 +3517,7 @@ module g_cvmix_idemix2
 !         write(*,*) lcl_divh_sum, mype
 
         lcl_divs_sum = 0.0_WP
-        do node = 1, myDim_nod2D  ! Full extended domain: telescoping holds locally per rank
+        do node = 1, partit%myDim_nod2D  ! Full extended domain: telescoping holds locally per rank
             do fbini = 2, idemix2_nfbin-1  ! Exclude ghost bins
                 lcl_divs_sum = lcl_divs_sum + div_s(fbini, node, ti)*dphit(fbini)
             end do
@@ -3609,10 +3526,10 @@ module g_cvmix_idemix2
         ! Sum across all MPI ranks
         glb_divh_sum = 0.0_WP
         glb_divs_sum = 0.0_WP
-        call MPI_Allreduce(lcl_divh_sum, glb_divh_sum, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-        call MPI_Allreduce(lcl_divs_sum, glb_divs_sum, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+        call MPI_Allreduce(lcl_divh_sum, glb_divh_sum, 1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+        call MPI_Allreduce(lcl_divs_sum, glb_divs_sum, 1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
         
-        if (mype == 0) then
+        if (partit%mype == 0) then
             write(*,*) ' debug: flux total conservation check (',trim(compartment_name),'):',&
                        '  Σ(div_h*vols) = ', glb_divh_sum, &
                        ', Σ(div_s*dphi) = ', glb_divs_sum
@@ -3643,10 +3560,6 @@ module g_cvmix_idemix2
         real(kind=WP)                         :: lcl_forc, glb_forc, lcl_diss, glb_diss
         real(kind=WP)                         :: lcl_maxE, glb_maxE, lcl_minE, glb_minE
         
-#include "../associate_part_def.h"
-#include "../associate_mesh_def.h"
-#include "../associate_part_ass.h"
-#include "../associate_mesh_ass.h"
         
         lcl_energy = 0.0_WP
         lcl_vol    = 0.0_WP
@@ -3654,7 +3567,7 @@ module g_cvmix_idemix2
         lcl_diss   = 0.0_WP
         lcl_maxE   = -1.0e33
         lcl_minE   =  1.0e33
-        do node = 1, myDim_nod2D  ! Only owned nodes
+        do node = 1, partit%myDim_nod2D  ! Only owned nodes
             lcl_vol = lcl_vol + vol_s(node)
             do fbini = 2, idemix2_nfbin-1  ! Exclude ghost bins
                 lcl_energy = lcl_energy + Ecompart(fbini, node, ti) * dphit(fbini) * vol_s(node)
@@ -3670,16 +3583,16 @@ module g_cvmix_idemix2
         glb_vol    = 0.0_WP
         glb_forc   = 0.0_WP
         glb_diss   = 0.0_WP
-        call MPI_Allreduce(lcl_energy, glb_energy, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-        call MPI_Allreduce(lcl_vol   , glb_vol   , 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-        call MPI_Allreduce(lcl_forc  , glb_forc  , 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-        call MPI_Allreduce(lcl_diss  , glb_diss  , 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-        call MPI_Allreduce(lcl_minE  , glb_minE  , 1, MPI_WP, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-        call MPI_Allreduce(lcl_maxE  , glb_maxE  , 1, MPI_WP, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+        call MPI_Allreduce(lcl_energy, glb_energy, 1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+        call MPI_Allreduce(lcl_vol   , glb_vol   , 1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+        call MPI_Allreduce(lcl_forc  , glb_forc  , 1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+        call MPI_Allreduce(lcl_diss  , glb_diss  , 1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+        call MPI_Allreduce(lcl_minE  , glb_minE  , 1, MPI_WP, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
+        call MPI_Allreduce(lcl_maxE  , glb_maxE  , 1, MPI_WP, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
         
         
         ! Print on rank 0
-        if (mype == 0) then
+        if (partit%mype == 0) then
             write(*,*) ' debug: global Σ(E_',trim(compartment_name),'*dphi*vols) = ', glb_energy, ' J', &
                              ', global min(E_',trim(compartment_name),') = ', glb_minE, &
                              ', global max(E_',trim(compartment_name),') = ', glb_maxE
@@ -3708,36 +3621,32 @@ module g_cvmix_idemix2
         real(kind=WP)                         :: u1, u2, v1, v2, Ue, CFL_h, CFL_cs
         real(kind=WP)                         :: lcl_cfl_h, glb_cfl_h, lcl_cfl_cs, glb_cfl_cs
         
-#include "../associate_part_def.h"
-#include "../associate_mesh_def.h"
-#include "../associate_part_ass.h"
-#include "../associate_mesh_ass.h"
         
         nfbin = idemix2_nfbin
         lcl_cfl_h  = 0.0_WP
         lcl_cfl_cs = 0.0_WP
         
         ! Max horizontal CFL over all edges
-        do edge = 1, myDim_edge2D
-            ednodes = edges(:,edge)
-            el      = edge_tri(:,edge)
+        do edge = 1, partit%myDim_edge2D
+            ednodes = mesh%edges(:,edge)
+            el      = mesh%edge_tri(:,edge)
             
-            dx1     = edge_cross_dxdy(1,edge)
-            dy1     = edge_cross_dxdy(2,edge)
-            dxdy12  = edge_dxdy(:,edge)*r_earth
+            dx1     = mesh%edge_cross_dxdy(1,edge)
+            dy1     = mesh%edge_cross_dxdy(2,edge)
+            dxdy12  = mesh%edge_dxdy(:,edge)*r_earth
             
             el2 = el(1)
             dx2 = 0.0_WP
             dy2 = 0.0_WP
             if (el(2) > 0) then
                 el2     = el(2)
-                dx2     = edge_cross_dxdy(3,edge)
-                dy2     = edge_cross_dxdy(4,edge)
-                dxdy12(1) = dxdy12(1) * (elem_cos(el(1)) + elem_cos(el2)) * 0.5_WP
+                dx2     = mesh%edge_cross_dxdy(3,edge)
+                dy2     = mesh%edge_cross_dxdy(4,edge)
+                dxdy12(1) = dxdy12(1) * (mesh%elem_cos(el(1)) + mesh%elem_cos(el2)) * 0.5_WP
                 n_x     = (  dy1  + (-dy2))/2
                 n_y     = ((-dx1) +   dx2 )/2
             else
-                dxdy12(1) = dxdy12(1) * elem_cos(el(1))
+                dxdy12(1) = dxdy12(1) * mesh%elem_cos(el(1))
                 n_x     =  dy1
                 n_y     = -dx1
             end if
@@ -3760,7 +3669,7 @@ module g_cvmix_idemix2
         end do
         
         ! Max cross-spectral CFL over all nodes and bins
-        do node = 1, myDim_nod2D
+        do node = 1, partit%myDim_nod2D
             do fbini = 2, nfbin-1
                 CFL_cs = abs(cs(fbini, node)) * dt / dphit(fbini)
                 lcl_cfl_cs = max(lcl_cfl_cs, CFL_cs)
@@ -3770,10 +3679,10 @@ module g_cvmix_idemix2
         ! Global max across MPI ranks
         glb_cfl_h  = 0.0_WP
         glb_cfl_cs = 0.0_WP
-        call MPI_Allreduce(lcl_cfl_h , glb_cfl_h , 1, MPI_WP, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-        call MPI_Allreduce(lcl_cfl_cs, glb_cfl_cs, 1, MPI_WP, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+        call MPI_Allreduce(lcl_cfl_h , glb_cfl_h , 1, MPI_WP, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
+        call MPI_Allreduce(lcl_cfl_cs, glb_cfl_cs, 1, MPI_WP, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
         
-        if (mype == 0) then
+        if (partit%mype == 0) then
             write(*,*) ' debug: CFL_max_horizontal(',trim(compartment_name),') = ', glb_cfl_h, &
                        ', CFL_max_cross_spectral(',trim(compartment_name),') = ', glb_cfl_cs
 !             write(*,*) ' debug: dt_max_FE(',trim(compartment_name),') = ', dt/max(glb_cfl_h, glb_cfl_cs), ' s', &
@@ -3801,10 +3710,6 @@ module g_cvmix_idemix2
 !         integer        :: edge, fbini, nfbin, node, el(2), el2, ednodes(2)
 !         real(kind=WP)  :: dx1, dy1, dx2, dy2, u1, v1, u2, v2, vflux
 !         
-! #include "../associate_part_def.h"
-! #include "../associate_mesh_def.h"
-! #include "../associate_part_ass.h"
-! #include "../associate_mesh_ass.h"
 !         
 !         nfbin = idemix2_nfbin
 !         div_vel = 0.0_WP

@@ -23,6 +23,12 @@ integer, parameter            :: WP=real64   ! Working precision (double, defaul
 ! degrade if WP is ever narrowed (time axes, external double APIs, global
 ! reduction accumulators).
 integer, parameter            :: WP_full=real64
+! Tracer carry: in a single-precision build each write of the tracer state keeps
+! the rounding residual (thickness-weighted) in tracers%work%carry and feeds it
+! into the next write, so the content stays exact to real64 while the state is
+! real32. A derived constant, not a switch: false whenever WP is already full
+! precision, so the carry loops are dead code in a double-precision build.
+logical, parameter            :: use_tracer_carry=(WP /= WP_full)
 integer, parameter            :: MAX_PATH=4096 ! Maximum file path length
 integer		                  :: mstep
 real(kind=WP), parameter      :: pi=3.141592653589793238462643383279502884_WP
@@ -58,7 +64,7 @@ real(kind=WP)                 :: K_ver=0.00001_WP
 real(kind=WP)                 :: scale_area=2.0e8_WP
 real(kind=WP)                 :: surf_relax_T= 0.0_WP
 real(kind=WP)                 :: surf_relax_S= 10.0_WP/(60*3600.0_WP*24)
-logical                       :: balance_salt_water =.true.
+logical                       :: balance_salt_water =.true. ! currently not used
 real(kind=WP)                 :: clim_relax= 1.0_WP/(10*3600.0_WP*24)
 real(kind=WP)                 :: clim_decay, clim_growth
                                  ! set to 0.0 if no relaxation

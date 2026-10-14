@@ -2,7 +2,7 @@ module oce_adv_tra_driver_module
     USE MOD_MESH
     USE MOD_TRACER
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     USE MOD_DYN
     USE g_comm_auto
     USE diagnostics, only: ldiag_DVD
@@ -35,8 +35,9 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
     real(kind=WP),  intent(in), target    :: WE(mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
 
     real(kind=WP),  pointer, dimension (:,:)   :: pwvel
-    real(kind=WP),  pointer, dimension (:,:)   :: ttf, ttfAB, fct_LO, fct_LO_tend
-    real(kind=WP),  pointer, dimension (:,:)   :: adv_flux_hor, adv_flux_ver, dttf_h, dttf_v
+    real(kind=WP),  pointer, dimension (:,:)   :: ttf, ttfAB, fct_LO
+    real(kind=WP),  pointer, dimension (:,:)   :: adv_flux_hor, adv_flux_ver
+    real(kind=WP_full), pointer, dimension (:,:) :: fct_LO_tend, dttf_h, dttf_v
     real(kind=WP),  pointer, dimension (:,:)   :: fct_ttf_min, fct_ttf_max
     real(kind=WP),  pointer, dimension (:,:)   :: fct_plus, fct_minus
 
@@ -52,10 +53,6 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
     real(kind=WP) :: opth, optv
     logical       :: do_zero_flux
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     ttf             => tracers%data(tr_num)%values
     ttfAB           => tracers%data(tr_num)%valuesAB
     opth            =  tracers%data(tr_num)%tra_adv_ph
@@ -87,9 +84,9 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
 #else
         !$ACC PARALLEL LOOP GANG VECTOR COLLAPSE(2) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 #endif
-        do n=1, myDim_nod2D+eDim_nod2D
+        do n=1, partit%myDim_nod2D+partit%eDim_nod2D
            do nz=1, mesh%nl - 1
-              fct_LO(nz,n) = 0.0_WP
+              fct_LO_tend(nz,n) = 0.0_WP_full
            end do
         end do
 #ifndef ENABLE_OPENACC
@@ -103,23 +100,23 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
         ! ascending edge order, so the result does not depend on the number of threads.
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, k, edge, el, nl1, nu1, nl2, nu2, nu12, nl12, nz)
-        do n=1, myDim_nod2D+eDim_nod2D
+        do n=1, partit%myDim_nod2D+partit%eDim_nod2D
             do k=1, mesh%nod_in_edge2D_num(n)
                 edge=mesh%nod_in_edge2D(k,n)
-                el=edge_tri(:,edge)
-                nl1=nlevels(el(1))-1
-                nu1=ulevels(el(1))
+                el=mesh%edge_tri(:,edge)
+                nl1=mesh%nlevels(el(1))-1
+                nu1=mesh%ulevels(el(1))
                 nl2=0
                 nu2=0
                 if(el(2)>0) then
-                    nl2=nlevels(el(2))-1
-                    nu2=ulevels(el(2))
+                    nl2=mesh%nlevels(el(2))-1
+                    nu2=mesh%ulevels(el(2))
                 end if
                 nl12 = max(nl1,nl2)
                 nu12 = nu1
                 if (nu2>0) nu12 = min(nu1,nu2)
                 do nz=nu12, nl12
-                    fct_LO(nz, n)=fct_LO(nz, n)+mesh%nod_in_edge2D_sgn(k,n)*adv_flux_hor(nz, edge)
+                    fct_LO_tend(nz, n)=fct_LO_tend(nz, n)+mesh%nod_in_edge2D_sgn(k,n)*real(adv_flux_hor(nz, edge), WP_full)
                 end do
             end do
         end do
@@ -128,18 +125,18 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
 #if !defined(DISABLE_OPENACC_ATOMICS)
         !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 #else
-        !$ACC UPDATE SELF(fct_lo, adv_flux_hor)
+        !$ACC UPDATE SELF(fct_LO_tend, adv_flux_hor)
 #endif
-        do e=1, myDim_edge2D
-            enodes=edges(:,e)
-            el=edge_tri(:,e)
-            nl1=nlevels(el(1))-1
-            nu1=ulevels(el(1))
+        do e=1, partit%myDim_edge2D
+            enodes=mesh%edges(:,e)
+            el=mesh%edge_tri(:,e)
+            nl1=mesh%nlevels(el(1))-1
+            nu1=mesh%ulevels(el(1))
             nl2=0
             nu2=0
             if(el(2)>0) then
-                nl2=nlevels(el(2))-1
-                nu2=ulevels(el(2))
+                nl2=mesh%nlevels(el(2))-1
+                nu2=mesh%ulevels(el(2))
             end if
 
             nl12 = max(nl1,nl2)
@@ -155,11 +152,11 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
                !$ACC ATOMIC UPDATE
 #endif
 
-               fct_LO(nz, enodes(1))=fct_LO(nz, enodes(1))+adv_flux_hor(nz, e)
+               fct_LO_tend(nz, enodes(1))=fct_LO_tend(nz, enodes(1))+adv_flux_hor(nz, e)
 #if !defined(DISABLE_OPENACC_ATOMICS)
                !$ACC ATOMIC UPDATE
 #endif
-               fct_LO(nz, enodes(2))=fct_LO(nz, enodes(2))-adv_flux_hor(nz, e)
+               fct_LO_tend(nz, enodes(2))=fct_LO_tend(nz, enodes(2))-adv_flux_hor(nz, e)
             end do
 #if !defined(DISABLE_OPENACC_ATOMICS)
             !$ACC END LOOP
@@ -168,7 +165,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
 #if !defined(DISABLE_OPENACC_ATOMICS)
         !$ACC END PARALLEL LOOP
 #else
-        !$ACC UPDATE DEVICE(fct_lo)
+        !$ACC UPDATE DEVICE(fct_LO_tend)
 #endif
 #endif
 
@@ -182,12 +179,12 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
 
 !#if defined (__recom)
         if (tracers%data(tr_num)%ltra_diag) then
-           do n=1, myDim_nod2D+eDim_nod2D
-              nu1 = ulevels_nod2D(n)
-              nl1 = nlevels_nod2D(n)
+           do n=1, partit%myDim_nod2D+partit%eDim_nod2D
+              nu1 = mesh%ulevels_nod2D(n)
+              nl1 = mesh%nlevels_nod2D(n)
               do nz = nu1, nl1-1
                  ! Horizontal advection part for LO (FCT is .TRUE.)
-                 tracers%work%tra_advhoriz(nz,n,tr_num) = fct_LO(nz,n) * dt/areasvol(nz,n)/hnode_new(nz,n)
+                 tracers%work%tra_advhoriz(nz,n,tr_num) = fct_LO_tend(nz,n) * dt/mesh%areasvol(nz,n)/mesh%hnode_new(nz,n)
               end do
            end do
         end if
@@ -203,15 +200,15 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
 #else
         !$ACC PARALLEL LOOP GANG PRESENT(fct_LO, fct_LO_tend) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 #endif
-        do n=1, myDim_nod2D
-            nu1 = ulevels_nod2D(n)
-            nl1 = nlevels_nod2D(n)
+        do n=1, partit%myDim_nod2D
+            nu1 = mesh%ulevels_nod2D(n)
+            nl1 = mesh%nlevels_nod2D(n)
             !!PS do  nz=1, nlevels_nod2D(n)-1
             !$ACC LOOP VECTOR
             do  nz= nu1, nl1-1
                 ! kept in flux form: LO*hnode_new-ttf*hnode is not precise enough in single precision
-                fct_LO_tend(nz,n)=(fct_LO(nz,n)+(adv_flux_ver(nz, n)-adv_flux_ver(nz+1, n)))*dt/areasvol(nz,n)
-                fct_LO(nz,n)=(ttf(nz,n)*hnode(nz,n)+fct_LO_tend(nz,n))/hnode_new(nz,n)
+                fct_LO_tend(nz,n)=(fct_LO_tend(nz,n)+(real(adv_flux_ver(nz, n), WP_full)-adv_flux_ver(nz+1, n)))*dt/mesh%areasvol(nz,n)
+                fct_LO(nz,n)=(ttf(nz,n)*mesh%hnode(nz,n)+fct_LO_tend(nz,n))/mesh%hnode_new(nz,n)
             end do
             !$ACC END LOOP
         end do
@@ -232,7 +229,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
             !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 #endif
 !$OMP DO
-            do n=1, myDim_edge2D
+            do n=1, partit%myDim_edge2D
                 !$ACC LOOP VECTOR
                 do nz=1, mesh%nl - 1
                     tracers%work%dvd_trflx_hor(nz, n, tr_num) = adv_flux_hor(nz, n)
@@ -247,7 +244,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
 
             !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 !$OMP DO
-            do n=1, myDim_nod2D
+            do n=1, partit%myDim_nod2D
                 !$ACC LOOP VECTOR
                 do nz=1, mesh%nl
                     tracers%work%dvd_trflx_ver(nz, n, tr_num) = adv_flux_ver(nz, n)
@@ -272,12 +269,12 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
         if (tracers%data(tr_num)%ltra_diag) then
            ! NOTE: adv_flux_ver is only allocated over myDim_nod2D (no halo, see
            ! oce_adv_tra_fct.F90), so this loop must not extend into eDim_nod2D.
-           do n=1, myDim_nod2D
-              nu1 = ulevels_nod2D(n)
-              nl1 = nlevels_nod2D(n)
+           do n=1, partit%myDim_nod2D
+              nu1 = mesh%ulevels_nod2D(n)
+              nl1 = mesh%nlevels_nod2D(n)
               do nz = nu1, nl1-1
                  ! Vertical advection part for LO (FCT is .TRUE.)
-                 tracers%work%tra_advvert (nz,n,tr_num) = (adv_flux_ver(nz, n)-adv_flux_ver(nz+1, n))*dt/areasvol(nz,n)/hnode_new(nz,n)
+                 tracers%work%tra_advvert (nz,n,tr_num) = (adv_flux_ver(nz, n)-adv_flux_ver(nz+1, n))*dt/mesh%areasvol(nz,n)/mesh%hnode_new(nz,n)
               end do
            end do
         end if
@@ -314,8 +311,8 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
         CASE('UPW1')
              call adv_tra_hor_upw1(vel, ttfAB, partit, mesh,        adv_flux_hor,                                 o_init_zero=do_zero_flux)
         CASE DEFAULT !unknown
-            if (mype==0) write(*,*) 'Unknown horizontal advection type ',  trim(tracers%data(tr_num)%tra_adv_hor), '! Check your namelists!'
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+            if (partit%mype==0) write(*,*) 'Unknown horizontal advection type ',  trim(tracers%data(tr_num)%tra_adv_hor), '! Check your namelists!'
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     END SELECT
     if (trim(tracers%data(tr_num)%tra_adv_lim)=='FCT') then
        pwvel=>w
@@ -336,8 +333,8 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
         CASE('UPW1')
             call adv_tra_ver_upw1 (   pwvel, ttfAB, partit, mesh,       adv_flux_ver, o_init_zero=do_zero_flux)
         CASE DEFAULT !unknown
-            if (mype==0) write(*,*) 'Unknown vertical advection type ',  trim(tracers%data(tr_num)%tra_adv_ver), '! Check your namelists!'
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+            if (partit%mype==0) write(*,*) 'Unknown vertical advection type ',  trim(tracers%data(tr_num)%tra_adv_ver), '! Check your namelists!'
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
         ! --> be aware the vertical implicite part in case without FCT is done in
         !     oce_ale_tracer.F90 --> subroutine diff_ver_part_impl_ale(tr_num, partit, mesh)
         !     for do_wimpl=.true.
@@ -363,7 +360,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz)
             !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 !$OMP DO
-            do n=1, myDim_edge2D
+            do n=1, partit%myDim_edge2D
                 !$ACC LOOP VECTOR
                 do nz=1, mesh%nl-1
                     tracers%work%dvd_trflx_hor(nz, n, tr_num) = tracers%work%dvd_trflx_hor(nz, n, tr_num) + adv_flux_hor(nz, n)
@@ -377,7 +374,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
             
             !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 !$OMP DO
-            do n=1, myDim_nod2D
+            do n=1, partit%myDim_nod2D
                 !$ACC LOOP VECTOR
                 do nz=1, mesh%nl
                     tracers%work%dvd_trflx_ver(nz, n, tr_num) = tracers%work%dvd_trflx_ver(nz, n, tr_num) + adv_flux_ver(nz, n)
@@ -396,7 +393,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz)
             !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 !$OMP DO
-            do n=1, myDim_edge2D
+            do n=1, partit%myDim_edge2D
                 !$ACC LOOP VECTOR
                 do nz=1, mesh%nl-1
                     tracers%work%dvd_trflx_hor(nz, n, tr_num) = adv_flux_hor(nz, n)
@@ -408,7 +405,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
             
             !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 !$OMP DO
-            do n=1, myDim_nod2D
+            do n=1, partit%myDim_nod2D
                 !$ACC LOOP VECTOR
                 do nz=1, mesh%nl
                     tracers%work%dvd_trflx_ver(nz, n, tr_num) = adv_flux_ver(nz, n)
@@ -429,23 +426,23 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
         if (tracers%data(tr_num)%ltra_diag) then
         !_______________________________________________________________________
            if (trim(tracers%data(tr_num)%tra_adv_lim)=='FCT') then
-              do n=1, myDim_nod2D+eDim_nod2D
-                 nu1 = ulevels_nod2D(n)
-                 nl1 = nlevels_nod2D(n)
+              do n=1, partit%myDim_nod2D+partit%eDim_nod2D
+                 nu1 = mesh%ulevels_nod2D(n)
+                 nl1 = mesh%nlevels_nod2D(n)
                  do nz = nu1, nl1-1
                     ! part for LO + antidiffusive (FCT is .TRUE.)
-                    tracers%work%tra_advhoriz(nz,n,tr_num) = tracers%work%tra_advhoriz(nz,n,tr_num) + dttf_h(nz,n)/hnode_new(nz,n)
-                    tracers%work%tra_advvert(nz,n,tr_num)  = tracers%work%tra_advvert(nz,n,tr_num)  + dttf_v(nz,n)/hnode_new(nz,n)
+                    tracers%work%tra_advhoriz(nz,n,tr_num) = tracers%work%tra_advhoriz(nz,n,tr_num) + dttf_h(nz,n)/mesh%hnode_new(nz,n)
+                    tracers%work%tra_advvert(nz,n,tr_num)  = tracers%work%tra_advvert(nz,n,tr_num)  + dttf_v(nz,n)/mesh%hnode_new(nz,n)
                  end do
               end do
            else
-              do n=1, myDim_nod2D+eDim_nod2D
-                 nu1 = ulevels_nod2D(n)
-                 nl1 = nlevels_nod2D(n)
+              do n=1, partit%myDim_nod2D+partit%eDim_nod2D
+                 nu1 = mesh%ulevels_nod2D(n)
+                 nl1 = mesh%nlevels_nod2D(n)
                  do nz = nu1, nl1-1
                     ! (FCT .FALSE.)
-                    tracers%work%tra_advhoriz(nz,n,tr_num) = dttf_h(nz,n)/hnode_new(nz,n)
-                    tracers%work%tra_advvert (nz,n,tr_num) = dttf_v(nz,n)/hnode_new(nz,n)
+                    tracers%work%tra_advhoriz(nz,n,tr_num) = dttf_h(nz,n)/mesh%hnode_new(nz,n)
+                    tracers%work%tra_advvert (nz,n,tr_num) = dttf_v(nz,n)/mesh%hnode_new(nz,n)
                  end do
               end do
            end if
@@ -461,16 +458,12 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
     real(kind=WP), intent(in),    target :: dt
     type(t_partit),intent(inout), target :: partit
     type(t_mesh),  intent(in),    target :: mesh
-    real(kind=WP), intent(inout)      :: dttf_h(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-    real(kind=WP), intent(inout)      :: dttf_v(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP_full), intent(inout)  :: dttf_h(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP_full), intent(inout)  :: dttf_v(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
     real(kind=WP), intent(inout)      :: flux_h(mesh%nl-1, partit%myDim_edge2D)
     real(kind=WP), intent(inout)      :: flux_v(mesh%nl,   partit%myDim_nod2D)
-    real(kind=WP), intent(in), optional :: lo_tend(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP_full), intent(in), optional :: lo_tend(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
     integer                           :: n, nz, k, elem, enodes(3), num, el(2), nu12, nl12, nu1, nu2, nl1, nl2, edge
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     !___________________________________________________________________________
     ! c. Update the solution
     ! Vertical
@@ -483,9 +476,9 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
 #else
         !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 #endif
-          do n=1, myDim_nod2d
-             nu1 = ulevels_nod2D(n)
-             nl1 = nlevels_nod2D(n)
+          do n=1, partit%myDim_nod2d
+             nu1 = mesh%ulevels_nod2D(n)
+             nl1 = mesh%nlevels_nod2D(n)
              !!PS do nz=1,nlevels_nod2D(n)-1
              !$ACC LOOP VECTOR
              do nz=nu1, nl1-1
@@ -504,12 +497,12 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
 #else
     !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 #endif
-    do n=1, myDim_nod2d
-        nu1 = ulevels_nod2D(n)
-        nl1 = nlevels_nod2D(n)
+    do n=1, partit%myDim_nod2d
+        nu1 = mesh%ulevels_nod2D(n)
+        nl1 = mesh%nlevels_nod2D(n)
         !$ACC LOOP VECTOR
         do nz=nu1,nl1-1
-            dttf_v(nz,n)=dttf_v(nz,n) + (flux_v(nz,n)-flux_v(nz+1,n))*dt/areasvol(nz,n)
+            dttf_v(nz,n)=dttf_v(nz,n) + (real(flux_v(nz,n), WP_full)-flux_v(nz+1,n))*dt/mesh%areasvol(nz,n)
         end do
         !$ACC END LOOP
     end do
@@ -523,23 +516,23 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
     ! node, and the summation order per node is the ascending edge order at any thread count.
 #ifndef ENABLE_OPENACC
 !$OMP DO
-    do n=1, myDim_nod2D+eDim_nod2D
+    do n=1, partit%myDim_nod2D+partit%eDim_nod2D
         do k=1, mesh%nod_in_edge2D_num(n)
             edge=mesh%nod_in_edge2D(k,n)
-            el=edge_tri(:,edge)
-            nl1=nlevels(el(1))-1
-            nu1=ulevels(el(1))
+            el=mesh%edge_tri(:,edge)
+            nl1=mesh%nlevels(el(1))-1
+            nu1=mesh%ulevels(el(1))
             nl2=0
             nu2=0
             if(el(2)>0) then
-                nl2=nlevels(el(2))-1
-                nu2=ulevels(el(2))
+                nl2=mesh%nlevels(el(2))-1
+                nu2=mesh%ulevels(el(2))
             end if
             nl12 = max(nl1,nl2)
             nu12 = nu1
             if (nu2>0) nu12 = min(nu1,nu2)
             do nz=nu12, nl12
-                dttf_h(nz,n)=dttf_h(nz,n)+mesh%nod_in_edge2D_sgn(k,n)*flux_h(nz,edge)*dt/areasvol(nz,n)
+                dttf_h(nz,n)=dttf_h(nz,n)+mesh%nod_in_edge2D_sgn(k,n)*real(flux_h(nz,edge), WP_full)*dt/mesh%areasvol(nz,n)
             end do
         end do
     end do
@@ -551,17 +544,17 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
 #else
     !$ACC UPDATE SELF(dttf_h, flux_h)
 #endif
-    do edge=1, myDim_edge2D
-        enodes(1:2)=edges(:,edge)
-        el=edge_tri(:,edge)
-        nl1=nlevels(el(1))-1
-        nu1=ulevels(el(1))
+    do edge=1, partit%myDim_edge2D
+        enodes(1:2)=mesh%edges(:,edge)
+        el=mesh%edge_tri(:,edge)
+        nl1=mesh%nlevels(el(1))-1
+        nu1=mesh%ulevels(el(1))
 
         nl2=0
         nu2=0
         if(el(2)>0) then
-            nl2=nlevels(el(2))-1
-            nu2=ulevels(el(2))
+            nl2=mesh%nlevels(el(2))-1
+            nu2=mesh%ulevels(el(2))
         end if
 
         nl12 = max(nl1,nl2)
@@ -575,11 +568,11 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
 #if !defined(DISABLE_OPENACC_ATOMICS)
             !$ACC ATOMIC UPDATE
 #endif
-            dttf_h(nz,enodes(1))=dttf_h(nz,enodes(1))+flux_h(nz,edge)*dt/areasvol(nz,enodes(1))
+            dttf_h(nz,enodes(1))=dttf_h(nz,enodes(1))+real(flux_h(nz,edge), WP_full)*dt/mesh%areasvol(nz,enodes(1))
 #if !defined(DISABLE_OPENACC_ATOMICS)
             !$ACC ATOMIC UPDATE
 #endif
-            dttf_h(nz,enodes(2))=dttf_h(nz,enodes(2))-flux_h(nz,edge)*dt/areasvol(nz,enodes(2))
+            dttf_h(nz,enodes(2))=dttf_h(nz,enodes(2))-real(flux_h(nz,edge), WP_full)*dt/mesh%areasvol(nz,enodes(2))
         end do
 #if !defined(DISABLE_OPENACC_ATOMICS)
         !$ACC END LOOP

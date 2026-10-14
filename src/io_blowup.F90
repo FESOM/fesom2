@@ -4,7 +4,7 @@ MODULE io_BLOWUP
 	use g_comm_auto
     USE MOD_MESH
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     USE MOD_TRACER  
     USE MOD_DYN
     USE MOD_ICE
@@ -47,6 +47,7 @@ MODULE io_BLOWUP
 	! id will keep the IDs of all required dimentions and variables
 	type(nc_file), save       :: bid
 	integer,       save       :: globalstep=0
+	real(kind=WP), allocatable, target, save :: hnode_bu(:,:)   ! WP copy of mesh%hnode (kind WP_full)
 	real(kind=WP)             :: ctime !current time in seconds from the beginning of the year
 	
 	PRIVATE
@@ -80,62 +81,59 @@ MODULE io_BLOWUP
 		character(500)            :: trname, units
 		character(4)              :: cyear
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
-		if(mype==0) write(*,*)' --> Init. blowpup file '
+		if(partit%mype==0) write(*,*)' --> Init. blowpup file '
 		write(cyear,'(i4)') year
 		! create an ocean restart file; serial output implemented so far
 		bid%filename=trim(ResultPath)//trim(runid)//'.'//cyear//'.oce.blowup.nc'
 		if (bid%is_in_use) return
 		bid%is_in_use=.true.
-		call def_dim(bid, 'node', nod2d)
-		call def_dim(bid, 'elem', elem2d)
-		call def_dim(bid, 'nz_1', nl-1)
-		call def_dim(bid, 'nz',   nl)
+		call def_dim(bid, 'node', mesh%nod2d)
+		call def_dim(bid, 'elem', mesh%elem2d)
+		call def_dim(bid, 'nz_1', mesh%nl-1)
+		call def_dim(bid, 'nz',   mesh%nl)
 		
 		!===========================================================================
 		!===================== Definition part =====================================
 		!===========================================================================
 		!___Define the netCDF variables for 2D fields_______________________________
 		!___SSH_____________________________________________________________________
-		call def_variable(bid, 'eta_n'		, (/nod2D/)			, 'sea surface elevation', 'm', dynamics%eta_n);
+		call def_variable(bid, 'eta_n'		, (/mesh%nod2D/)			, 'sea surface elevation', 'm', dynamics%eta_n);
 		!___ALE related fields______________________________________________________
-		call def_variable(bid, 'hbar'		, (/nod2D/)			, 'ALE surface elevation hbar_n+0.5', 'm', hbar);
+		call def_variable(bid, 'hbar'		, (/mesh%nod2D/)			, 'ALE surface elevation hbar_n+0.5', 'm', mesh%hbar);
 !!PS 		call def_variable(bid, 'hbar_old'	, (/nod2D/)			, 'ALE surface elevation hbar_n-0.5', 'm', hbar_old);
         if (.not. dynamics%use_ssh_se_subcycl) then
-            call def_variable(bid, 'd_eta'		, (/nod2D/)			, 'change in ssh from solver', 'm', dynamics%d_eta);
-            call def_variable(bid, 'ssh_rhs'	, (/nod2D/)			, 'RHS for the elevation', '?', dynamics%ssh_rhs);
-            call def_variable(bid, 'ssh_rhs_old', (/nod2D/)			, 'RHS for the elevation', '?', dynamics%ssh_rhs_old);
+            call def_variable(bid, 'd_eta'		, (/mesh%nod2D/)			, 'change in ssh from solver', 'm', dynamics%d_eta);
+            call def_variable(bid, 'ssh_rhs'	, (/mesh%nod2D/)			, 'RHS for the elevation', '?', dynamics%ssh_rhs);
+            call def_variable(bid, 'ssh_rhs_old', (/mesh%nod2D/)			, 'RHS for the elevation', '?', dynamics%ssh_rhs_old);
             
         else
-            call def_variable(bid, 'ubt_rhs'  , (/elem2D/), 'zonal RHS barotr. transp. equation' , '?'  , dynamics%se_uvBT_rhs(  1,:));
-            call def_variable(bid, 'vbt_rhs'  , (/elem2D/), 'merid. RHS barotr. transp. equation', '?'  , dynamics%se_uvBT_rhs(  2,:));
-            call def_variable(bid, 'ubt'	  , (/elem2D/), 'zonal barotr. transp.'              , '?'  , dynamics%se_uvBT(      1,:));
-            call def_variable(bid, 'vbt'	  , (/elem2D/), 'merid. barotr. transp.'             , '?'  , dynamics%se_uvBT(      2,:));
-            call def_variable(bid, 'ubt_theta', (/elem2D/), 'zonal barotr. theta term.'          , '?'  , dynamics%se_uvBT_theta(1,:));
-            call def_variable(bid, 'vbt_theta', (/elem2D/), 'merid. barotr. theta term'          , '?'  , dynamics%se_uvBT_theta(2,:));
-            call def_variable(bid, 'ubt_mean' , (/elem2D/), 'zonal barotr. mean term.'           , '?'  , dynamics%se_uvBT_mean( 1,:));
-            call def_variable(bid, 'vbt_mean' , (/elem2D/), 'merid. barotr. mean term'           , '?'  , dynamics%se_uvBT_mean( 2,:));
-            call def_variable(bid, 'uh'       , (/nl-1, elem2D/), 'zonal velocity'               , 'm/s', dynamics%se_uvh(1,:,:));
-            call def_variable(bid, 'vh'       , (/nl-1, elem2D/), 'meridional velocity'          , 'm/s', dynamics%se_uvh(2,:,:));
+            call def_variable(bid, 'ubt_rhs'  , (/mesh%elem2D/), 'zonal RHS barotr. transp. equation' , '?'  , dynamics%se_uvBT_rhs(  1,:));
+            call def_variable(bid, 'vbt_rhs'  , (/mesh%elem2D/), 'merid. RHS barotr. transp. equation', '?'  , dynamics%se_uvBT_rhs(  2,:));
+            call def_variable(bid, 'ubt'	  , (/mesh%elem2D/), 'zonal barotr. transp.'              , '?'  , dynamics%se_uvBT(      1,:));
+            call def_variable(bid, 'vbt'	  , (/mesh%elem2D/), 'merid. barotr. transp.'             , '?'  , dynamics%se_uvBT(      2,:));
+            call def_variable(bid, 'ubt_theta', (/mesh%elem2D/), 'zonal barotr. theta term.'          , '?'  , dynamics%se_uvBT_theta(1,:));
+            call def_variable(bid, 'vbt_theta', (/mesh%elem2D/), 'merid. barotr. theta term'          , '?'  , dynamics%se_uvBT_theta(2,:));
+            call def_variable(bid, 'ubt_mean' , (/mesh%elem2D/), 'zonal barotr. mean term.'           , '?'  , dynamics%se_uvBT_mean( 1,:));
+            call def_variable(bid, 'vbt_mean' , (/mesh%elem2D/), 'merid. barotr. mean term'           , '?'  , dynamics%se_uvBT_mean( 2,:));
+            call def_variable(bid, 'uh'       , (/mesh%nl-1, mesh%elem2D/), 'zonal velocity'               , 'm/s', dynamics%se_uvh(1,:,:));
+            call def_variable(bid, 'vh'       , (/mesh%nl-1, mesh%elem2D/), 'meridional velocity'          , 'm/s', dynamics%se_uvh(2,:,:));
 		end if 
 		
 		!___Define the netCDF variables for 3D fields_______________________________
-		call def_variable(bid, 'hnode'		, (/nl-1,  nod2D/)	, 'ALE stuff', '?', hnode);
-		call def_variable(bid, 'helem'		, (/nl-1, elem2D/)	, 'Element layer thickness', 'm/s', helem(:,:));
-		call def_variable(bid, 'u'			, (/nl-1, elem2D/)	, 'zonal velocity', 'm/s', dynamics%uv(1,:,:));
-		call def_variable(bid, 'v'			, (/nl-1, elem2D/)	, 'meridional velocity', 'm/s', dynamics%uv(2,:,:));
-		call def_variable(bid, 'u_rhs'			, (/nl-1, elem2D/)	, 'zonal velocity', 'm/s', dynamics%uv_rhs(1,:,:));
-		call def_variable(bid, 'v_rhs'			, (/nl-1, elem2D/)	, 'meridional velocity', 'm/s', dynamics%uv_rhs(2,:,:));
-		call def_variable(bid, 'urhs_AB'	, (/nl-1, elem2D/)	, 'Adams-Bashforth for u', 'm/s', dynamics%uv_rhsAB(1,1,:,:));
-		call def_variable(bid, 'vrhs_AB'	, (/nl-1, elem2D/)	, 'Adams-Bashforth for v', 'm/s', dynamics%uv_rhsAB(1,2,:,:));
-		call def_variable(bid, 'zbar_n_bot' , (/nod2D/)			, 'node bottom depth', 'm', zbar_n_bot);
-		call def_variable(bid, 'zbar_e_bot' , (/elem2d/)		, 'elem bottom depth', 'm', zbar_e_bot);
-		call def_variable(bid, 'bottom_node_thickness' , (/nod2D/)			, 'node bottom thickness', 'm', bottom_node_thickness);
-		call def_variable(bid, 'bottom_elem_thickness' , (/elem2d/)		, 'elem bottom thickness', 'm', bottom_elem_thickness);
+		hnode_bu = real(mesh%hnode, WP)
+		call def_variable(bid, 'hnode'		, (/mesh%nl-1,  mesh%nod2D/)	, 'ALE stuff', '?', hnode_bu);
+		call def_variable(bid, 'helem'		, (/mesh%nl-1, mesh%elem2D/)	, 'Element layer thickness', 'm/s', mesh%helem(:,:));
+		call def_variable(bid, 'u'			, (/mesh%nl-1, mesh%elem2D/)	, 'zonal velocity', 'm/s', dynamics%uv(1,:,:));
+		call def_variable(bid, 'v'			, (/mesh%nl-1, mesh%elem2D/)	, 'meridional velocity', 'm/s', dynamics%uv(2,:,:));
+		call def_variable(bid, 'u_rhs'			, (/mesh%nl-1, mesh%elem2D/)	, 'zonal velocity', 'm/s', dynamics%uv_rhs(1,:,:));
+		call def_variable(bid, 'v_rhs'			, (/mesh%nl-1, mesh%elem2D/)	, 'meridional velocity', 'm/s', dynamics%uv_rhs(2,:,:));
+		call def_variable(bid, 'urhs_AB'	, (/mesh%nl-1, mesh%elem2D/)	, 'Adams-Bashforth for u', 'm/s', dynamics%uv_rhsAB(1,1,:,:));
+		call def_variable(bid, 'vrhs_AB'	, (/mesh%nl-1, mesh%elem2D/)	, 'Adams-Bashforth for v', 'm/s', dynamics%uv_rhsAB(1,2,:,:));
+		call def_variable(bid, 'zbar_n_bot' , (/mesh%nod2D/)			, 'node bottom depth', 'm', mesh%zbar_n_bot);
+		call def_variable(bid, 'zbar_e_bot' , (/mesh%elem2d/)		, 'elem bottom depth', 'm', mesh%zbar_e_bot);
+		call def_variable(bid, 'bottom_node_thickness' , (/mesh%nod2D/)			, 'node bottom thickness', 'm', mesh%bottom_node_thickness);
+		call def_variable(bid, 'bottom_elem_thickness' , (/mesh%elem2d/)		, 'elem bottom thickness', 'm', mesh%bottom_elem_thickness);
 !!PS 		call def_variable(bid, 'pgf_x'	, (/nl-1, elem2D/)	, 'zonal pressure gradient force', '???', pgf_x(:,:));
 !!PS 		call def_variable(bid, 'pgf_y'	, (/nl-1, elem2D/)	, 'meridional pressure gradient force', '???', pgf_y(:,:));
 !!PS 		call def_variable(bid, 'density_m_rho0'	, (/nl-1, nod2D/)	, 'density minus rho0', '???', density_m_rho0(:,:));
@@ -155,37 +153,37 @@ MODULE io_BLOWUP
 				write(longname,'(A15,i1)') 'passive tracer ', j
 				units='none'
 			END SELECT
-			call def_variable(bid, trim(trname),       (/nl-1, nod2D/), trim(longname), trim(units), tracers%data(j)%values(:,:));
+			call def_variable(bid, trim(trname),       (/mesh%nl-1, mesh%nod2D/), trim(longname), trim(units), tracers%data(j)%values(:,:));
 !!PS 			longname=trim(longname)//', Adams–Bashforth'
 !!PS 			call def_variable(bid, trim(trname)//'_AB',(/nl-1, nod2D/), trim(longname), trim(units), tracers%data(j)%valuesAB(:,:)(:,:));
 		end do
-		call def_variable(bid, 'w'			, (/nl, nod2D/)		, 'vertical velocity', 'm/s', dynamics%w);
-		call def_variable(bid, 'w_expl'		, (/nl, nod2D/)		, 'vertical velocity', 'm/s', dynamics%w_e);
-		call def_variable(bid, 'w_impl'		, (/nl, nod2D/)		, 'vertical velocity', 'm/s', dynamics%w_i);
-		call def_variable(bid, 'cfl_z'		, (/nl, nod2D/)		, 'vertical CFL criteria', '', dynamics%cfl_z);
+		call def_variable(bid, 'w'			, (/mesh%nl, mesh%nod2D/)		, 'vertical velocity', 'm/s', dynamics%w);
+		call def_variable(bid, 'w_expl'		, (/mesh%nl, mesh%nod2D/)		, 'vertical velocity', 'm/s', dynamics%w_e);
+		call def_variable(bid, 'w_impl'		, (/mesh%nl, mesh%nod2D/)		, 'vertical velocity', 'm/s', dynamics%w_i);
+		call def_variable(bid, 'cfl_z'		, (/mesh%nl, mesh%nod2D/)		, 'vertical CFL criteria', '', dynamics%cfl_z);
 		
 		!_____________________________________________________________________________
 		! write snapshot ice variables to blowup file
-		call def_variable(bid, 'a_ice'		, (/nod2D/)			, 'ice concentration [0 to 1]', '%', ice%data(1)%values);
-		call def_variable(bid, 'm_ice'		, (/nod2D/)			, 'effective ice thickness',    'm', ice%data(2)%values);
-		call def_variable(bid, 'm_snow'		, (/nod2D/)			, 'effective snow thickness',   'm', ice%data(3)%values);
-		call def_variable(bid, 'u_ice'		, (/nod2D/)			, 'zonal velocity',    'm/s', ice%uice);
-		call def_variable(bid, 'v_ice'		, (/nod2D/)			, 'meridional velocity', 'm', ice%vice);
+		call def_variable(bid, 'a_ice'		, (/mesh%nod2D/)			, 'ice concentration [0 to 1]', '%', ice%data(1)%values);
+		call def_variable(bid, 'm_ice'		, (/mesh%nod2D/)			, 'effective ice thickness',    'm', ice%data(2)%values);
+		call def_variable(bid, 'm_snow'		, (/mesh%nod2D/)			, 'effective snow thickness',   'm', ice%data(3)%values);
+		call def_variable(bid, 'u_ice'		, (/mesh%nod2D/)			, 'zonal velocity',    'm/s', ice%uice);
+		call def_variable(bid, 'v_ice'		, (/mesh%nod2D/)			, 'meridional velocity', 'm', ice%vice);
 !!PS  		call def_variable(bid, 'a_ice_old'	, (/nod2D/)			, 'ice concentration [0 to 1]', '%', a_ice_old); !PS
 !!PS  		call def_variable(bid, 'm_ice_old'	, (/nod2D/)			, 'effective ice thickness',    'm', m_ice_old); !PS
 !!PS  		call def_variable(bid, 'm_snow_old'	, (/nod2D/)			, 'effective snow thickness',   'm', m_snow_old); !PS
 !!PS 		call def_variable(bid, 'u_ice_old'	, (/nod2D/)			, 'zonal velocity',    'm/s', u_ice_old);
 !!PS  		call def_variable(bid, 'v_ice_old'	, (/nod2D/)			, 'meridional velocity', 'm', v_ice_old);
- 		call def_variable(bid, 'heat_flux'	, (/nod2D/)			, 'heat flux ',     '?', heat_flux); !PS
-		call def_variable(bid, 'water_flux'	, (/nod2D/)			, 'water flux ',    '?', water_flux); !PS
-		call def_variable(bid, 'tx_sur'	    , (/elem2d/)		, 'tx_sur',         '?', stress_surf(1, :)); !PS
-		call def_variable(bid, 'ty_sur'	    , (/elem2d/)		, 'ty_sur',         '?', stress_surf(2, :)); !PS
+ 		call def_variable(bid, 'heat_flux'	, (/mesh%nod2D/)			, 'heat flux ',     '?', heat_flux); !PS
+		call def_variable(bid, 'water_flux'	, (/mesh%nod2D/)			, 'water flux ',    '?', water_flux); !PS
+		call def_variable(bid, 'tx_sur'	    , (/mesh%elem2d/)		, 'tx_sur',         '?', stress_surf(1, :)); !PS
+		call def_variable(bid, 'ty_sur'	    , (/mesh%elem2d/)		, 'ty_sur',         '?', stress_surf(2, :)); !PS
 		
 !!PS 		call def_variable(bid, 'fer_k'			, (/nl, nod2D/)		, 'GM diffusivity', '', fer_K);
 		
-		call def_variable(bid, 'Kv'			, (/nl, nod2D/)		, 'vertical diffusivity', '', Kv);
-		call def_variable(bid, 'Av'			, (/nl, elem2d/)	, 'vertical viscosity', '', Av);
-		call def_variable(bid, 'N2'			, (/nl, nod2D/)		, 'squared bouyancy freq', '', bvfreq);
+		call def_variable(bid, 'Kv'			, (/mesh%nl, mesh%nod2D/)		, 'vertical diffusivity', '', Kv);
+		call def_variable(bid, 'Av'			, (/mesh%nl, mesh%elem2d/)	, 'vertical viscosity', '', Av);
+		call def_variable(bid, 'N2'			, (/mesh%nl, mesh%nod2D/)		, 'squared bouyancy freq', '', bvfreq);
 		
 	end subroutine ini_blowup_io
 !
@@ -380,13 +378,9 @@ MODULE io_BLOWUP
                 type(t_mesh),   intent(in),    target :: mesh
                 type(t_partit), intent(inout), target :: partit
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
 		! Serial output implemented so far
-		if (mype==0) then
+		if (partit%mype==0) then
 			c=1
 			!id%rec_count=id%rec_count+1
 			write(*,*) 'writing blowup record ', id%rec_count
@@ -401,9 +395,9 @@ MODULE io_BLOWUP
 			if (shape==1) then
 				size1=id%var(i)%dims(1)
 				allocate(aux1(size1))
-				if (size1==nod2D)  call gather_nod (id%var(i)%pt1, aux1, partit)
-				if (size1==elem2D) call gather_elem(id%var(i)%pt1, aux1, partit)
-				if (mype==0) then
+				if (size1==mesh%nod2D)  call gather_nod (id%var(i)%pt1, aux1, partit)
+				if (size1==mesh%elem2D) call gather_elem(id%var(i)%pt1, aux1, partit)
+				if (partit%mype==0) then
 				id%error_status(c)=nf90_put_var(id%ncid, id%var(i)%code, aux1, start=(/1, id%rec_count/), count=(/size1, 1/)); c=c+1
 				end if
 				deallocate(aux1)
@@ -412,22 +406,22 @@ MODULE io_BLOWUP
 				size1=id%var(i)%dims(1)
 				size2=id%var(i)%dims(2)
 				allocate(aux2(size1, size2))
-				if (size1==nod2D  .or. size2==nod2D)  call gather_nod (id%var(i)%pt2, aux2, partit)
-				if (size1==elem2D .or. size2==elem2D) call gather_elem(id%var(i)%pt2, aux2, partit)
-				if (mype==0) then
+				if (size1==mesh%nod2D  .or. size2==mesh%nod2D)  call gather_nod (id%var(i)%pt2, aux2, partit)
+				if (size1==mesh%elem2D .or. size2==mesh%elem2D) call gather_elem(id%var(i)%pt2, aux2, partit)
+				if (partit%mype==0) then
 				id%error_status(c)=nf90_put_var(id%ncid, id%var(i)%code, aux2, start=(/1, 1, id%rec_count/), count=(/size1, size2, 1/)); c=c+1
 				end if
 				deallocate(aux2)
 			else
-				if (mype==0) write(*,*) 'not supported shape of array in restart file'
-				call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+				if (partit%mype==0) write(*,*) 'not supported shape of array in restart file'
+				call par_abort(partit%MPI_COMM_FESOM, partit%mype)
 				stop
 			end if
 		end do
 		
-		if (mype==0) id%error_count=c-1
+		if (partit%mype==0) id%error_count=c-1
 		call was_error(id, partit)
-		if (mype==0) id%error_status(1)=nf90_close(id%ncid);
+		if (partit%mype==0) id%error_status(1)=nf90_close(id%ncid);
 		id%error_count=1
 		call was_error(id, partit)
 	end subroutine write_blowup
@@ -511,7 +505,7 @@ MODULE io_BLOWUP
 			if (status .ne. NF90_NOERR) then
 				if (partit%mype==0) write(*,*) 'error counter=', k
 				if (partit%mype==0) call handle_err(status, partit)
-				call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+				call par_abort(partit%MPI_COMM_FESOM, partit%mype)
 				stop
 			end if
 		end do

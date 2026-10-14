@@ -36,7 +36,7 @@ MODULE g_sbf
    USE iso_fortran_env, only: error_unit, real64
    USE MOD_MESH
    USE MOD_PARTIT
-   use par_support_module, only: par_ex
+   use par_support_module, only: par_abort
    USE o_ARRAYS
    USE o_PARAM
    USE g_comm_auto
@@ -160,6 +160,7 @@ MODULE g_sbf
    integer, save  :: nm_sbc_unit     = 103       ! unit to open namelist file, skip 100-102 for cray fortran
    logical        :: ic_cyclic=.true.
   !============== namelistatmdata variables ================
+   character(len=10), save    :: forcing_distribution = 'bcast' ! 'bcast' or 'scatter' (each rank receives only its interpolation box)
    character(len=256), save   :: nm_xwind_file = 'xwind.dat' ! name of file with winds, if netcdf file then provide only name from "nameyyyy.nc" yyyy.nc will be added by model
    character(len=256), save   :: nm_ywind_file = 'ywind.dat' ! name of file with winds, if netcdf file then provide only name from "nameyyyy.nc" yyyy.nc will be added by model
    character(len=256), save   :: nm_xstre_file = 'xstre.dat' ! name of file with stress, if netcdf file then provide only name from "nameyyyy.nc" yyyy.nc will be added by model
@@ -236,6 +237,12 @@ MODULE g_sbf
       integer sbcdata_a_t_index
       real(4), allocatable, dimension(:,:)     :: sbcdata_b
       integer sbcdata_b_t_index
+      ! ========== forcing_distribution='scatter': sbcdata_a/b are allocated with the box bounds
+      integer :: box(4) = (/1, 0, 1, 0/)                 ! i0, i1, j0, j1
+      integer,  allocatable, dimension(:,:)    :: all_box      ! (4, 0:npes-1), I/O rank only
+      integer,  allocatable, dimension(:)      :: scat_counts, scat_displs ! I/O rank only
+      real(4),  allocatable, dimension(:)      :: scat_pack    ! I/O rank only
+      real(4),  allocatable, dimension(:,:)    :: readbuf      ! full grid, I/O rank only
       ! ========== interpolation coeficients
    end type flfi_type
    type(flfi_type), allocatable, save, target :: sbc_flfi(:)  !array for information about flux files
@@ -455,7 +462,7 @@ CONTAINS
                 write(error_unit,*) '          message block in gen_surface_forcing.F90.'
                 write(error_unit,*) '____________________________________________________________'
                 write(error_unit,*) achar(27)//'[0m'
-                call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+                call par_abort(partit%MPI_COMM_FESOM, partit%mype)
             end if
         elseif ((trim(flf%calendar).eq.'julian')    .or. &
                 (trim(flf%calendar).eq.'gregorian') .or. &
@@ -476,7 +483,7 @@ CONTAINS
                 write(error_unit,*) '          gen_surface_forcing.F90'
                 write(error_unit,*) '____________________________________________________________'
                 write(error_unit,*) achar(27)//'[0m'
-                call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+                call par_abort(partit%MPI_COMM_FESOM, partit%mype)
             end if 
         else
             write(error_unit,*) achar(27)//'[31m'
@@ -495,7 +502,7 @@ CONTAINS
             write(error_unit,*) '        example with ncdump -h forcing_file.nc '
             write(error_unit,*) '____________________________________________________________'
             write(error_unit,*) achar(27)//'[0m'
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
         end if ! --> if ((trim(flf%calendar).eq.'none')   .or. & ...
     end if !--> if (partit%mype==0 .and. use_flpyrcheck) then
       
@@ -670,10 +677,6 @@ CONTAINS
       type(flfi_type), pointer :: flf
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
 ! used for interpolate on elements
 !      ALLOCATE( bilin_indx_i(elem2D),bilin_indx_j(elem2D), &
@@ -695,7 +698,7 @@ CONTAINS
       ! is called once per run) on the root rank only, gated by flag_debug -- matches
       ! the "say what routine I'm in" debug convention. Useful to confirm e.g. JRA55
       ! resolves as 3 h and CORE2 as 6 h, and that the axis is not float32-collapsed.
-      if (flag_debug .and. mype==0) then
+      if (flag_debug .and. partit%mype==0) then
          write(*,*) ' --> [forcing] inferred temporal resolution per variable:'
          do fld_idx = 1, i_totfl
             flf => sbc_flfi(fld_idx)
@@ -725,10 +728,10 @@ CONTAINS
          ! prepare nearest coordinates in INfile , save to bilin_indx_i/j
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, x, y)
 !$OMP DO REDUCTION(max: warn)
-         do i = 1, myDim_nod2D+eDim_nod2D
-            x  = geo_coord_nod2D(1,i)/rad
+         do i = 1, partit%myDim_nod2D+partit%eDim_nod2D
+            x  = mesh%geo_coord_nod2D(1,i)/rad
             if (x < 0) x=x+360._WP
-            y  = geo_coord_nod2D(2,i)/rad
+            y  = mesh%geo_coord_nod2D(2,i)/rad
 
             ! find nearest
             if ( x < flf%nc_lon(flf%nc_Nlon) .and. x >= flf%nc_lon(1) ) then
@@ -759,6 +762,7 @@ CONTAINS
          end do
 !$OMP END DO
 !$OMP END PARALLEL
+         call sbc_box_setup(fld_idx, partit)
       end do
       lfirst=.false.
       end if
@@ -784,17 +788,17 @@ CONTAINS
       ! first steps. Mirror the sbc_do rotation here.
       if (l_xwind .and. rotated_grid) then
 !$OMP PARALLEL DO
-         do i=1, myDim_nod2D+eDim_nod2D
-            call vector_g2r(coef_a(i_xwind,i), coef_a(i_ywind,i), coord_nod2D(1,i), coord_nod2D(2,i), 0)
-            call vector_g2r(coef_b(i_xwind,i), coef_b(i_ywind,i), coord_nod2D(1,i), coord_nod2D(2,i), 0)
+         do i=1, partit%myDim_nod2D+partit%eDim_nod2D
+            call vector_g2r(coef_a(i_xwind,i), coef_a(i_ywind,i), mesh%coord_nod2D(1,i), mesh%coord_nod2D(2,i), 0)
+            call vector_g2r(coef_b(i_xwind,i), coef_b(i_ywind,i), mesh%coord_nod2D(1,i), mesh%coord_nod2D(2,i), 0)
          end do
 !$OMP END PARALLEL DO
       end if
       if (l_xstre .and. rotated_grid) then
 !$OMP PARALLEL DO
-         do i=1, myDim_nod2D+eDim_nod2D
-            call vector_g2r(coef_a(i_xstre,i), coef_a(i_ystre,i), coord_nod2D(1,i), coord_nod2D(2,i), 0)
-            call vector_g2r(coef_b(i_xstre,i), coef_b(i_ystre,i), coord_nod2D(1,i), coord_nod2D(2,i), 0)
+         do i=1, partit%myDim_nod2D+partit%eDim_nod2D
+            call vector_g2r(coef_a(i_xstre,i), coef_a(i_ystre,i), mesh%coord_nod2D(1,i), mesh%coord_nod2D(2,i), 0)
+            call vector_g2r(coef_b(i_xstre,i), coef_b(i_ystre,i), mesh%coord_nod2D(1,i), mesh%coord_nod2D(2,i), 0)
          end do
 !$OMP END PARALLEL DO
       end if
@@ -809,6 +813,7 @@ CONTAINS
 
    SUBROUTINE getcoeffld(fld_idx, rdate, partit, mesh)
       use forcing_provider_async_module
+      use fesom_profiler, only: fesom_profiler_start, fesom_profiler_end
       use io_netcdf_workaround_module
       use g_clock
       !!---------------------------------------------------------------------
@@ -855,10 +860,6 @@ CONTAINS
       real(4), dimension(:,:), pointer :: sbcdata1, sbcdata2
       logical sbcdata1_from_cache, sbcdata2_from_cache
       integer rootrank
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
       ! fld_idx determines which ouf our forcing fields we use here
       nc_Ntime =>sbc_flfi(fld_idx)%nc_Ntime
@@ -873,11 +874,15 @@ CONTAINS
       nc_lat   =>sbc_flfi(fld_idx)%nc_lat
 
       if(.not. allocated(sbc_flfi(fld_idx)%sbcdata_a)) then
-        allocate(sbc_flfi(fld_idx)%sbcdata_a(nc_Nlon,nc_Nlat))
+        sbc_flfi(fld_idx)%read_forcing_rootrank = next_io_rank(partit%MPI_COMM_FESOM, sbc_flfi(fld_idx)%async_netcdf_allowed, partit)
+        if (trim(forcing_distribution)=='scatter') then
+          call sbc_box_alloc(fld_idx, partit)
+        else
+          allocate(sbc_flfi(fld_idx)%sbcdata_a(nc_Nlon,nc_Nlat))
+          allocate(sbc_flfi(fld_idx)%sbcdata_b(nc_Nlon,nc_Nlat))
+        end if
         sbc_flfi(fld_idx)%sbcdata_a_t_index = -1
-        allocate(sbc_flfi(fld_idx)%sbcdata_b(nc_Nlon,nc_Nlat))
         sbc_flfi(fld_idx)%sbcdata_b_t_index = -1
-        sbc_flfi(fld_idx)%read_forcing_rootrank = next_io_rank(MPI_COMM_FESOM, sbc_flfi(fld_idx)%async_netcdf_allowed, partit)
       end if
       rootrank = sbc_flfi(fld_idx)%read_forcing_rootrank
 
@@ -934,7 +939,7 @@ CONTAINS
          t_indx    = nc_Ntime
          t_indx_p1 = t_indx
          delta_t = 1.0_real64
-         if (mype==0) then
+         if (partit%mype==0) then
             write(error_unit,*) 'WARNING: no temporal extrapolation into future (nearest neighbour is used): ', trim(var_name), ' !'
             write(error_unit,*) trim(file_name)
             write(error_unit,*) nc_time(1), nc_time(nc_Ntime), now_date
@@ -944,7 +949,7 @@ CONTAINS
          t_indx = 1
          t_indx_p1 = t_indx
          delta_t = 1.0_real64
-         if (mype==0) then 
+         if (partit%mype==0) then 
             write(error_unit,*) 'WARNING: no temporal extrapolation back in time (nearest neighbour is used): ', trim(var_name), ' !'
             write(error_unit,*) trim(file_name)
             write(error_unit,*) nc_time(1), nc_time(nc_Ntime), now_date
@@ -992,12 +997,17 @@ CONTAINS
 
       iost = 0
       !open file sbc_flfi
-      if (mype==0) then
+      if (partit%mype==0) then
          !write(*,*) 'check: ', trim(file_name)
       end if
 
+      call fesom_profiler_start("sbc_read_distribute")
+      if (trim(forcing_distribution)=='scatter') then
+        if (.not. sbcdata1_from_cache) call sbc_box_distribute(fld_idx, t_indx,    sbcdata1, partit)
+        if (.not. sbcdata2_from_cache) call sbc_box_distribute(fld_idx, t_indx_p1, sbcdata2, partit)
+      else
       !read data from file
-      if (mype==rootrank) then
+      if (partit%mype==rootrank) then
          nf_start(1)=1
          nf_edges(1)=nc_Nlon-2
          nf_start(2)=1
@@ -1010,7 +1020,7 @@ CONTAINS
          iost = 0
       end if
 
-      if(mype == rootrank) then
+      if(partit%mype == rootrank) then
         if(.not. sbcdata1_from_cache) then
            sbcdata1(1, 1:nc_Nlat)       = sbcdata1(nc_Nlon-1, 1:nc_Nlat)
            sbcdata1(nc_Nlon,1:nc_Nlat) = sbcdata1(2, 1:nc_Nlat)
@@ -1018,11 +1028,11 @@ CONTAINS
       end if
       if(sbcdata1_from_cache) then ! use the cache instead of bcast
       else
-        call MPI_BCast(sbcdata1(1:nc_Nlon,1:nc_Nlat), nc_Nlon*nc_Nlat, MPI_REAL, rootrank, MPI_COMM_FESOM, ierror)
+        call MPI_BCast(sbcdata1(1:nc_Nlon,1:nc_Nlat), nc_Nlon*nc_Nlat, MPI_REAL, rootrank, partit%MPI_COMM_FESOM, ierror)
      end if
 
        ! read next time step in file (check for +1 done before)
-      if (mype==rootrank) then
+      if (partit%mype==rootrank) then
         nf_start(3)=t_indx_p1
         nf_edges(3)=1
         if(.not. sbcdata2_from_cache) then
@@ -1031,7 +1041,7 @@ CONTAINS
       iost = 0
       end if
 
-      if (mype==rootrank) then
+      if (partit%mype==rootrank) then
         if(.not. sbcdata2_from_cache) then
          sbcdata2(1, 1:nc_Nlat)       = sbcdata2(nc_Nlon-1, 1:nc_Nlat)
          sbcdata2(nc_Nlon, 1:nc_Nlat) = sbcdata2(2, 1:nc_Nlat)
@@ -1040,7 +1050,7 @@ CONTAINS
      if(sbcdata2_from_cache) then ! use the cache instead of bcast
       !
      else
-       call MPI_BCast(sbcdata2(1:nc_Nlon,1:nc_Nlat), nc_Nlon*nc_Nlat, MPI_REAL, rootrank, MPI_COMM_FESOM, ierror)
+       call MPI_BCast(sbcdata2(1:nc_Nlon,1:nc_Nlat), nc_Nlon*nc_Nlat, MPI_REAL, rootrank, partit%MPI_COMM_FESOM, ierror)
      end if
 
 !      !flip data in case of lat from -90 to 90
@@ -1055,18 +1065,21 @@ CONTAINS
          call fill_land_from_ocean(sbcdata1, forcing_ocean_mask, nc_Nlon, nc_Nlat)
          call fill_land_from_ocean(sbcdata2, forcing_ocean_mask, nc_Nlon, nc_Nlat)
       end if
+      end if
 
+      call fesom_profiler_end("sbc_read_distribute")
+      call fesom_profiler_start("sbc_interp")
       ! bilinear space interpolation, and time interpolation ,
       ! data is assumed to be sampled on a regular grid
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(ii, i, j, ip1, jp1, x, y, extrp, x1, x2, y1, y2, denom, data1, data2)
-      do ii = 1, myDim_nod2D+eDim_nod2D
+      do ii = 1, partit%myDim_nod2D+partit%eDim_nod2D
          i = bilin_indx_i(fld_idx, ii)
          j = bilin_indx_j(fld_idx, ii)
          ip1 = i + 1
          jp1 = j + 1
-         x  = geo_coord_nod2D(1,ii)/rad
+         x  = mesh%geo_coord_nod2D(1,ii)/rad
          if (x < 0.0_WP) x=x+360._WP
-         y  = geo_coord_nod2D(2,ii)/rad
+         y  = mesh%geo_coord_nod2D(2,ii)/rad
          extrp = 0
          if ( i == 0 ) then
             i   = nc_Nlon
@@ -1121,6 +1134,7 @@ CONTAINS
 
       end do
 !$OMP END PARALLEL DO
+      call fesom_profiler_end("sbc_interp")
    END SUBROUTINE getcoeffld
 
    SUBROUTINE data_timeinterp(rdate, partit)
@@ -1190,6 +1204,7 @@ CONTAINS
                         nm_mslp_file, nm_xwind_var, nm_ywind_var, nm_xstre_var, nm_ystre_var, nm_humi_var, &
                         nm_qsr_var, nm_qlw_var, nm_tair_var, nm_prec_var, nm_snow_var, &
                         nm_mslp_var, nm_cloud_var, nm_cloud_file, nm_nc_iyear, nm_nc_imm, nm_nc_idd, nm_nc_freq, nm_nc_tmid, y_perpetual, &
+                        forcing_distribution, &
                         l_xwind, l_ywind, l_xstre, l_ystre, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow, &
                         nm_runoff_file, runoff_data_source, runoff_climatology, nm_sss_data_file, sss_data_source, &
                         chl_data_source, nm_chl_data_file, chl_const, use_runoff_mapper, runoff_basins_file, runoff_radius, &
@@ -1199,23 +1214,19 @@ CONTAINS
 !      namelist /nam_rsbc/ fe_data_source, nm_fe_data_file, nm_aen_data_file, nm_river_data_file, nm_erosion_data_file, nm_co2_data_file
 !#endif
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
       ! OPEN and read namelist for SBC
       open(unit=nm_sbc_unit, file='namelist.forcing', action='read', form='formatted', access='sequential', status='old', iostat=iost )
       if (iost == 0) then
-         if (mype==0) WRITE(*,*) '     file   : ', 'namelist.forcing',' open ok'
+         if (partit%mype==0) WRITE(*,*) '     file   : ', 'namelist.forcing',' open ok'
       else
-         if (mype==0) WRITE(error_unit,*) 'ERROR: --> bad opening file   : ', 'namelist.forcing',' ; iostat=',iost
-         call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+         if (partit%mype==0) WRITE(error_unit,*) 'ERROR: --> bad opening file   : ', 'namelist.forcing',' ; iostat=',iost
+         call par_abort(partit%MPI_COMM_FESOM, partit%mype)
       endif
       READ( nm_sbc_unit, nml=nam_sbc, iostat=iost )
       close( nm_sbc_unit )
       
-      if (mype==0) then
+      if (partit%mype==0) then
          write(*,*) "Start: Ocean forcing initialization."
          write(*,*) "Surface boundary conditions parameters:"
          if (use_ocean_only_forcing) then
@@ -1230,7 +1241,7 @@ CONTAINS
 
       i_totfl=0
       if (l_xwind) then
-         if (mype==0) then
+         if (partit%mype==0) then
             write(*,*) "      nm_xwind_file = ", trim(nm_xwind_file) ," ! name of file with X winds"
             write(*,*) "      nm_xwind_var  = ", trim(nm_xwind_var)  ," ! name of variable in file with wind "
          end if
@@ -1239,7 +1250,7 @@ CONTAINS
       end if
 
       if (l_ywind) then
-         if (mype==0) then
+         if (partit%mype==0) then
             write(*,*) "      nm_ywind_file = ", trim(nm_ywind_file) ," ! name of file with Y winds"
             write(*,*) "      nm_ywind_var  = ", trim(nm_ywind_var)  ," ! name of variable in file with wind "
          end if
@@ -1248,7 +1259,7 @@ CONTAINS
       end if
 
       if (l_xstre) then
-         if (mype==0) then
+         if (partit%mype==0) then
             write(*,*) "      nm_xstre_file = ", trim(nm_xstre_file) ," ! name of file with X stress"
             write(*,*) "      nm_xstre_var  = ", trim(nm_xstre_var)  ," ! name of variable in file with wind stress "
          end if
@@ -1257,7 +1268,7 @@ CONTAINS
       end if
 
       if (l_ystre) then
-         if (mype==0) then
+         if (partit%mype==0) then
             write(*,*) "      nm_ystre_file = ", trim(nm_ystre_file) ," ! name of file with Y stress"
             write(*,*) "      nm_ystre_var  = ", trim(nm_ystre_var)  ," ! name of variable in file with wind stress "
          end if
@@ -1266,7 +1277,7 @@ CONTAINS
       end if
 
       if (l_humi) then
-         if (mype==0) then
+         if (partit%mype==0) then
             write(*,*) "      nm_humi_file = ", trim(nm_humi_file) ," ! name of file with humidity"
             write(*,*) "      nm_humi_var   = ", trim(nm_humi_var) ," ! name of variable in file with humidity  "
          end if
@@ -1275,7 +1286,7 @@ CONTAINS
       end if
 
       if (l_qsr) then
-         if (mype==0) then
+         if (partit%mype==0) then
             write(*,*) "      nm_qsr_file = ", trim(nm_qsr_file) ," ! name of file with solar heat "
             write(*,*) "      nm_qsr_var  = ", trim(nm_qsr_var)  ," ! name of variable in file with solar heat "
          end if
@@ -1284,7 +1295,7 @@ CONTAINS
       end if
 
       if (l_qlw) then
-         if (mype==0) then
+         if (partit%mype==0) then
             write(*,*) "      nm_qlw_file   = ", trim(nm_qlw_file) ," ! name of file with Long wave "
             write(*,*) "      nm_qlw_var    = ", trim(nm_qlw_var)  ," ! name of variable in file with Long wave "
          end if
@@ -1293,7 +1304,7 @@ CONTAINS
       end if
 
       if (l_tair) then
-         if (mype==0) then
+         if (partit%mype==0) then
             write(*,*) "      nm_tair_file  = ", trim(nm_tair_file) ," ! name of file with 2m air temperature "
             write(*,*) "      nm_tair_var   = ", trim(nm_tair_var)  ," ! name of variable in file with 2m air temperature "
          end if
@@ -1302,7 +1313,7 @@ CONTAINS
       end if
 
       if (l_prec) then
-         if (mype==0) then
+         if (partit%mype==0) then
             write(*,*) "      nm_prec_file  = ", trim(nm_prec_file) ," ! name of file with total precipitation "
             write(*,*) "      nm_prec_var   = ", trim(nm_prec_var)  ," ! name of variable in file with total precipitation  "
          end if
@@ -1311,7 +1322,7 @@ CONTAINS
       end if
 
       if (l_snow) then
-         if (mype==0) then
+         if (partit%mype==0) then
             write(*,*) "      nm_snow_file  = ", trim(nm_snow_file) ," ! name of file with snow precipitation "
             write(*,*) "      nm_snow_var   = ", trim(nm_snow_var) , " !name of variable in file with air_pressure_at_sea_level "
          end if
@@ -1320,7 +1331,7 @@ CONTAINS
       end if
 
       if (l_mslp) then
-         if (mype==0) then
+         if (partit%mype==0) then
             write(*,*) "      nm_mslp_file  = ", trim(nm_mslp_file)," !air_pressure_at_sea_level "
             write(*,*) "      nm_mslp_var   = ", trim(nm_mslp_var) ," !name of variable in file with air_pressure_at_sea_level "
          end if
@@ -1328,20 +1339,20 @@ CONTAINS
          i_mslp  =i_totfl
       end if
 
-      if (mype==0) then
+      if (partit%mype==0) then
          write(*,*) 'total fluxes to read: ', i_totfl
       end if
 
-      ALLOCATE( coef_a(i_totfl,myDim_nod2D+eDim_nod2D), coef_b(i_totfl,myDim_nod2D+eDim_nod2D), &
-              & atmdata(i_totfl,myDim_nod2D+eDim_nod2D), time_t0(i_totfl), &
+      ALLOCATE( coef_a(i_totfl,partit%myDim_nod2D+partit%eDim_nod2D), coef_b(i_totfl,partit%myDim_nod2D+partit%eDim_nod2D), &
+              & atmdata(i_totfl,partit%myDim_nod2D+partit%eDim_nod2D), time_t0(i_totfl), &
                    &      STAT=sbc_alloc )
       coef_a       = 0.0_WP
       coef_b       = 0.0_WP
       atmdata      = 0.0_WP
       time_t0      = 0.0_real64
 
-      ALLOCATE( bilin_indx_i(i_totfl, myDim_nod2D+eDim_nod2D), bilin_indx_j(i_totfl, myDim_nod2D+eDim_nod2D), &
-              & qns(myDim_nod2D+eDim_nod2D), emp(myDim_nod2D+eDim_nod2D), qsr(myDim_nod2D+eDim_nod2D),  &
+      ALLOCATE( bilin_indx_i(i_totfl, partit%myDim_nod2D+partit%eDim_nod2D), bilin_indx_j(i_totfl, partit%myDim_nod2D+partit%eDim_nod2D), &
+              & qns(partit%myDim_nod2D+partit%eDim_nod2D), emp(partit%myDim_nod2D+partit%eDim_nod2D), qsr(partit%myDim_nod2D+partit%eDim_nod2D),  &
                    &      STAT=sbc_alloc )
       bilin_indx_i = 0.0_WP
       bilin_indx_j = 0.0_WP
@@ -1362,7 +1373,7 @@ CONTAINS
     ! realy exist
     if (surf_relax_S > 0._WP) then
         if (sss_data_source=='CORE1' .or. sss_data_source=='CORE2') then
-            if (mype==0) then 
+            if (partit%mype==0) then 
                 write(*,*)
                 write(*,*) ' --> using total monthly SSS climatology for restoring'
                 write(*,*) '     sss_data_source  = ', sss_data_source
@@ -1373,7 +1384,7 @@ CONTAINS
             file_exist=.false.
             inquire(file=make_full_path(nm_sss_data_file), exist=file_exist) 
             if ( .not. file_exist) then   
-                if (mype==0) then
+                if (partit%mype==0) then
                     write(error_unit,*)
                     write(error_unit,*) achar(27)//'[33m'
                     write(error_unit,*) '____________________________________________________________________'
@@ -1386,11 +1397,11 @@ CONTAINS
                     write(error_unit,*) achar(27)//'[0m'
                     write(error_unit,*)
                 end if
-                call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+                call par_abort(partit%MPI_COMM_FESOM, partit%mype)
             end if
             
         else
-            if (mype==0) then
+            if (partit%mype==0) then
             write(error_unit,*)
                 write(error_unit,*) achar(27)//'[33m'
                 write(error_unit,*) '____________________________________________________________________'
@@ -1407,7 +1418,7 @@ CONTAINS
                 write(error_unit,*) achar(27)//'[0m'
                 write(error_unit,*)
             end if
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
         
         end if 
     end if     
@@ -1418,14 +1429,14 @@ CONTAINS
     ! runoff, so only one runoff time slice for the entire simulation is used. 
     ! This part is only read ones when the forcing is first time initialized
     if (runoff_data_source=='NONE') then
-        if (mype==0) then
+        if (partit%mype==0) then
             write(*,*) ' --> river runoff is switched off (runoff_data_source=''NONE'') '
             write(*,*)
         end if
         ! runoff was allocated and set to zero in forcing_array_setup, nothing to read
 
     elseif (runoff_data_source=='CORE1' .or. runoff_data_source=='CORE2' ) then
-        if (mype==0) then 
+        if (partit%mype==0) then 
             write(*,*) ' --> using total longterm runoff climatology (only 1 time slice) '
             write(*,*) '     runoff_data_source = ', runoff_data_source
             write(*,*) '     nm_runoff_file     = ', trim(make_full_path(nm_runoff_file))
@@ -1441,7 +1452,7 @@ CONTAINS
             runoff=runoff/1000.0_WP  ! Kg/s/m2 --> m/s
             
         else
-            if (mype==0) then
+            if (partit%mype==0) then
                 write(error_unit,*)
                 write(error_unit,*) achar(27)//'[31m'
                 write(error_unit,*) '____________________________________________________________________'
@@ -1456,12 +1467,12 @@ CONTAINS
                 write(error_unit,*) achar(27)//'[0m'
                 write(error_unit,*)
             end if
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
 
         end if
 
     elseif (runoff_data_source=='Dai09' .or. runoff_data_source=='JRA55') then 
-        if (mype==0) then 
+        if (partit%mype==0) then 
             write(*,*) ' --> using monthly runoff climatology (12 time slices) '
             write(*,*) '     runoff_data_source = ', runoff_data_source
             write(*,*) '     nm_runoff_file     = ', trim(make_full_path(nm_runoff_file))
@@ -1475,7 +1486,7 @@ CONTAINS
         file_exist=.false.
         inquire(file=make_full_path(nm_runoff_file), exist=file_exist) 
         if ( .not. file_exist .and. runoff_climatology) then   
-            if (mype==0) then
+            if (partit%mype==0) then
                 write(error_unit,*)
                 write(error_unit,*) achar(27)//'[31m'
                 write(error_unit,*) '____________________________________________________________________'
@@ -1490,12 +1501,12 @@ CONTAINS
                 write(error_unit,*) achar(27)//'[0m'
                 write(error_unit,*)
             end if
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
 
         end if
 
     else
-        if (mype==0) then
+        if (partit%mype==0) then
             write(error_unit,*)
             write(error_unit,*) achar(27)//'[31m'
             write(error_unit,*) '____________________________________________________________________'
@@ -1517,7 +1528,7 @@ CONTAINS
             write(error_unit,*) achar(27)//'[0m'
             write(error_unit,*)
         end if
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
 
     end if   
     
@@ -1528,7 +1539,7 @@ CONTAINS
             file_exist=.false.
             inquire(file=make_full_path(nm_chl_data_file), exist=file_exist) 
             if (file_exist) then 
-                if (mype==0) then 
+                if (partit%mype==0) then 
                     ! print *, achar(27)//'[30m'
                     write(*,*) ' --> you will use short-wave penetration with the Sweeny chlorophyll climatology: '
                     write(*,*) '     chl_data_source  =', trim(chl_data_source)
@@ -1537,7 +1548,7 @@ CONTAINS
                     !print *, achar(27)//'[0m'
                 end if    
             else 
-                if (mype==0) then
+                if (partit%mype==0) then
                     write(error_unit,*)
                     write(error_unit,*) achar(27)//'[31m'
                     write(error_unit,*) '____________________________________________________________________'
@@ -1551,11 +1562,11 @@ CONTAINS
                     write(error_unit,*) achar(27)//'[0m'
                     write(error_unit,*)
                 end if
-                call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+                call par_abort(partit%MPI_COMM_FESOM, partit%mype)
                 
             end if 
         elseif (chl_data_source == 'Const.' .or. chl_data_source == 'None') then
-            if (mype==0) then 
+            if (partit%mype==0) then 
                 write(error_unit,*) achar(27)//'[33m'
                 write(error_unit,*) ' --> you will use short-wave penetration with constant chlorophyll concentration: ', chl_const
                 write(error_unit,*) '     Are you sure about this??? Usually the shortwave penetration will run better with Sweeney'
@@ -1567,7 +1578,7 @@ CONTAINS
             chl=chl_const
             
         else
-            if (mype==0) then
+            if (partit%mype==0) then
                 write(error_unit,*)
                 write(error_unit,*) achar(27)//'[31m'
                 write(error_unit,*) '____________________________________________________________________'
@@ -1584,14 +1595,14 @@ CONTAINS
                 write(error_unit,*) achar(27)//'[0m'
                 write(error_unit,*)
             end if
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
             
         end if ! --> if (chl_data_source == 'Sweeney') then
     end if ! --> if (use_sw_pene) then
 
     !___________________________________________________________________________
-    if (mype==0) write(*,*) "DONE:  Ocean forcing initialization."
-    if (mype==0) write(*,*) 'Parts of forcing data (only constant in time fields) are read'
+    if (partit%mype==0) write(*,*) "DONE:  Ocean forcing initialization."
+    if (partit%mype==0) write(*,*) 'Parts of forcing data (only constant in time fields) are read'
 
 !#if defined(__recom)
 !        ! OPEN and read namelist for SBC REcoM
@@ -1613,7 +1624,7 @@ CONTAINS
 !#if defined(__usetp)
 !        endif !(partit%my_fesom_group==0) then
 !#endif
-!            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+!            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
 !            stop
 !        endif
 !        READ( nm_sbc_unit+1, nml=nam_rsbc, iostat=iost )
@@ -1658,7 +1669,7 @@ CONTAINS
 #if defined(__usetp)
         endif !(partit%my_fesom_group==0) then
 #endif
-          call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+          call par_abort(partit%MPI_COMM_FESOM, partit%mype)
           stop
       endif
 
@@ -1668,6 +1679,7 @@ CONTAINS
 #endif
 
    SUBROUTINE sbc_do(partit, mesh)
+      use fesom_profiler, only: fesom_profiler_start, fesom_profiler_end
       !!---------------------------------------------------------------------
       !!                    ***  ROUTINE sbc_do ***
       !!
@@ -1707,10 +1719,6 @@ CONTAINS
       type(t_partit), intent(inout), target :: partit
       type(t_mesh),   intent(in),    target :: mesh
       
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
       force_newcoeff=.false.
       if (yearnew/=yearold) then
@@ -1766,7 +1774,9 @@ CONTAINS
          nc_Ntime =>sbc_flfi(fld_idx)%nc_Ntime
          if ( ((rdate > nc_time(t_indx_p1)) .and. (nc_time(t_indx) < nc_time(nc_Ntime))) .or. force_newcoeff) then
             ! get new coefficients for time interpolation on model grid for all data
+            call fesom_profiler_start("sbc_getcoeff")
             call getcoeffld(fld_idx, rdate, partit, mesh)
+            call fesom_profiler_end("sbc_getcoeff")
             if ((l_xwind .and. (fld_idx==i_xwind)) .and. rotated_grid) do_rotation_wind=.true.
             if ((l_xstre .and. (fld_idx==i_xstre)) .and. rotated_grid) do_rotation_stre=.true.
          endif
@@ -1774,18 +1784,18 @@ CONTAINS
 
       if (do_rotation_wind) then
 !$OMP PARALLEL DO
-         do i=1, myDim_nod2D+eDim_nod2D
-            call vector_g2r(coef_a(i_xwind,i), coef_a(i_ywind,i), coord_nod2D(1,i), coord_nod2D(2,i), 0)
-            call vector_g2r(coef_b(i_xwind,i), coef_b(i_ywind,i), coord_nod2D(1,i), coord_nod2D(2,i), 0)
+         do i=1, partit%myDim_nod2D+partit%eDim_nod2D
+            call vector_g2r(coef_a(i_xwind,i), coef_a(i_ywind,i), mesh%coord_nod2D(1,i), mesh%coord_nod2D(2,i), 0)
+            call vector_g2r(coef_b(i_xwind,i), coef_b(i_ywind,i), mesh%coord_nod2D(1,i), mesh%coord_nod2D(2,i), 0)
          end do
 !$OMP END PARALLEL DO
       end if
 
       if (do_rotation_stre) then
 !$OMP PARALLEL DO
-         do i=1, myDim_nod2D+eDim_nod2D
-            call vector_g2r(coef_a(i_xstre,i), coef_a(i_ystre,i), coord_nod2D(1,i), coord_nod2D(2,i), 0)
-            call vector_g2r(coef_b(i_xstre,i), coef_b(i_ystre,i), coord_nod2D(1,i), coord_nod2D(2,i), 0)
+         do i=1, partit%myDim_nod2D+partit%eDim_nod2D
+            call vector_g2r(coef_a(i_xstre,i), coef_a(i_ystre,i), mesh%coord_nod2D(1,i), mesh%coord_nod2D(2,i), 0)
+            call vector_g2r(coef_b(i_xstre,i), coef_b(i_ystre,i), mesh%coord_nod2D(1,i), mesh%coord_nod2D(2,i), 0)
          end do
 !$OMP END PARALLEL DO
       end if
@@ -1803,7 +1813,7 @@ CONTAINS
                 i=month
                 if (mstep > 1) i=i+1 
                 if (i > 12) i=1
-                if (mype==0) write(*,*) 'Updating SSS restoring data for month     ', i 
+                if (partit%mype==0) write(*,*) 'Updating SSS restoring data for month     ', i 
                 call read_other_NetCDF(make_full_path(nm_sss_data_file), 'SALT', i, Ssurf, .true., .true., partit, mesh) 
             end if
         end if
@@ -1817,7 +1827,7 @@ CONTAINS
                 i=month
                 if (mstep > 1) i=i+1 
                 if (i > 12) i=1
-                if (mype==0) write(*,*) 'Updating chlorophyll climatology for month ', i 
+                if (partit%mype==0) write(*,*) 'Updating chlorophyll climatology for month ', i 
                 call read_other_NetCDF(make_full_path(nm_chl_data_file), 'chl', i, chl, .true., .true., partit, mesh) 
             end if
         end if
@@ -1836,7 +1846,7 @@ CONTAINS
                 i=month
                 if (mstep > 1) i=i+1 
                 if (i > 12) i=1
-                if (mype==0) write(*,*) 'Updating monthly climatology runoff for month ', i 
+                if (partit%mype==0) write(*,*) 'Updating monthly climatology runoff for month ', i 
                 filename=trim(make_full_path(nm_runoff_file))
                 
                 ! file existence has here been already checked in sbc_ini
@@ -1847,7 +1857,7 @@ CONTAINS
                 i=month
                 if (mstep > 1) i=i+1 
                 if (i > 12) i=1
-                if (mype==0) write(*,*) 'Updating monthly runoff for month             ', i 
+                if (partit%mype==0) write(*,*) 'Updating monthly runoff for month             ', i 
                 filename=trim(make_full_path(nm_runoff_file))//cyearnew//'.nc' 
                 
                 ! check here if transient climatology file exists, quit model if 
@@ -1855,7 +1865,7 @@ CONTAINS
                 file_exist=.false.
                 inquire(file=filename, exist=file_exist) 
                 if (.not. file_exist) then   
-                    if (mype==0) then
+                    if (partit%mype==0) then
                         write(error_unit,*)
                         write(error_unit,*) achar(27)//'[31m'
                         write(error_unit,*) '____________________________________________________________________'
@@ -1868,7 +1878,7 @@ CONTAINS
                         write(error_unit,*) achar(27)//'[0m'
                         write(error_unit,*)
                     end if
-                    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+                    call par_abort(partit%MPI_COMM_FESOM, partit%mype)
                 end if 
             
             end if ! --> if(runoff_climatology) then
@@ -1919,10 +1929,6 @@ SUBROUTINE sbc_do_recom(partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_mesh),   intent(in),    target :: mesh
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
         update_monthly_flag=( (day_in_month==num_day_in_month(fleapyear,month) .AND. timenew==86400._WP) .OR. mstep==1)
 
@@ -1949,7 +1955,7 @@ SUBROUTINE sbc_do_recom(partit, mesh)
 #if defined(__usetp)
         if (partit%my_fesom_group==0) then
 #endif
-                if (mype == 0) then
+                if (partit%mype == 0) then
                     write(*,*) 'Constant_CO2   = ', CO2_for_spinup
                     write(*,*) 'Atm CO2        = ', AtmCO2
             end if
@@ -1962,8 +1968,8 @@ SUBROUTINE sbc_do_recom(partit, mesh)
 
                     if (ciso_14) then
                         ! Atmospheric 14C varies with latitude
-                        do i=1, myDim_nod2D
-                            lat_val = geo_coord_nod2D(2,i) / rad
+                        do i=1, partit%myDim_nod2D
+                            lat_val = mesh%geo_coord_nod2D(2,i) / rad
 
                             if (ciso_organic_14) then
 !                               Convert Delta_14C to delta_14C
@@ -1986,7 +1992,7 @@ SUBROUTINE sbc_do_recom(partit, mesh)
         if (partit%my_fesom_group==0) then
 #endif
 
-            if (mype==0) write(*,*) 'Updating CO2 climatology for month       ', i,' from ', trim(filename)
+            if (partit%mype==0) write(*,*) 'Updating CO2 climatology for month       ', i,' from ', trim(filename)
 #if defined(__usetp)
         endif !(partit%my_fesom_group==0) then
 #endif
@@ -2000,7 +2006,7 @@ SUBROUTINE sbc_do_recom(partit, mesh)
 #if defined(__usetp)
         if (partit%my_fesom_group==0) then
 #endif    
-            if(mype==0) write(*,*) currentCO2year, firstyearofcurrentCO2cycle, yearnew, firstyearoffesomcycle
+            if(partit%mype==0) write(*,*) currentCO2year, firstyearofcurrentCO2cycle, yearnew, firstyearoffesomcycle
 #if defined(__usetp)
         endif !(partit%my_fesom_group==0) then
 #endif
@@ -2012,7 +2018,7 @@ SUBROUTINE sbc_do_recom(partit, mesh)
             if (status.ne.nf90_noerr)then
                 write(error_unit,*) 'ERROR: CANNOT READ CO2 FILE CORRECTLY !!!!!'
                 write(error_unit,*) 'Error in opening netcdf file '//filename
-                call par_ex(MPI_COMM_FESOM, mype)
+                call par_abort(partit%MPI_COMM_FESOM, partit%mype)
                 stop
             endif
 	
@@ -2027,8 +2033,8 @@ SUBROUTINE sbc_do_recom(partit, mesh)
 #if defined(__usetp)
         if (partit%my_fesom_group==0) then
 #endif
-            if (mype==0) write(*,*) 'Current carbon year=',currentCO2year
-            if (mype==0) write(*,*) 'Atm CO2=', AtmCO2
+            if (partit%mype==0) write(*,*) 'Current carbon year=',currentCO2year
+            if (partit%mype==0) write(*,*) 'Atm CO2=', AtmCO2
 #if defined(__usetp)
         endif !(partit%my_fesom_group==0) then
 #endif
@@ -2037,7 +2043,7 @@ SUBROUTINE sbc_do_recom(partit, mesh)
     end if   ! atmospheric box model or prescribed CO2 values   
 
 !   Control output of atmospheric CO2 values
-    if (mype==0) then !OG
+    if (partit%mype==0) then !OG
 #if defined(__usetp)
         if (partit%my_fesom_group==0) then
 #endif
@@ -2065,7 +2071,7 @@ SUBROUTINE sbc_do_recom(partit, mesh)
 #if defined(__usetp)
         if (partit%my_fesom_group==0) then
 #endif 
-            if (mype==0) write(*,*) 'Updating iron climatology for month       ', i,' from ', trim(filename)
+            if (partit%mype==0) write(*,*) 'Updating iron climatology for month       ', i,' from ', trim(filename)
 #if defined(__usetp)
         endif
 #endif
@@ -2075,7 +2081,7 @@ SUBROUTINE sbc_do_recom(partit, mesh)
 #if defined(__usetp)
         if (partit%my_fesom_group==0) then
 #endif 
-        if (mype==0) write(*,*) 'Albani is switched off --> Check namelist.recom'
+        if (partit%mype==0) write(*,*) 'Albani is switched off --> Check namelist.recom'
 #if defined(__usetp)
         endif
 #endif
@@ -2096,7 +2102,7 @@ SUBROUTINE sbc_do_recom(partit, mesh)
         if (partit%my_fesom_group==0) then
 #endif
 
-            if (mype==0) write(*,*) 'Updating nitrogen climatology for month   ', i,' from ', trim(filename)
+            if (partit%mype==0) write(*,*) 'Updating nitrogen climatology for month   ', i,' from ', trim(filename)
 #if defined(__usetp)
         endif
 #endif
@@ -2115,7 +2121,7 @@ SUBROUTINE sbc_do_recom(partit, mesh)
 #if defined(__usetp)
         if (partit%my_fesom_group==0) then
 #endif
-        if (mstep==1 .and. mype==0) write(*,*) 'useAeolianN is switched off'
+        if (mstep==1 .and. partit%mype==0) write(*,*) 'useAeolianN is switched off'
 #if defined(__usetp)
         endif
 #endif
@@ -2128,7 +2134,7 @@ SUBROUTINE sbc_do_recom(partit, mesh)
 !<  read riverine input
     ! *** River inputs are in mmol/m2/s ***
     ! add river nutrients as surface boundary condition (surface_bc function in oce_ale_tracers)
-        if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'   --> River_input'//achar(27)//'[0m'
+        if (recom_debug .and. partit%mype==0) print *, achar(27)//'[36m'//'   --> River_input'//achar(27)//'[0m'
 
         is_riverinput = 1.0d0
 
@@ -2140,7 +2146,7 @@ SUBROUTINE sbc_do_recom(partit, mesh)
 #if defined(__usetp)
         if (partit%my_fesom_group==0) then
 #endif
-            if (mype==0) write(*,*) 'Updating riverine restoring data for month', i,' from ', trim(filename)
+            if (partit%mype==0) write(*,*) 'Updating riverine restoring data for month', i,' from ', trim(filename)
 #if defined(__usetp)
         endif
 #endif
@@ -2168,7 +2174,7 @@ SUBROUTINE sbc_do_recom(partit, mesh)
 #if defined(__usetp)
         if (partit%my_fesom_group==0) then
 #endif
-        if (mype==0 .and. mstep==1) write(*,*) 'No riverine input'
+        if (partit%mype==0 .and. mstep==1) write(*,*) 'No riverine input'
 #if defined(__usetp)
         endif
 #endif
@@ -2194,7 +2200,7 @@ SUBROUTINE sbc_do_recom(partit, mesh)
 #if defined(__usetp)
         if (partit%my_fesom_group==0) then
 #endif
-    if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//' --> Erosion_input'//achar(27)//'[0m'
+    if (recom_debug .and. partit%mype==0) print *, achar(27)//'[36m'//' --> Erosion_input'//achar(27)//'[0m'
 #if defined(__usetp)
         endif
 #endif
@@ -2209,7 +2215,7 @@ SUBROUTINE sbc_do_recom(partit, mesh)
 #if defined(__usetp)
         if (partit%my_fesom_group==0) then
 #endif
-            if (mype==0) write(*,*) 'Updating erosion restoring data for month ', i,' from ', trim(filename)
+            if (partit%mype==0) write(*,*) 'Updating erosion restoring data for month ', i,' from ', trim(filename)
 #if defined(__usetp)
         endif
 #endif
@@ -2227,7 +2233,7 @@ SUBROUTINE sbc_do_recom(partit, mesh)
 #if defined(__usetp)
         if (partit%my_fesom_group==0) then
 #endif
-        if (mype==0 .and. mstep==1) write(*,*) 'No erosion input'
+        if (partit%mype==0 .and. mstep==1) write(*,*) 'No erosion input'
 #if defined(__usetp)
         endif
 #endif
@@ -2245,8 +2251,8 @@ SUBROUTINE sbc_do_recom(partit, mesh)
 #if defined(__usetp)
         if (partit%my_fesom_group==0) then
 #endif
-            if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Sed_input'//achar(27)//'[0m'
-            if (mype==0) write(*,*) 'Updating sedimentary input first time from', nm_sed_data_file
+            if (recom_debug .and. partit%mype==0) print *, achar(27)//'[36m'//'     --> Sed_input'//achar(27)//'[0m'
+            if (partit%mype==0) write(*,*) 'Updating sedimentary input first time from', nm_sed_data_file
 #if defined(__usetp)
         endif
 #endif
@@ -2286,7 +2292,7 @@ SUBROUTINE sbc_do_recom(partit, mesh)
 #if defined(__usetp)
         if (partit%my_fesom_group==0) then
 #endif
-        if (mype==0) write(*,*) 'adding loopback fluxes through runoff for the first time' !OG
+        if (partit%mype==0) write(*,*) 'adding loopback fluxes through runoff for the first time' !OG
 #if defined(__usetp)
         endif
 #endif
@@ -2304,57 +2310,57 @@ SUBROUTINE sbc_do_recom(partit, mesh)
         if(status.ne.nf_noerr) call handle_err(status)
         status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(1))
         if(status.ne.nf_noerr) call handle_err(status)
-        if (recom_debug .and. mype==0) write(*,*) mype, 'loopback_orgm_din (mmolN/day):', ncdata(1) !OG
+        if (recom_debug .and. partit%mype==0) write(*,*) partit%mype, 'loopback_orgm_din (mmolN/day):', ncdata(1) !OG
 
         status=nf_inq_varid(ncid, 'loopback_orgm_dic', varid)
         if(status.ne.nf_noerr) call handle_err(status)
         status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(2))
         if(status.ne.nf_noerr) call handle_err(status)
-        if (recom_debug .and. mype==0) write(*,*) mype, 'loopback_orgm_dic (mmolC/day):', ncdata(2) !OG
+        if (recom_debug .and. partit%mype==0) write(*,*) partit%mype, 'loopback_orgm_dic (mmolC/day):', ncdata(2) !OG
 
         status=nf_inq_varid(ncid, 'loopback_orgm_alk', varid)
         if(status.ne.nf_noerr) call handle_err(status)
         status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(3))
         if(status.ne.nf_noerr) call handle_err(status)
-        if (recom_debug .and. mype==0) write(*,*) mype, 'loopback_orgm_alk (mmolAlk/day):', ncdata(3) !OG
+        if (recom_debug .and. partit%mype==0) write(*,*) partit%mype, 'loopback_orgm_alk (mmolAlk/day):', ncdata(3) !OG
 
         status=nf_inq_varid(ncid, 'loopback_opal', varid)
         if(status.ne.nf_noerr) call handle_err(status)
         status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(4))
         if(status.ne.nf_noerr) call handle_err(status)
-        if (recom_debug .and. mype==0) write(*,*) mype, 'loopback_opal (mmolSi/day):', ncdata(4) !OG
+        if (recom_debug .and. partit%mype==0) write(*,*) partit%mype, 'loopback_opal (mmolSi/day):', ncdata(4) !OG
 
         status=nf_inq_varid(ncid, 'loopback_caco3', varid)
         if(status.ne.nf_noerr) call handle_err(status)
         status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(5))
         if(status.ne.nf_noerr) call handle_err(status)
-        if (recom_debug .and. mype==0) write(*,*) mype, 'loopback_caco3 (mmolC/day):', ncdata(5) !OG
+        if (recom_debug .and. partit%mype==0) write(*,*) partit%mype, 'loopback_caco3 (mmolC/day):', ncdata(5) !OG
 
       if(ciso) then
         status=nf_inq_varid(ncid, 'loopback_orgm_dic13', varid)
         if(status.ne.nf_noerr) call handle_err(status)
         status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(6))
         if(status.ne.nf_noerr) call handle_err(status)
-        if (recom_debug .and. mype==0) write(*,*) mype, 'loopback_dic13:', ncdata(6)      !OG
+        if (recom_debug .and. partit%mype==0) write(*,*) partit%mype, 'loopback_dic13:', ncdata(6)      !OG
 
         status=nf_inq_varid(ncid, 'loopback_caco313', varid)
         if(status.ne.nf_noerr) call handle_err(status)
         status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(7))
         if(status.ne.nf_noerr) call handle_err(status)
-        if (recom_debug .and. mype==0) write(*,*) mype, 'loopback_caco313:', ncdata(7)!OG
+        if (recom_debug .and. partit%mype==0) write(*,*) partit%mype, 'loopback_caco313:', ncdata(7)!OG
 
        if(ciso_14 .and. ciso_organic_14) then
         status=nf_inq_varid(ncid, 'loopback_orgm_dic14', varid)
         if(status.ne.nf_noerr) call handle_err(status)
         status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(8))
         if(status.ne.nf_noerr) call handle_err(status)
-        if (recom_debug .and. mype==0) write(*,*) mype, 'loopback_dic14:', ncdata(8) !OG
+        if (recom_debug .and. partit%mype==0) write(*,*) partit%mype, 'loopback_dic14:', ncdata(8) !OG
 
         status=nf_inq_varid(ncid, 'loopback_caco314', varid)
         if(status.ne.nf_noerr) call handle_err(status)
         status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(9))
         if(status.ne.nf_noerr) call handle_err(status)
-        if (recom_debug .and. mype==0) write(*,*) mype, 'loopback_caco314:', ncdata(9) !OG
+        if (recom_debug .and. partit%mype==0) write(*,*) partit%mype, 'loopback_caco314:', ncdata(9) !OG
 
        end if ! ciso_14 .and. ciso_organic_14
       end if ! ciso
@@ -2374,7 +2380,7 @@ SUBROUTINE sbc_do_recom(partit, mesh)
         if (partit%my_fesom_group==0) then
 #endif
             if (mstep == 1) then
-                if (mype==0) write(*,*) 'sedimentary input from MEDUSA not used!' !OG
+                if (partit%mype==0) write(*,*) 'sedimentary input from MEDUSA not used!' !OG
             endif
 #if defined(__usetp)
         endif
@@ -2493,7 +2499,7 @@ END SUBROUTINE sbc_do_recom
 
       if (iost .ne. NF90_NOERR) then
          write(error_unit,*) 'ERROR: I/O status= "',trim(nf90_strerror(iost)),'";',iost,' file= ',fname
-         call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+         call par_abort(partit%MPI_COMM_FESOM, partit%mype)
          stop
       endif
    END SUBROUTINE check_nferr
@@ -2513,8 +2519,6 @@ END SUBROUTINE sbc_do_recom
       real(4), allocatable :: sftof(:,:)
       real(4) :: miss
       logical :: has_missing
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
       ! Use grid dimensions from the first forcing field (all share the same grid)
       nlon = sbc_flfi(1)%nc_Nlon   ! includes +2 halo
@@ -2528,7 +2532,7 @@ END SUBROUTINE sbc_do_recom
       allocate(sftof(nlon, nlat))
       sftof = 0.0
 
-      if (mype == 0) then
+      if (partit%mype == 0) then
          write(*,*) 'Ocean-only forcing: reading mask from ', trim(nm_ocean_mask_file)
          write(*,*) '  variable: ', trim(nm_ocean_mask_var), '  threshold: ', ocean_mask_threshold, '%'
 
@@ -2540,20 +2544,20 @@ END SUBROUTINE sbc_do_recom
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
       if (iost /= NF90_NOERR) then
-         call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+         call par_abort(partit%MPI_COMM_FESOM, partit%mype)
       end if
 
-      if (mype == 0) then
+      if (partit%mype == 0) then
          iost = nf90_inq_varid(ncid, trim(nm_ocean_mask_var), varid)
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
       if (iost /= NF90_NOERR) then
-         if (mype == 0) write(*,*) 'ERROR: variable not found in mask file: ', trim(nm_ocean_mask_var)
-         call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+         if (partit%mype == 0) write(*,*) 'ERROR: variable not found in mask file: ', trim(nm_ocean_mask_var)
+         call par_abort(partit%MPI_COMM_FESOM, partit%mype)
       end if
 
       ! Read the data (nlon-2 x nlat, excluding halo columns)
-      if (mype == 0) then
+      if (partit%mype == 0) then
          ! Note: sftof in file is (lat, lon) but nf90_get_var maps to Fortran column-major
          ! The forcing grid reading convention in this module uses (lon, lat) with halos at columns 1 and nlon
          iost = nf90_get_var(ncid, varid, sftof(2:nlon-1, 1:nlat), &
@@ -2591,7 +2595,7 @@ END SUBROUTINE sbc_do_recom
          end do
       end do
 
-      if (mype == 0) then
+      if (partit%mype == 0) then
          write(*,*) 'Ocean-only forcing: mask loaded.'
          write(*,*) '  Grid size (with halos): ', nlon, ' x ', nlat
          write(*,*) '  Ocean points: ', sum(forcing_ocean_mask), ' / ', nlon*nlat
@@ -2599,6 +2603,97 @@ END SUBROUTINE sbc_do_recom
 
       deallocate(sftof)
    END SUBROUTINE read_forcing_ocean_mask
+
+   SUBROUTINE sbc_box_setup(fld_idx, partit)
+      ! bounding box of the forcing cells the bilinear interpolation in getcoeffld touches on this rank
+      IMPLICIT NONE
+      integer,        intent(in)            :: fld_idx
+      type(t_partit), intent(inout), target :: partit
+      integer :: ii, i, j, ip1, jp1, i0, i1, j0, j1, nlon, nlat
+      nlon = sbc_flfi(fld_idx)%nc_Nlon
+      nlat = sbc_flfi(fld_idx)%nc_Nlat
+      i0 = nlon; i1 = 1; j0 = nlat; j1 = 1
+      do ii = 1, partit%myDim_nod2D+partit%eDim_nod2D
+         i = bilin_indx_i(fld_idx, ii); j = bilin_indx_j(fld_idx, ii)
+         ip1 = i + 1; jp1 = j + 1
+         if (i ==  0) then; i = nlon; ip1 = i; end if
+         if (i == -1) then; i = 1;    ip1 = i; end if
+         if (j ==  0) then; j = nlat; jp1 = j; end if
+         if (j == -1) then; j = 1;    jp1 = j; end if
+         i0 = min(i0, i); i1 = max(i1, ip1); j0 = min(j0, j); j1 = max(j1, jp1)
+      end do
+      sbc_flfi(fld_idx)%box = (/i0, i1, j0, j1/)
+   END SUBROUTINE sbc_box_setup
+
+   SUBROUTINE sbc_box_alloc(fld_idx, partit)
+      IMPLICIT NONE
+      integer,        intent(in)            :: fld_idx
+      type(t_partit), intent(inout), target :: partit
+      type(flfi_type), pointer :: flf
+      integer :: r, ierror, b(4)
+      flf => sbc_flfi(fld_idx)
+      b = flf%box
+      allocate(flf%sbcdata_a(b(1):b(2), b(3):b(4)))
+      allocate(flf%sbcdata_b(b(1):b(2), b(3):b(4)))
+      if (partit%mype == flf%read_forcing_rootrank) then
+         allocate(flf%all_box(4, 0:partit%npes-1))
+      else
+         allocate(flf%all_box(4, 0:0), flf%scat_counts(0:0), flf%scat_displs(0:0), flf%scat_pack(1))
+      end if
+      call MPI_Gather(b, 4, MPI_INTEGER, flf%all_box, 4, MPI_INTEGER, flf%read_forcing_rootrank, partit%MPI_COMM_FESOM, ierror)
+      if (partit%mype == flf%read_forcing_rootrank) then
+         allocate(flf%scat_counts(0:partit%npes-1), flf%scat_displs(0:partit%npes-1))
+         do r = 0, partit%npes-1
+            flf%scat_counts(r) = (flf%all_box(2,r)-flf%all_box(1,r)+1)*(flf%all_box(4,r)-flf%all_box(3,r)+1)
+         end do
+         flf%scat_displs(0) = 0
+         do r = 1, partit%npes-1
+            flf%scat_displs(r) = flf%scat_displs(r-1) + flf%scat_counts(r-1)
+         end do
+         allocate(flf%scat_pack(sum(flf%scat_counts)))
+         allocate(flf%readbuf(flf%nc_Nlon, flf%nc_Nlat))
+         if (partit%mype==0 .and. flag_debug) write(*,*) ' --> [forcing] box scatter: field ', fld_idx, ' cells sent per record ', &
+                                                   sum(flf%scat_counts), ' of ', flf%nc_Nlon*flf%nc_Nlat*partit%npes, ' broadcast'
+      end if
+   END SUBROUTINE sbc_box_alloc
+
+   SUBROUTINE sbc_box_distribute(fld_idx, time_index, boxdata, partit)
+      use forcing_provider_async_module
+      use fesom_profiler, only: fesom_profiler_start, fesom_profiler_end
+      IMPLICIT NONE
+      integer,        intent(in)            :: fld_idx, time_index
+      real(4), dimension(:,:), pointer      :: boxdata
+      type(t_partit), intent(inout), target :: partit
+      type(flfi_type), pointer :: flf
+      integer :: r, ii, jj, p, nlon, nlat, ierror, nbox
+      flf => sbc_flfi(fld_idx)
+      nlon = flf%nc_Nlon; nlat = flf%nc_Nlat
+      call fesom_profiler_start("sbc_ioread")
+      if (partit%mype == flf%read_forcing_rootrank) then
+         call forcing_provider%get_forcingdata(i_totfl, fld_idx, flf%async_netcdf_allowed, trim(flf%file_name), yearnew, &
+                                               trim(flf%var_name), time_index, flf%readbuf(2:nlon-1, 1:nlat))
+      end if
+      call fesom_profiler_end("sbc_ioread")
+      if (partit%mype == flf%read_forcing_rootrank) then
+         flf%readbuf(1,    1:nlat) = flf%readbuf(nlon-1, 1:nlat)
+         flf%readbuf(nlon, 1:nlat) = flf%readbuf(2,      1:nlat)
+         if (use_ocean_only_forcing) call fill_land_from_ocean(flf%readbuf, forcing_ocean_mask, nlon, nlat)
+         p = 0
+         do r = 0, partit%npes-1
+            do jj = flf%all_box(3,r), flf%all_box(4,r)
+               do ii = flf%all_box(1,r), flf%all_box(2,r)
+                  p = p + 1
+                  flf%scat_pack(p) = flf%readbuf(ii, jj)
+               end do
+            end do
+         end do
+      end if
+      nbox = size(boxdata)
+      call fesom_profiler_start("sbc_scatterv")
+      call MPI_Scatterv(flf%scat_pack, flf%scat_counts, flf%scat_displs, MPI_REAL, boxdata, nbox, MPI_REAL, &
+                        flf%read_forcing_rootrank, partit%MPI_COMM_FESOM, ierror)
+      call fesom_profiler_end("sbc_scatterv")
+   END SUBROUTINE sbc_box_distribute
 
    SUBROUTINE fill_land_from_ocean(data, mask, nlon, nlat)
       !! Iteratively fill land cells with extrapolated ocean values.
@@ -3566,7 +3661,7 @@ subroutine read_runoff_mapper(file, vari, R, partit, mesh)
    use o_param
    USE MOD_MESH
    USE MOD_PARTIT
-   use par_support_module, only: par_ex
+   use par_support_module, only: par_abort
    USE g_forcing_arrays,    only: runoff
    use g_support
    use netcdf
@@ -3591,26 +3686,22 @@ subroutine read_runoff_mapper(file, vari, R, partit, mesh)
    integer                    :: ierror           ! return error code
 !  type(sparse_matrix)        :: RUNOFF_MAPPER
  
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
  
-   if (mype==0) write(*,*) 'building RUNOFF MAPPER with radius of smoothing= ', R*1.e-3, ' km'
-   if (mype==0) then
+   if (partit%mype==0) write(*,*) 'building RUNOFF MAPPER with radius of smoothing= ', R*1.e-3, ' km'
+   if (partit%mype==0) then
       ! open file
       status=nf90_open(trim(file), nf90_nowrite, ncid)
    end if
  
-   call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+   call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
    if (status.ne.nf90_noerr)then
       write(error_unit,*) 'ERROR: CANNOT READ 2D netCDF FILE CORRECTLY !!!!!'
       write(error_unit,*) 'Error in opening netcdf file '//file
-      call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+      call par_abort(partit%MPI_COMM_FESOM, partit%mype)
       stop
    endif
 
-   if (mype==0) then
+   if (partit%mype==0) then
       ! lat
       status=nf90_inq_dimid(ncid, 'lat', latid)
       status=nf90_inquire_dimension(ncid, latid, len=latlen)
@@ -3618,18 +3709,18 @@ subroutine read_runoff_mapper(file, vari, R, partit, mesh)
       status=nf90_inq_dimid(ncid, 'lon', lonid)
       status=nf90_inquire_dimension(ncid, lonid, len=lonlen)
    end if
-   call MPI_BCast(latlen, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-   call MPI_BCast(lonlen, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+   call MPI_BCast(latlen, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+   call MPI_BCast(lonlen, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
  
    ! lat
-   if (mype==0) then
+   if (partit%mype==0) then
       allocate(lat(latlen))
       status=nf90_inq_varid(ncid, 'lat', varid)
       status=nf90_get_var(ncid, varid, lat, start=(/1/), count=(/latlen/))
    end if
 
    ! lon
-   if (mype==0) then
+   if (partit%mype==0) then
       allocate(lon(lonlen))
       status=nf90_inq_varid(ncid, 'lon', varid)
       status=nf90_get_var(ncid, varid, lon, start=(/1/), count=(/lonlen/))
@@ -3641,7 +3732,7 @@ subroutine read_runoff_mapper(file, vari, R, partit, mesh)
    end do
    end if
 
-   if (mype==0) then
+   if (partit%mype==0) then
       allocate(ncdata(lonlen,latlen))
       ncdata = 0.0_WP
      ! data
@@ -3661,12 +3752,12 @@ subroutine read_runoff_mapper(file, vari, R, partit, mesh)
      end do
    end if
 
-   call MPI_BCast(number_arrival_points, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+   call MPI_BCast(number_arrival_points, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
    allocate(lon_sparse(number_arrival_points), lat_sparse(number_arrival_points))
    allocate(dist_min(number_arrival_points), dist_min_glo(number_arrival_points), dist_ind(number_arrival_points))
    allocate(data_sparse(number_arrival_points))
 
-   if (mype==0) then
+   if (partit%mype==0) then
       cnt=1
       do i=1, lonlen
          do j=1, latlen
@@ -3680,9 +3771,9 @@ subroutine read_runoff_mapper(file, vari, R, partit, mesh)
       end do
       deallocate(ncdata, lon, lat)
    end if
-   call MPI_BCast(lon_sparse,  number_arrival_points, MPI_WP, 0, MPI_COMM_FESOM, ierror)
-   call MPI_BCast(lat_sparse,  number_arrival_points, MPI_WP, 0, MPI_COMM_FESOM, ierror)
-   call MPI_BCast(data_sparse, number_arrival_points, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+   call MPI_BCast(lon_sparse,  number_arrival_points, MPI_WP, 0, partit%MPI_COMM_FESOM, ierror)
+   call MPI_BCast(lat_sparse,  number_arrival_points, MPI_WP, 0, partit%MPI_COMM_FESOM, ierror)
+   call MPI_BCast(data_sparse, number_arrival_points, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
    drain_num=maxval(data_sparse)
    ALLOCATE(arrival_area(drain_num))
    arrival_area=0.0_WP ! will be used further to normalize the total flux
@@ -3691,8 +3782,8 @@ subroutine read_runoff_mapper(file, vari, R, partit, mesh)
    lat_sparse=lat_sparse*rad
 
    do n=1, number_arrival_points
-      do i=1, myDim_nod2d
-         dist=distance_on_sphere(lon_sparse(n), lat_sparse(n), geo_coord_nod2D(1,i), geo_coord_nod2D(2,i))
+      do i=1, partit%myDim_nod2d
+         dist=distance_on_sphere(lon_sparse(n), lat_sparse(n), mesh%geo_coord_nod2D(1,i), mesh%geo_coord_nod2D(2,i))
          if (i==1) then
             dist_min(n)=dist
             dist_ind(n)=1
@@ -3706,40 +3797,40 @@ subroutine read_runoff_mapper(file, vari, R, partit, mesh)
    do i=1, number_arrival_points
       dist_min_glo(i)=dist_min(i)
    end do
-   call MPI_AllREDUCE(MPI_IN_PLACE , dist_min_glo , number_arrival_points, MPI_WP, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+   call MPI_AllREDUCE(MPI_IN_PLACE , dist_min_glo , number_arrival_points, MPI_WP, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
 
    lon_sparse=0.0_WP
    lat_sparse=0.0_WP
    status=0
    do i=1, number_arrival_points
       n=dist_ind(i)
-      if ((dist_min(i)==dist_min_glo(i)) .AND. (n<=myDim_nod2d)) then
-           lon_sparse(i)=geo_coord_nod2D(1, n)
-           lat_sparse(i)=geo_coord_nod2D(2, n)
+      if ((dist_min(i)==dist_min_glo(i)) .AND. (n<=partit%myDim_nod2d)) then
+           lon_sparse(i)=mesh%geo_coord_nod2D(1, n)
+           lat_sparse(i)=mesh%geo_coord_nod2D(2, n)
            status=status+1
       end if
    end do
-   call MPI_AllREDUCE(MPI_IN_PLACE , lon_sparse , number_arrival_points, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-   call MPI_AllREDUCE(MPI_IN_PLACE , lat_sparse , number_arrival_points, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-   call MPI_AllREDUCE(MPI_IN_PLACE , status ,     1, MPI_INTEGER, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+   call MPI_AllREDUCE(MPI_IN_PLACE , lon_sparse , number_arrival_points, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+   call MPI_AllREDUCE(MPI_IN_PLACE , lat_sparse , number_arrival_points, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+   call MPI_AllREDUCE(MPI_IN_PLACE , status ,     1, MPI_INTEGER, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
 
    if (status/=number_arrival_points) then
-      if (mype==0) then
+      if (partit%mype==0) then
          write(error_unit,*) 'RUNOFF MAPPER ERROR: total number of arrival points does not sum up among partitions: ', status, number_arrival_points
          write(error_unit,*) 'two different grid points have same distance to a target point!'
       end if
-      call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+      call par_abort(partit%MPI_COMM_FESOM, partit%mype)
       STOP
    end if
-   RUNOFF_MAPPER%dim=myDim_nod2d+eDim_nod2D
+   RUNOFF_MAPPER%dim=partit%myDim_nod2d+partit%eDim_nod2D
    ALLOCATE(RUNOFF_MAPPER%rowptr(RUNOFF_MAPPER%dim+1))
    
    RUNOFF_MAPPER%rowptr(1) = 1
    
-   DO n=1, myDim_nod2d+eDim_nod2D
+   DO n=1, partit%myDim_nod2d+partit%eDim_nod2D
       cnt=0
       DO i=1, number_arrival_points
-         dist=distance_on_sphere(lon_sparse(i), lat_sparse(i), geo_coord_nod2D(1,n), geo_coord_nod2D(2,n))
+         dist=distance_on_sphere(lon_sparse(i), lat_sparse(i), mesh%geo_coord_nod2D(1,n), mesh%geo_coord_nod2D(2,n))
          if (dist < R) cnt=cnt+1
       END DO
       RUNOFF_MAPPER%rowptr(n+1)=RUNOFF_MAPPER%rowptr(n)+max(cnt,1)
@@ -3747,25 +3838,25 @@ subroutine read_runoff_mapper(file, vari, R, partit, mesh)
    
    ALLOCATE(RUNOFF_MAPPER%colind(RUNOFF_MAPPER%rowptr(RUNOFF_MAPPER%dim+1)-1))
    ALLOCATE(RUNOFF_MAPPER%values(RUNOFF_MAPPER%rowptr(RUNOFF_MAPPER%dim+1)-1))
-   DO n=1, myDim_nod2d+eDim_nod2D
+   DO n=1, partit%myDim_nod2d+partit%eDim_nod2D
       offset=RUNOFF_MAPPER%rowptr(n)
       cnt=0
-      W=areasvol(ulevels_nod2D(n),n)
+      W=mesh%areasvol(mesh%ulevels_nod2D(n),n)
       DO i=1, number_arrival_points
          j=data_sparse(i)
          if ((j<0) .OR. (j>drain_num)) then
-            if (mype==0) then
+            if (partit%mype==0) then
                write(error_unit,*) 'RUNOFF MAPPER ERROR: arrival point has an index outside of permitted range', j, drain_num
                write(error_unit,*) 'two different grid points have same distance to a target point!'
             end if
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
             STOP
          end if
-         dist=distance_on_sphere(lon_sparse(i), lat_sparse(i), geo_coord_nod2D(1,n), geo_coord_nod2D(2,n))
+         dist=distance_on_sphere(lon_sparse(i), lat_sparse(i), mesh%geo_coord_nod2D(1,n), mesh%geo_coord_nod2D(2,n))
          if (dist < R) then
             RUNOFF_MAPPER%values(offset+cnt)=(1.0-dist/R)
             RUNOFF_MAPPER%colind(offset+cnt)=j
-            if (n<=myDim_nod2d) then
+            if (n<=partit%myDim_nod2d) then
                arrival_area(j)=arrival_area(j)+(1.0-dist/R)*W
             end if
             cnt=cnt+1
@@ -3777,7 +3868,7 @@ subroutine read_runoff_mapper(file, vari, R, partit, mesh)
       end if
    END DO
 
-   call MPI_AllREDUCE(MPI_IN_PLACE , arrival_area, drain_num, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+   call MPI_AllREDUCE(MPI_IN_PLACE , arrival_area, drain_num, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
 
    DO i=1, drain_num
       where (RUNOFF_MAPPER%colind==i)
@@ -3789,7 +3880,7 @@ subroutine read_runoff_mapper(file, vari, R, partit, mesh)
    deallocate(arrival_area)
    deallocate(data_sparse, dist_ind)
 
-do n=1, myDim_nod2D+eDim_nod2D
+do n=1, partit%myDim_nod2D+partit%eDim_nod2D
    i=RUNOFF_MAPPER%rowptr(n)
    j=RUNOFF_MAPPER%rowptr(n+1)-1
    runoff(n)=sum(RUNOFF_MAPPER%values(i:j))
@@ -3797,8 +3888,8 @@ end do
 
 call integrate_nod(runoff, W, partit, mesh)
 
-if (mype==0) write(*,*) 'RUNOFF MAPPER check (total amount of basins):', drain_num
-if (mype==0) write(*,*) 'RUNOFF MAPPER check (input of 1Sv from each basin results in runoff of):', W, ' Sv'
+if (partit%mype==0) write(*,*) 'RUNOFF MAPPER check (total amount of basins):', drain_num
+if (partit%mype==0) write(*,*) 'RUNOFF MAPPER check (input of 1Sv from each basin results in runoff of):', W, ' Sv'
 
 !allocate(BASIN_RUNOFF(drain_num))
 !BASIN_RUNOFF=0.0_WP

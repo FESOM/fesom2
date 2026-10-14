@@ -6,7 +6,7 @@ module fesom_main_storage_module
   USE MOD_ICE
   USE MOD_TRACER
   USE MOD_PARTIT
-  use par_support_module, only: par_ex
+  use par_support_module, only: par_abort, par_finalize
   USE MOD_DYN
   USE o_ARRAYS
   USE o_PARAM
@@ -41,7 +41,7 @@ module fesom_main_storage_module
   use gen_forcing_couple_module, only: update_atm_forcing
 #endif
   use oce_setup_step_module, only: before_oce_step
-  use oce_ale_module, only: oce_timestep_ale
+  use oce_ale_module, only: oce_timestep_ale, write_oce_step_times
   use oce_mesh_module, only: read_mesh
   use fesom_version_info_module
   use command_line_options_module
@@ -54,7 +54,9 @@ module fesom_main_storage_module
   use icb_allocate_module, only: allocate_icb
   use gen_forcing_init_module, only: forcing_setup
   use par_support_module, only: par_init
-  use write_step_info_module, only: plot_fesomlogo
+  use write_step_info_module, only: plot_fesomlogo, write_step_info, write_enegry_info, check_blowup
+  use fesom_monitor_module, only: t_monitor, monitor_fill_ocean
+  use fesom_conservation_module, only: conservation_before_step, conservation_after_step
   use, intrinsic :: iso_fortran_env, only : real32
   use g_forcing_param, only: use_landice_water, use_age_tracer
   use oce_landice_water_module, only: landice_water_init
@@ -99,6 +101,7 @@ use mod_transit, only: year_ce, r14c_nh, r14c_tz, r14c_sh, r14c_ti, xCO2_ti, xf1
 #if defined(__recom) && defined(__usetp)
     integer, pointer  :: my_fesom_group, MPI_COMM_FESOM_WORLD, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS
 #endif
+    type(t_monitor)   :: ocean_monitor   ! global ocean scalars after the last step
     real(kind=WP)     :: t0, t1, t2, t3, t4, t5, t6, t7, t8 
     real(kind=WP)     :: t_start   , t_end 
     real(kind=WP)     :: t_iceb_s  , t_iceb_e  , rtime_iceb_full, t_iceb_s0, t_iceb_e0, t_iceb_s1, t_iceb_e1
@@ -283,7 +286,7 @@ contains
             if(mype_fesom_world == 0) then
                 write(*,*) 'MPI_comm_split mismatch npes_fesom_world, num_fesom_groups', npes_fesom_world, num_fesom_groups
             end if
-            call par_ex(f%MPI_COMM_FESOM, f%mype)
+            call par_abort(f%MPI_COMM_FESOM, f%mype)
             stop
         end if
 
@@ -299,33 +302,33 @@ contains
         call MPI_comm_split(f%MPI_COMM_FESOM_WORLD, f%my_fesom_group, 0, f%MPI_COMM_FESOM, f%MPIerr)
         if (f%MPIerr /= MPI_SUCCESS) then
             write(*,*) 'MPI_comm_split(MPI_COMM_FESOM_WORLD, my_fesom_group, 0, MPI_COMM_FESOM, MPIERR) failed'
-            call par_ex(f%MPI_COMM_FESOM, f%mype)
+            call par_abort(f%MPI_COMM_FESOM, f%mype)
             stop
         end if
 
         call MPI_comm_size(f%MPI_COMM_FESOM, npes_check, f%MPIerr)
         if(f%MPIerr /= MPI_SUCCESS) then
             write(*,*) 'MPI_comm_size(MPI_COMM_FESOM, npes_check, MPIERR) failed'
-            call par_ex(f%MPI_COMM_FESOM, f%mype)
+            call par_abort(f%MPI_COMM_FESOM, f%mype)
             stop
         end if
 
         call MPI_comm_rank(f%MPI_COMM_FESOM, mype_check, f%MPIerr)
         if(f%MPIerr /= MPI_SUCCESS) then
             write(*,*) 'MPI_comm_rank(MPI_COMM_FESOM, mype_check, MPIERR) failed'
-            call par_ex(f%MPI_COMM_FESOM, f%mype)
+            call par_abort(f%MPI_COMM_FESOM, f%mype)
             stop
         end if
 
         if(npes_check /= f%npes) then
             write(*,*) 'npes mismatch, npes, npes_check', f%npes, npes_check
-            call par_ex(f%MPI_COMM_FESOM, f%mype)
+            call par_abort(f%MPI_COMM_FESOM, f%mype)
             stop
         end if
 
         if(mype_check /= f%mype) then
             write(*,*) 'mype mismatch, mype, mype_check', f%mype, mype_check
-            call par_ex(f%MPI_COMM_FESOM, f%mype)
+            call par_abort(f%MPI_COMM_FESOM, f%mype)
             stop
         end if
 
@@ -334,33 +337,33 @@ contains
         call MPI_comm_split(f%MPI_COMM_FESOM_WORLD, f%mype, f%my_fesom_group, f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, f%MPIERR)
         if (f%MPIERR /= MPI_SUCCESS) then
             write(*,*) 'MPI_comm_split(MPI_COMM_FESOM_WORLD, mype, my_fesom_group, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, MPIERR) failed'
-            call par_ex(f%MPI_COMM_FESOM, f%mype)
+            call par_abort(f%MPI_COMM_FESOM, f%mype)
             stop
         end if
 
         call MPI_comm_size(f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, npes_check, f%MPIERR)
         if(f%MPIERR /= MPI_SUCCESS) then
             write(*,*) 'MPI_comm_size(MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, npes_check, MPIERR) failed'
-            call par_ex(f%MPI_COMM_FESOM, f%mype)
+            call par_abort(f%MPI_COMM_FESOM, f%mype)
             stop
         end if
 
         call MPI_comm_rank(f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, mype_check, f%MPIERR)
         if(f%MPIERR /= MPI_SUCCESS) then
             write(*,*) 'MPI_comm_rank(MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, mype_check, MPIERR) failed'
-            call par_ex(f%MPI_COMM_FESOM, f%mype)
+            call par_abort(f%MPI_COMM_FESOM, f%mype)
             stop
         end if
 
         if(npes_check /= num_fesom_groups) then
             write(*,*) 'npes mismatch, num_fesom_groups, npes_check', num_fesom_groups, npes_check
-            call par_ex(f%MPI_COMM_FESOM, f%mype)
+            call par_abort(f%MPI_COMM_FESOM, f%mype)
             stop
         end if
 
         if(mype_check /= f%my_fesom_group) then
             write(*,*) 'mype mismatch, my_fesom_group, mype_check', f%my_fesom_group, mype_check
-            call par_ex(f%MPI_COMM_FESOM, f%mype)
+            call par_abort(f%MPI_COMM_FESOM, f%mype)
             stop
         end if
 
@@ -501,6 +504,10 @@ contains
         IF (use_atm_ice_tskin) THEN
           nrecv = nrecv + 1
           recv_tsk_ico = nrecv
+        END IF
+        IF (use_atm_mslp) THEN
+          nrecv = nrecv + 1
+          recv_mslp_oce = nrecv
         END IF
 #endif
 #endif
@@ -737,6 +744,10 @@ contains
         !___IF RESTART WITH ZLEVEL OR ZSTAR IS DONE, ALSO THE ACTUAL LEVELS AND ____
         !___MIDDEPTH LEVELS NEEDS TO BE CALCULATET AT RESTART_______________________
         if (r_restart .and. .not. f%which_readr==2) then
+#if defined(USE_SINGLE_PRECISION)
+            f%mesh%hnode     = real(f%mesh%hnode_wp, WP_full)
+            f%mesh%hnode_new = real(f%mesh%hnode_new_wp, WP_full)
+#endif
             call restart_thickness_ale(f%partit, f%mesh)
         end if
         ! for KE diagnostic we need to compute an exact profile of reference density
@@ -815,7 +826,7 @@ contains
     !    read  (f%mype+300) f%tracers_copy
     !    close (f%mype+300)
     
-    !call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype)
+    !call par_abort(f%partit%MPI_COMM_FESOM, f%partit%mype)
     !stop
     !         
     !    if (f%mype==10) write(,) f%mesh1%ssh_stiff%values-f%mesh%ssh_stiff%value    
@@ -855,6 +866,7 @@ contains
     !$ACC ENTER DATA COPYIN (f%mesh%nlevels_nod2D, f%mesh%nod_in_elem2D, f%mesh%nod_in_elem2D_num) 
     !$ACC ENTER DATA COPYIN (f%mesh%edge_dxdy, f%mesh%nlevels, f%mesh%ulevels_nod2D_max) 
     !$ACC ENTER DATA COPYIN (f%mesh%areasvol, f%mesh%nlevels_nod2D_min) 
+    !$ACC ENTER DATA COPYIN (f%mesh%nod_in_edge2D_num, f%mesh%nod_in_edge2D, f%mesh%nod_in_edge2D_sgn)
     !$ACC ENTER DATA CREATE (f%mesh%helem, f%mesh%hnode, f%mesh%hnode_new, f%mesh%zbar_3d_n, f%mesh%z_3d_n)
     !do n=f%from_nstep, f%from_nstep-1+current_nsteps
     !$ACC ENTER DATA COPYIN  (f%ice)
@@ -900,6 +912,7 @@ contains
     ! EO parameters
     integer n, nstart, ntotal, tr_num, tracer_index
     logical :: do_cmor_0d_reset
+    real(kind=WP_full) :: t_check
 
 #if defined (__recom)
     type(tracers_info_type)               :: tracers_info
@@ -1209,6 +1222,7 @@ contains
         end if
 #endif
 
+        if (conservation_freq > 0) call conservation_before_step(f%partit, f%tracers, f%mesh)
         f%t_oce_s = MPI_Wtime()
 #if defined (FESOM_PROFILING)
         call fesom_profiler_start("oce_timestep_ale")
@@ -1225,6 +1239,33 @@ contains
             end if
           end do
         end if ! use_transit
+
+        !___post-step: step log and blow-up check______________________________
+#if defined(__recom) && defined(__usetp)
+        if (f%my_fesom_group==0) then
+#endif
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("oce_blowup_check")
+#endif
+        t_check = MPI_Wtime()
+        if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call write_step_info'//achar(27)//'[0m'
+        call monitor_fill_ocean(f%ocean_monitor, n, mod(n,logfile_outfreq)==0, &
+                                f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+        call write_step_info(n, logfile_outfreq, f%ocean_monitor, f%dynamics, f%partit)
+        if ( (f%dynamics%ldiag_ke) .and. (mod(n,logfile_outfreq)==0) ) then
+            call write_enegry_info(f%dynamics, f%partit, f%mesh)
+        end if
+        if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call check_blowup'//achar(27)//'[0m'
+        call check_blowup(n, f%ocean_monitor, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+        t_check = MPI_Wtime() - t_check
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("oce_blowup_check")
+#endif
+        call write_oce_step_times(n, t_check, f%partit)
+#if defined(__recom) && defined(__usetp)
+        end if
+#endif
+        if (conservation_freq > 0) call conservation_after_step(n, f%partit, f%tracers, f%mesh)
         f%t_oce_e = MPI_Wtime()
         
         !___compute energy diagnostics..._______________________________________
@@ -1300,6 +1341,10 @@ contains
 #endif 
 #if defined (FESOM_PROFILING)
         call fesom_profiler_start("output")
+#endif
+#if defined(USE_SINGLE_PRECISION)
+        f%mesh%hnode_wp     = real(f%mesh%hnode, WP)
+        f%mesh%hnode_new_wp = real(f%mesh%hnode_new, WP)
 #endif
         call output (n, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
 #if defined (FESOM_PROFILING)
@@ -1435,7 +1480,7 @@ contains
 #endif
     ! Enhanced profiler report. It reduces over MPI_COMM_FESOM, so every rank has to
     ! call it once while MPI is still up: here, before the REcoM group loop and before
-    ! par_ex. In the OpenIFS-coupled build par_ex calls oasis_terminate, which finalizes
+    ! par_finalize. In the OpenIFS-coupled build par_finalize calls oasis_terminate, which finalizes
     ! MPI, so a report after it aborts every rank ("MPI_Comm_f2c() was called after
     ! MPI_FINALIZE") once the run is otherwise complete.
 #if defined (FESOM_PROFILING)
@@ -1499,6 +1544,7 @@ contains
     !$ACC EXIT DATA DELETE (f%mesh%nlevels_nod2D, f%mesh%nod_in_elem2D, f%mesh%nod_in_elem2D_num) 
     !$ACC EXIT DATA DELETE (f%mesh%edge_dxdy, f%mesh%nlevels, f%mesh%hnode, f%mesh%hnode_new, f%mesh%ulevels_nod2D_max) 
     !$ACC EXIT DATA DELETE (f%mesh%zbar_3d_n, f%mesh%z_3d_n, f%mesh%areasvol, f%mesh%nlevels_nod2D_min) 
+    !$ACC EXIT DATA DELETE (f%mesh%nod_in_edge2D_num, f%mesh%nod_in_edge2D, f%mesh%nod_in_edge2D_sgn)
     !$ACC EXIT DATA DELETE (f%partit%eDim_nod2D, f%partit%myDim_edge2D) 
     !$ACC EXIT DATA DELETE (f%partit%myDim_elem2D, f%partit%myDim_nod2D, f%partit%myList_edge2D) 
     !$ACC EXIT DATA DELETE (f%mesh, f%partit, f)
@@ -1585,8 +1631,8 @@ contains
 #endif
 
 #if defined (__oifs) 
-    ! OpenIFS coupled version has to call oasis_terminate through par_ex
-    call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype)
+    ! OpenIFS coupled version has to call oasis_terminate through par_finalize
+    call par_finalize(f%partit%MPI_COMM_FESOM, f%partit%mype)
 #endif
 
 #if defined(__recom) && defined (__usetp)
@@ -1600,9 +1646,9 @@ contains
     
 #if defined(__recom) && defined(__usetp) && defined(__oifs)
     ! FESOM program group 0 already performed the OASIS-coordinated shutdown
-    ! (oasis_terminate, via the #if defined(__oifs) call par_ex(...) block in the
+    ! (oasis_terminate, via the #if defined(__oifs) call par_finalize(...) block in the
     ! per-group stats loop above) and is therefore already MPI-finalized at this
-    ! point. Calling par_ex/oasis_terminate a second time here would re-enter
+    ! point. Calling par_finalize/oasis_terminate a second time here would re-enter
     ! oasis_terminate's global MPI_Barrier(mpi_comm_global_world,...) + MPI_Finalize
     ! sequence on an already-finalized MPI session -- undefined behaviour that
     ! aborts group 0's ranks while group 1 (and OIFS/rnfmap/lpj_guess/xios, whose
@@ -1623,10 +1669,10 @@ contains
     ! mpi/pmix_v3 "Error handler invoked" step cancellation above, independent of
     ! any PMIx/UCX tuning.
     if (f%my_fesom_group /= 0) then
-        call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype)
+        call par_finalize(f%partit%MPI_COMM_FESOM, f%partit%mype)
     end if
 #else
-    if(f%fesom_did_mpi_init) call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype) ! finalize MPI before FESOM prints its stats block, otherwise there is sometimes output from other processes from an earlier time in the programm AFTER the starts block (with parastationMPI)
+    if(f%fesom_did_mpi_init) call par_finalize(f%partit%MPI_COMM_FESOM, f%partit%mype) ! finalize MPI before FESOM prints its stats block, otherwise there is sometimes output from other processes from an earlier time in the programm AFTER the starts block (with parastationMPI)
 #endif
 
 #if defined(__recom) && defined(__usetp)

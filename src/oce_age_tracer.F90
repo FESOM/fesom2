@@ -23,16 +23,12 @@ subroutine age_tracer_init(partit, mesh)
   type(t_partit), intent(in), target :: partit
   type(t_mesh), intent(in) , target :: mesh
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
   if (use_age_mask) then
-     allocate(temp_arr2d(nod2D))
+     allocate(temp_arr2d(mesh%nod2D))
      temp_arr2d=0
-     do n=1, myDim_nod2D  !note: eDim_nod2D should not be included in this case
-        temp_arr2d(myList_nod2D(n))=n
+     do n=1, partit%myDim_nod2D  !note: eDim_nod2D should not be included in this case
+        temp_arr2d(partit%myList_nod2D(n))=n
      end do
 
      file_name=trim(age_tracer_path)//'age_tracer_release_nodes.out'
@@ -53,8 +49,8 @@ subroutine age_tracer_init(partit, mesh)
      deallocate(nodes_release)
      deallocate(temp_arr2d)
 
-     if(mype==0) write(*,*) 'Age tracer file prepared: ', file_name
-     if(mype==0) write(*,*) 'index_age_tracer: ', index_age_tracer 
+     if(partit%mype==0) write(*,*) 'Age tracer file prepared: ', file_name
+     if(partit%mype==0) write(*,*) 'index_age_tracer: ', index_age_tracer 
   end if
 
 end subroutine age_tracer_init

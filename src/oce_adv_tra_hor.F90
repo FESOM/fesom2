@@ -32,10 +32,6 @@ subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, o_init_zero)
     integer                           :: el(2), enodes(2), nz, edge
     integer                           :: nu12, nl12, nl1, nl2, nu1, nu2
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
     l_init_zero=.true.
     if (present(o_init_zero)) then
@@ -47,7 +43,7 @@ subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, o_init_zero)
 #else
        !$ACC PARALLEL LOOP GANG VECTOR COLLAPSE(2) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 #endif
-       do edge=1, myDim_edge2D
+       do edge=1, partit%myDim_edge2D
           do nz=1, mesh%nl-1
              flux(nz,edge)=0.0_WP
           end do
@@ -69,24 +65,24 @@ subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, o_init_zero)
 #else
     !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 #endif
-    do edge=1, myDim_edge2D
+    do edge=1, partit%myDim_edge2D
         ! local indice of nodes that span up edge ed
-        enodes=edges(:,edge)
+        enodes=mesh%edges(:,edge)
 
         ! local index of element that contribute to edge
-        el=edge_tri(:,edge)
+        el=mesh%edge_tri(:,edge)
 
         ! number of layers -1 at elem el(1)
-        nl1=nlevels(el(1))-1
+        nl1=mesh%nlevels(el(1))-1
 
         ! index off surface layer in case of cavity !=1
-        nu1=ulevels(el(1))
+        nu1=mesh%ulevels(el(1))
 
         ! edge_cross_dxdy(1:2,ed)... dx,dy distance from element centroid el(1) to
         ! center of edge --> needed to calc flux perpedicular to edge from elem el(1)
-        deltaX1=edge_cross_dxdy(1,edge)
-        deltaY1=edge_cross_dxdy(2,edge)
-        a=r_earth*elem_cos(el(1))
+        deltaX1=mesh%edge_cross_dxdy(1,edge)
+        deltaY1=mesh%edge_cross_dxdy(2,edge)
+        a=r_earth*mesh%elem_cos(el(1))
 
         !_______________________________________________________________________
         ! same parameter but for other element el(2) that contributes to edge ed
@@ -94,12 +90,12 @@ subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, o_init_zero)
         nl2=0
         nu2=0
         if(el(2)>0) then
-            deltaX2=edge_cross_dxdy(3,edge)
-            deltaY2=edge_cross_dxdy(4,edge)
+            deltaX2=mesh%edge_cross_dxdy(3,edge)
+            deltaY2=mesh%edge_cross_dxdy(4,edge)
             ! number of layers -1 at elem el(2)
-            nl2=nlevels(el(2))-1
-            nu2=ulevels(el(2))
-            a=0.5_WP*(a+r_earth*elem_cos(el(2)))
+            nl2=mesh%nlevels(el(2))-1
+            nu2=mesh%ulevels(el(2))
+            a=0.5_WP*(a+r_earth*mesh%elem_cos(el(2)))
         end if
 
         !_______________________________________________________________________
@@ -120,7 +116,7 @@ subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, o_init_zero)
         do nz=nu1, nu12-1
            !____________________________________________________________________
            ! volume flux across the segments
-           vflux=(-VEL(2,nz,el(1))*deltaX1 + VEL(1,nz,el(1))*deltaY1)*helem(nz,el(1))
+           vflux=(-VEL(2,nz,el(1))*deltaX1 + VEL(1,nz,el(1))*deltaY1)*mesh%helem(nz,el(1))
 
            !____________________________________________________________________
            ! 1st. low order upwind solution
@@ -140,7 +136,7 @@ subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, o_init_zero)
             do nz=nu2, nu12-1
                 !___________________________________________________________
                 ! volume flux across the segments
-                vflux=(VEL(2,nz,el(2))*deltaX2 - VEL(1,nz,el(2))*deltaY2)*helem(nz,el(2))
+                vflux=(VEL(2,nz,el(2))*deltaX2 - VEL(1,nz,el(2))*deltaY2)*mesh%helem(nz,el(2))
 
                 !___________________________________________________________
                 ! 1st. low order upwind solution
@@ -161,8 +157,8 @@ subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, o_init_zero)
             !___________________________________________________________________
             ! 1st. low order upwind solution
             ! here already assumed that ed is NOT! a boundary edge so el(2) should exist
-            vflux=(-VEL(2,nz,el(1))*deltaX1 + VEL(1,nz,el(1))*deltaY1)*helem(nz,el(1)) &
-                  +(VEL(2,nz,el(2))*deltaX2 - VEL(1,nz,el(2))*deltaY2)*helem(nz,el(2))
+            vflux=(-VEL(2,nz,el(1))*deltaX1 + VEL(1,nz,el(1))*deltaY1)*mesh%helem(nz,el(1)) &
+                  +(VEL(2,nz,el(2))*deltaX2 - VEL(1,nz,el(2))*deltaY2)*mesh%helem(nz,el(2))
 
             flux(nz, edge)=-0.5_WP*(                                                     &
                          ttf(nz, enodes(1))*(vflux+abs(vflux))+ &
@@ -176,7 +172,7 @@ subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, o_init_zero)
         do nz=nl12+1, nl1
            !____________________________________________________________________
            ! volume flux across the segments
-           vflux=(-VEL(2,nz,el(1))*deltaX1 + VEL(1,nz,el(1))*deltaY1)*helem(nz,el(1))
+           vflux=(-VEL(2,nz,el(1))*deltaX1 + VEL(1,nz,el(1))*deltaY1)*mesh%helem(nz,el(1))
            !____________________________________________________________________
            ! 1st. low order upwind solution
            flux(nz, edge)=-0.5_WP*(                                                     &
@@ -192,7 +188,7 @@ subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, o_init_zero)
         do nz=nl12+1, nl2
                 !_______________________________________________________________
                 ! volume flux across the segments
-                vflux=(VEL(2,nz,el(2))*deltaX2 - VEL(1,nz,el(2))*deltaY2)*helem(nz,el(2))
+                vflux=(VEL(2,nz,el(2))*deltaX2 - VEL(1,nz,el(2))*deltaY2)*mesh%helem(nz,el(2))
                 !_______________________________________________________________
                 ! 1st. low order upwind solution
                 flux(nz, edge)=-0.5_WP*(                                           &
@@ -230,10 +226,6 @@ subroutine adv_tra_hor_muscl(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_g
     integer                           :: el(2), enodes(2), nz, edge
     integer                           :: nu12, nl12, nl1, nl2, nu1, nu2
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
     l_init_zero=.true.
     if (present(o_init_zero)) then
@@ -241,7 +233,7 @@ subroutine adv_tra_hor_muscl(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_g
     end if
     if (l_init_zero) then
 !$OMP PARALLEL DO
-       do edge=1, myDim_edge2D
+       do edge=1, partit%myDim_edge2D
           flux(:,edge)=0.0_WP
        end do
 !$OMP END PARALLEL DO
@@ -253,24 +245,24 @@ subroutine adv_tra_hor_muscl(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_g
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, deltaX1, deltaY1, deltaX2, deltaY2, Tmean1, Tmean2, cHO, &
 !$OMP                                      c_lo, a, vflux, el, enodes, nz, nu12, nl12, nl1, nl2, nu1, nu2)
 !$OMP DO
-    do edge=1, myDim_edge2D
+    do edge=1, partit%myDim_edge2D
         ! local indice of nodes that span up edge ed
-        enodes=edges(:,edge)
+        enodes=mesh%edges(:,edge)
 
         ! local index of element that contribute to edge
-        el=edge_tri(:,edge)
+        el=mesh%edge_tri(:,edge)
 
         ! number of layers -1 at elem el(1)
-        nl1=nlevels(el(1))-1
+        nl1=mesh%nlevels(el(1))-1
 
         ! index off surface layer in case of cavity !=1
-        nu1=ulevels(el(1))
+        nu1=mesh%ulevels(el(1))
 
         ! edge_cross_dxdy(1:2,ed)... dx,dy distance from element centroid el(1) to
         ! center of edge --> needed to calc flux perpedicular to edge from elem el(1)
-        deltaX1=edge_cross_dxdy(1,edge)
-        deltaY1=edge_cross_dxdy(2,edge)
-        a=r_earth*elem_cos(el(1))
+        deltaX1=mesh%edge_cross_dxdy(1,edge)
+        deltaY1=mesh%edge_cross_dxdy(2,edge)
+        a=r_earth*mesh%elem_cos(el(1))
 
         !_______________________________________________________________________
         ! same parameter but for other element el(2) that contributes to edge ed
@@ -278,12 +270,12 @@ subroutine adv_tra_hor_muscl(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_g
         nl2=0
         nu2=0
         if(el(2)>0) then
-            deltaX2=edge_cross_dxdy(3,edge)
-            deltaY2=edge_cross_dxdy(4,edge)
+            deltaX2=mesh%edge_cross_dxdy(3,edge)
+            deltaY2=mesh%edge_cross_dxdy(4,edge)
             ! number of layers -1 at elem el(2)
-            nl2=nlevels(el(2))-1
-            nu2=ulevels(el(2))
-            a=0.5_WP*(a+r_earth*elem_cos(el(2)))
+            nl2=mesh%nlevels(el(2))-1
+            nu2=mesh%ulevels(el(2))
+            a=0.5_WP*(a+r_earth*mesh%elem_cos(el(2)))
         end if
 
         !_______________________________________________________________________
@@ -307,17 +299,17 @@ subroutine adv_tra_hor_muscl(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_g
            !____________________________________________________________________
            Tmean2=ttf(nz, enodes(2))- &
                   (2.0_WP*(ttf(nz, enodes(2))-ttf(nz,enodes(1)))+ &
-                  edge_dxdy(1,edge)*a*edge_up_dn_grad(2,nz,edge)+ &
-                  edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(4,nz,edge))/6.0_WP*c_lo(2)
+                  mesh%edge_dxdy(1,edge)*a*edge_up_dn_grad(2,nz,edge)+ &
+                  mesh%edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(4,nz,edge))/6.0_WP*c_lo(2)
 
            Tmean1=ttf(nz, enodes(1))+ &
                   (2.0_WP*(ttf(nz, enodes(2))-ttf(nz,enodes(1)))+ &
-                  edge_dxdy(1,edge)*a*edge_up_dn_grad(1,nz,edge)+ &
-                  edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(3,nz,edge))/6.0_WP*c_lo(1)
+                  mesh%edge_dxdy(1,edge)*a*edge_up_dn_grad(1,nz,edge)+ &
+                  mesh%edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(3,nz,edge))/6.0_WP*c_lo(1)
 
            !____________________________________________________________________
            ! volume flux across the segments
-           vflux=(-VEL(2,nz,el(1))*deltaX1 + VEL(1,nz,el(1))*deltaY1)*helem(nz,el(1))
+           vflux=(-VEL(2,nz,el(1))*deltaX1 + VEL(1,nz,el(1))*deltaY1)*mesh%helem(nz,el(1))
            cHO=(vflux+abs(vflux))*Tmean1 + (vflux-abs(vflux))*Tmean2
            flux(nz,edge)=-0.5_WP*(1.0_WP-num_ord)*cHO - vflux*num_ord*0.5_WP*(Tmean1+Tmean2)-flux(nz,edge)
         end do
@@ -334,17 +326,17 @@ subroutine adv_tra_hor_muscl(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_g
                 !_______________________________________________________________
                 Tmean2=ttf(nz, enodes(2))- &
                         (2.0_WP*(ttf(nz, enodes(2))-ttf(nz,enodes(1)))+ &
-                        edge_dxdy(1,edge)*a*edge_up_dn_grad(2,nz,edge)+ &
-                        edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(4,nz,edge))/6.0_WP*c_lo(2)
+                        mesh%edge_dxdy(1,edge)*a*edge_up_dn_grad(2,nz,edge)+ &
+                        mesh%edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(4,nz,edge))/6.0_WP*c_lo(2)
 
                 Tmean1=ttf(nz, enodes(1))+ &
                         (2.0_WP*(ttf(nz, enodes(2))-ttf(nz,enodes(1)))+ &
-                        edge_dxdy(1,edge)*a*edge_up_dn_grad(1,nz,edge)+ &
-                        edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(3,nz,edge))/6.0_WP*c_lo(1)
+                        mesh%edge_dxdy(1,edge)*a*edge_up_dn_grad(1,nz,edge)+ &
+                        mesh%edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(3,nz,edge))/6.0_WP*c_lo(1)
 
                 !_______________________________________________________________
                 ! volume flux across the segments
-                vflux=(VEL(2,nz,el(2))*deltaX2 - VEL(1,nz,el(2))*deltaY2)*helem(nz,el(2))
+                vflux=(VEL(2,nz,el(2))*deltaX2 - VEL(1,nz,el(2))*deltaY2)*mesh%helem(nz,el(2))
                 cHO=(vflux+abs(vflux))*Tmean1 + (vflux-abs(vflux))*Tmean2
                 flux(nz,edge)=-0.5_WP*(1.0_WP-num_ord)*cHO - vflux*num_ord*0.5_WP*(Tmean1+Tmean2)-flux(nz,edge)
             end do
@@ -393,8 +385,8 @@ subroutine adv_tra_hor_muscl(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_g
            !     gradient info from upwind triangle
            Tmean2=ttf(nz, enodes(2))- &
                   (2.0_WP*(ttf(nz, enodes(2))-ttf(nz,enodes(1)))+ &
-                  edge_dxdy(1,edge)*a*edge_up_dn_grad(2,nz,edge)+ &
-                  edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(4,nz,edge))/6.0_WP*c_lo(2)
+                  mesh%edge_dxdy(1,edge)*a*edge_up_dn_grad(2,nz,edge)+ &
+                  mesh%edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(4,nz,edge))/6.0_WP*c_lo(2)
 
             ! use upwind triangle to interpolate Tracer to edge center with
             ! fancy scheme --> Linear upwind reconstruction
@@ -405,8 +397,8 @@ subroutine adv_tra_hor_muscl(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_g
             !     gradient info from downwind triangle
             Tmean1=ttf(nz, enodes(1))+ &
                    (2.0_WP*(ttf(nz, enodes(2))-ttf(nz,enodes(1)))+ &
-                   edge_dxdy(1,edge)*a*edge_up_dn_grad(1,nz,edge)+ &
-                   edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(3,nz,edge))/6.0_WP*c_lo(1)
+                   mesh%edge_dxdy(1,edge)*a*edge_up_dn_grad(1,nz,edge)+ &
+                   mesh%edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(3,nz,edge))/6.0_WP*c_lo(1)
 
             !___________________________________________________________________
             ! volume flux along the edge segment ed
@@ -428,8 +420,8 @@ subroutine adv_tra_hor_muscl(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_g
             !                         C2 (centroid el(2)) --> (u2,v2)
 
             ! here already assumed that ed is NOT! a boundary edge so el(2) should exist
-            vflux=(-VEL(2,nz,el(1))*deltaX1 + VEL(1,nz,el(1))*deltaY1)*helem(nz,el(1)) &
-                  +(VEL(2,nz,el(2))*deltaX2 - VEL(1,nz,el(2))*deltaY2)*helem(nz,el(2))
+            vflux=(-VEL(2,nz,el(1))*deltaX1 + VEL(1,nz,el(1))*deltaY1)*mesh%helem(nz,el(1)) &
+                  +(VEL(2,nz,el(2))*deltaX2 - VEL(1,nz,el(2))*deltaY2)*mesh%helem(nz,el(2))
 
             !___________________________________________________________________
             ! (1-num_ord) is done with 3rd order upwind
@@ -446,17 +438,17 @@ subroutine adv_tra_hor_muscl(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_g
            !____________________________________________________________________
            Tmean2=ttf(nz, enodes(2))- &
                   (2.0_WP*(ttf(nz, enodes(2))-ttf(nz,enodes(1)))+ &
-                  edge_dxdy(1,edge)*a*edge_up_dn_grad(2,nz,edge)+ &
-                  edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(4,nz,edge))/6.0_WP*c_lo(2)
+                  mesh%edge_dxdy(1,edge)*a*edge_up_dn_grad(2,nz,edge)+ &
+                  mesh%edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(4,nz,edge))/6.0_WP*c_lo(2)
 
            Tmean1=ttf(nz, enodes(1))+ &
                   (2.0_WP*(ttf(nz, enodes(2))-ttf(nz,enodes(1)))+ &
-                  edge_dxdy(1,edge)*a*edge_up_dn_grad(1,nz,edge)+ &
-                  edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(3,nz,edge))/6.0_WP*c_lo(1)
+                  mesh%edge_dxdy(1,edge)*a*edge_up_dn_grad(1,nz,edge)+ &
+                  mesh%edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(3,nz,edge))/6.0_WP*c_lo(1)
 
            !____________________________________________________________________
            ! volume flux across the segments
-           vflux=(-VEL(2,nz,el(1))*deltaX1 + VEL(1,nz,el(1))*deltaY1)*helem(nz,el(1))
+           vflux=(-VEL(2,nz,el(1))*deltaX1 + VEL(1,nz,el(1))*deltaY1)*mesh%helem(nz,el(1))
            cHO=(vflux+abs(vflux))*Tmean1 + (vflux-abs(vflux))*Tmean2
            flux(nz,edge)=-0.5_WP*(1.0_WP-num_ord)*cHO - vflux*num_ord*0.5_WP*(Tmean1+Tmean2)-flux(nz,edge)
         end do
@@ -470,17 +462,17 @@ subroutine adv_tra_hor_muscl(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_g
            !____________________________________________________________________
            Tmean2=ttf(nz, enodes(2))- &
                   (2.0_WP*(ttf(nz, enodes(2))-ttf(nz,enodes(1)))+ &
-                  edge_dxdy(1,edge)*a*edge_up_dn_grad(2,nz,edge)+ &
-                  edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(4,nz,edge))/6.0_WP*c_lo(2)
+                  mesh%edge_dxdy(1,edge)*a*edge_up_dn_grad(2,nz,edge)+ &
+                  mesh%edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(4,nz,edge))/6.0_WP*c_lo(2)
 
            Tmean1=ttf(nz, enodes(1))+ &
                   (2.0_WP*(ttf(nz, enodes(2))-ttf(nz,enodes(1)))+ &
-                  edge_dxdy(1,edge)*a*edge_up_dn_grad(1,nz,edge)+ &
-                  edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(3,nz,edge))/6.0_WP*c_lo(1)
+                  mesh%edge_dxdy(1,edge)*a*edge_up_dn_grad(1,nz,edge)+ &
+                  mesh%edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(3,nz,edge))/6.0_WP*c_lo(1)
 
            !____________________________________________________________________
            ! volume flux across the segments
-           vflux=(VEL(2,nz,el(2))*deltaX2 - VEL(1,nz,el(2))*deltaY2)*helem(nz,el(2))
+           vflux=(VEL(2,nz,el(2))*deltaX2 - VEL(1,nz,el(2))*deltaY2)*mesh%helem(nz,el(2))
            cHO=(vflux+abs(vflux))*Tmean1 + (vflux-abs(vflux))*Tmean2
            flux(nz,edge)=-0.5_WP*(1.0_WP-num_ord)*cHO - vflux*num_ord*0.5_WP*(Tmean1+Tmean2)-flux(nz,edge)
         end do
@@ -508,10 +500,6 @@ end subroutine adv_tra_hor_muscl
     integer                           :: el(2), enodes(2), nz, edge
     integer                           :: nu12, nl12, nl1, nl2, nu1, nu2
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
     l_init_zero=.true.
     if (present(o_init_zero)) then
@@ -523,7 +511,7 @@ end subroutine adv_tra_hor_muscl
 #else
        !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 #endif
-       do edge=1, myDim_edge2D
+       do edge=1, partit%myDim_edge2D
           flux(:,edge)=0.0_WP
        end do
 #ifndef ENABLE_OPENACC
@@ -543,24 +531,24 @@ end subroutine adv_tra_hor_muscl
 #else
     !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 #endif
-    do edge=1, myDim_edge2D
+    do edge=1, partit%myDim_edge2D
         ! local indice of nodes that span up edge ed
-        enodes=edges(:,edge)
+        enodes=mesh%edges(:,edge)
 
         ! local index of element that contribute to edge
-        el=edge_tri(:,edge)
+        el=mesh%edge_tri(:,edge)
 
         ! number of layers -1 at elem el(1)
-        nl1=nlevels(el(1))-1
+        nl1=mesh%nlevels(el(1))-1
 
         ! index off surface layer in case of cavity !=1
-        nu1=ulevels(el(1))
+        nu1=mesh%ulevels(el(1))
 
         ! edge_cross_dxdy(1:2,ed)... dx,dy distance from element centroid el(1) to
         ! center of edge --> needed to calc flux perpedicular to edge from elem el(1)
-        deltaX1=edge_cross_dxdy(1,edge)
-        deltaY1=edge_cross_dxdy(2,edge)
-        a=r_earth*elem_cos(el(1))
+        deltaX1=mesh%edge_cross_dxdy(1,edge)
+        deltaY1=mesh%edge_cross_dxdy(2,edge)
+        a=r_earth*mesh%elem_cos(el(1))
 
         !_______________________________________________________________________
         ! same parameter but for other element el(2) that contributes to edge ed
@@ -568,12 +556,12 @@ end subroutine adv_tra_hor_muscl
         nl2=0
         nu2=0
         if(el(2)>0) then
-            deltaX2=edge_cross_dxdy(3,edge)
-            deltaY2=edge_cross_dxdy(4,edge)
+            deltaX2=mesh%edge_cross_dxdy(3,edge)
+            deltaY2=mesh%edge_cross_dxdy(4,edge)
             ! number of layers -1 at elem el(2)
-            nl2=nlevels(el(2))-1
-            nu2=ulevels(el(2))
-            a=0.5_WP*(a+r_earth*elem_cos(el(2)))
+            nl2=mesh%nlevels(el(2))-1
+            nu2=mesh%ulevels(el(2))
+            a=0.5_WP*(a+r_earth*mesh%elem_cos(el(2)))
         end if
 
         !_______________________________________________________________________
@@ -595,17 +583,17 @@ end subroutine adv_tra_hor_muscl
            !____________________________________________________________________
            Tmean2=ttf(nz, enodes(2))- &
                   (2.0_WP*(ttf(nz, enodes(2))-ttf(nz,enodes(1)))+ &
-                  edge_dxdy(1,edge)*a*edge_up_dn_grad(2,nz,edge)+ &
-                  edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(4,nz,edge))/6.0_WP
+                  mesh%edge_dxdy(1,edge)*a*edge_up_dn_grad(2,nz,edge)+ &
+                  mesh%edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(4,nz,edge))/6.0_WP
 
            Tmean1=ttf(nz, enodes(1))+ &
                   (2.0_WP*(ttf(nz, enodes(2))-ttf(nz,enodes(1)))+ &
-                  edge_dxdy(1,edge)*a*edge_up_dn_grad(1,nz,edge)+ &
-                  edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(3,nz,edge))/6.0_WP
+                  mesh%edge_dxdy(1,edge)*a*edge_up_dn_grad(1,nz,edge)+ &
+                  mesh%edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(3,nz,edge))/6.0_WP
 
            !____________________________________________________________________
            ! volume flux across the segments
-           vflux=(-VEL(2,nz,el(1))*deltaX1 + VEL(1,nz,el(1))*deltaY1)*helem(nz,el(1))
+           vflux=(-VEL(2,nz,el(1))*deltaX1 + VEL(1,nz,el(1))*deltaY1)*mesh%helem(nz,el(1))
            cHO=(vflux+abs(vflux))*Tmean1 + (vflux-abs(vflux))*Tmean2
            flux(nz,edge)=-0.5_WP*(1.0_WP-num_ord)*cHO - vflux*num_ord*0.5_WP*(Tmean1+Tmean2)-flux(nz,edge)
         end do
@@ -621,16 +609,16 @@ end subroutine adv_tra_hor_muscl
             !___________________________________________________________________
             Tmean2=ttf(nz, enodes(2))- &
                     (2.0_WP*(ttf(nz, enodes(2))-ttf(nz,enodes(1)))+ &
-                    edge_dxdy(1,edge)*a*edge_up_dn_grad(2,nz,edge)+ &
-                    edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(4,nz,edge))/6.0_WP
+                    mesh%edge_dxdy(1,edge)*a*edge_up_dn_grad(2,nz,edge)+ &
+                    mesh%edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(4,nz,edge))/6.0_WP
 
             Tmean1=ttf(nz, enodes(1))+ &
                     (2.0_WP*(ttf(nz, enodes(2))-ttf(nz,enodes(1)))+ &
-                    edge_dxdy(1,edge)*a*edge_up_dn_grad(1,nz,edge)+ &
-                    edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(3,nz,edge))/6.0_WP
+                    mesh%edge_dxdy(1,edge)*a*edge_up_dn_grad(1,nz,edge)+ &
+                    mesh%edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(3,nz,edge))/6.0_WP
             !___________________________________________________________________
             ! volume flux across the segments
-            vflux=(VEL(2,nz,el(2))*deltaX2 - VEL(1,nz,el(2))*deltaY2)*helem(nz,el(2))
+            vflux=(VEL(2,nz,el(2))*deltaX2 - VEL(1,nz,el(2))*deltaY2)*mesh%helem(nz,el(2))
             cHO=(vflux+abs(vflux))*Tmean1 + (vflux-abs(vflux))*Tmean2
             flux(nz,edge)=-0.5_WP*(1.0_WP-num_ord)*cHO - vflux*num_ord*0.5_WP*(Tmean1+Tmean2)-flux(nz,edge)
             end do
@@ -678,8 +666,8 @@ end subroutine adv_tra_hor_muscl
            !     gradient info from upwind triangle
            Tmean2=ttf(nz, enodes(2))- &
                   (2.0_WP*(ttf(nz, enodes(2))-ttf(nz,enodes(1)))+ &
-                  edge_dxdy(1,edge)*a*edge_up_dn_grad(2,nz,edge)+ &
-                  edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(4,nz,edge))/6.0_WP
+                  mesh%edge_dxdy(1,edge)*a*edge_up_dn_grad(2,nz,edge)+ &
+                  mesh%edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(4,nz,edge))/6.0_WP
 
             ! use upwind triangle to interpolate Tracer to edge center with
             ! fancy scheme --> Linear upwind reconstruction
@@ -690,8 +678,8 @@ end subroutine adv_tra_hor_muscl
             !     gradient info from downwind triangle
             Tmean1=ttf(nz, enodes(1))+ &
                    (2.0_WP*(ttf(nz, enodes(2))-ttf(nz,enodes(1)))+ &
-                   edge_dxdy(1,edge)*a*edge_up_dn_grad(1,nz,edge)+ &
-                   edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(3,nz,edge))/6.0_WP
+                   mesh%edge_dxdy(1,edge)*a*edge_up_dn_grad(1,nz,edge)+ &
+                   mesh%edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(3,nz,edge))/6.0_WP
             !___________________________________________________________________
             ! volume flux along the edge segment ed
             ! netto volume flux along segment that comes from edge node 1 and 2
@@ -712,8 +700,8 @@ end subroutine adv_tra_hor_muscl
             !                         C2 (centroid el(2)) --> (u2,v2)
 
             ! here already assumed that ed is NOT! a boundary edge so el(2) should exist
-            vflux=(-VEL(2,nz,el(1))*deltaX1 + VEL(1,nz,el(1))*deltaY1)*helem(nz,el(1)) &
-                  +(VEL(2,nz,el(2))*deltaX2 - VEL(1,nz,el(2))*deltaY2)*helem(nz,el(2))
+            vflux=(-VEL(2,nz,el(1))*deltaX1 + VEL(1,nz,el(1))*deltaY1)*mesh%helem(nz,el(1)) &
+                  +(VEL(2,nz,el(2))*deltaX2 - VEL(1,nz,el(2))*deltaY2)*mesh%helem(nz,el(2))
 
             !___________________________________________________________________
             ! (1-num_ord) is done with 3rd order upwind
@@ -729,17 +717,17 @@ end subroutine adv_tra_hor_muscl
            !____________________________________________________________________
            Tmean2=ttf(nz, enodes(2))- &
                   (2.0_WP*(ttf(nz, enodes(2))-ttf(nz,enodes(1)))+ &
-                  edge_dxdy(1,edge)*a*edge_up_dn_grad(2,nz,edge)+ &
-                  edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(4,nz,edge))/6.0_WP
+                  mesh%edge_dxdy(1,edge)*a*edge_up_dn_grad(2,nz,edge)+ &
+                  mesh%edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(4,nz,edge))/6.0_WP
 
            Tmean1=ttf(nz, enodes(1))+ &
                   (2.0_WP*(ttf(nz, enodes(2))-ttf(nz,enodes(1)))+ &
-                  edge_dxdy(1,edge)*a*edge_up_dn_grad(1,nz,edge)+ &
-                  edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(3,nz,edge))/6.0_WP
+                  mesh%edge_dxdy(1,edge)*a*edge_up_dn_grad(1,nz,edge)+ &
+                  mesh%edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(3,nz,edge))/6.0_WP
 
            !____________________________________________________________________
            ! volume flux across the segments
-           vflux=(-VEL(2,nz,el(1))*deltaX1 + VEL(1,nz,el(1))*deltaY1)*helem(nz,el(1))
+           vflux=(-VEL(2,nz,el(1))*deltaX1 + VEL(1,nz,el(1))*deltaY1)*mesh%helem(nz,el(1))
            cHO=(vflux+abs(vflux))*Tmean1 + (vflux-abs(vflux))*Tmean2
            flux(nz,edge)=-0.5_WP*(1.0_WP-num_ord)*cHO - vflux*num_ord*0.5_WP*(Tmean1+Tmean2)-flux(nz,edge)
         end do
@@ -752,17 +740,17 @@ end subroutine adv_tra_hor_muscl
            !____________________________________________________________________
            Tmean2=ttf(nz, enodes(2))- &
                   (2.0_WP*(ttf(nz, enodes(2))-ttf(nz,enodes(1)))+ &
-                  edge_dxdy(1,edge)*a*edge_up_dn_grad(2,nz,edge)+ &
-                  edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(4,nz,edge))/6.0_WP
+                  mesh%edge_dxdy(1,edge)*a*edge_up_dn_grad(2,nz,edge)+ &
+                  mesh%edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(4,nz,edge))/6.0_WP
 
            Tmean1=ttf(nz, enodes(1))+ &
                   (2.0_WP*(ttf(nz, enodes(2))-ttf(nz,enodes(1)))+ &
-                  edge_dxdy(1,edge)*a*edge_up_dn_grad(1,nz,edge)+ &
-                  edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(3,nz,edge))/6.0_WP
+                  mesh%edge_dxdy(1,edge)*a*edge_up_dn_grad(1,nz,edge)+ &
+                  mesh%edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(3,nz,edge))/6.0_WP
 
            !____________________________________________________________________
            ! volume flux across the segments
-           vflux=(VEL(2,nz,el(2))*deltaX2 - VEL(1,nz,el(2))*deltaY2)*helem(nz,el(2))
+           vflux=(VEL(2,nz,el(2))*deltaX2 - VEL(1,nz,el(2))*deltaY2)*mesh%helem(nz,el(2))
            cHO=(vflux+abs(vflux))*Tmean1 + (vflux-abs(vflux))*Tmean2
            flux(nz,edge)=-0.5_WP*(1.0_WP-num_ord)*cHO - vflux*num_ord*0.5_WP*(Tmean1+Tmean2)-flux(nz,edge)
         end do
@@ -815,10 +803,6 @@ subroutine adv_tra_hor_spbee(             &
     real(kind=WP)                           :: vflux, cfl, T12vflux
     integer                                 :: edel(2), ednodes(2), edge, edel0
     integer                                 :: nz, nl1, nl2, nl12, nu1, nu2, nu12, nzs, nze
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     
     !___________________________________________________________________________
     if (num_ord == 1.0_WP) then
@@ -838,7 +822,7 @@ subroutine adv_tra_hor_spbee(             &
 #else
         !$ACC PARALLEL LOOP GANG VECTOR COLLAPSE(2) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 #endif
-       do edge=1, myDim_edge2D
+       do edge=1, partit%myDim_edge2D
           do nz=1, mesh%nl-1
              flux(nz,edge)=0.0_WP
           end do
@@ -857,25 +841,25 @@ subroutine adv_tra_hor_spbee(             &
 !$OMP                                  vflux, cfl, dt_over_edlen, T12vflux,  &
 !$OMP                                  u1, u2, v1, v2, n_x, n_y, Ue, nlen, inv_nlen)
 !$OMP DO        
-    do edge=1, myDim_edge2D
+    do edge=1, partit%myDim_edge2D
         !_______________________________________________________________________
         ! local indice of nodes that span up edge ed
-        ednodes= edges(:,edge)
+        ednodes= mesh%edges(:,edge)
             
         ! local index of element that contribute to edge
-        edel     = edge_tri(:,edge)
+        edel     = mesh%edge_tri(:,edge)
         
-        nl1      = nlevels(edel(1))-1
+        nl1      = mesh%nlevels(edel(1))-1
         ! nu1 ... upper index of ocean default = 1 but can consider cavity !=1
-        nu1      = ulevels(edel(1))
+        nu1      = mesh%ulevels(edel(1))
         
         ! edge_cross_dxdy(1:2,ed)... dx,dy distance from center of edge to
         ! element centroid el(1) --> needed to calc flux perpedicular to edge from elem el(1)
-        dx1    = edge_cross_dxdy(1,edge)
-        dy1    = edge_cross_dxdy(2,edge)
+        dx1    = mesh%edge_cross_dxdy(1,edge)
+        dy1    = mesh%edge_cross_dxdy(2,edge)
             
         ! length of edge dx dy
-        dxdy12 = edge_dxdy(:,edge)*r_earth  
+        dxdy12 = mesh%edge_dxdy(:,edge)*r_earth  
             
         !_______________________________________________________________________
         ! same parameter but for other element el(2) that contributes to edge ed
@@ -885,11 +869,11 @@ subroutine adv_tra_hor_spbee(             &
         dx2    = 0.0_WP
         dy2    = 0.0_WP
         if(edel(2)>0) then
-            nl2      = nlevels(edel(2))-1
-            nu2      = ulevels(edel(2))            
-            dx2      = edge_cross_dxdy(3,edge)
-            dy2      = edge_cross_dxdy(4,edge)
-            dxdy12(1)= dxdy12(1) * (elem_cos(edel(1)) + elem_cos(edel(2))) * 0.5_WP
+            nl2      = mesh%nlevels(edel(2))-1
+            nu2      = mesh%ulevels(edel(2))            
+            dx2      = mesh%edge_cross_dxdy(3,edge)
+            dy2      = mesh%edge_cross_dxdy(4,edge)
+            dxdy12(1)= dxdy12(1) * (mesh%elem_cos(edel(1)) + mesh%elem_cos(edel(2))) * 0.5_WP
                 
             ! compute mean edge-segment normal vector
             !                         (dx1,dy1)
@@ -908,7 +892,7 @@ subroutine adv_tra_hor_spbee(             &
             n_y      = ((-dx1) +   dx2 )/2
                 
         else
-            dxdy12(1)= dxdy12(1) * elem_cos(edel(1))   
+            dxdy12(1)= dxdy12(1) * mesh%elem_cos(edel(1))   
             ! compute edge-segment normal vector
             n_x      =  dy1
             n_y      = -dx1
@@ -957,7 +941,7 @@ subroutine adv_tra_hor_spbee(             &
             ! compute volume flux across the segments from el(1)
             u1        = vel(1, nz, edel0)
             v1        = vel(2, nz, edel0)
-            vflux     = (v1*dx0 + u1*dy0)*helem(nz,edel0)
+            vflux     = (v1*dx0 + u1*dy0)*mesh%helem(nz,edel0)
             
             ! compute approximated edge centered and along edge projected 
             ! mean velocity --> need to add component to make second order
@@ -986,7 +970,7 @@ subroutine adv_tra_hor_spbee(             &
                 v1        = vel(2, nz, edel(1))
                 u2        = vel(1, nz, edel(2))
                 v2        = vel(2, nz, edel(2))  
-                vflux     =  (-v1*dx1 + u1*dy1)*helem(nz,edel(1)) + ( v2*dx2 - u2*dy2)*helem(nz,edel(2))
+                vflux     =  (-v1*dx1 + u1*dy1)*mesh%helem(nz,edel(1)) + ( v2*dx2 - u2*dy2)*mesh%helem(nz,edel(2))
                 
                 ! compute approximated edge centered and along edge projected 
                 ! mean velocity --> need to add component to make second order
@@ -1022,7 +1006,7 @@ subroutine adv_tra_hor_spbee(             &
                 ! compute volume flux across the segments from el(1)
                 u1        = vel(1, nz, edel0)
                 v1        = vel(2, nz, edel0)
-                vflux     = (v1*dx0 + u1*dy0)*helem(nz,edel0)
+                vflux     = (v1*dx0 + u1*dy0)*mesh%helem(nz,edel0)
                 
                 ! compute approximated edge centered and along edge projected 
                 ! mean velocity --> need to add component to make second order

@@ -169,12 +169,20 @@ subroutine ini_ocean_io(dynamics, tracers, partit, mesh)
   ! Not allocated with split-explicit subcycling (use_ssh_se_subcycl), which does not use the CG solver.
   if (allocated(dynamics%d_eta)) &
   call oce_files%def_node_var_optional('d_eta', 'SSH increment / CG initial guess', 'm', dynamics%d_eta, mesh, partit)
+#if defined(USE_SINGLE_PRECISION)
+  call oce_files%def_node_var('hnode', 'nodal layer thickness', 'm',   mesh%hnode_wp, mesh, partit)
+#else
   call oce_files%def_node_var('hnode', 'nodal layer thickness', 'm',   mesh%hnode, mesh, partit)
+#endif
   ! hnode_new is filled by vert_vel_ale, but fer_solve_Gamma and init_Redi_GM run EARLIER in
   ! the step and read it (oce_fer_gm.F90:82, :266), so with Fer_GM they consume the previous
   ! step's value -> prognostic across the step boundary. Also written by the binary path
   ! (MOD_MESH.F90, write_bin_array(mesh%hnode_new)).
+#if defined(USE_SINGLE_PRECISION)
+  call oce_files%def_node_var_optional('hnode_new', 'nodal layer thickness, next step', 'm', mesh%hnode_new_wp, mesh, partit)
+#else
   call oce_files%def_node_var_optional('hnode_new', 'nodal layer thickness, next step', 'm', mesh%hnode_new, mesh, partit)
+#endif
   
   !___Define the netCDF variables for 3D fields_______________________________
 #ifdef ENABLE_NVHPC_WORKAROUNDS
@@ -471,7 +479,7 @@ subroutine read_initial_conditions(which_readr, ice, dynamics, tracers, partit, 
   call MPI_Bcast(binfiles_exist, 1, MPI_LOGICAL, RAW_RESTART_METADATA_RANK, partit%MPI_COMM_FESOM, mpierr)
 
   ! Read restart files in order of preference
-  if(rawfiles_exist) then
+  if(rawfiles_exist .and. raw_restart_length_unit /= "off") then
     ! Read raw/core dump restart
     which_readr = 1
     ! Note: This will need to be updated once we have read functions that accept paths
@@ -569,14 +577,10 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
   integer :: tr_num
 #endif
 
-#if defined(__recom) && defined(__usetp)
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
-  num_tracers = tracers%num_tracers
-#else
   integer :: mpierr
+
+#if defined(__recom) && defined(__usetp)
+  num_tracers = tracers%num_tracers
 #endif
 
   ! Build paths for reading using RestartInPath
@@ -691,7 +695,7 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
 
 #if defined(__recom) && defined(__usetp)
     if(num_fesom_groups > 1) then
-        tr_arr_slice_count_fix_1 = 1 * (nl - 1) * (myDim_nod2D + eDim_nod2D)
+        tr_arr_slice_count_fix_1 = 1 * (mesh%nl - 1) * (partit%myDim_nod2D + partit%eDim_nod2D)
 
         do group_i = 0, num_fesom_groups - 1
             call calc_slice(num_tracers, num_fesom_groups, group_i, tr_num_start, tr_num_end, tr_num_in_group, has_one_added_tracer)

@@ -27,6 +27,7 @@ contains
 ! Than compute for all cavity points (ulevels_nod2D>1), which is the closest
 ! cavity line point to that point --> use their coordinates and depth
 subroutine compute_nrst_pnt2cavline(partit, mesh)
+    use par_support_module, only: par_abort
     implicit none
 
     type(t_partit), intent(inout), target :: partit
@@ -36,13 +37,9 @@ subroutine compute_nrst_pnt2cavline(partit, mesh)
     real(kind=WP), allocatable, dimension(:)            :: cavl_lon, cavl_lat, cavl_dep,lcl_cavl_lon, lcl_cavl_lat, lcl_cavl_dep
     real(kind=WP)                                       :: aux_x, aux_y, aux_d, aux_dmin
     
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
     !___________________________________________________________________________
-    if (mype==0) write(*,*) ' --> compute cavity line '
+    if (partit%mype==0) write(*,*) ' --> compute cavity line '
     allocate(lcl_cavl_idx(mesh%nod2d), cavl_idx(mesh%nod2d))
     allocate(lcl_cavl_lon(mesh%nod2d), cavl_lon(mesh%nod2d))
     allocate(lcl_cavl_lat(mesh%nod2d), cavl_lat(mesh%nod2d))
@@ -56,25 +53,25 @@ subroutine compute_nrst_pnt2cavline(partit, mesh)
     cavl_lat     = 0.0
     cavl_dep     = 0.0
     
-    do node=1,myDim_nod2d  ! should not include eDim_nod2d 
+    do node=1,partit%myDim_nod2d  ! should not include eDim_nod2d 
         !_______________________________________________________________________
         ! node is a cavity point
-        if (ulevels_nod2D(node)>1) then 
+        if (mesh%ulevels_nod2D(node)>1) then 
             cycle
         !_______________________________________________________________________    
         ! node is not a cavity point --> but should have a neighbour that is cavity
         ! point
         else
             ! loop over neighbouring elements to verttice node
-            do kk=1,nod_in_elem2D_num(node)
-                elnodes = elem2D_nodes(:,nod_in_elem2D(kk,node))
+            do kk=1,mesh%nod_in_elem2D_num(node)
+                elnodes = mesh%elem2D_nodes(:,mesh%nod_in_elem2D(kk,node))
                 ! found non cavity point with a cavity point as neighbour
-                if (any(ulevels_nod2D(elnodes)>1)) then
-                    gnode = myList_nod2D(node)
+                if (any(mesh%ulevels_nod2D(elnodes)>1)) then
+                    gnode = partit%myList_nod2D(node)
                     lcl_cavl_idx(gnode) = 1
-                    lcl_cavl_lon(gnode) = geo_coord_nod2D(1,node)
-                    lcl_cavl_lat(gnode) = geo_coord_nod2D(2,node) 
-                    lcl_cavl_dep(gnode) = Z_3d_n(nlevels_nod2D(node)-1,node)
+                    lcl_cavl_lon(gnode) = mesh%geo_coord_nod2D(1,node)
+                    lcl_cavl_lat(gnode) = mesh%geo_coord_nod2D(2,node) 
+                    lcl_cavl_dep(gnode) = mesh%Z_3d_n(mesh%nlevels_nod2D(node)-1,node)
                     exit
                 end if 
             end do
@@ -83,10 +80,10 @@ subroutine compute_nrst_pnt2cavline(partit, mesh)
     
     !___________________________________________________________________________
     ! mpi reduce from local to global 
-    call MPI_AllREDUCE(lcl_cavl_idx, cavl_idx, nod2d, MPI_INTEGER         , MPI_SUM, MPI_COMM_FESOM, MPIerr)
-    call MPI_AllREDUCE(lcl_cavl_lon, cavl_lon, nod2d, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-    call MPI_AllREDUCE(lcl_cavl_lat, cavl_lat, nod2d, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-    call MPI_AllREDUCE(lcl_cavl_dep, cavl_dep, nod2d, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+    call MPI_AllREDUCE(lcl_cavl_idx, cavl_idx, mesh%nod2d, MPI_INTEGER         , MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+    call MPI_AllREDUCE(lcl_cavl_lon, cavl_lon, mesh%nod2d, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+    call MPI_AllREDUCE(lcl_cavl_lat, cavl_lat, mesh%nod2d, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+    call MPI_AllREDUCE(lcl_cavl_dep, cavl_dep, mesh%nod2d, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
   
     !___________________________________________________________________________
     ! deallocate local arrays
@@ -95,20 +92,21 @@ subroutine compute_nrst_pnt2cavline(partit, mesh)
     !___________________________________________________________________________
     ! now search for all cavity points (ulevels_nod2d>1), which is the closest 
     ! cavity line points with respect to that point
-    if (mype==0) write(*,*) ' --> compute nearest cavity line point with respect to cavity point'
-    allocate(mesh%cavity_nrst_cavlpnt_xyz(3,myDim_nod2d+eDim_nod2d))
+    if (partit%mype==0) write(*,*) ' --> compute nearest cavity line point with respect to cavity point'
+    allocate(mesh%cavity_nrst_cavlpnt_xyz(3,partit%myDim_nod2d+partit%eDim_nod2d))
     mesh%cavity_nrst_cavlpnt_xyz = 0.0_WP
-    do node=1,myDim_nod2d !+eDim_nod2d
+    do node=1,partit%myDim_nod2d !+eDim_nod2d
         !_______________________________________________________________________
         ! --> node is not a cavity point --> cycle over it and go to next one
-        if(ulevels_nod2D(node)==1) cycle 
+        if(mesh%ulevels_nod2D(node)==1) cycle 
         
         !_______________________________________________________________________
         ! do global search over all cavity line points to search for closest one
-        aux_x=geo_coord_nod2D(1,node)
-        aux_y=geo_coord_nod2D(2,node)
+        aux_x=mesh%geo_coord_nod2D(1,node)
+        aux_y=mesh%geo_coord_nod2D(2,node)
         aux_dmin = 3000.0e3_WP
-        do gnode=1,nod2d
+        aux_idx  = 0
+        do gnode=1,mesh%nod2d
             if (cavl_idx(gnode)/=1) cycle
             call dist_on_earth(aux_x, aux_y, cavl_lon(gnode), cavl_lat(gnode), aux_d)
             if (aux_d<aux_dmin) then
@@ -120,6 +118,10 @@ subroutine compute_nrst_pnt2cavline(partit, mesh)
         !_______________________________________________________________________
         ! write out coordinates and bottom depth for that closest cavity
         ! line point
+        if (aux_idx==0) then
+            write(*,*) 'ERROR: no cavity line point found within 3000km of cavity node at lon/lat=', aux_x/rad, aux_y/rad
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
+        end if
         mesh%cavity_nrst_cavlpnt_xyz(1,node)=cavl_lon(aux_idx)
         mesh%cavity_nrst_cavlpnt_xyz(2,node)=cavl_lat(aux_idx)
         mesh%cavity_nrst_cavlpnt_xyz(3,node)=cavl_dep(aux_idx)
@@ -187,23 +189,19 @@ subroutine cavity_heat_water_fluxes_3eq(ice, dynamics, tracers, partit, mesh)
     real(kind=WP), dimension(:,:,:), pointer :: UVnode
     real(kind=WP), dimension(:)    , pointer :: fresh_wa_flux, net_heat_flux
 !     real(kind=WP), dimension(:)    , pointer :: net_heat_flux
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     UVnode=>dynamics%uvnode(:,:,:)
     fresh_wa_flux => ice%flx_fw(:)
     net_heat_flux => ice%flx_h(:)
     
     !___________________________________________________________________________
-    do node=1,myDim_nod2D !+eDim_nod2D  
-        nzmin = ulevels_nod2D(node)
+    do node=1,partit%myDim_nod2D !+eDim_nod2D  
+        nzmin = mesh%ulevels_nod2D(node)
         if(nzmin==1) cycle ! if no cavity skip that node
         
         !_______________________________________________________________________
         temp = tracers%data(1)%values(nzmin,node)
         sal  = tracers%data(2)%values(nzmin,node)
-        zice = Z_3d_n(nzmin, node)  !(<0)
+        zice = mesh%Z_3d_n(nzmin, node)  !(<0)
         
         !_______________________________________________________________________
         ! Calculate the in-situ temperature tin
@@ -221,7 +219,7 @@ subroutine cavity_heat_water_fluxes_3eq(ice, dynamics, tracers, partit, mesh)
         vt1  = sqrt(UVnode(1,nzmin,node)*UVnode(1,nzmin,node)+UVnode(2,nzmin,node)*UVnode(2,nzmin,node))
         vt1  = max(vt1,0.001_WP)
         !vt1  = max(vt1,0.005) ! CW
-        re   = hnode(nzmin,node)/un        !vt1*re is the Reynolds number; use actual top-layer thickness [m]
+        re   = mesh%hnode(nzmin,node)/un        !vt1*re is the Reynolds number; use actual top-layer thickness [m]
         
         gats1= sak1*vt1
         gats2= 2.12_WP*log(gats1*re)-9._WP
@@ -341,10 +339,6 @@ subroutine cavity_heat_water_fluxes_2eq(ice, tracers, partit, mesh)
     real(kind=WP)   :: t_i, s_i, p, t_fz
     real(kind=WP), dimension(:)  , pointer :: fresh_wa_flux, net_heat_flux
 !     real(kind=WP), dimension(:)  , pointer :: net_heat_flux
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     fresh_wa_flux => ice%flx_fw(:)
     net_heat_flux => ice%flx_h(:)
     
@@ -360,12 +354,12 @@ subroutine cavity_heat_water_fluxes_2eq(ice, tracers, partit, mesh)
     c6 = -7.53e-4_WP
     
     !___________________________________________________________________________
-    do node=1,myDim_nod2D      
-        nzmin = ulevels_nod2D(node)
+    do node=1,partit%myDim_nod2D      
+        nzmin = mesh%ulevels_nod2D(node)
         if(nzmin==1) cycle
         t_i  = tracers%data(1)%values(nzmin,node)
         s_i  = tracers%data(2)%values(nzmin,node)
-        t_fz = c3*(s_i**(3./2.)) + c4*(s_i**2) + c5*s_i + c6*abs(Z_3d_n(nzmin,node))
+        t_fz = c3*(s_i**(3./2.)) + c4*(s_i**2) + c5*s_i + c6*abs(mesh%Z_3d_n(nzmin,node))
         
         heat_flux(node)=vcpw*gama*(t_i - t_fz)  ! Hunter2006 used cpw=3974J/Kg (*rhowat)
         water_flux(node) = -1.0*heat_flux(node)/(L*1000.0)  
@@ -391,17 +385,13 @@ subroutine cavity_momentum_fluxes(dynamics, partit, mesh)
     real(kind=WP)  :: aux
     real(kind=WP), dimension(:,:,:), pointer :: UV, UVnode
     
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     UV=>dynamics%uv(:,:,:)
     UVnode=>dynamics%uvnode(:,:,:)
 
     !___________________________________________________________________________
-    do elem=1,myDim_elem2D
-        elnodes= elem2D_nodes(:,elem)
-        nzmin  = ulevels(elem)
+    do elem=1,partit%myDim_elem2D
+        elnodes= mesh%elem2D_nodes(:,elem)
+        nzmin  = mesh%ulevels(elem)
         if(nzmin==1) cycle   
         
         ! momentum stress:
@@ -413,8 +403,8 @@ subroutine cavity_momentum_fluxes(dynamics, partit, mesh)
     end do
     
     !___________________________________________________________________________
-    do node=1,myDim_nod2D+eDim_nod2D   
-        nzmin  = ulevels_nod2d(node)
+    do node=1,partit%myDim_nod2D+partit%eDim_nod2D   
+        nzmin  = mesh%ulevels_nod2d(node)
         if(nzmin==1) cycle   
         
         ! momentum stress:
@@ -438,16 +428,12 @@ subroutine cavity_ice_clean_vel(ice, partit, mesh)
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     u_ice           => ice%uice(:)
     v_ice           => ice%vice(:)
     
     !___________________________________________________________________________
-    do node=1,myDim_nod2d+eDim_nod2d           
-        if(ulevels_nod2D(node)>1) then
+    do node=1,partit%myDim_nod2d+partit%eDim_nod2d           
+        if(mesh%ulevels_nod2D(node)>1) then
             U_ice(node)=0._WP
             V_ice(node)=0._WP
         endif
@@ -466,17 +452,13 @@ subroutine cavity_ice_clean_ma(ice, partit, mesh)
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     a_ice        => ice%data(1)%values(:)
     m_ice        => ice%data(2)%values(:)
     m_snow       => ice%data(3)%values(:)
     
     !___________________________________________________________________________
-    do node=1,myDim_nod2d+eDim_nod2d           
-        if(ulevels_nod2D(node)>1) then
+    do node=1,partit%myDim_nod2d+partit%eDim_nod2d           
+        if(mesh%ulevels_nod2D(node)>1) then
             m_ice(node) =0.0_WP
             m_snow(node)=0.0_WP
             a_ice(node) =0.0_WP
@@ -520,7 +502,7 @@ subroutine potit(salz,pt,pres,rfpres,tin)
     enddo
     write(6,*) ' WARNING!'
     write(6,*) ' in-situ temperature calculation has not converged.'
-    stop
+    error stop 'potit: in-situ temperature calculation has not converged'
     return
 end subroutine potit
 !

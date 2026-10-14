@@ -400,6 +400,7 @@ end subroutine compute_param
 subroutine compute_compart_groupvel(  &
                 nfbin               , &   
                 coriolis            , & 
+                coriol_gradx        , &
                 coriol_grady        , &
                 coslat              , &
                 cn                  , &
@@ -418,6 +419,7 @@ subroutine compute_compart_groupvel(  &
     type(idemix2_type), intent(in) , optional, target :: idemix2_const_userdef
     integer           , intent(in)                    :: nfbin
     real(cvmix_r8)    , intent(in)                    :: coriolis       , &
+                                                         coriol_gradx   , &
                                                          coriol_grady   , &
                                                          coslat         , &
                                                          cn             , &
@@ -474,7 +476,8 @@ subroutine compute_compart_groupvel(  &
     !        +-> this minus sign is from the -cos(phi)
     !
 
-    kdot_x = fxa2/omega_compart*cn_gradx
+    kdot_x =  cn/fxa/omega_compart * coriolis*coriol_gradx &
+             +fxa2/omega_compart*cn_gradx
     
     !___________________________________________________________________________
     !zonal, meridional and cross-spectral component of M2 internal tide group velocity

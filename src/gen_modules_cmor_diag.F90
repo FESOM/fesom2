@@ -63,6 +63,8 @@ module cmor_variables_diag
 
   ! Auxiliary arrays for tendency tracking
   ! FESOM 2 uses (level, nod2D) indexing
+  ! layer contents hnode*T and hnode*S of the previous call, so that the tendencies
+  ! include the change of the layer thickness (zlevel, zstar)
   real(kind=WP), save, allocatable :: previous_temp(:,:)  ! (nl-1, myDim_nod2D)
   real(kind=WP), save, allocatable :: previous_salt(:,:)  ! (nl-1, myDim_nod2D)
 
@@ -81,12 +83,8 @@ contains
     type(t_mesh),   intent(in),    target :: mesh
     integer :: n2, k, ierr
     real(kind=WP) :: volo_local
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
-    if (mype == 0) then
+    if (partit%mype == 0) then
         write(*,*) '____________________________________________________________'
         write(*,*) ' --> Initializing CMOR diagnostics for CMIP6/CMIP7'
     end if
@@ -96,34 +94,34 @@ contains
     ! Use areasvol which accounts for ice shelf cavities (uses bottom face area
     ! for first wet cell under cavity instead of top face)
     volo_local = 0.0_WP
-    do n2 = 1, myDim_nod2D
-       do k = ulevels_nod2D(n2), nlevels_nod2D(n2)-1
-          volo_local = volo_local + areasvol(k, n2) * hnode(k, n2)
+    do n2 = 1, partit%myDim_nod2D
+       do k = mesh%ulevels_nod2D(n2), mesh%nlevels_nod2D(n2)-1
+          volo_local = volo_local + mesh%areasvol(k, n2) * mesh%hnode(k, n2)
        end do
     end do
-    call MPI_AllREDUCE(volo_local, volo, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, ierr)
+    call MPI_AllREDUCE(volo_local, volo, 1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, ierr)
   
     ! Allocate 2D arrays (indexed by nod2D)
-    allocate(opottemptend(myDim_nod2D))
-    allocate(pbo(myDim_nod2D))
-    allocate(tos(myDim_nod2D))
-    allocate(sos(myDim_nod2D))
+    allocate(opottemptend(partit%myDim_nod2D))
+    allocate(pbo(partit%myDim_nod2D))
+    allocate(tos(partit%myDim_nod2D))
+    allocate(sos(partit%myDim_nod2D))
 
     ! Allocate new tendency and shortwave diagnostic arrays
-    allocate(osalttend(myDim_nod2D))
-    allocate(opottemprmadvect(myDim_nod2D))
-    allocate(opottempdiff(myDim_nod2D))
-    allocate(osaltrmadvect(myDim_nod2D))
-    allocate(osaltdiff(myDim_nod2D))
-    allocate(rsdoabsorb(nl-1, myDim_nod2D))
+    allocate(osalttend(partit%myDim_nod2D))
+    allocate(opottemprmadvect(partit%myDim_nod2D))
+    allocate(opottempdiff(partit%myDim_nod2D))
+    allocate(osaltrmadvect(partit%myDim_nod2D))
+    allocate(osaltdiff(partit%myDim_nod2D))
+    allocate(rsdoabsorb(mesh%nl-1, partit%myDim_nod2D))
 
     ! Allocate previous tracer arrays (level, nod2D)
-    allocate(previous_temp(nl-1, myDim_nod2D))
-    allocate(previous_salt(nl-1, myDim_nod2D))
+    allocate(previous_temp(mesh%nl-1, partit%myDim_nod2D))
+    allocate(previous_salt(mesh%nl-1, partit%myDim_nod2D))
 
     ! Allocate advection snapshot arrays
-    allocate(cmor_del_ttf_adv_temp(nl-1, myDim_nod2D))
-    allocate(cmor_del_ttf_adv_salt(nl-1, myDim_nod2D))
+    allocate(cmor_del_ttf_adv_temp(mesh%nl-1, partit%myDim_nod2D))
+    allocate(cmor_del_ttf_adv_salt(mesh%nl-1, partit%myDim_nod2D))
 
     opottemptend = 0.0_WP
     pbo = 0.0_WP
@@ -153,7 +151,7 @@ contains
     initialized = .true.
     first_call = .true.
     
-    if (mype == 0) then
+    if (partit%mype == 0) then
         write(*,*) '    Global ocean volume = ', volo, ' m^3'
         write(*,*) '    CMOR diagnostics initialized'
     end if
@@ -178,10 +176,6 @@ contains
     real(kind=WP), dimension(:,:), pointer :: temp, salt
     real(kind=WP), dimension(:),   pointer :: eta_n
     
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
     if (.not. initialized) call init_cmor_diag(partit, mesh)
     
@@ -192,10 +186,10 @@ contains
     
     ! Initialize previous tracer arrays on first call
     if (first_call) then
-        do n2 = 1, myDim_nod2D
-            do k = ulevels_nod2D(n2), nlevels_nod2D(n2)-1
-                previous_temp(k, n2) = temp(k, n2)
-                previous_salt(k, n2) = salt(k, n2)
+        do n2 = 1, partit%myDim_nod2D
+            do k = mesh%ulevels_nod2D(n2), mesh%nlevels_nod2D(n2)-1
+                previous_temp(k, n2) = temp(k, n2) * mesh%hnode(k, n2)
+                previous_salt(k, n2) = salt(k, n2) * mesh%hnode(k, n2)
             end do
         end do
         first_call = .false.
@@ -212,18 +206,20 @@ contains
     ! Compute bottom pressure and temperature tendency
     ! FESOM 2: loop over 2D nodes, then levels
     !=================================================================
-    do n2 = 1, myDim_nod2D
-        ku = ulevels_nod2D(n2)  ! Upper level (surface or cavity)
-        kl = nlevels_nod2D(n2)  ! Bottom level + 1
+    do n2 = 1, partit%myDim_nod2D
+        ku = mesh%ulevels_nod2D(n2)  ! Upper level (surface or cavity)
+        kl = mesh%nlevels_nod2D(n2)  ! Bottom level + 1
         
-        ! Bottom pressure: SSH contribution
-        pbo(n2) = eta_n(n2) * density_0 * g
+        ! Bottom pressure: SSH contribution. With zlevel and zstar the layer
+        ! thicknesses below already contain the surface elevation, except under
+        ! ice-shelf cavities, where they are fixed.
+        if (trim(which_ALE)=='linfs' .or. ku>1) pbo(n2) = eta_n(n2) * density_0 * g
         
         ! Loop through water column levels
-        z_up = zbar_3d_n(ku, n2)  ! Top of first layer
+        z_up = mesh%zbar_3d_n(ku, n2)  ! Top of first layer
         
         do k = ku, kl-1
-            z_lo = zbar_3d_n(k+1, n2)  ! Bottom of current layer
+            z_lo = mesh%zbar_3d_n(k+1, n2)  ! Bottom of current layer
             dz = abs(z_up - z_lo)
             
             ! Use density_m_rho0 if available, else use density_0
@@ -236,14 +232,14 @@ contains
             ! Bottom pressure: steric contribution (accumulate through column)
             pbo(n2) = pbo(n2) + g * dz * dens_val
             
-            ! Temperature tendency: dT/dt * rho * Cp * dz
+            ! Temperature tendency: d(T*dz)/dt * rho * Cp
             ! Tendency is expressed as rate of change of heat content per unit area
             opottemptend(n2) = opottemptend(n2) + &
-                (temp(k, n2) - previous_temp(k, n2)) / dt * vcpw * hnode(k, n2)
+                (temp(k, n2) * mesh%hnode(k, n2) - previous_temp(k, n2)) / dt * vcpw
 
-            ! Salinity tendency: dS/dt * dz [psu*m/s]
+            ! Salinity tendency: d(S*dz)/dt [psu*m/s]
             osalttend(n2) = osalttend(n2) + &
-                (salt(k, n2) - previous_salt(k, n2)) / dt * hnode(k, n2)
+                (salt(k, n2) * mesh%hnode(k, n2) - previous_salt(k, n2)) / dt
 
             ! Advection tendency from saved del_ttf snapshots
             ! del_ttf_adv has units [tracer*m], divide by dt to get [tracer*m/s]
@@ -262,7 +258,7 @@ contains
     !=================================================================
     ! Diffusion tendency = total tendency - advection tendency
     !=================================================================
-    do n2 = 1, myDim_nod2D
+    do n2 = 1, partit%myDim_nod2D
         opottempdiff(n2) = opottemptend(n2) - opottemprmadvect(n2)
         osaltdiff(n2) = osalttend(n2) - osaltrmadvect(n2)
     end do
@@ -272,30 +268,37 @@ contains
     ! sw_3d is temperature flux at level interfaces [K*m/s]
     ! Absorption in layer k = (sw_3d(k) - sw_3d(k+1)) * vcpw [W/m^2]
     !=================================================================
+    ! sw_3d is only allocated with shortwave penetration (use_sw_pene)
     rsdoabsorb = 0.0_WP
-    do n2 = 1, myDim_nod2D
-        ku = ulevels_nod2D(n2)
-        kl = nlevels_nod2D(n2)
-        do k = ku, kl-1
-            rsdoabsorb(k, n2) = (sw_3d(k, n2) - sw_3d(k+1, n2)) * vcpw
+    if (allocated(sw_3d)) then
+        do n2 = 1, partit%myDim_nod2D
+            ku = mesh%ulevels_nod2D(n2)
+            kl = mesh%nlevels_nod2D(n2)
+            do k = ku, kl-1
+                rsdoabsorb(k, n2) = (sw_3d(k, n2) - sw_3d(k+1, n2)) * vcpw
+            end do
         end do
-    end do
+    end if
     
     !=================================================================
     ! Compute global mean salinity and temperature
     ! Volume-weighted average over all levels
     ! Use areasvol for proper cavity handling
     !=================================================================
+    ! volo is recomputed with the current layer thicknesses, like the numerators
     soga = 0.0_WP
     thetaoga = 0.0_WP
-    do n2 = 1, myDim_nod2D
-        do k = ulevels_nod2D(n2), nlevels_nod2D(n2)-1
-            soga = soga + salt(k, n2) * areasvol(k, n2) * hnode(k, n2)
-            thetaoga = thetaoga + temp(k, n2) * areasvol(k, n2) * hnode(k, n2)
+    volo = 0.0_WP
+    do n2 = 1, partit%myDim_nod2D
+        do k = mesh%ulevels_nod2D(n2), mesh%nlevels_nod2D(n2)-1
+            soga = soga + salt(k, n2) * mesh%areasvol(k, n2) * mesh%hnode(k, n2)
+            thetaoga = thetaoga + temp(k, n2) * mesh%areasvol(k, n2) * mesh%hnode(k, n2)
+            volo = volo + mesh%areasvol(k, n2) * mesh%hnode(k, n2)
         end do
     end do
-    call MPI_AllREDUCE(MPI_IN_PLACE, soga, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, ierr)
-    call MPI_AllREDUCE(MPI_IN_PLACE, thetaoga, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, ierr)
+    call MPI_AllREDUCE(MPI_IN_PLACE, volo, 1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, ierr)
+    call MPI_AllREDUCE(MPI_IN_PLACE, soga, 1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, ierr)
+    call MPI_AllREDUCE(MPI_IN_PLACE, thetaoga, 1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, ierr)
     soga = soga / volo
     thetaoga = thetaoga / volo
   
@@ -303,8 +306,8 @@ contains
     ! Compute sea surface temperature and salinity
     ! Use uppermost wet level for each node
     !=================================================================
-    do n2 = 1, myDim_nod2D
-        k = ulevels_nod2D(n2)  ! Surface level (or first wet level in cavity)
+    do n2 = 1, partit%myDim_nod2D
+        k = mesh%ulevels_nod2D(n2)  ! Surface level (or first wet level in cavity)
         tos(n2) = temp(k, n2)
         sos(n2) = salt(k, n2)
     end do
@@ -319,30 +322,31 @@ contains
     sivoln = 0.0_WP
     sivols = 0.0_WP
     
-    do n2 = 1, myDim_nod2D
-        if (coord_nod2D(2, n2) > 0.0_WP) then
+    do n2 = 1, partit%myDim_nod2D
+        ! geographical latitude; coord_nod2D is on the rotated grid
+        if (mesh%geo_coord_nod2D(2, n2) > 0.0_WP) then
             ! Northern hemisphere
-            siarean = siarean + ice%data(1)%values(n2) * area(1, n2)
+            siarean = siarean + ice%data(1)%values(n2) * mesh%area(1, n2)
             if (ice%data(1)%values(n2) >= 0.15_WP) then
-                siextentn = siextentn + area(1, n2)
+                siextentn = siextentn + mesh%area(1, n2)
             end if
-            sivoln = sivoln + ice%data(2)%values(n2) * area(1, n2)
+            sivoln = sivoln + ice%data(2)%values(n2) * mesh%area(1, n2)
         else
             ! Southern hemisphere
-            siareas = siareas + ice%data(1)%values(n2) * area(1, n2)
+            siareas = siareas + ice%data(1)%values(n2) * mesh%area(1, n2)
             if (ice%data(1)%values(n2) >= 0.15_WP) then
-                siextents = siextents + area(1, n2)
+                siextents = siextents + mesh%area(1, n2)
             end if
-            sivols = sivols + ice%data(2)%values(n2) * area(1, n2)
+            sivols = sivols + ice%data(2)%values(n2) * mesh%area(1, n2)
         end if
     end do
     
-    call MPI_AllREDUCE(MPI_IN_PLACE, siarean, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, ierr)
-    call MPI_AllREDUCE(MPI_IN_PLACE, siareas, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, ierr)
-    call MPI_AllREDUCE(MPI_IN_PLACE, siextentn, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, ierr)
-    call MPI_AllREDUCE(MPI_IN_PLACE, siextents, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, ierr)
-    call MPI_AllREDUCE(MPI_IN_PLACE, sivoln, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, ierr)
-    call MPI_AllREDUCE(MPI_IN_PLACE, sivols, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, ierr)
+    call MPI_AllREDUCE(MPI_IN_PLACE, siarean, 1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, ierr)
+    call MPI_AllREDUCE(MPI_IN_PLACE, siareas, 1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, ierr)
+    call MPI_AllREDUCE(MPI_IN_PLACE, siextentn, 1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, ierr)
+    call MPI_AllREDUCE(MPI_IN_PLACE, siextents, 1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, ierr)
+    call MPI_AllREDUCE(MPI_IN_PLACE, sivoln, 1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, ierr)
+    call MPI_AllREDUCE(MPI_IN_PLACE, sivols, 1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, ierr)
     
     ! Convert to proper units
     siarean = siarean / 1.0e12_WP      ! to 10^12 m^2
@@ -380,10 +384,10 @@ contains
     sivols    = sivols_acc    / n_cmor_acc
 
     ! Update previous tracer values for next time step
-    do n2 = 1, myDim_nod2D
-        do k = ulevels_nod2D(n2), nlevels_nod2D(n2)-1
-            previous_temp(k, n2) = temp(k, n2)
-            previous_salt(k, n2) = salt(k, n2)
+    do n2 = 1, partit%myDim_nod2D
+        do k = mesh%ulevels_nod2D(n2), mesh%nlevels_nod2D(n2)-1
+            previous_temp(k, n2) = temp(k, n2) * mesh%hnode(k, n2)
+            previous_salt(k, n2) = salt(k, n2) * mesh%hnode(k, n2)
         end do
     end do
 
@@ -397,7 +401,7 @@ contains
   subroutine save_cmor_advection(tr_num, del_ttf, local_nod2D, nlev)
     implicit none
     integer, intent(in) :: tr_num, local_nod2D, nlev
-    real(kind=WP), intent(in) :: del_ttf(nlev, local_nod2D)
+    real(kind=WP_full), intent(in) :: del_ttf(nlev, local_nod2D)
 
     if (.not. initialized) return
 

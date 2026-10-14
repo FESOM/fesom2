@@ -73,10 +73,6 @@ subroutine mle_add_gamma(partit, mesh)
     real(kind=WP) :: sigbar(2)
     real(kind=WP) :: zbar_n(mesh%nl), gcol(2, mesh%nl)
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
     if (.not. use_mle) return
     ! With GM off nothing else fills fer_gamma, so it has to start clean each step.
@@ -91,9 +87,9 @@ subroutine mle_add_gamma(partit, mesh)
 !$OMP                                     umax, ztop, zspan, nzmin_s, nzmax_s, &
 !$OMP                                     n2bar, nml, lfront, &
 !$OMP                                     sigbar, zbar_n, gcol)
-    DO n=1, myDim_nod2D
-        nzmin = ulevels_nod2D(n)
-        nzmax = nlevels_nod2D(n)
+    DO n=1, partit%myDim_nod2D
+        nzmin = mesh%ulevels_nod2D(n)
+        nzmax = mesh%nlevels_nod2D(n)
         if (nzmax - nzmin < 3) cycle
 
         !_______________________________________________________________________
@@ -101,14 +97,14 @@ subroutine mle_add_gamma(partit, mesh)
         ! hnode_new exactly as fer_solve_Gamma does so the two stay consistent
         zbar_n(nzmin) = 0.0_WP
         do nz = nzmin, nzmax-1
-            zbar_n(nz+1) = zbar_n(nz) + hnode_new(nz,n)
+            zbar_n(nz+1) = zbar_n(nz) + mesh%hnode_new(nz,n)
         end do
 
         !_______________________________________________________________________
         ! Level range every element containing this node has, as in fer_solve_Gamma.
         ! Required for the bolus transport to integrate to zero; see the header.
-        nzmin_s = ulevels_nod2D_max(n)
-        nzmax_s = nlevels_nod2D_min(n)
+        nzmin_s = mesh%ulevels_nod2D_max(n)
+        nzmax_s = mesh%nlevels_nod2D_min(n)
         if (nzmax_s - nzmin_s < 3) cycle
 
         !_______________________________________________________________________
@@ -148,7 +144,7 @@ subroutine mle_add_gamma(partit, mesh)
         fdenom = sqrt(mesh%coriolis_node(n)**2 + 1.0_WP/(mle_tau*mle_tau))
         nml    = sqrt(max(n2bar, 0.0_WP))
         lfront = max(nml*zspan/fdenom, mle_Lf_min)
-        dxlf   = min(mesh_resolution(n)/lfront, mle_resscale_max)
+        dxlf   = min(mesh%mesh_resolution(n)/lfront, mle_resscale_max)
         prefac = mle_Ce * dxlf * zspan*zspan / fdenom
 
         !_______________________________________________________________________
@@ -170,7 +166,7 @@ subroutine mle_add_gamma(partit, mesh)
         ! whole column, so mu(z) is not distorted.
         umax = 0.0_WP
         do nz = nzmin_s, nzmax_s-1
-            thick = max(hnode_new(nz,n), 1.0_WP)
+            thick = max(real(mesh%hnode_new(nz,n), WP), 1.0_WP)
             umax  = max(umax, sqrt( (gcol(1,nz)-gcol(1,nz+1))**2 &
                                   + (gcol(2,nz)-gcol(2,nz+1))**2 ) / thick)
         end do

@@ -4,7 +4,7 @@
 module g_support
   USE MOD_MESH
   USE MOD_PARTIT
-  use par_support_module, only: par_ex
+  use par_support_module, only: par_abort
   use g_comm_auto
   use o_ARRAYS
   use g_config, only: dummy
@@ -66,29 +66,25 @@ subroutine smooth_nod2D(arr, N, partit, mesh)
   integer                                    :: node, elem, j, q, elnodes(3)
   real(kind=WP)                              :: vol
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
-  allocate(work_array(myDim_nod2D))
+  allocate(work_array(partit%myDim_nod2D))
   DO q=1, N !apply mass matrix N times to smooth the field
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, elem, j, q, elnodes, vol)
-     DO node=1, myDim_nod2D
+     DO node=1, partit%myDim_nod2D
         vol=0._WP
         work_array(node)=0._WP
-        DO j=1, nod_in_elem2D_num(node)
-           elem=nod_in_elem2D(j, node)
-           elnodes=elem2D_nodes(:,elem)
-           work_array(node)=work_array(node)+sum(arr(elnodes))/3._WP*elem_area(elem)
-           vol=vol+elem_area(elem)
+        DO j=1, mesh%nod_in_elem2D_num(node)
+           elem=mesh%nod_in_elem2D(j, node)
+           elnodes=mesh%elem2D_nodes(:,elem)
+           work_array(node)=work_array(node)+sum(arr(elnodes))/3._WP*mesh%elem_area(elem)
+           vol=vol+mesh%elem_area(elem)
         END DO
         work_array(node)=work_array(node)/vol
     END DO
 !$OMP END PARALLEL DO
 
 !$OMP PARALLEL DO
-    DO node=1,myDim_nod2D
+    DO node=1,partit%myDim_nod2D
        arr(node)=work_array(node)
     ENDDO
 !$OMP END PARALLEL DO
@@ -116,32 +112,28 @@ subroutine smooth_nod3D(arr, N_smooth, partit, mesh)
   real(kind=WP)                  :: vol(mesh%nl, partit%myDim_nod2D)
   real(kind=WP), allocatable     :: work_array(:,:)
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
   nlev=ubound(arr,1)
-  allocate(work_array(nlev,myDim_nod2D))
+  allocate(work_array(nlev,partit%myDim_nod2D))
 
 ! Precompute area of patches on all levels (at the bottom, some neighbouring
 ! nodes may vanish in the bathymetry) in the first smoothing step
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, q, el, nz, j, uln, nln, ule, nle)
 !$OMP DO
-  DO n=1, myDim_nod2D
-     uln = ulevels_nod2d(n)
-     nln = min(nlev,nlevels_nod2d(n))
+  DO n=1, partit%myDim_nod2D
+     uln = mesh%ulevels_nod2d(n)
+     nln = min(nlev,mesh%nlevels_nod2d(n))
      vol(       1:nln,n) = 0._WP
      work_array(1:nln,n) = 0._WP
-     DO j=1, nod_in_elem2D_num(n)
-        el = nod_in_elem2D(j,n)
-        ule = max( uln, ulevels(el) )
-        nle = min( nln, min(nlev,nlevels(el)) )
+     DO j=1, mesh%nod_in_elem2D_num(n)
+        el = mesh%nod_in_elem2D(j,n)
+        ule = max( uln, mesh%ulevels(el) )
+        nle = min( nln, min(nlev,mesh%nlevels(el)) )
         DO nz=ule, nle
-           vol(nz,n) = vol(nz,n) + elem_area(el)
-           work_array(nz,n) = work_array(nz,n) + elem_area(el) * (arr(nz, elem2D_nodes(1,el)) &
-                                                                + arr(nz, elem2D_nodes(2,el)) &
-                                                                + arr(nz, elem2D_nodes(3,el)))
+           vol(nz,n) = vol(nz,n) + mesh%elem_area(el)
+           work_array(nz,n) = work_array(nz,n) + mesh%elem_area(el) * (arr(nz, mesh%elem2D_nodes(1,el)) &
+                                                                + arr(nz, mesh%elem2D_nodes(2,el)) &
+                                                                + arr(nz, mesh%elem2D_nodes(3,el)))
         END DO
      ENDDO
      DO nz=uln,nln
@@ -151,9 +143,9 @@ subroutine smooth_nod3D(arr, N_smooth, partit, mesh)
 !$OMP END DO
   ! combined: scale by patch volume + copy back to original field
 !$OMP DO
-  DO n=1, myDim_nod2D
-     uln = ulevels_nod2d(n)
-     nln = min(nlev,nlevels_nod2d(n))
+  DO n=1, partit%myDim_nod2D
+     uln = mesh%ulevels_nod2d(n)
+     nln = min(nlev,mesh%nlevels_nod2d(n))
      DO nz=uln,nln
         arr(nz, n) = work_array(nz, n) *vol(nz,n) 
      END DO
@@ -167,28 +159,28 @@ subroutine smooth_nod3D(arr, N_smooth, partit, mesh)
 ! And the remaining smoothing sweeps
   DO q=1,N_smooth-1
 !$OMP DO
-     DO n=1, myDim_nod2D
-        uln = ulevels_nod2d(n)
-        nln = min(nlev,nlevels_nod2d(n))
+     DO n=1, partit%myDim_nod2D
+        uln = mesh%ulevels_nod2d(n)
+        nln = min(nlev,mesh%nlevels_nod2d(n))
         work_array(1:nln,n) = 0._WP
-        DO j=1,nod_in_elem2D_num(n)
-           el = nod_in_elem2D(j,n)
-           ule = max( uln, ulevels(el) )
-           nle = min( nln, min(nlev,nlevels(el)) )
+        DO j=1,mesh%nod_in_elem2D_num(n)
+           el = mesh%nod_in_elem2D(j,n)
+           ule = max( uln, mesh%ulevels(el) )
+           nle = min( nln, min(nlev,mesh%nlevels(el)) )
            DO nz=ule,nle
-              work_array(nz,n) = work_array(nz,n) + elem_area(el) * (arr(nz, elem2D_nodes(1,el)) &
-                                                                   + arr(nz, elem2D_nodes(2,el)) &
-                                                                   + arr(nz, elem2D_nodes(3,el)))
+              work_array(nz,n) = work_array(nz,n) + mesh%elem_area(el) * (arr(nz, mesh%elem2D_nodes(1,el)) &
+                                                                   + arr(nz, mesh%elem2D_nodes(2,el)) &
+                                                                   + arr(nz, mesh%elem2D_nodes(3,el)))
            END DO
         ENDDO
      ENDDO
 !$OMP END DO
 ! combined: scale by patch volume + copy back to original field
 !$OMP DO
-     DO n=1, myDim_nod2D
+     DO n=1, partit%myDim_nod2D
         !!PS DO nz=1, min(nlev, nlevels_nod2d(n))
-        uln = ulevels_nod2d(n)
-        nln = min(nlev,nlevels_nod2d(n))
+        uln = mesh%ulevels_nod2d(n)
+        nln = min(nlev,mesh%nlevels_nod2d(n))
         DO nz=uln,nln
            arr(nz, n) = work_array(nz, n) *vol(nz,n) 
         END DO
@@ -215,21 +207,17 @@ subroutine smooth_elem2D(arr, N, partit, mesh)
     real(KIND=WP), dimension(:), intent(inout) :: arr
     integer                                    :: node, elem, j, q, elnodes(3)
     real(kind=WP)                              :: vol
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h" 
-    allocate(work_array(myDim_nod2D+eDim_nod2D))
+    allocate(work_array(partit%myDim_nod2D+partit%eDim_nod2D))
     DO q=1, N !apply mass matrix N times to smooth the field
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, elem, j, q, elnodes, vol)
 !$OMP DO
-        DO node=1, myDim_nod2D
+        DO node=1, partit%myDim_nod2D
             vol=0._WP
             work_array(node)=0._WP
-            DO j=1, nod_in_elem2D_num(node)
-                elem=nod_in_elem2D(j, node)
-                work_array(node)=work_array(node)+arr(elem)*elem_area(elem)
-                vol=vol+elem_area(elem)
+            DO j=1, mesh%nod_in_elem2D_num(node)
+                elem=mesh%nod_in_elem2D(j, node)
+                work_array(node)=work_array(node)+arr(elem)*mesh%elem_area(elem)
+                vol=vol+mesh%elem_area(elem)
             END DO
             work_array(node)=work_array(node)/vol
         END DO
@@ -240,8 +228,8 @@ subroutine smooth_elem2D(arr, N, partit, mesh)
 !$OMP END MASTER
 !$OMP BARRIER
 !$OMP DO
-        DO elem=1, myDim_elem2D
-            elnodes=elem2D_nodes(:, elem)
+        DO elem=1, partit%myDim_elem2D
+            elnodes=mesh%elem2D_nodes(:, elem)
             arr(elem)=sum(work_array(elnodes))/3.0_WP  ! Here, we need the inverse and scale by 1/3
         ENDDO
 !$OMP END DO
@@ -265,35 +253,31 @@ subroutine smooth_elem3D(arr, N, partit, mesh)
     real(KIND=WP), dimension(:,:), intent(inout) :: arr
     integer                                      :: node, elem, my_nl, nz, j, q, elnodes(3)
     real(kind=WP)                                :: vol
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h" 
 
-    allocate(work_array(myDim_nod2D+eDim_nod2D))
+    allocate(work_array(partit%myDim_nod2D+partit%eDim_nod2D))
     
     my_nl=ubound(arr,1)
     DO q=1, N !apply mass matrix N times to smooth the field
         DO nz=1, my_nl
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, elem, j, q, elnodes, vol)
 !$OMP DO
-            DO node=1, myDim_nod2D+eDim_nod2D
+            DO node=1, partit%myDim_nod2D+partit%eDim_nod2D
                work_array(node) = 0.0_WP
             END DO
 !$OMP END DO
 !$OMP DO
-            DO node=1, myDim_nod2D
+            DO node=1, partit%myDim_nod2D
                 vol=0._WP
-                if (nz > nlevels_nod2d(node)) CYCLE
-                if (nz < ulevels_nod2D(node)    ) CYCLE
-                DO j=1, nod_in_elem2D_num(node)
-                    elem=nod_in_elem2D(j, node)
+                if (nz > mesh%nlevels_nod2d(node)) CYCLE
+                if (nz < mesh%ulevels_nod2D(node)    ) CYCLE
+                DO j=1, mesh%nod_in_elem2D_num(node)
+                    elem=mesh%nod_in_elem2D(j, node)
                     if (elem<=0) CYCLE
-                    if (nz>nlevels(elem)  ) CYCLE
-                    if (nz<ulevels(elem)) CYCLE
-                    elnodes=elem2D_nodes(:,elem)
-                    work_array(node)=work_array(node)+arr(nz, elem)*elem_area(elem)
-                    vol=vol+elem_area(elem)
+                    if (nz>mesh%nlevels(elem)  ) CYCLE
+                    if (nz<mesh%ulevels(elem)) CYCLE
+                    elnodes=mesh%elem2D_nodes(:,elem)
+                    work_array(node)=work_array(node)+arr(nz, elem)*mesh%elem_area(elem)
+                    vol=vol+mesh%elem_area(elem)
                 END DO
                 work_array(node)=work_array(node)/vol
             END DO
@@ -304,10 +288,10 @@ subroutine smooth_elem3D(arr, N, partit, mesh)
 !$OMP END MASTER
 !$OMP BARRIER
 !$OMP DO
-            DO elem=1, myDim_elem2D
-                if (nz>nlevels(elem)  ) CYCLE
-                if (nz<ulevels(elem)) CYCLE
-                elnodes=elem2D_nodes(:, elem)
+            DO elem=1, partit%myDim_elem2D
+                if (nz>mesh%nlevels(elem)  ) CYCLE
+                if (nz<mesh%ulevels(elem)) CYCLE
+                elnodes=mesh%elem2D_nodes(:, elem)
                 arr(nz, elem)=sum(work_array(elnodes))/3.0_WP
             ENDDO
 !$OMP END DO
@@ -324,7 +308,7 @@ end subroutine smooth_elem3D
 !
 subroutine integrate_nod_2D(data, int2D, partit, mesh)
   USE MOD_PARTIT
-  use par_support_module, only: par_ex
+  use par_support_module, only: par_abort
   use g_comm_auto
 
   IMPLICIT NONE
@@ -339,21 +323,17 @@ subroutine integrate_nod_2D(data, int2D, partit, mesh)
   ! grows like eps*sqrt(N), and the result is used to *balance* global fluxes to
   ! zero -- so any error here becomes a systematic net source, not noise.
   real(kind=WP_full) :: lval, gval
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h" 
 
 lval=0.0_WP_full
-  do row=1, myDim_nod2D
-     lval=lval+data(row)*areasvol(ulevels_nod2D(row),row)
+  do row=1, partit%myDim_nod2D
+     lval=lval+data(row)*mesh%areasvol(mesh%ulevels_nod2D(row),row)
   end do
   int2D=0.0_WP
   gval=0.0_WP_full
   ! reduce into a WP_full buffer and round once: MPI must not write a real64
   ! into the caller's real(WP) argument when WP is single precision.
   call MPI_AllREDUCE(lval, gval, 1, MPI_WP_FULL, MPI_SUM, &
-       MPI_COMM_FESOM, MPIerr)
+       partit%MPI_COMM_FESOM, partit%MPIerr)
   int2D=real(gval, WP)
 end subroutine integrate_nod_2D
 !
@@ -361,7 +341,7 @@ end subroutine integrate_nod_2D
 !
 subroutine integrate_nod_3D(data, int3D, partit, mesh)
   USE MOD_PARTIT
-  use par_support_module, only: par_ex
+  use par_support_module, only: par_abort
   use g_comm_auto
 
   IMPLICIT NONE
@@ -375,18 +355,15 @@ subroutine integrate_nod_3D(data, int3D, partit, mesh)
   ! they cannot degrade with WP.
   real(kind=WP_full) :: lval, gval
   real(kind=WP_full) :: lval_row
+  integer :: MPIerr
 
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h" 
 
   lval=0.0_WP_full
-  do row=1, myDim_nod2D
+  do row=1, partit%myDim_nod2D
      lval_row = 0.0_WP_full
-     do k=ulevels_nod2D(row), nlevels_nod2D(row)-1
-        lval_row=lval_row+data(k, row)*areasvol(k,row)*hnode_new(k,row)  ! --> TEST_cavity
+     do k=mesh%ulevels_nod2D(row), mesh%nlevels_nod2D(row)-1
+        lval_row=lval_row+data(k, row)*mesh%areasvol(k,row)*mesh%hnode_new(k,row)  ! --> TEST_cavity
      end do
      lval = lval + lval_row
   end do
@@ -396,7 +373,7 @@ subroutine integrate_nod_3D(data, int3D, partit, mesh)
   ! reduce into a WP_full buffer and round once: MPI must not write a real64
   ! into the caller's real(WP) argument when WP is single precision.
   call MPI_AllREDUCE(lval, gval, 1, MPI_WP_FULL, MPI_SUM, &
-       MPI_COMM_FESOM, MPIerr)
+       partit%MPI_COMM_FESOM, MPIerr)
   int3D=real(gval, WP)
 end subroutine integrate_nod_3D
 !
@@ -415,10 +392,6 @@ subroutine extrap_nod3D(arr, partit, mesh)
     real(kind=WP)                  :: loc_max, glob_max
     integer                        :: loc_sum, glob_sum, glob_sum_old
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     !___________________________________________________________________________
     ! The historical fill below is order- and DECOMPOSITION-dependent: nodes are
     ! filled in local-numbering order from already-filled neighbours (in-place
@@ -437,20 +410,20 @@ subroutine extrap_nod3D(arr, partit, mesh)
        call extrap_nod3D_det(arr, partit, mesh)
        return
     end if
-    allocate(work_array(myDim_nod2D+eDim_nod2D))
+    allocate(work_array(partit%myDim_nod2D+partit%eDim_nod2D))
     call exchange_nod(arr, partit)
     
     !___________________________________________________________________________
     loc_max=maxval(arr(1,:))
     glob_max=0._WP
-    call MPI_AllREDUCE(loc_max, glob_max, 1, MPI_WP, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+    call MPI_AllREDUCE(loc_max, glob_max, 1, MPI_WP, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
     glob_sum=-1
 
     !___________________________________________________________________________
     do while (glob_max>0.99_WP*dummy)  
         !_______________________________________________________________________
         ! extrapolate in horizontal direction
-        do nz=1, nl-1
+        do nz=1, mesh%nl-1
             work_array=arr(nz,:)
             success=.true.
             
@@ -461,24 +434,24 @@ subroutine extrap_nod3D(arr, partit, mesh)
                 
                 !_______________________________________________________________
                 ! loop over local vertices n 
-                do n=1, myDim_nod2D!+eDim_nod2D
+                do n=1, partit%myDim_nod2D!+eDim_nod2D
                     ! found node n that has to be extrapolated
-                    if ( (work_array(n)>0.99_WP*dummy) .and.  (nlevels_nod2D(n)>nz)) then
+                    if ( (work_array(n)>0.99_WP*dummy) .and.  (mesh%nlevels_nod2D(n)>nz)) then
                         cnt=0
                         val=0._WP
                         
                         !_______________________________________________________
                         ! loop over adjacent elements
-                        do k=1, nod_in_elem2D_num(n)
-                            el=nod_in_elem2D(k, n)
+                        do k=1, mesh%nod_in_elem2D_num(n)
+                            el=mesh%nod_in_elem2D(k, n)
                             
-                            if (nz>nlevels(el)) cycle
-                            enodes=elem2D_nodes(:, el)
+                            if (nz>mesh%nlevels(el)) cycle
+                            enodes=mesh%elem2D_nodes(:, el)
                             !___________________________________________________
                             ! loop over vertices of adjacent element 
                             do j=1, 3
                                 if (enodes(j)==0) cycle
-                                if ((work_array(enodes(j))<0.99_WP*dummy) .and. (nlevels_nod2D(enodes(j))>nz)) then
+                                if ((work_array(enodes(j))<0.99_WP*dummy) .and. (mesh%nlevels_nod2D(enodes(j))>nz)) then
                                     val=val+work_array(enodes(j))
                                     cnt=cnt+1              
                                 end if
@@ -507,14 +480,14 @@ subroutine extrap_nod3D(arr, partit, mesh)
         
         !_______________________________________________________________________
         loc_max=maxval(arr(1,:))
-        call MPI_AllREDUCE(loc_max, glob_max, 1, MPI_WP, MPI_MAX, MPI_COMM_FESOM, MPIerr)   
+        call MPI_AllREDUCE(loc_max, glob_max, 1, MPI_WP, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)   
         
     END DO ! -->  DO WHILE (glob_max>0.99_WP*dummy)  
     
     !___________________________________________________________________________
     ! extrapolate in vertical direction
-    do n=1, myDim_nod2D
-        nl1 = nlevels_nod2D(n)-1
+    do n=1, partit%myDim_nod2D
+        nl1 = mesh%nlevels_nod2D(n)-1
         !!PS DO nz=2, nl1
         !!PS  do nz=ulevels_nod2D(n)+1, nl1
         do nz=2, nl1
@@ -562,16 +535,12 @@ subroutine extrap_nod3D_det(arr, partit, mesh)
     integer                        :: relax_sweeps, relax_cap
     real(kind=WP)                  :: val, dmax, gdmax
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     !___________________________________________________________________________
-    nod_alloc = myDim_nod2D + eDim_nod2D
+    nod_alloc = partit%myDim_nod2D + partit%eDim_nod2D
     allocate(cur(nod_alloc), nxt(nod_alloc), filled(nod_alloc))
     relax_sweeps = 0
 
-    do nz = 1, nl-1
+    do nz = 1, mesh%nl-1
         cur(1:nod_alloc) = arr(nz, 1:nod_alloc)
         call exchange_nod(cur, partit)
         filled(:) = (cur(:) > 0.99_WP*dummy)     ! dummy at entry = to be filled
@@ -581,8 +550,8 @@ subroutine extrap_nod3D_det(arr, partit, mesh)
         do
             nxt(1:nod_alloc) = cur(1:nod_alloc)
             loc_prog = 0
-            do n = 1, myDim_nod2D
-                if ((cur(n) > 0.99_WP*dummy) .and. (nlevels_nod2D(n) > nz)) then
+            do n = 1, partit%myDim_nod2D
+                if ((cur(n) > 0.99_WP*dummy) .and. (mesh%nlevels_nod2D(n) > nz)) then
                     call det_ring_mean(n, nz, cur, val, cnt)
                     if (cnt > 0) then
                         nxt(n) = val
@@ -591,7 +560,7 @@ subroutine extrap_nod3D_det(arr, partit, mesh)
                 end if
             end do
             glob_prog = loc_prog
-            call MPI_AllREDUCE(loc_prog, glob_prog, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+            call MPI_AllREDUCE(loc_prog, glob_prog, 1, MPI_INTEGER, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
             if (glob_prog == 0) exit
             cur(1:nod_alloc) = nxt(1:nod_alloc)
             call exchange_nod(cur, partit)
@@ -609,8 +578,8 @@ subroutine extrap_nod3D_det(arr, partit, mesh)
         do
             nxt(1:nod_alloc) = cur(1:nod_alloc)
             dmax = 0._WP
-            do n = 1, myDim_nod2D
-                if (filled(n) .and. (nlevels_nod2D(n) > nz)) then
+            do n = 1, partit%myDim_nod2D
+                if (filled(n) .and. (mesh%nlevels_nod2D(n) > nz)) then
                     call det_ring_mean(n, nz, cur, val, cnt)
                     if (cnt > 0) then
                         nxt(n) = val
@@ -619,11 +588,11 @@ subroutine extrap_nod3D_det(arr, partit, mesh)
                 end if
             end do
             gdmax = dmax
-            call MPI_AllREDUCE(dmax, gdmax, 1, MPI_WP, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+            call MPI_AllREDUCE(dmax, gdmax, 1, MPI_WP, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
             if (gdmax <= ic_extrap_tol) exit
             relax_sweeps = relax_sweeps + 1
             if (relax_sweeps >= relax_cap) then
-                if (mype == 0) write(*,*) 'extrap_nod3D_det: relaxation sweep cap at level ', nz, &
+                if (partit%mype == 0) write(*,*) 'extrap_nod3D_det: relaxation sweep cap at level ', nz, &
                                           ' (max change ', gdmax, ') - proceeding'
                 exit
             end if
@@ -636,8 +605,8 @@ subroutine extrap_nod3D_det(arr, partit, mesh)
 
     !___________________________________________________________________________
     ! vertical fill - identical to the historical routine
-    do n = 1, myDim_nod2D
-        nl1 = nlevels_nod2D(n)-1
+    do n = 1, partit%myDim_nod2D
+        nl1 = mesh%nlevels_nod2D(n)-1
         do nz = 2, nl1
             if (arr(nz,n) > 0.99_WP*dummy) arr(nz,n) = arr(nz-1,n)
         end do
@@ -659,21 +628,21 @@ contains
         real(kind=WP), intent(out) :: val
         integer,       intent(out) :: cnt
         integer                    :: k, j, el, a, b, g
-        integer                    :: ngid(2*nod_in_elem2D_num(n))
-        real(kind=WP)              :: nval(2*nod_in_elem2D_num(n)), w
+        integer                    :: ngid(2*mesh%nod_in_elem2D_num(n))
+        real(kind=WP)              :: nval(2*mesh%nod_in_elem2D_num(n)), w
         integer                    :: enodes(3)
         cnt = 0
         val = 0._WP
-        do k = 1, nod_in_elem2D_num(n)
-            el = nod_in_elem2D(k, n)
-            if (nz > nlevels(el)) cycle
-            enodes = elem2D_nodes(:, el)
+        do k = 1, mesh%nod_in_elem2D_num(n)
+            el = mesh%nod_in_elem2D(k, n)
+            if (nz > mesh%nlevels(el)) cycle
+            enodes = mesh%elem2D_nodes(:, el)
             do j = 1, 3
                 if (enodes(j) == 0) cycle
                 if (enodes(j) == n) cycle
-                if ((layer(enodes(j)) < 0.99_WP*dummy) .and. (nlevels_nod2D(enodes(j)) > nz)) then
+                if ((layer(enodes(j)) < 0.99_WP*dummy) .and. (mesh%nlevels_nod2D(enodes(j)) > nz)) then
                     cnt = cnt + 1
-                    ngid(cnt) = myList_nod2D(enodes(j))
+                    ngid(cnt) = partit%myList_nod2D(enodes(j))
                     nval(cnt) = layer(enodes(j))
                 end if
             end do
@@ -745,7 +714,7 @@ FUNCTION omp_min_max_sum1(arr, pos1, pos2, what, partit, nan)
 
     CASE DEFAULT
        if (partit%mype==0) write(*,*) trim(what), ' is not implemented in omp_min_max_sum case!'
-       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+       call par_abort(partit%MPI_COMM_FESOM, partit%mype)
        STOP
   END SELECT
 
@@ -773,7 +742,9 @@ FUNCTION omp_min_max_sum2(arr, pos11, pos12, pos21, pos22, what, partit, nan)
   SELECT CASE (trim(what))
     CASE ('min')
       if (.not. present(nan)) vmasked=huge(vmasked) !just some crazy number
-      val=arr(1,1)
+      ! Only unmasked values inside the range can become the result; with
+      ! none, the result is the mask value. Same for 'max' below.
+      val=huge(val)
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j)
 !$OMP DO REDUCTION(min: val)
       do j=pos21, pos22
@@ -783,10 +754,11 @@ FUNCTION omp_min_max_sum2(arr, pos11, pos12, pos21, pos22, what, partit, nan)
       end do
 !$OMP END DO
 !$OMP END PARALLEL
+      if (val==huge(val)) val=vmasked
 
     CASE ('max')
       if (.not. present(nan)) vmasked=tiny(vmasked) !just some crazy number
-      val=arr(1,1)
+      val=-huge(val)
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j)
 !$OMP DO REDUCTION(max: val)
       do j=pos21, pos22
@@ -796,6 +768,7 @@ FUNCTION omp_min_max_sum2(arr, pos11, pos12, pos21, pos22, what, partit, nan)
       end do
 !$OMP END DO
 !$OMP END PARALLEL
+      if (val==-huge(val)) val=vmasked
 
     CASE ('sum')
       if (.not. present(nan)) vmasked=huge(vmasked) !just some crazy number
@@ -817,7 +790,7 @@ FUNCTION omp_min_max_sum2(arr, pos11, pos12, pos21, pos22, what, partit, nan)
 
    CASE DEFAULT
       if (partit%mype==0) write(*,*) trim(what), ' is not implemented in omp_min_max_sum case!'
-      call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+      call par_abort(partit%MPI_COMM_FESOM, partit%mype)
       STOP
    END SELECT
 
@@ -828,7 +801,7 @@ end function omp_min_max_sum2
 !
 subroutine integrate_elem_3D(data, int3D, partit, mesh)
   USE MOD_PARTIT
-  use par_support_module, only: par_ex
+  use par_support_module, only: par_abort
   use g_comm_auto
 
   IMPLICIT NONE
@@ -842,18 +815,15 @@ subroutine integrate_elem_3D(data, int3D, partit, mesh)
   ! they cannot degrade with WP.
   real(kind=WP_full) :: lval, gval
   real(kind=WP_full) :: lval_row
+  integer :: MPIerr
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h" 
 
   lval=0.0_WP_full
-  do row=1, myDim_elem2D
-     if(elem2D_nodes(1, row) > myDim_nod2D) cycle
+  do row=1, partit%myDim_elem2D
+     if(mesh%elem2D_nodes(1, row) > partit%myDim_nod2D) cycle
      lval_row = 0.0_WP_full
-     do k=ulevels(row), nlevels(row)-1
-        lval_row=lval_row+data(k, row)*elem_area(row)*helem(k,row)
+     do k=mesh%ulevels(row), mesh%nlevels(row)-1
+        lval_row=lval_row+data(k, row)*mesh%elem_area(row)*mesh%helem(k,row)
      end do
      lval = lval + lval_row
   end do
@@ -863,7 +833,7 @@ subroutine integrate_elem_3D(data, int3D, partit, mesh)
   ! reduce into a WP_full buffer and round once: MPI must not write a real64
   ! into the caller's real(WP) argument when WP is single precision.
   call MPI_AllREDUCE(lval, gval, 1, MPI_WP_FULL, MPI_SUM, &
-       MPI_COMM_FESOM, MPIerr)
+       partit%MPI_COMM_FESOM, MPIerr)
   int3D=real(gval, WP)
 end subroutine integrate_elem_3D
 !
@@ -871,7 +841,7 @@ end subroutine integrate_elem_3D
 !
 subroutine integrate_elem_2D(data, int2D, partit, mesh)
   USE MOD_PARTIT
-  use par_support_module, only: par_ex
+  use par_support_module, only: par_abort
   use g_comm_auto
 
   IMPLICIT NONE
@@ -884,16 +854,13 @@ subroutine integrate_elem_2D(data, int2D, partit, mesh)
   ! See the note in integrate_nod_2D: global integrals accumulate in WP_full so
   ! they cannot degrade with WP.
   real(kind=WP_full) :: lval, gval
+  integer :: MPIerr
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h" 
 
   lval=0.0_WP_full
-  do row=1, myDim_elem2D
-     if(elem2D_nodes(1, row) > myDim_nod2D) cycle
-     lval = lval + data(row)*elem_area(row)
+  do row=1, partit%myDim_elem2D
+     if(mesh%elem2D_nodes(1, row) > partit%myDim_nod2D) cycle
+     lval = lval + data(row)*mesh%elem_area(row)
   end do
 
   int2D=0.0_WP
@@ -901,7 +868,7 @@ subroutine integrate_elem_2D(data, int2D, partit, mesh)
   ! reduce into a WP_full buffer and round once: MPI must not write a real64
   ! into the caller's real(WP) argument when WP is single precision.
   call MPI_AllREDUCE(lval, gval, 1, MPI_WP_FULL, MPI_SUM, &
-       MPI_COMM_FESOM, MPIerr)
+       partit%MPI_COMM_FESOM, MPIerr)
   int2D=real(gval, WP)
 end subroutine integrate_elem_2D
 

@@ -18,7 +18,7 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
     use o_param
     USE MOD_MESH
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     use g_interp
     use netcdf
     implicit none
@@ -45,14 +45,10 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
     logical                               :: found_error=.False.
     integer                               :: ierror           ! return error code
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
     !___________________________________________________________________________
     ! open netcdf file, check existence
-    if (mype==0) then
+    if (partit%mype==0) then
         ! open file
         status=nf90_open(file, nf90_nowrite, ncid)
         if (status /= nf90_noerr) then
@@ -72,12 +68,12 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
     
     ! broadcast found_error variable to all other processes --> create kill signal
     ! for all processes
-    call MPI_BCast(found_error, 1, MPI_LOGICAL, 0, MPI_COMM_FESOM, ierror)
-    if (found_error) call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+    call MPI_BCast(found_error, 1, MPI_LOGICAL, 0, partit%MPI_COMM_FESOM, ierror)
+    if (found_error) call par_abort(partit%MPI_COMM_FESOM, partit%mype)
 
     !___________________________________________________________________________
     ! read dimensions from netcdf file, checkfor the naming of dimensions
-    if (mype==0) then
+    if (partit%mype==0) then
         ! lat
         status=nf90_inq_dimid(ncid, 'lat', latid)
         if (status == NF90_EBADDIM) then
@@ -114,17 +110,17 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
     end if
     ! broadcast found_error variable to all other processes --> create kill signal
     ! for all processes
-    call MPI_BCast(found_error, 1, MPI_LOGICAL, 0, MPI_COMM_FESOM, ierror)
-    if (found_error) call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+    call MPI_BCast(found_error, 1, MPI_LOGICAL, 0, partit%MPI_COMM_FESOM, ierror)
+    if (found_error) call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     
     ! broadcast len of lon/lat to all processes
-    call MPI_BCast(latlen, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-    call MPI_BCast(lonlen, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+    call MPI_BCast(latlen, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+    call MPI_BCast(lonlen, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
 
     !___________________________________________________________________________
     ! read latitude regular coordinates from netcdf file --> lat
     allocate(lat(latlen))
-    if (mype==0) then
+    if (partit%mype==0) then
         status=nf90_inq_varid(ncid, 'lat', varid)
         if (status == NF90_ENOTVAR) then
             print *, achar(27)//'[33m'
@@ -143,16 +139,16 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
     end if
     ! broadcast found_error variable to all other processes --> create kill signal
     ! for all processes
-    call MPI_BCast(found_error, 1, MPI_LOGICAL, 0, MPI_COMM_FESOM, ierror)
-    if (found_error) call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+    call MPI_BCast(found_error, 1, MPI_LOGICAL, 0, partit%MPI_COMM_FESOM, ierror)
+    if (found_error) call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     
     ! broadcast latitude array to all processes
-    call MPI_BCast(lat, latlen, MPI_WP, 0, MPI_COMM_FESOM, ierror)  
+    call MPI_BCast(lat, latlen, MPI_WP, 0, partit%MPI_COMM_FESOM, ierror)  
 
     !___________________________________________________________________________
     ! read longitude regular coordinates from netcdf file --> lat
     allocate(lon(lonlen))
-    if (mype==0) then
+    if (partit%mype==0) then
         status=nf90_inq_varid(ncid, 'lon', varid)
         if (status == NF90_ENOTVAR) then
             print *, achar(27)//'[33m'
@@ -171,11 +167,11 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
     end if
     ! broadcast found_error variable to all other processes --> create kill signal
     ! for all processes
-    call MPI_BCast(found_error, 1, MPI_LOGICAL, 0, MPI_COMM_FESOM, ierror)
-    if (found_error) call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+    call MPI_BCast(found_error, 1, MPI_LOGICAL, 0, partit%MPI_COMM_FESOM, ierror)
+    if (found_error) call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     
     ! broadcast longitude array to all processes
-    call MPI_BCast(lon, lonlen, MPI_WP, 0, MPI_COMM_FESOM, ierror)  
+    call MPI_BCast(lon, lonlen, MPI_WP, 0, partit%MPI_COMM_FESOM, ierror)  
 
     ! make sure range 0. - 360.
     do n=1,lonlen
@@ -188,7 +184,7 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
     ! read the 2d data --> check if variable name does exist
     allocate(ncdata(lonlen,latlen), ncdata_temp(lonlen,latlen))
     ncdata = 0.0_WP
-    if (mype==0) then
+    if (partit%mype==0) then
         ! data
         status=nf90_inq_varid(ncid, vari, varid)
         if (status == NF90_ENOTVAR) then
@@ -203,7 +199,7 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
             print *, achar(27)//'[0m'
             write(*,*)
             found_error = .True.
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
         end if
         istart= (/1,1,itime/)
         icount= (/lonlen,latlen,1/)
@@ -219,12 +215,12 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
     end if
     ! broadcast found_error variable to all other processes --> create kill signal
     ! for all processes
-    call MPI_BCast(found_error, 1, MPI_LOGICAL, 0, MPI_COMM_FESOM, ierror)
-    if (found_error) call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+    call MPI_BCast(found_error, 1, MPI_LOGICAL, 0, partit%MPI_COMM_FESOM, ierror)
+    if (found_error) call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     
     ! broadcast 2d data array to all processes
-    call MPI_BCast(ncdata, lonlen*latlen, MPI_WP, 0, MPI_COMM_FESOM, ierror)
-    call MPI_BCast(miss  ,             1, MPI_WP, 0, MPI_COMM_FESOM, ierror)
+    call MPI_BCast(ncdata, lonlen*latlen, MPI_WP, 0, partit%MPI_COMM_FESOM, ierror)
+    call MPI_BCast(miss  ,             1, MPI_WP, 0, partit%MPI_COMM_FESOM, ierror)
     
     ncdata_temp=ncdata
     do i=1,lonlen
@@ -271,20 +267,20 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
         num=size(model_2Darray,1)
         allocate(temp_x(num), temp_y(num))  
         do n=1, num
-            temp_x(n)=geo_coord_nod2d(1,n)/rad              
-            temp_y(n)=geo_coord_nod2d(2,n)/rad             
+            temp_x(n)=mesh%geo_coord_nod2d(1,n)/rad              
+            temp_y(n)=mesh%geo_coord_nod2d(2,n)/rad             
             ! change lon range to [0 360]
             if(temp_x(n)<0._WP) temp_x(n)=temp_x(n) + 360.0_WP  
         end do
         
     ! do data interpolation on element centroids
     else
-        num = myDim_elem2D
+        num = partit%myDim_elem2D
         allocate(temp_x(num), temp_y(num))  
         do n=1, num
             ! compute points of element centroids in geo frame use them here for interpolation
-            elnodes  = elem2D_nodes(:,n)
-            elnodes_x= geo_coord_nod2D(1, elnodes)
+            elnodes  = mesh%elem2D_nodes(:,n)
+            elnodes_x= mesh%geo_coord_nod2D(1, elnodes)
             xmin     = minval(elnodes_x)
             do k=1,3
                 if(elnodes_x(k)-xmin>=cyclic_length/2.0_WP) elnodes_x(k)=elnodes_x(k)-cyclic_length
@@ -292,7 +288,7 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
             end do
             ! compute in units [deg], in geo frame
             temp_x(n)=sum(elnodes_x)/3.0_WP/rad
-            temp_y(n)=sum(geo_coord_nod2D(2,elnodes))/3.0_WP/rad
+            temp_y(n)=sum(mesh%geo_coord_nod2D(2,elnodes))/3.0_WP/rad
             
             ! change lon range to [0 360]
             if(temp_x(n)<0._WP) temp_x(n)=temp_x(n) + 360.0_WP  
@@ -324,7 +320,7 @@ subroutine read_other_NetCDF_3d(file, vname, zvname, model_3Darray, do_onvert, p
     use o_param
     USE MOD_MESH
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     use g_interp
     use netcdf
     implicit none
@@ -350,14 +346,10 @@ subroutine read_other_NetCDF_3d(file, vname, zvname, model_3Darray, do_onvert, p
     logical                               :: found_error=.False.
     integer                               :: ierror           ! return error code
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
     !___________________________________________________________________________
     ! open netcdf file, check existence
-    if (mype==0) then
+    if (partit%mype==0) then
         ! open file
         status=nf90_open(file, nf90_nowrite, ncid)
         if (status /= nf90_noerr) then
@@ -377,12 +369,12 @@ subroutine read_other_NetCDF_3d(file, vname, zvname, model_3Darray, do_onvert, p
     
     ! broadcast found_error variable to all other processes --> create kill signal
     ! for all processes
-    call MPI_BCast(found_error, 1, MPI_LOGICAL, 0, MPI_COMM_FESOM, ierror)
-    if (found_error) call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+    call MPI_BCast(found_error, 1, MPI_LOGICAL, 0, partit%MPI_COMM_FESOM, ierror)
+    if (found_error) call par_abort(partit%MPI_COMM_FESOM, partit%mype)
 
     !___________________________________________________________________________
     ! read dimensions from netcdf file, checkfor the naming of dimensions
-    if (mype==0) then
+    if (partit%mype==0) then
         ! lat
         status=nf90_inq_dimid(ncid, 'lat', latid)
         if (status == NF90_EBADDIM) then
@@ -436,18 +428,18 @@ subroutine read_other_NetCDF_3d(file, vname, zvname, model_3Darray, do_onvert, p
     end if
     ! broadcast found_error variable to all other processes --> create kill signal
     ! for all processes
-    call MPI_BCast(found_error, 1, MPI_LOGICAL, 0, MPI_COMM_FESOM, ierror)
-    if (found_error) call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+    call MPI_BCast(found_error, 1, MPI_LOGICAL, 0, partit%MPI_COMM_FESOM, ierror)
+    if (found_error) call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     
     ! broadcast len of lon/lat to all processes
-    call MPI_BCast(latlen, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-    call MPI_BCast(lonlen, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-    call MPI_BCast(zlen  , 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+    call MPI_BCast(latlen, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+    call MPI_BCast(lonlen, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+    call MPI_BCast(zlen  , 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
 
     !___________________________________________________________________________
     ! read latitude regular coordinates from netcdf file --> lat
     allocate(lat(latlen))
-    if (mype==0) then
+    if (partit%mype==0) then
         status=nf90_inq_varid(ncid, 'lat', varid)
         if (status == NF90_ENOTVAR) then
             print *, achar(27)//'[33m'
@@ -466,16 +458,16 @@ subroutine read_other_NetCDF_3d(file, vname, zvname, model_3Darray, do_onvert, p
     end if
     ! broadcast found_error variable to all other processes --> create kill signal
     ! for all processes
-    call MPI_BCast(found_error, 1, MPI_LOGICAL, 0, MPI_COMM_FESOM, ierror)
-    if (found_error) call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+    call MPI_BCast(found_error, 1, MPI_LOGICAL, 0, partit%MPI_COMM_FESOM, ierror)
+    if (found_error) call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     
     ! broadcast latitude array to all processes
-    call MPI_BCast(lat, latlen, MPI_WP, 0, MPI_COMM_FESOM, ierror)  
+    call MPI_BCast(lat, latlen, MPI_WP, 0, partit%MPI_COMM_FESOM, ierror)  
 
     !___________________________________________________________________________
     ! read longitude regular coordinates from netcdf file --> lat
     allocate(lon(lonlen))
-    if (mype==0) then
+    if (partit%mype==0) then
         status=nf90_inq_varid(ncid, 'lon', varid)
         if (status == NF90_ENOTVAR) then
             print *, achar(27)//'[33m'
@@ -494,11 +486,11 @@ subroutine read_other_NetCDF_3d(file, vname, zvname, model_3Darray, do_onvert, p
     end if
     ! broadcast found_error variable to all other processes --> create kill signal
     ! for all processes
-    call MPI_BCast(found_error, 1, MPI_LOGICAL, 0, MPI_COMM_FESOM, ierror)
-    if (found_error) call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+    call MPI_BCast(found_error, 1, MPI_LOGICAL, 0, partit%MPI_COMM_FESOM, ierror)
+    if (found_error) call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     
     ! broadcast longitude array to all processes
-    call MPI_BCast(lon, lonlen, MPI_WP, 0, MPI_COMM_FESOM, ierror)  
+    call MPI_BCast(lon, lonlen, MPI_WP, 0, partit%MPI_COMM_FESOM, ierror)  
 
     ! make sure range 0. - 360.
     do n=1,lonlen
@@ -530,7 +522,7 @@ subroutine read_other_NetCDF_3d(file, vname, zvname, model_3Darray, do_onvert, p
 !     ! broadcast found_error variable to all other processes --> create kill signal
 !     ! for all processes
 !     call MPI_BCast(found_error, 1, MPI_LOGICAL, 0, MPI_COMM_FESOM, ierror)
-!     if (found_error) call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+!     if (found_error) call par_abort(partit%MPI_COMM_FESOM, partit%mype)
 !     
 !     ! broadcast longitude array to all processes
 !     call MPI_BCast(z, zlen, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)  
@@ -539,7 +531,7 @@ subroutine read_other_NetCDF_3d(file, vname, zvname, model_3Darray, do_onvert, p
     ! read the 3d data --> check if variable name does exist
     allocate(ncdata(lonlen, latlen, zlen))
     ncdata = 0.0_WP
-    if (mype==0) then
+    if (partit%mype==0) then
         ! data
         status=nf90_inq_varid(ncid, vname, varid)
         if (status == NF90_ENOTVAR) then
@@ -567,19 +559,19 @@ subroutine read_other_NetCDF_3d(file, vname, zvname, model_3Darray, do_onvert, p
     end if
     ! broadcast found_error variable to all other processes --> create kill signal
     ! for all processes
-    call MPI_BCast(found_error, 1, MPI_LOGICAL, 0, MPI_COMM_FESOM, ierror)
-    if (found_error) call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+    call MPI_BCast(found_error, 1, MPI_LOGICAL, 0, partit%MPI_COMM_FESOM, ierror)
+    if (found_error) call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     
     ! broadcast 2d data array to all processes
-    call MPI_BCast(ncdata   , lonlen*latlen*zlen, MPI_WP, 0, MPI_COMM_FESOM, ierror)
-    call MPI_BCast(missvalue,                  1, MPI_WP, 0, MPI_COMM_FESOM, ierror)
+    call MPI_BCast(ncdata   , lonlen*latlen*zlen, MPI_WP, 0, partit%MPI_COMM_FESOM, ierror)
+    call MPI_BCast(missvalue,                  1, MPI_WP, 0, partit%MPI_COMM_FESOM, ierror)
     
     !___________________________________________________________________________
     ! size of input array should be 3d (nz, myDim_elem2D) or (nz, myDim_nod2D)
     found_error = .False.
     nz = size(model_3Darray,1)
     if (nz /= zlen) then 
-        if (mype==0) then
+        if (partit%mype==0) then
             print *, achar(27)//'[33m'
             write(*,*) '____________________________________________________________________'
             write(*,*) ' ERROR: length of zdimension in file does not agree with len of zdim in model'
@@ -591,29 +583,29 @@ subroutine read_other_NetCDF_3d(file, vname, zvname, model_3Darray, do_onvert, p
     end if 
     ! broadcast found_error variable to all other processes --> create kill signal
     ! for all processes
-    call MPI_BCast(found_error, 1, MPI_LOGICAL, 0, MPI_COMM_FESOM, ierror)
-    if (found_error) call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+    call MPI_BCast(found_error, 1, MPI_LOGICAL, 0, partit%MPI_COMM_FESOM, ierror)
+    if (found_error) call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     
     ! create interpolation coordinates
     ! do data interpolation on vertices
     if (do_onvert) then
-        num=myDim_nod2d+eDim_nod2d
+        num=partit%myDim_nod2d+partit%eDim_nod2d
         allocate(temp_x(num), temp_y(num))  
         do n=1, num
-            temp_x(n)=geo_coord_nod2d(1,n)/rad              
-            temp_y(n)=geo_coord_nod2d(2,n)/rad             
+            temp_x(n)=mesh%geo_coord_nod2d(1,n)/rad              
+            temp_y(n)=mesh%geo_coord_nod2d(2,n)/rad             
             ! change lon range to [0 360]
             if(temp_x(n)<0._WP) temp_x(n)=temp_x(n) + 360.0_WP  
         end do
         
     ! do data interpolation on element centroids
     else
-        num = myDim_elem2D
+        num = partit%myDim_elem2D
         allocate(temp_x(num), temp_y(num))  
         do n=1, num
             ! compute points of element centroids in geo frame use them here for interpolation
-            elnodes  = elem2D_nodes(:,n)
-            elnodes_x= geo_coord_nod2D(1, elnodes)
+            elnodes  = mesh%elem2D_nodes(:,n)
+            elnodes_x= mesh%geo_coord_nod2D(1, elnodes)
             xmin     = minval(elnodes_x)
             do k=1,3
                 if(elnodes_x(k)-xmin>=cyclic_length/2.0_WP) elnodes_x(k)=elnodes_x(k)-cyclic_length
@@ -621,7 +613,7 @@ subroutine read_other_NetCDF_3d(file, vname, zvname, model_3Darray, do_onvert, p
             end do
             ! compute in units [deg], in geo frame
             temp_x(n)=sum(elnodes_x)/3.0_WP/rad
-            temp_y(n)=sum(geo_coord_nod2D(2,elnodes))/3.0_WP/rad
+            temp_y(n)=sum(mesh%geo_coord_nod2D(2,elnodes))/3.0_WP/rad
             
             ! change lon range to [0 360]
             if(temp_x(n)<0._WP) temp_x(n)=temp_x(n) + 360.0_WP  
@@ -661,7 +653,7 @@ subroutine read_surf_hydrography_NetCDF(file, vari, itime, model_2Darray, partit
     use o_param
     USE MOD_MESH
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     use g_rotate_grid
     use, intrinsic :: ISO_FORTRAN_ENV, only: real64
     use g_interp
@@ -685,25 +677,21 @@ subroutine read_surf_hydrography_NetCDF(file, vari, itime, model_2Darray, partit
   logical                       :: check_dummy
   integer                       :: ierror           ! return error code
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
-  if (mype==0) then
+  if (partit%mype==0) then
      ! open file
      status=nf90_open(file, nf90_nowrite, ncid)
   end if
 
-  call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+  call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
   if (status.ne.nf90_noerr)then
      print*,'ERROR: CANNOT READ runoff FILE CORRECTLY !!!!!'
      print*,'Error in opening netcdf file '//file
-     call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+     call par_abort(partit%MPI_COMM_FESOM, partit%mype)
      stop
   endif
 
-  if (mype==0) then
+  if (partit%mype==0) then
     ! lat
     status=nf90_inq_dimid(ncid, 'lat', latid)
     status=nf90_inquire_dimension(ncid, latid, len=latlen)
@@ -714,19 +702,19 @@ subroutine read_surf_hydrography_NetCDF(file, vari, itime, model_2Darray, partit
 
   ! lat
   allocate(lat(latlen))
-  if (mype==0) then
+  if (partit%mype==0) then
      status=nf90_inq_varid(ncid, 'lat', varid)
      status=nf90_get_var(ncid, varid, lat, start=(/1/), count=(/latlen/))
    end if
-  call MPI_BCast(lat, latlen, MPI_WP, 0, MPI_COMM_FESOM, ierror)  
+  call MPI_BCast(lat, latlen, MPI_WP, 0, partit%MPI_COMM_FESOM, ierror)  
 
   ! lon
   allocate(lon(lonlen))
-  if (mype==0) then
+  if (partit%mype==0) then
      status=nf90_inq_varid(ncid, 'lon', varid)
      status=nf90_get_var(ncid, varid, lon, start=(/1/), count=(/lonlen/))
   end if
-  call MPI_BCast(lon, lonlen, MPI_WP, 0, MPI_COMM_FESOM, ierror)  
+  call MPI_BCast(lon, lonlen, MPI_WP, 0, partit%MPI_COMM_FESOM, ierror)  
 
   ! make sure range 0. - 360.
   do n=1,lonlen
@@ -739,7 +727,7 @@ subroutine read_surf_hydrography_NetCDF(file, vari, itime, model_2Darray, partit
   allocate(ncdata(lonlen,latlen))
   ncdata = 0.0_WP
 
-  if (mype==0) then
+  if (partit%mype==0) then
      status=nf90_inq_varid(ncid, vari, varid)
      istart = (/1,1,1,itime/)
      icount= (/lonlen,latlen,1,1/)
@@ -752,20 +740,20 @@ subroutine read_surf_hydrography_NetCDF(file, vari, itime, model_2Darray, partit
      !close file
      status=nf90_close(ncid)
   end if
-  call MPI_BCast(ncdata, lonlen*latlen, MPI_WP, 0, MPI_COMM_FESOM, ierror)
-  call MPI_BCast(miss,               1, MPI_WP, 0, MPI_COMM_FESOM, ierror)
+  call MPI_BCast(ncdata, lonlen*latlen, MPI_WP, 0, partit%MPI_COMM_FESOM, ierror)
+  call MPI_BCast(miss,               1, MPI_WP, 0, partit%MPI_COMM_FESOM, ierror)
   ! the next step is to interpolate data to model grids
   ! model grid coordinates
-  num=myDim_nod2d+eDim_nod2d
+  num=partit%myDim_nod2d+partit%eDim_nod2d
   allocate(temp_x(num), temp_y(num))  
   do n=1, num                        
      if (rotated_grid) then
-        call r2g(x, y, coord_nod2d(1,n), coord_nod2d(2,n))
+        call r2g(x, y, mesh%coord_nod2d(1,n), mesh%coord_nod2d(2,n))
         temp_x(n)=x/rad   ! change unit to degree  
         temp_y(n)=y/rad                             
      else
-        temp_x(n)=coord_nod2d(1,n)/rad              
-        temp_y(n)=coord_nod2d(2,n)/rad             
+        temp_x(n)=mesh%coord_nod2d(1,n)/rad              
+        temp_y(n)=mesh%coord_nod2d(2,n)/rad             
      end if
      ! change lon range to [0 360]
      if(temp_x(n)<0._WP) temp_x(n)=temp_x(n) + 360.0_WP
@@ -786,7 +774,7 @@ subroutine read_2ddata_on_grid_NetCDF(file, vari, itime, model_2Darray, partit, 
   use o_param
   USE MOD_MESH
   USE MOD_PARTIT
-  use par_support_module, only: par_ex
+  use par_support_module, only: par_abort
   use g_rotate_grid
   use g_interp
   use netcdf
@@ -804,32 +792,28 @@ subroutine read_2ddata_on_grid_NetCDF(file, vari, itime, model_2Darray, partit, 
   character(*),  intent(in)     :: vari
   integer                       :: ierror           ! return error code
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
-  if (mype==0) then
+  if (partit%mype==0) then
     ! open file
     status=nf90_open(file, nf90_nowrite, ncid)
   end if
-  call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+  call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
   if (status.ne.nf90_noerr)then
      print*,'ERROR: CANNOT READ runoff FILE CORRECTLY !!!!!'
      print*,'Error in opening netcdf file '//file
-     call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+     call par_abort(partit%MPI_COMM_FESOM, partit%mype)
      stop
   endif
 
-  if (mype==0) then
+  if (partit%mype==0) then
   ! get variables
      status=nf90_inq_varid(ncid, vari, varid)
      istart = (/1, itime/)
-     icount= (/nod2D, 1/)
+     icount= (/mesh%nod2D, 1/)
      status=nf90_get_var(ncid, varid, ncdata, start=istart, count=icount)
      status=nf90_close(ncid)
   end if      
-  call MPI_BCast(ncdata, nod2D, MPI_WP, 0, MPI_COMM_FESOM, ierror)
-  model_2Darray=ncdata(myList_nod2D) 
+  call MPI_BCast(ncdata, mesh%nod2D, MPI_WP, 0, partit%MPI_COMM_FESOM, ierror)
+  model_2Darray=ncdata(partit%myList_nod2D) 
 end subroutine read_2ddata_on_grid_NetCDF
 end module g_read_other_NetCDF

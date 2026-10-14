@@ -175,6 +175,104 @@ if(ENABLE_MPI_TESTS AND NOT FESOM_COUPLED AND NOT OIFS_COUPLED AND NOT USE_YAC)
         USE_ICE ".false."
     )
 
+    if(BUILD_MESHPARTITIONER)
+        set(FRESH_DATA_DIR "${CMAKE_BINARY_DIR}/tests/fresh_data")
+        file(MAKE_DIRECTORY "${FRESH_DATA_DIR}/MESHES")
+        file(GLOB DATA_ENTRIES LIST_DIRECTORIES true "${TEST_DATA_DIR}/*")
+        foreach(DATA_ENTRY IN LISTS DATA_ENTRIES)
+            get_filename_component(DATA_NAME "${DATA_ENTRY}" NAME)
+            if(NOT DATA_NAME STREQUAL "MESHES" AND IS_DIRECTORY "${DATA_ENTRY}" AND NOT EXISTS "${FRESH_DATA_DIR}/${DATA_NAME}")
+                file(CREATE_LINK "${DATA_ENTRY}" "${FRESH_DATA_DIR}/${DATA_NAME}" SYMBOLIC)
+            endif()
+        endforeach()
+        foreach(PARTITION_NAME flat_1 hier_1x1 hier_1x2)
+            set(PARTITION_MESH_DIR "${CMAKE_BINARY_DIR}/tests/meshpartitioner/meshes/pi_${PARTITION_NAME}")
+            if(NOT EXISTS "${PARTITION_MESH_DIR}")
+                file(MAKE_DIRECTORY "${PARTITION_MESH_DIR}")
+            endif()
+            if(NOT EXISTS "${FRESH_DATA_DIR}/MESHES/pi_${PARTITION_NAME}")
+                file(CREATE_LINK "${PARTITION_MESH_DIR}" "${FRESH_DATA_DIR}/MESHES/pi_${PARTITION_NAME}" SYMBOLIC)
+            endif()
+        endforeach()
+
+        add_fesom_test_with_options(integration_pi_fresh_flat_1_mpi1_omp2
+            "pi_flat_1" "96" "1" "d" "1" "d" "10" ".true." ".false."
+            NP 1
+            OMP_THREADS 2
+            TIMEOUT ${TEST_TIMEOUT}
+            LABEL fresh_partition
+            DATA_DIR "${FRESH_DATA_DIR}"
+        )
+        set_tests_properties(integration_pi_fresh_flat_1_mpi1_omp2 PROPERTIES FIXTURES_REQUIRED "partition_pi_flat_1")
+
+        add_fesom_test_with_options(integration_pi_fresh_hier_1x1_mpi1_omp2
+            "pi_hier_1x1" "96" "1" "d" "1" "d" "10" ".true." ".false."
+            NP 1
+            OMP_THREADS 2
+            TIMEOUT ${TEST_TIMEOUT}
+            LABEL fresh_partition
+            DATA_DIR "${FRESH_DATA_DIR}"
+        )
+        set_tests_properties(integration_pi_fresh_hier_1x1_mpi1_omp2 PROPERTIES FIXTURES_REQUIRED "partition_pi_hier_1x1")
+
+        add_fesom_test_with_options(integration_pi_fresh_hier_1x2_mpi2_omp2
+            "pi_hier_1x2" "96" "1" "d" "1" "d" "10" ".true." ".false."
+            MPI_TEST
+            NP 2
+            OMP_THREADS 2
+            TIMEOUT ${TEST_TIMEOUT}
+            LABEL fresh_partition
+            DATA_DIR "${FRESH_DATA_DIR}"
+        )
+        set_tests_properties(integration_pi_fresh_hier_1x2_mpi2_omp2 PROPERTIES FIXTURES_REQUIRED "partition_pi_hier_1x2")
+    endif()
+
+    # Conservation budgets: the pi set-ups rerun with conservation_freq=4, and
+    # tools/check_conservation.py judges the residual of volume, heat and salt at the
+    # end of the day against the integral (volume and salt 1e-12; heat 3e-10, as the
+    # implicit vertical mixing leaves up to ~8e-11 per day). A single-precision build
+    # closes the budgets at the same level (real64 tracer accumulators, the tracer
+    # carry and real64 layer thicknesses), so it is held to the same tolerances.
+    # Registered only with ENABLE_CONSERVATION_TESTS=ON.
+    if(ENABLE_CONSERVATION_TESTS)
+        find_package(Python3 COMPONENTS Interpreter QUIET)
+    endif()
+    if(ENABLE_CONSERVATION_TESTS AND Python3_Interpreter_FOUND)
+        set(_cons_args --rtol-heat 3e-10)
+        set(_cons_args_cavity --rtol-volume 3e-8 --rtol-heat 3e-9 --rtol-salt 3e-9)
+        add_fesom_test(conservation_pi_mpi2
+            MPI_TEST
+            NP 2
+            TIMEOUT ${TEST_TIMEOUT}
+            LABEL conservation
+            CONSERVATION_FREQ 4
+            CONSERVATION_CHECK_ARGS ${_cons_args}
+        )
+        add_fesom_test(conservation_pi_ice_free_mpi2
+            MPI_TEST
+            NP 2
+            TIMEOUT ${TEST_TIMEOUT}
+            LABEL conservation
+            USE_ICE ".false."
+            CONSERVATION_FREQ 4
+            CONSERVATION_CHECK_ARGS ${_cons_args}
+        )
+        # The cavity set-up does not close in double precision either: it loses ~8e-9 of
+        # the volume and ~1e-9 of heat and salt per day under the ice shelf. These
+        # tolerances record that state so that a change is noticed.
+        add_fesom_test_with_options(conservation_pi_cavity_mpi2
+            "pi_cavity" "96" "1" "d" "1" "d" "10" ".true." ".true."
+            MPI_TEST
+            NP 2
+            TIMEOUT ${TEST_TIMEOUT}
+            LABEL conservation
+            CONSERVATION_FREQ 4
+            CONSERVATION_CHECK_ARGS ${_cons_args_cavity}
+        )
+    elseif(ENABLE_CONSERVATION_TESTS)
+        message(STATUS "Python 3 not found -- skipping the conservation_* tests.")
+    endif()
+
     # Additional MPI test configurations can be added here
     # For example, testing different domain decompositions
 elseif(NOT ENABLE_MPI_TESTS)

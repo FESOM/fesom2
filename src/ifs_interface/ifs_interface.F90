@@ -188,7 +188,6 @@ SUBROUTINE nemogcmcoup_coupinit( mypeIN, npesIN, icomm, &
    LOGICAL :: lexists
 
    ! associate the mesh, only what is needed here
-   ! #include "associate_mesh.h"
    nod2D              => fesom%mesh%nod2D              
    elem2D             => fesom%mesh%elem2D  
    myDim_nod2D        => fesom%partit%myDim_nod2D
@@ -364,7 +363,6 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
    ! Loop variables
    INTEGER :: n, elem, ierr, jf
 
-   !#include "associate_mesh.h"
    ! associate what is needed only
    myDim_nod2D  => fesom%partit%myDim_nod2D
    eDim_nod2D   => fesom%partit%eDim_nod2D
@@ -584,7 +582,6 @@ SUBROUTINE nemogcmcoup_exflds_get( mype, npes, icomm, &
    ! Loop variables
    INTEGER :: n, elem, ierr, jf
 
-   !#include "associate_mesh.h"
    ! associate what is needed only
    myDim_nod2D  => fesom%partit%myDim_nod2D
    eDim_nod2D   => fesom%partit%eDim_nod2D
@@ -798,7 +795,6 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    REAL(wpIFS), DIMENSION(npoints,maxnfield) :: zsendnf
    REAL(wpIFS), DIMENSION(fesom%partit%myDim_nod2D,maxnfield) :: zrecvnf
 
-   !#include "associate_mesh.h"
    ! associate only the necessary things
    real(kind=wpIFS), dimension(:,:), pointer :: coord_nod2D
    real(kind=wpIFS), dimension(:)  , pointer :: stress_atmice_x, stress_atmice_y
@@ -1185,7 +1181,7 @@ subroutine ocean_update_runoff(NBASIN_RUNOFF, BASIN_RUNOFF)
    USE fesom_main_storage_module, only: fesom => f
    USE MOD_MESH
    USE MOD_PARTIT
-   use par_support_module, only: par_ex
+   use par_support_module, only: par_abort
    USE g_forcing_arrays,    only: runoff
    USE g_sbf,               only: RUNOFF_MAPPER
    use g_support
@@ -1203,7 +1199,7 @@ subroutine ocean_update_runoff(NBASIN_RUNOFF, BASIN_RUNOFF)
       if (total_number_of_basins/=NBASIN_RUNOFF) then
          if (fesom%partit%mype==0) write(*,*) 'mismatch in number of runoff basins between ocean and atmosphere:', total_number_of_basins, NBASIN_RUNOFF
          if (fesom%partit%mype==0) write(*,*) 'the model will stop!'
-         call par_ex(fesom%partit%MPI_COMM_FESOM, fesom%partit%mype)
+         call par_abort(fesom%partit%MPI_COMM_FESOM, fesom%partit%mype)
          stop
       end if
       lfirst=.false.

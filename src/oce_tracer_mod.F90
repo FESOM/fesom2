@@ -3,7 +3,7 @@ MODULE o_tracers
 USE MOD_MESH
 USE MOD_TRACER
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 use oce_muscl_adv_module, only: fill_up_dn_grad
 IMPLICIT NONE
 
@@ -14,7 +14,7 @@ CONTAINS
 SUBROUTINE init_tracers_AB(tr_num, tracers, partit, mesh)
     USE MOD_MESH
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     USE MOD_TRACER
     use g_config, only: flag_debug
     use o_arrays
@@ -89,7 +89,7 @@ end do
        write(*,*) '____________________________________________________________________'
        print *, achar(27)//'[0m'
        write(*,*)
-       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+       call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     end if
 
     if (tracers%data(tr_num)%AB_order==2) then
@@ -149,7 +149,7 @@ SUBROUTINE tracer_gradient_elements(ttf, ttf_grad, partit, mesh, do_overz_in)
     !computes elemental gradient of tracer
     USE MOD_MESH
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     USE MOD_TRACER
     USE o_PARAM
     USE o_ARRAYS
@@ -164,10 +164,6 @@ SUBROUTINE tracer_gradient_elements(ttf, ttf_grad, partit, mesh, do_overz_in)
     integer                                         :: nz, nzmin, nzmax
     logical                                         :: do_overz
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h" 
     
     !
     !___________________________________________________________________________
@@ -182,13 +178,13 @@ SUBROUTINE tracer_gradient_elements(ttf, ttf_grad, partit, mesh, do_overz_in)
 #else
 !ACC PARALLEL LOOP DEFAULT(PRESENT) PRIVATE(elnodes)
 #endif
-        do elem=1, myDim_elem2D
-            elnodes=elem2D_nodes(:,elem)
-            nzmin = ulevels(elem)
-            nzmax = nlevels(elem)
+        do elem=1, partit%myDim_elem2D
+            elnodes=mesh%elem2D_nodes(:,elem)
+            nzmin = mesh%ulevels(elem)
+            nzmax = mesh%nlevels(elem)
             do nz=nzmin, nzmax-1   
-                ttf_grad(1,nz, elem)=sum(gradient_sca(1:3,elem)*ttf(nz,elnodes))
-                ttf_grad(2,nz, elem)=sum(gradient_sca(4:6,elem)*ttf(nz,elnodes))
+                ttf_grad(1,nz, elem)=sum(mesh%gradient_sca(1:3,elem)*ttf(nz,elnodes))
+                ttf_grad(2,nz, elem)=sum(mesh%gradient_sca(4:6,elem)*ttf(nz,elnodes))
             end do
         end do
 #ifndef ENABLE_OPENACC
@@ -207,11 +203,11 @@ SUBROUTINE tracer_gradient_elements(ttf, ttf_grad, partit, mesh, do_overz_in)
 #else
 !ACC PARALLEL LOOP DEFAULT(PRESENT) PRIVATE(elnodes)
 #endif
-        do elem=1, myDim_elem2D
-            elnodes=elem2D_nodes(:,elem)
+        do elem=1, partit%myDim_elem2D
+            elnodes=mesh%elem2D_nodes(:,elem)
             do nz=nzmin+1, nzmax-1   
-                ttf_grad(1,nz, elem)=sum(gradient_sca(1:3,elem)*ttf(nz,elnodes))
-                ttf_grad(2,nz, elem)=sum(gradient_sca(4:6,elem)*ttf(nz,elnodes))
+                ttf_grad(1,nz, elem)=sum(mesh%gradient_sca(1:3,elem)*ttf(nz,elnodes))
+                ttf_grad(2,nz, elem)=sum(mesh%gradient_sca(4:6,elem)*ttf(nz,elnodes))
             end do
         end do
 #ifndef ENABLE_OPENACC
@@ -228,7 +224,7 @@ SUBROUTINE tracer_gradient_z(ttf, ttf_grad, partit, mesh)
     !computes vertical gradient of tracer
     USE MOD_MESH
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     USE MOD_TRACER
     USE o_PARAM
     USE o_ARRAYS
@@ -243,20 +239,16 @@ SUBROUTINE tracer_gradient_z(ttf, ttf_grad, partit, mesh)
     real(kind=WP)            :: dz
     integer                  :: n, nz, nzmin, nzmax
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h" 
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax, dz)
 #else
 !ACC PARALLEL LOOP DEFAULT(PRESENT)
 #endif
-    DO n=1, myDim_nod2D+eDim_nod2D
-        nzmax=nlevels_nod2D(n)
-        nzmin=ulevels_nod2D(n)
+    DO n=1, partit%myDim_nod2D+partit%eDim_nod2D
+        nzmax=mesh%nlevels_nod2D(n)
+        nzmin=mesh%ulevels_nod2D(n)
         DO nz=nzmin+1,  nzmax-1
-            dz=0.5_WP*(hnode(nz-1,n)+hnode(nz,n))
+            dz=0.5_WP*(mesh%hnode(nz-1,n)+mesh%hnode(nz,n))
             ttf_grad(nz, n)=(ttf(nz-1,n)-ttf(nz,n))/dz
         END DO
         ttf_grad(nzmin, n)=0.0_WP
@@ -276,7 +268,7 @@ SUBROUTINE relax_to_clim(tr_num, tracers, partit, mesh)
     use o_arrays
     USE MOD_MESH
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     USE MOD_TRACER
     IMPLICIT NONE
 
@@ -287,10 +279,6 @@ SUBROUTINE relax_to_clim(tr_num, tracers, partit, mesh)
     integer                                :: n, nzmin, nzmax    
     real(kind=WP), dimension(:,:), pointer :: trarr
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h" 
     trarr=>tracers%data(tr_num)%values(:,:)
 
     if ((clim_relax>1.0e-8_WP).and.(tracers%data(tr_num)%ID==1)) then
@@ -300,9 +288,9 @@ SUBROUTINE relax_to_clim(tr_num, tracers, partit, mesh)
 !ACC UPDATE DEVICE(relax2clim, Tclim)
 !ACC PARALLEL LOOP DEFAULT(PRESENT)
 #endif
-        DO n=1, myDim_nod2D
-            nzmin = ulevels_nod2D(n)    
-            nzmax = nlevels_nod2D(n)    
+        DO n=1, partit%myDim_nod2D
+            nzmin = mesh%ulevels_nod2D(n)    
+            nzmax = mesh%nlevels_nod2D(n)    
             !!PS tr_arr(1:nlevels_nod2D(n)-1,n,tr_num)=tr_arr(1:nlevels_nod2D(n)-1,n,tr_num)+&
             !!PS         relax2clim(n)*dt*(Tclim(1:nlevels_nod2D(n)-1,n)-tr_arr(1:nlevels_nod2D(n)-1,n,tr_num))
             trarr(nzmin:nzmax-1,n)=trarr(nzmin:nzmax-1,n)+&
@@ -321,9 +309,9 @@ SUBROUTINE relax_to_clim(tr_num, tracers, partit, mesh)
 !ACC UPDATE DEVICE(Sclim)
 !ACC PARALLEL LOOP DEFAULT(PRESENT)
 #endif
-        DO n=1, myDim_nod2D
-            nzmin = ulevels_nod2D(n)    
-            nzmax = nlevels_nod2D(n)  
+        DO n=1, partit%myDim_nod2D
+            nzmin = mesh%ulevels_nod2D(n)    
+            nzmax = mesh%nlevels_nod2D(n)  
             trarr(nzmin:nzmax-1,n)=trarr(nzmin:nzmax-1,n)+&
                     relax2clim(n)*dt*(Sclim(nzmin:nzmax-1,n)-trarr(nzmin:nzmax-1,n))
         END DO
