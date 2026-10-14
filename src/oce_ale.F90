@@ -3566,7 +3566,11 @@ subroutine impl_vert_visc_ale_acc(dynamics, partit, mesh)
                                      .or. (TRIM(which_toy)=="soufflet"))
     ! computed on the host in this step (mixing, forcing) or last updated on the device
     ! in the tracer part of the previous step
-    !$ACC UPDATE DEVICE(Av, stress_surf, dynamics%w_i)
+    !$ACC UPDATE DEVICE(stress_surf, dynamics%w_i)
+    ! with KPP on the device Av is computed there (mo_convect_acc)
+    if (.not. kpp_on_device) then
+        !$ACC UPDATE DEVICE(Av)
+    end if
     if (.not. geom_on_device) then
         !$ACC UPDATE DEVICE(mesh%helem)
     end if
@@ -3829,6 +3833,12 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
 #if defined (FESOM_PROFILING)
         call fesom_profiler_end("mix_kpp")
 #endif
+#if defined(_OPENACC)
+        if (kpp_on_device) then
+            ! Kv_double and Av are on the device: Kv copy and mo_convect there
+            call mo_convect_acc(ice, partit, mesh)
+        else
+#endif
 !$OMP PARALLEL DO
         do node=1, partit%myDim_nod2D+partit%eDim_nod2D
            Kv(:, node)=Kv_double(:, node, 1)
@@ -3836,6 +3846,9 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
 !$OMP END PARALLEL DO
 
         call mo_convect(ice, partit, mesh)
+#if defined(_OPENACC)
+        end if
+#endif
         
     ! use FESOM2.0 tuned pacanowski & philander parameterization for vertical 
     ! mixing     

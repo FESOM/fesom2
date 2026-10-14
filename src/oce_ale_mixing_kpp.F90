@@ -1659,10 +1659,10 @@ contains
      !$ACC END PARALLEL LOOP
      ! ghats and blmc stay on the device for the tracer diffusion (the caller brings
      ! them back for the DVD diagnostic)
-     !$ACC UPDATE HOST(diffK, hbl, kbl, Bo, ustar, bfsfc, stable, caseA)
-     call exchange_nod(diffK(:,:,1), partit)
-     call exchange_nod(diffK(:,:,2), partit)
-     call exchange_nod(ghats, partit)
+     ! diffK (Kv_double) and viscAE (Av) stay on the device for mo_convect_acc, which
+     ! copies Kv and Av back; ghats is exchanged on the device
+     !$ACC UPDATE HOST(hbl, kbl, Bo, ustar, bfsfc, stable, caseA)
+     call exchange_nod(ghats, partit, luse_g2g=.true.)
      if (partit%npes > 1) then
         !$ACC UPDATE HOST(viscA)
         call exchange_nod(viscA, partit)
@@ -1683,7 +1683,6 @@ contains
         IF (viscAE(nzmin,elem) < minmix) viscAE(nzmin,elem) = minmix
      END DO
      !$ACC END PARALLEL LOOP
-     !$ACC UPDATE HOST(viscAE)
 #if defined (FESOM_PROFILING)
      call fesom_profiler_end("kpp_smooth_final")
 #endif
