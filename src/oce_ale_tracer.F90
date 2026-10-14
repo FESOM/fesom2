@@ -757,7 +757,7 @@ end subroutine backup_ttf_rhs
 subroutine store_diag_component(del_ttf, ttf_rhs_bak, hnode_new, ulevels_nod2D, nlevels_nod2D, myDim_nod2D, eDim_nod2D, target_field)
     real(kind=WP_full), intent(in)    :: del_ttf(:,:)
     real(kind=WP), intent(in)    :: ttf_rhs_bak(:,:)
-    real(kind=WP), intent(in)    :: hnode_new(:,:)
+    real(kind=WP_full), intent(in)  :: hnode_new(:,:)
     integer      , intent(in)    :: ulevels_nod2D(:)
     integer      , intent(in)    :: nlevels_nod2D(:)
     integer      , intent(in)    :: myDim_nod2D

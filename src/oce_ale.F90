@@ -106,6 +106,12 @@ subroutine init_ale(dynamics, partit, mesh)
     ! hnode and hnode_new: layer thicknesses at nodes. 
     allocate(mesh%hnode(1:mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D))
     allocate(mesh%hnode_new(1:mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D))
+#if defined(USE_SINGLE_PRECISION)
+    allocate(mesh%hnode_wp(1:mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D))
+    allocate(mesh%hnode_new_wp(1:mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D))
+    mesh%hnode_wp = 0.0_WP
+    mesh%hnode_new_wp = 0.0_WP
+#endif
     ! ssh_rhs_old: auxiliary array to store an intermediate part of the rhs computations.
     allocate(dynamics%ssh_rhs_old(partit%myDim_nod2D+partit%eDim_nod2D))
     dynamics%ssh_rhs_old = 0.0_WP
@@ -818,6 +824,14 @@ subroutine init_thickness_ale(dynamics, partit, mesh)
     
     !___________________________________________________________________________
     mesh%hnode_new=mesh%hnode  ! Should be initialized, because only variable part is updated.
+#if defined(USE_SINGLE_PRECISION)
+    ! Seed the WP mirrors that the netCDF restart reads into. hnode_new is an
+    ! optional restart variable: a restart written before it existed leaves its
+    ! mirror untouched, and the copy-back after the read (fesom_module) must then
+    ! give back this initial state, not the zeros from init_ale.
+    mesh%hnode_wp     = real(mesh%hnode, WP)
+    mesh%hnode_new_wp = real(mesh%hnode_new, WP)
+#endif
     call exchange_elem(mesh%helem, partit)
     !!PS call check_total_volume(partit, mesh)
     
@@ -834,7 +848,7 @@ subroutine update_thickness_ale(partit, mesh)
     !___________________________________________________________________________
     integer :: n, nz, elem, elnodes(3),nzmax, nzmin
     integer      , dimension(:), allocatable :: idx
-    real(kind=WP)                            :: rescue_hnode_old(mesh%nl-1)
+    real(kind=WP_full)                       :: rescue_hnode_old(mesh%nl-1)   ! holds hnode (WP_full) for the DVD diagnostic
     !___________________________________________________________________________
     ! pointer on necessary derived types
 
@@ -2412,7 +2426,7 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
 !$OMP END PARALLEL DO
     !___________________________________________________________________________
     call exchange_nod(Wvel, partit)
-    call exchange_nod(mesh%hnode_new, partit)   ! Or extend cycles above  
+    call exchange_nod_h(mesh%hnode_new, partit)   ! Or extend cycles above  
     if (Fer_GM) call exchange_nod(fer_Wvel, partit)
 !$OMP BARRIER    
 
@@ -3570,5 +3584,27 @@ subroutine write_oce_step_times(n, t_check, partit)
     write(*,*)
     write(*,*)
 end subroutine write_oce_step_times
+!
+!
+!===============================================================================
+! Halo exchange of a WP_full node array. In a single-precision build the value goes as a WP part and
+! a WP remainder through the WP exchange and is reassembled on the halo.
+subroutine exchange_nod_h(arr, partit)
+    real(kind=WP_full), intent(inout)         :: arr(:,:)
+    type(t_partit),  intent(inout), target :: partit
+#if defined(USE_SINGLE_PRECISION)
+    real(kind=WP), allocatable, save       :: hi(:,:), lo(:,:)
+    integer                                :: n0
+    if (.not. allocated(hi)) allocate(hi(size(arr,1), size(arr,2)), lo(size(arr,1), size(arr,2)))
+    hi = real(arr, WP)
+    lo = real(arr - real(hi, WP_full), WP)
+    call exchange_nod(hi, partit)
+    call exchange_nod(lo, partit)
+    n0 = partit%myDim_nod2D
+    arr(:, n0+1:) = real(hi(:, n0+1:), WP_full) + real(lo(:, n0+1:), WP_full)
+#else
+    call exchange_nod(arr, partit)
+#endif
+end subroutine exchange_nod_h
 
 end module oce_ale_module
