@@ -18,6 +18,9 @@ module g_comm
 
   use, intrinsic :: ISO_FORTRAN_ENV, only: int16, int32, real32, real64
   use o_PARAM, only: WP
+#ifdef ENABLE_OPENACC
+  use, intrinsic :: iso_c_binding, only: c_ptr, c_loc, c_f_pointer
+#endif
 
   implicit none
 
@@ -30,6 +33,16 @@ module g_comm
   real(kind=WP), pointer             :: g2g_f1(:) => null(), g2g_f2(:) => null()
   logical                            :: g2g_unpack_pending = .false.
   integer                            :: g2g_nfields = 0
+  ! The same for whole columns (3D fields, several values per point) of nodal (kind 1) and elemental
+  ! (kind 2) fields, one message per neighbour; unpacked in exchange_nod_end / exchange_elem_end.
+  type g2g_cols_state
+     real(kind=WP), allocatable :: sbuf(:), rbuf(:)
+     integer,       allocatable :: slist(:), rlist(:)
+     type(c_ptr)                :: f(3)
+     integer                    :: nf = 0, inner = 0, ntot = 0
+     logical                    :: pending = .false.
+  end type g2g_cols_state
+  type(g2g_cols_state), target :: g2g_cols(2)
 #endif
 
 contains
@@ -374,6 +387,10 @@ end if
 #endif
 
   if (lg2g) then
+#ifdef ENABLE_OPENACC
+     call g2g_cols_begin(1, 1, size(nod1_array2D), partit, nod1_array2D, nod2_array2D, nod3_array2D)
+     return
+#endif
 
    !$ACC HOST_DATA USE_DEVICE(nod1_array2D, nod2_array2D, nod3_array2D)
 
@@ -488,6 +505,10 @@ end if
          partit%com_nod2D%rPE, partit%com_nod2D%sPE)
 #endif
     if(lg2g) then
+#ifdef ENABLE_OPENACC
+       call g2g_cols_begin(1, size(nod_array3D,1), size(nod_array3D,2), partit, nod_array3D)
+       return
+#endif
       !$ACC HOST_DATA USE_DEVICE(nod_array3D) 
 
       DO n=1,rn
@@ -586,6 +607,10 @@ end if
 #endif
 
   if(lg2g) then 
+#ifdef ENABLE_OPENACC
+     call g2g_cols_begin(1, size(nod1_array3D,1), size(nod1_array3D,2), partit, nod1_array3D, nod2_array3D)
+     return
+#endif
      !$ACC HOST_DATA USE_DEVICE(nod1_array3D, nod2_array3D) 
 
     DO n=1,rn
@@ -692,6 +717,10 @@ if (partit%npes>1) then
 #endif
 
   if(lg2g) then
+#ifdef ENABLE_OPENACC
+     call g2g_cols_begin(1, size(nod_array3D,1)*size(nod_array3D,2), size(nod_array3D,3), partit, nod_array3D)
+     return
+#endif
     !$ACC HOST_DATA USE_DEVICE(nod_array3D)
   
     DO n=1,rn
@@ -739,6 +768,7 @@ if (partit%npes > 1) &
   call MPI_WAITALL(partit%com_nod2D%nreq, partit%com_nod2D%req, MPI_STATUSES_IGNORE, partit%MPIerr)
 #ifdef ENABLE_OPENACC
 if (g2g_unpack_pending) call g2g_unpack_2fields(partit)
+if (g2g_cols(1)%pending) call g2g_cols_unpack(1, partit)
 #endif
 
 END SUBROUTINE exchange_nod_end
@@ -874,6 +904,147 @@ g2g_unpack_pending = .false.
 g2g_nfields = 0
 nullify(g2g_f1, g2g_f2)
 END SUBROUTINE g2g_unpack_2fields
+
+! Packed device exchange of nf (1-3) contiguous device fields over the nodal (kind=1) or elemental (kind=2)
+! halo: whole columns of the listed points, same values as the MPI indexed datatypes, one message per neighbour.
+SUBROUTINE g2g_cols_begin(kind, inner, ntot, partit, a1, a2, a3)
+USE MOD_PARTIT
+IMPLICIT NONE
+integer,        intent(in)                     :: kind, inner, ntot
+type(t_partit), intent(inout), target          :: partit
+real(kind=WP),  intent(inout), target          :: a1(*)
+real(kind=WP),  intent(inout), target, optional:: a2(*), a3(*)
+type(g2g_cols_state), pointer :: st
+type(com_struct),     pointer :: com
+real(kind=WP), pointer :: f1(:), f2(:), f3(:), sb(:), rb(:)
+integer, pointer       :: sl(:)
+integer :: i, j, n, sn, rn, ns, nr, nf, a, l, blk
+
+st => g2g_cols(kind)
+if (kind==1) then
+   com => partit%com_nod2D
+else
+   com => partit%com_elem2D
+end if
+sn=com%sPEnum
+rn=com%rPEnum
+ns=com%sptr(sn+1)-1
+nr=com%rptr(rn+1)-1
+nf=1
+if (present(a2)) nf=2
+if (present(a3)) nf=3
+blk=nf*inner
+call g2g_cols_alloc(st, com, blk*ns, blk*nr)
+
+st%f(1)=c_loc(a1(1)); call c_f_pointer(st%f(1), f1, [inner*ntot])
+if (nf>=2) then; st%f(2)=c_loc(a2(1)); call c_f_pointer(st%f(2), f2, [inner*ntot]); end if
+if (nf==3) then; st%f(3)=c_loc(a3(1)); call c_f_pointer(st%f(3), f3, [inner*ntot]); end if
+sb => st%sbuf
+rb => st%rbuf
+sl => st%slist
+!$ACC PARALLEL LOOP COLLAPSE(2) DEFAULT(PRESENT)
+do i=1, ns
+   do j=1, inner
+      sb((i-1)*blk+j)=f1((sl(i)-1)*inner+j)
+   end do
+end do
+!$ACC END PARALLEL LOOP
+if (nf>=2) then
+!$ACC PARALLEL LOOP COLLAPSE(2) DEFAULT(PRESENT)
+do i=1, ns
+   do j=1, inner
+      sb((i-1)*blk+inner+j)=f2((sl(i)-1)*inner+j)
+   end do
+end do
+!$ACC END PARALLEL LOOP
+end if
+if (nf==3) then
+!$ACC PARALLEL LOOP COLLAPSE(2) DEFAULT(PRESENT)
+do i=1, ns
+   do j=1, inner
+      sb((i-1)*blk+2*inner+j)=f3((sl(i)-1)*inner+j)
+   end do
+end do
+!$ACC END PARALLEL LOOP
+end if
+
+!$ACC HOST_DATA USE_DEVICE(sb, rb)
+do n=1, rn
+   a=(com%rptr(n)-1)*blk+1
+   l=(com%rptr(n+1)-com%rptr(n))*blk
+   call MPI_IRECV(rb(a), l, MPI_WP, com%rPE(n), com%rPE(n), partit%MPI_COMM_FESOM, com%req(n), partit%MPIerr)
+end do
+do n=1, sn
+   a=(com%sptr(n)-1)*blk+1
+   l=(com%sptr(n+1)-com%sptr(n))*blk
+   call MPI_ISEND(sb(a), l, MPI_WP, com%sPE(n), partit%mype, partit%MPI_COMM_FESOM, com%req(rn+n), partit%MPIerr)
+end do
+!$ACC END HOST_DATA
+com%nreq=rn+sn
+st%nf=nf
+st%inner=inner
+st%ntot=ntot
+st%pending=.true.
+END SUBROUTINE g2g_cols_begin
+
+SUBROUTINE g2g_cols_unpack(kind, partit)
+USE MOD_PARTIT
+IMPLICIT NONE
+integer,        intent(in)            :: kind
+type(t_partit), intent(inout), target :: partit
+type(g2g_cols_state), pointer :: st
+real(kind=WP), pointer :: f(:), rb(:)
+integer, pointer       :: rl(:)
+integer :: i, j, k, nr, inner, blk
+
+st => g2g_cols(kind)
+if (kind==1) then
+   nr=partit%com_nod2D%rptr(partit%com_nod2D%rPEnum+1)-1
+else
+   nr=partit%com_elem2D%rptr(partit%com_elem2D%rPEnum+1)-1
+end if
+inner=st%inner
+blk=st%nf*inner
+rb => st%rbuf
+rl => st%rlist
+do k=1, st%nf
+   call c_f_pointer(st%f(k), f, [inner*st%ntot])
+!$ACC PARALLEL LOOP COLLAPSE(2) DEFAULT(PRESENT)
+   do i=1, nr
+      do j=1, inner
+         f((rl(i)-1)*inner+j)=rb((i-1)*blk+(k-1)*inner+j)
+      end do
+   end do
+!$ACC END PARALLEL LOOP
+end do
+st%pending=.false.
+st%nf=0
+END SUBROUTINE g2g_cols_unpack
+
+! Device buffers (grown on demand) and lists of one halo kind.
+SUBROUTINE g2g_cols_alloc(st, com, nsb, nrb)
+USE MOD_PARTIT
+IMPLICIT NONE
+type(g2g_cols_state), intent(inout) :: st
+type(com_struct),     intent(in)    :: com
+integer,              intent(in)    :: nsb, nrb
+integer :: ns, nr
+if (.not. allocated(st%slist)) then
+   ns=com%sptr(com%sPEnum+1)-1
+   nr=com%rptr(com%rPEnum+1)-1
+   allocate(st%slist(max(1,ns)), st%rlist(max(1,nr)))
+   st%slist(1:ns)=com%slist(1:ns)
+   st%rlist(1:nr)=com%rlist(1:nr)
+   !$ACC ENTER DATA COPYIN(st%slist, st%rlist)
+end if
+if (allocated(st%sbuf)) then
+   if (size(st%sbuf)>=nsb .and. size(st%rbuf)>=nrb) return
+   !$ACC EXIT DATA DELETE(st%sbuf, st%rbuf)
+   deallocate(st%sbuf, st%rbuf)
+end if
+allocate(st%sbuf(max(1,nsb)), st%rbuf(max(1,nrb)))
+!$ACC ENTER DATA CREATE(st%sbuf, st%rbuf)
+END SUBROUTINE g2g_cols_alloc
 #endif
 
 SUBROUTINE exchange_elem_end(partit)
@@ -892,6 +1063,9 @@ type(t_partit), intent(inout), target :: partit
              partit%com_elem2D%req, MPI_STATUSES_IGNORE, partit%MPIerr)
      endif
   end if
+#ifdef ENABLE_OPENACC
+  if (g2g_cols(2)%pending) call g2g_cols_unpack(2, partit)
+#endif
 END SUBROUTINE exchange_elem_end
 !=============================================================================
 subroutine exchange_elem3D(elem_array3D, partit, luse_g2g)
@@ -947,6 +1121,10 @@ if (partit%npes> 1) then
 #endif
 
         if(lg2g) then
+#ifdef ENABLE_OPENACC
+           call g2g_cols_begin(2, size(elem_array3D,1), size(elem_array3D,2), partit, elem_array3D)
+           return
+#endif
          !$ACC HOST_DATA USE_DEVICE(elem_array3D)
            DO n=1,rn
               call MPI_IRECV(elem_array3D, 1, partit%r_mpitype_elem3D(n,nl1,1), partit%com_elem2D%rPE(n), &
@@ -980,6 +1158,10 @@ if (partit%npes> 1) then
               partit%com_elem2D%rPE, partit%com_elem2D%sPE)
 #endif
         if(lg2g) then
+#ifdef ENABLE_OPENACC
+           call g2g_cols_begin(2, size(elem_array3D,1), size(elem_array3D,2), partit, elem_array3D)
+           return
+#endif
           !$ACC HOST_DATA USE_DEVICE(elem_array3D)
            DO n=1,rn
               call MPI_IRECV(elem_array3D, 1, partit%r_mpitype_elem2D(n,nl1), partit%com_elem2D%rPE(n), &
@@ -1176,6 +1358,10 @@ end if
           partit%s_mpitype_elem3D(:,nl1,n_val), partit%com_elem2D%rPE, partit%com_elem2D%sPE)
 #endif
      if(lg2g) then
+#ifdef ENABLE_OPENACC
+        call g2g_cols_begin(2, size(elem_array3D,1)*size(elem_array3D,2), size(elem_array3D,3), partit, elem_array3D)
+        return
+#endif
        !$ACC HOST_DATA USE_DEVICE(elem_array3D)
        DO n=1,rn
           call MPI_IRECV(elem_array3D, 1, partit%r_mpitype_elem3D(n,nl1,n_val), partit%com_elem2D%rPE(n), &
@@ -1294,6 +1480,10 @@ if (partit%npes> 1) then
 #endif
 
      if(lg2g) then
+#ifdef ENABLE_OPENACC
+        call g2g_cols_begin(2, 1, size(elem_array2D), partit, elem_array2D)
+        return
+#endif
        !$ACC HOST_DATA USE_DEVICE(elem_array2D)
        DO n=1,rn
           call MPI_IRECV(elem_array2D, 1, partit%r_mpitype_elem2D(n,1), partit%com_elem2D%rPE(n), &
