@@ -197,7 +197,9 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
             !$ACC UPDATE DEVICE (mesh%helem, mesh%hnode_new, mesh%zbar_3d_n)
         end if
 !!!     !$ACC UPDATE DEVICE(tracers%work%fct_ttf_min, tracers%work%fct_ttf_max, tracers%work%fct_plus, tracers%work%fct_minus)
-        !$ACC UPDATE DEVICE (mesh%hnode, mesh%z_3d_n)
+        if (.not. geom_on_device) then
+            !$ACC UPDATE DEVICE (mesh%hnode, mesh%z_3d_n)
+        end if
 #ifdef ENABLE_OPENACC
         if (gm_on_device) then
             nlu = size(UV,2)

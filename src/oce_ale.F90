@@ -1048,6 +1048,52 @@ subroutine update_thickness_ale(partit, mesh)
 !$OMP BARRIER
 
 end subroutine update_thickness_ale
+#if defined(ENABLE_OPENACC)
+!
+!
+!===============================================================================
+! zstar part of update_thickness_ale on the device (hnode_new is current there after vert_vel_ale_acc);
+! the new geometry stays on the device (geom_on_device) and is copied back for the host code.
+subroutine update_thickness_ale_acc(partit, mesh)
+    implicit none
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(inout), target :: mesh
+    integer :: n, nz, elem, n1, n2, n3, nzmax, nzmin, nod_size, myDim_elem2D
+
+    nod_size     = partit%myDim_nod2D+partit%eDim_nod2D
+    myDim_elem2D = partit%myDim_elem2D
+    !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(nz, nzmin, nzmax)
+    do n=1, nod_size
+        nzmin = mesh%ulevels_nod2D(n)
+        nzmax = mesh%nlevels_nod2D_min(n)-2
+        if (nzmin == 1) then
+            do nz=nzmax, nzmin,-1
+                mesh%hnode(nz,n)     = mesh%hnode_new(nz,n)
+                mesh%zbar_3d_n(nz,n) = mesh%zbar_3d_n(nz+1,n) + mesh%hnode_new(nz,n)
+                mesh%Z_3d_n(nz,n)    = mesh%zbar_3d_n(nz+1,n) + mesh%hnode_new(nz,n)/2.0_WP
+            end do
+        end if
+    end do
+    !$ACC END PARALLEL LOOP
+    !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(nz, nzmin, nzmax, n1, n2, n3)
+    do elem=1, myDim_elem2D
+        nzmin = mesh%ulevels(elem)
+        nzmax = mesh%nlevels(elem)-1
+        if (nzmin == 1) then
+            n1 = mesh%elem2D_nodes(1, elem)
+            n2 = mesh%elem2D_nodes(2, elem)
+            n3 = mesh%elem2D_nodes(3, elem)
+            do nz=nzmin, nzmax-1
+                mesh%helem(nz,elem)=(mesh%hnode(nz,n1)+mesh%hnode(nz,n2)+mesh%hnode(nz,n3))/3.0_WP
+            end do
+        end if
+    end do
+    !$ACC END PARALLEL LOOP
+    call exchange_elem(mesh%helem, partit, luse_g2g=.true.)
+    geom_on_device = .true.
+    !$ACC UPDATE HOST(mesh%hnode, mesh%zbar_3d_n, mesh%Z_3d_n, mesh%helem)
+end subroutine update_thickness_ale_acc
+#endif
 !
 !
 !===============================================================================
@@ -2749,7 +2795,10 @@ subroutine vert_vel_ale_acc(dynamics, partit, mesh)
     end if
     ! hnode_new: the zstar update sets only the levels above nlevels_nod2D_min, the rest
     ! keeps its values, and all of it is brought back to the host below
-    !$ACC UPDATE DEVICE(UV, mesh%helem, mesh%zbar_3d_n, mesh%hbar, mesh%hbar_old, water_flux, mesh%hnode_new)
+    !$ACC UPDATE DEVICE(UV, mesh%hbar, mesh%hbar_old, water_flux)
+    if (.not. geom_on_device) then
+        !$ACC UPDATE DEVICE(mesh%helem, mesh%zbar_3d_n, mesh%hnode_new)
+    end if
     if (fer) then
         !$ACC UPDATE DEVICE(fer_UV)
     end if
@@ -3517,7 +3566,10 @@ subroutine impl_vert_visc_ale_acc(dynamics, partit, mesh)
                                      .or. (TRIM(which_toy)=="soufflet"))
     ! computed on the host in this step (mixing, forcing) or last updated on the device
     ! in the tracer part of the previous step
-    !$ACC UPDATE DEVICE(Av, stress_surf, mesh%helem, dynamics%w_i)
+    !$ACC UPDATE DEVICE(Av, stress_surf, dynamics%w_i)
+    if (.not. geom_on_device) then
+        !$ACC UPDATE DEVICE(mesh%helem)
+    end if
 
 !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(a, b, c, ur, vr, cp, up, vp, zbar_n, Z_n, &
 !$ACC                                                    nz, nzmin, nzmax, n1, n2, n3, zinv, m, friction, wu, wd)
@@ -4265,7 +4317,16 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     !___________________________________________________________________________
     ! Update hnode=hnode_new, helem
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call update_thickness_ale'//achar(27)//'[0m'
+#if defined(_OPENACC)
+    if (vv_on_device .and. trim(which_ale)=='zstar' .and. .not. ldiag_DVD) then
+        call update_thickness_ale_acc(partit, mesh)
+    else
+        geom_on_device = .false.
+        call update_thickness_ale(partit, mesh)
+    end if
+#else
     call update_thickness_ale(partit, mesh)
+#endif
     t10=MPI_Wtime()
 #if defined (FESOM_PROFILING)
     call fesom_profiler_end("oce_thickness_update")

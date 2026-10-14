@@ -3,7 +3,7 @@ module oce_fer_gm_module
     USE MOD_PARTIT
     use par_support_module, only: par_abort
     USE o_PARAM
-    USE o_ARRAYS, only: sigma_xy, fer_gamma, bvfreq, fer_c, fer_K, fer_k, fer_scal, Ki, &
+    USE o_ARRAYS, only: sigma_xy, fer_gamma, bvfreq, fer_c, fer_K, fer_k, fer_scal, Ki, geom_on_device, &
             MLD1_ind, neutral_slope, fer_tapfac, fer_GINsea_mask
     USE g_CONFIG
     USE g_comm_auto
@@ -566,7 +566,9 @@ subroutine init_Redi_GM_acc(dynamics, partit, mesh)
     call gm_create_data(dynamics, mesh)
     myDim_nod2D = partit%myDim_nod2D
     nl          = mesh%nl
-    !$ACC UPDATE DEVICE(mesh%hnode_new, mesh%zbar_3d_n)
+    if (.not. geom_on_device) then
+        !$ACC UPDATE DEVICE(mesh%hnode_new, mesh%zbar_3d_n)
+    end if
 
     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) &
     !$ACC PRIVATE(k, nz, nzmax, nzmin, reso, c1, cm, rosb, scaling, rr_ratio, zscaling, bvref, kmax_n, wnh, latd)
@@ -801,8 +803,9 @@ subroutine fer_gamma2vel_acc(dynamics, partit, mesh)
     call gm_create_data(dynamics, mesh)
     fer_UV => dynamics%fer_uv(:,:,:)
     myDim_elem2D = partit%myDim_elem2D
-    ! helem is kept on the host
-    !$ACC UPDATE DEVICE(mesh%helem)
+    if (.not. geom_on_device) then
+        !$ACC UPDATE DEVICE(mesh%helem)
+    end if
     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(n1, n2, n3, nz, nzmin, nzmax, zinv)
     DO el=1, myDim_elem2D
         n1=mesh%elem2D_nodes(1,el)

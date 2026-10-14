@@ -396,7 +396,10 @@ subroutine pressure_bv_acc(tracers, partit, mesh)
     end if
     ! temperature and salinity are current on the host at the start of the step (the
     ! tracer step uploads them again)
-    !$ACC UPDATE DEVICE(mesh%Z_3d_n, temp, salt)
+    !$ACC UPDATE DEVICE(temp, salt)
+    if (.not. geom_on_device) then
+        !$ACC UPDATE DEVICE(mesh%Z_3d_n)
+    end if
 
     !___________________________________________________________________________
     ! screen salinity
@@ -2286,7 +2289,9 @@ subroutine pressure_force_4_zxxxx_shchepetkin_acc(partit, mesh)
         call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     end if
     ! layer thicknesses from the thickness update at the end of the previous step
-    !$ACC UPDATE DEVICE(mesh%helem)
+    if (.not. geom_on_device) then
+        !$ACC UPDATE DEVICE(mesh%helem)
+    end if
 
 !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(Z_n, n1, n2, n3, nle, ule, nlz, ni, nd, kb, int_dp_x, int_dp_y, &
 !$ACC     drho_dx, drho_dy, dz_dx, dz_dy, aux_sum, dsum, zb, dx10, dx20, dx21, df10, df21, drz)

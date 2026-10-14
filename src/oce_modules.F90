@@ -348,6 +348,9 @@ logical                                     :: pgf_on_device = .false.
 logical                                     :: vv_on_device = .false., redi_on_device = .false.
 ! OpenACC: temperature and salinity on the device equal the host copies after the tracer step
 logical                                     :: ts_on_device = .false.
+! OpenACC: the layer geometry (hnode, hnode_new, helem, zbar_3d_n, Z_3d_n) on the device is
+! current (zstar thickness update on the device); its uploads are skipped
+logical                                     :: geom_on_device = .false.
 
 !_______________________________________________________________________________
 !!PS ! dummy arrays
