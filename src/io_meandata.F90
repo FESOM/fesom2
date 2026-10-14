@@ -3535,8 +3535,7 @@ logical function stream_src_on_device(entry)
     case ('Kv', 'Av')
         stream_src_on_device = kpp_on_device
     case ('w')
-        ! with GM the tracer step adds the bolus part to the device copy of w
-        stream_src_on_device = vv_on_device .and. .not. Fer_GM
+        stream_src_on_device = vv_on_device
     case ('bolus_w')
         stream_src_on_device = vv_on_device .and. Fer_GM
     end select
