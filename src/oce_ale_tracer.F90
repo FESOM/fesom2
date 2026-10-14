@@ -528,8 +528,10 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
 #ifdef ENABLE_OPENACC
     ! del_ttf arrives on the device from the advection; when a diagnostic, the explicit vertical
     ! scheme or recom reads it on the host, the whole diffusion of this tracer runs there
+    ! single precision (use_tracer_carry): the rounding carry of the tracer update is
+    ! not on the device, so the diffusion runs on the host
     diff_on_device = .not. (tracers%data(tr_num)%ltra_diag .or. ldiag_diapmix &
-                            .or. (.not. tracers%data(tr_num)%i_vert_diff))
+                            .or. (.not. tracers%data(tr_num)%i_vert_diff) .or. use_tracer_carry)
 #if defined(__recom)
     diff_on_device = .false.
 #endif
