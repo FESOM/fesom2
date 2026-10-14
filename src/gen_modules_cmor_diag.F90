@@ -401,7 +401,7 @@ contains
   subroutine save_cmor_advection(tr_num, del_ttf, local_nod2D, nlev)
     implicit none
     integer, intent(in) :: tr_num, local_nod2D, nlev
-    real(kind=WP), intent(in) :: del_ttf(nlev, local_nod2D)
+    real(kind=WP_full), intent(in) :: del_ttf(nlev, local_nod2D)
 
     if (.not. initialized) return
 

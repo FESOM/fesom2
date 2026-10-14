@@ -24,13 +24,13 @@ subroutine adv_tra_vert_impl(dt, w, ttf, partit, mesh, tend)
     type(t_mesh),  intent(in) , target :: mesh
     real(kind=WP), intent(inout)       :: ttf (mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
     real(kind=WP), intent(in)          :: W   (mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
-    real(kind=WP), intent(inout)       :: tend(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-    real(kind=WP)                      :: a(mesh%nl), b(mesh%nl), c(mesh%nl), tr(mesh%nl)
-    real(kind=WP)                      :: cp(mesh%nl), tp(mesh%nl)
-    real(kind=WP)                      :: zbar_n(mesh%nl), z_n(mesh%nl-1)
+    real(kind=WP_full), intent(inout)   :: tend(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP_full)                  :: a(mesh%nl), b(mesh%nl), c(mesh%nl), tr(mesh%nl)
+    real(kind=WP_full)                  :: cp(mesh%nl), tp(mesh%nl)
+    real(kind=WP_full)                  :: zbar_n(mesh%nl), z_n(mesh%nl-1)
     integer                            :: nz, n, nzmax, nzmin
-    real(kind=WP)                      :: m, zinv, dt_inv, dz
-    real(kind=WP)                      :: c1, v_adv
+    real(kind=WP_full)                  :: m, zinv, dt_inv, dz
+    real(kind=WP_full)                  :: c1, v_adv
 
 
     dt_inv=1.0_WP/dt
