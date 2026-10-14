@@ -2774,6 +2774,173 @@ CASE ('Silim_d              ')
 
 #endif
 
+! =====================================================================
+! DIFFUSION AND ADVECTION of DIN, DIC & ALK
+! =====================================================================
+
+! DIN 
+
+CASE ('DIN_hor_adv               ')
+! horizontal advection
+    if (use_REcoM) then
+        call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIN_hor_adv', 'Horizontal advection part of dissolved Inorganic N', '[mmol/m3]', tracers%work%tra_advhoriz(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('DIN_lo_hor_adv            ')
+! horizontal advection LO
+    if (use_REcoM) then
+        call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIN_lo_hor_adv', 'LO Horizontal advection part of dissolved Inorganic N', '[mmol/m3]', tracers%work%tra_advhoriz_LO(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('DIN_ver_adv               ')
+! vertical advection
+    if (use_REcoM) then
+       call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIN_ver_adv', 'Vertical advection part of dissolved Inorganic N', '[mmol/m3]', tracers%work%tra_advvert(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('DIN_lo_ver_adv            ')
+! vertical advection LO
+    if (use_REcoM) then
+       call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIN_lo_ver_adv', 'LO Vertical advection part of dissolved Inorganic N', '[mmol/m3]', tracers%work%tra_advvert_LO(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('DIN_tra_diff_part_hor_redi')
+! horizontal diffusion
+    if (use_REcoM) then
+       call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIN_tra_diff_part_hor_redi', 'Horizontal diffusion of dissolved Inorganic N (includes Redi diffusivity if Redi=.true.)', '[mmol/m3]', tracers%work%tra_diff_part_hor_redi(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('DIN_tra_diff_part_ver_expl')
+! vertical diffusion (Explicit)
+    if (use_REcoM) then
+       call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIN_tra_diff_part_ver_expl', 'Vertical diffusion of dissolved Inorganic N (Explicit)', '[mmol/m3]', tracers%work%tra_diff_part_ver_expl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('DIN_tra_diff_part_ver_redi_expl')
+! projection of horizontal Redi diffussivity onto vertical
+    if (use_REcoM) then
+       call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIN_tra_diff_part_ver_redi_expl', 'Projection of horizontal Redi diffussivity onto vertical for dissolved Inorganic N (Explicit)', '[mmol/m3]', tracers%work%tra_diff_part_ver_redi_expl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('DIN_tra_diff_part_ver_impl')
+! vertical diffusion (Implicit)
+    if (use_REcoM) then
+       call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIN_tra_diff_part_ver_impl', 'Vertical diffusion of dissolved Inorganic N (Implicit)', '[mmol/m3]', tracers%work%tra_diff_part_ver_impl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('DIN_recom_sms             ')
+! recom_sms
+    if (use_REcoM) then
+       call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIN_recom_sms', 'Recom SMS', '[mmol/m3]', tracers%work%tra_recom_sms(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+! DIC
+
+CASE ('DIC_hor_adv               ')
+! horizontal advection
+    if (use_REcoM) then
+       call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_hor_adv', 'Horizontal advection part of dissolved Inorganic C', '[mmol/m3]', tracers%work%tra_advhoriz(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('DIC_lo_hor_adv            ')
+! horizontal advection LO
+    if (use_REcoM) then
+       call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_lo_hor_adv', 'LO Horizontal advection part of dissolved Inorganic C', '[mmol/m3]', tracers%work%tra_advhoriz_LO(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('DIC_ver_adv               ')
+! vertical advection
+    if (use_REcoM) then
+       call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_ver_adv', 'Vertical advection part of dissolved Inorganic C', '[mmol/m3]', tracers%work%tra_advvert(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('DIC_lo_ver_adv            ')
+! vertical advection LO
+    if (use_REcoM) then
+       call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_lo_ver_adv', 'LO Vertical advection part of dissolved Inorganic C', '[mmol/m3]', tracers%work%tra_advvert_LO(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('DIC_tra_diff_part_hor_redi')
+! horizontal diffusion
+    if (use_REcoM) then
+       call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_tra_diff_part_hor_redi', 'Horizontal diffusion of dissolved Inorganic C (includes Redi diffusivity if Redi=.true.)', '[mmol/m3]', tracers%work%tra_diff_part_hor_redi(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('DIC_tra_diff_part_ver_expl')
+! vertical diffusion (Explicit)
+    if (use_REcoM) then
+       call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_tra_diff_part_ver_expl', 'Vertical diffusion of dissolved Inorganic C (Explicit)', '[mmol/m3]', tracers%work%tra_diff_part_ver_expl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('DIC_tra_diff_part_ver_redi_expl')
+! projection of horizontal Redi diffussivity onto vertical
+    if (use_REcoM) then
+       call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_tra_diff_part_ver_redi_expl', 'Projection of horizontal Redi diffussivity onto vertical for dissolved Inorganic C (Explicit)', '[mmol/m3]', tracers%work%tra_diff_part_ver_redi_expl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('DIC_tra_diff_part_ver_impl')
+! vertical diffusion (Implicit)
+    if (use_REcoM) then
+       call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_tra_diff_part_ver_impl', 'Vertical diffusion of dissolved Inorganic C (Implicit)', '[mmol/m3]', tracers%work%tra_diff_part_ver_impl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('DIC_recom_sms             ')
+! recom_sms
+    if (use_REcoM) then
+       call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_recom_sms', 'Recom SMS', '[mmol/m3]', tracers%work%tra_recom_sms(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+! ALK
+
+CASE ('Alk_hor_adv               ')
+! horizontal advection
+    if (use_REcoM) then
+       call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'Alk_hor_adv', 'Horizontal advection part of Total Alkalinity', '[mmol/m3]', tracers%work%tra_advhoriz(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('Alk_lo_hor_adv            ')
+! horizontal advection LO
+    if (use_REcoM) then
+       call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'Alk_lo_hor_adv', 'LO Horizontal advection part of Total Alkalinity', '[mmol/m3]', tracers%work%tra_advhoriz_LO(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif 
+
+CASE ('Alk_ver_adv               ')
+! vertical advection
+    if (use_REcoM) then
+       call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'Alk_ver_adv', 'Vertical advection part of Total Alkalinity', '[mmol/m3]', tracers%work%tra_advvert(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('Alk_tra_diff_part_hor_redi')
+! horizontal diffusion
+    if (use_REcoM) then
+       call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'Alk_tra_diff_part_hor_redi', 'Horizontal diffusion of Total Alkalinity (includes Redi diffusivity if Redi=.true.)', '[mmol/m3]', tracers%work%tra_diff_part_hor_redi(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('Alk_tra_diff_part_ver_expl')               
+! vertical diffusion (Explicit)
+    if (use_REcoM) then
+       call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'Alk_tra_diff_part_ver_expl', 'Vertical diffusion of Total Alkalinity (Explicit)', '[mmol/m3]', tracers%work%tra_diff_part_ver_expl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif 
+
+CASE ('Alk_tra_diff_part_ver_redi_expl')             
+! projection of horizontal Redi diffussivity onto vertical
+    if (use_REcoM) then
+       call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'Alk_tra_diff_part_ver_redi_expl', 'Projection of horizontal Redi diffussivity onto vertical for Total Alkalinity (Explicit)', '[mmol/m3]', tracers%work%tra_diff_part_ver_redi_expl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('Alk_tra_diff_part_ver_impl')               
+! vertical diffusion (Implicit)
+    if (use_REcoM) then
+       call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'Alk_tra_diff_part_ver_impl', 'Vertical diffusion of Total Alkalinity (Implicit)', '[mmol/m3]', tracers%work%tra_diff_part_ver_impl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('Alk_recom_sms             ')               
+! recom_sms
+    if (use_REcoM) then
+       call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'Alk_recom_sms', 'Recom SMS', '[mmol/m3]', tracers%work%tra_recom_sms(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+
 CASE ('otracers  ')
     do j=3, tracers%num_tracers
     write (id_string, "(I4.4)") tracers%data(j)%ID
@@ -2787,111 +2954,15 @@ CASE ('otracers  ')
          call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIN', 'Dissolved Inorganic Nitrogen', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
          endif
 
-
-
-            if (tracers%data(j)%ltra_diag) then
-               ! horizontal advection
-               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIN_hor_adv', 'Horizontal advection part of dissolved Inorganic N', '[mmol/m3]', tracers%work%tra_advhoriz(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-                ! horizontal advection LO
-               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIN_lo_hor_adv', 'LO Horizontal advection part of dissolved Inorganic N', '[mmol/m3]', tracers%work%tra_advhoriz_LO(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
-               ! vertical advection
-               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIN_ver_adv', 'Vertical advection part of dissolved Inorganic N', '[mmol/m3]', tracers%work%tra_advvert(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
-               ! vertical advection LO
-               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIN_lo_ver_adv', 'LO Vertical advection part of dissolved Inorganic N', '[mmol/m3]', tracers%work%tra_advvert_LO(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
-               ! horizontal diffusion
-               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIN_tra_diff_part_hor_redi', 'Horizontal diffusion of dissolved Inorganic N (includes Redi diffusivity if Redi=.true.)', '[mmol/m3]', tracers%work%tra_diff_part_hor_redi(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
-               if (tracers%data(j)%i_vert_diff) then
-               ! vertical diffusion (Explicit)
-                   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIN_tra_diff_part_ver_expl', 'Vertical diffusion of dissolved Inorganic N (Explicit)', '[mmol/m3]', tracers%work%tra_diff_part_ver_expl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-               end if
-
-               ! projection of horizontal Redi diffussivity onto vertical
-               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIN_tra_diff_part_ver_redi_expl', 'Projection of horizontal Redi diffussivity onto vertical for dissolved Inorganic N (Explicit)', '[mmol/m3]', tracers%work%tra_diff_part_ver_redi_expl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
-               ! vertical diffusion (Implicit)
-               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIN_tra_diff_part_ver_impl', 'Vertical diffusion of dissolved Inorganic N (Implicit)', '[mmol/m3]', tracers%work%tra_diff_part_ver_impl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
-               ! recom_sms
-               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIN_recom_sms', 'Recom SMS', '[mmol/m3]', tracers%work%tra_recom_sms(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-            end if
-
-
-
-
-
-
-
-
       else if (tracers%data(j)%ID==1002) then
          if (use_REcoM) then
          call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC', 'Dissolved Inorganic C', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
-            if (tracers%data(j)%ltra_diag) then
-               ! horizontal advection
-               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_hor_adv', 'Horizontal advection part of dissolved Inorganic C', '[mmol/m3]', tracers%work%tra_advhoriz(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-                ! horizontal advection LO
-               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_lo_hor_adv', 'LO Horizontal advection part of dissolved Inorganic C', '[mmol/m3]', tracers%work%tra_advhoriz_LO(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
-               ! vertical advection
-               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_ver_adv', 'Vertical advection part of dissolved Inorganic C', '[mmol/m3]', tracers%work%tra_advvert(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
-               ! vertical advection LO
-               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_lo_ver_adv', 'LO Vertical advection part of dissolved Inorganic C', '[mmol/m3]', tracers%work%tra_advvert_LO(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
-               ! horizontal diffusion
-               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_tra_diff_part_hor_redi', 'Horizontal diffusion of dissolved Inorganic C (includes Redi diffusivity if Redi=.true.)', '[mmol/m3]', tracers%work%tra_diff_part_hor_redi(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
-               if (tracers%data(j)%i_vert_diff) then
-               ! vertical diffusion (Explicit)
-                   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_tra_diff_part_ver_expl', 'Vertical diffusion of dissolved Inorganic C (Explicit)', '[mmol/m3]', tracers%work%tra_diff_part_ver_expl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-               end if
-
-               ! projection of horizontal Redi diffussivity onto vertical
-               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_tra_diff_part_ver_redi_expl', 'Projection of horizontal Redi diffussivity onto vertical for dissolved Inorganic C (Explicit)', '[mmol/m3]', tracers%work%tra_diff_part_ver_redi_expl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
-               ! vertical diffusion (Implicit)
-               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_tra_diff_part_ver_impl', 'Vertical diffusion of dissolved Inorganic C (Implicit)', '[mmol/m3]', tracers%work%tra_diff_part_ver_impl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
-               ! recom_sms
-               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_recom_sms', 'Recom SMS', '[mmol/m3]', tracers%work%tra_recom_sms(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-            end if
-
          endif
 
       else if (tracers%data(j)%ID==1003) then
          if (use_REcoM) then
          call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'Alk', 'Total Alkalinity', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 !!!!24.06.2025
-            if (tracers%data(j)%ltra_diag) then ! OG - tra_diag
-               ! horizontal advection
-               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'Alk_hor_adv', 'Horizontal advection part of Total Alkalinity', '[mmol/m3]', tracers%work%tra_advhoriz(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-                ! horizontal advection LO
-               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'Alk_lo_hor_adv', 'LO Horizontal advection part of Total Alkalinity', '[mmol/m3]', tracers%work%tra_advhoriz_LO(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-               ! vertical advection
-               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'Alk_ver_adv', 'Vertical advection part of Total Alkalinity', '[mmol/m3]', tracers%work%tra_advvert(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
-               ! horizontal diffusion
-               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'Alk_tra_diff_part_hor_redi', 'Horizontal diffusion of Total Alkalinity (includes Redi diffusivity if Redi=.true.)', '[mmol/m3]', tracers%work%tra_diff_part_hor_redi(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
-               if (.not. tracers%data(j)%i_vert_diff) then
-               ! vertical diffusion (Explicit)
-                   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'Alk_tra_diff_part_ver_expl', 'Vertical diffusion of Total Alkalinity (Explicit)', '[mmol/m3]', tracers%work%tra_diff_part_ver_expl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-               end if
-
-               ! projection of horizontal Redi diffussivity onto vertical
-               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'Alk_tra_diff_part_ver_redi_expl', 'Projection of horizontal Redi diffussivity onto vertical for Total Alkalinity (Explicit)', '[mmol/m3]', tracers%work%tra_diff_part_ver_redi_expl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
-               ! vertical diffusion (Implicit)
-               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'Alk_tra_diff_part_ver_impl', 'Vertical diffusion of Total Alkalinity (Implicit)', '[mmol/m3]', tracers%work%tra_diff_part_ver_impl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
-               ! recom_sms
-               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'Alk_recom_sms', 'Recom SMS', '[mmol/m3]', tracers%work%tra_recom_sms(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
-            end if
          endif
 
       ! =====================================================================
