@@ -1,7 +1,7 @@
 module oce_setup_step_module
     USE MOD_MESH
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_ex, par_abort
     USE MOD_TRACER
     USE MOD_DYN
     USE o_PARAM
@@ -136,7 +136,7 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
         case ('TOY'                   ) ; mix_scheme_nmb = 9
         case default 
             if (partit%mype==0) write(*,*) "!not existing mixing scheme!"
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
             stop
     end select
 

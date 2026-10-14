@@ -11,7 +11,7 @@ module par_support_module
     implicit none
 
     private
-    public :: par_init, par_ex, par_finalize, init_mpi_types, init_mpi_types_fbin, &
+    public :: par_init, par_abort, par_ex, par_finalize, init_mpi_types, init_mpi_types_fbin, &
               init_gatherLists, status_check
 
 contains
@@ -55,16 +55,15 @@ subroutine par_init(partit)    ! initializes MPI
   end if
 end subroutine par_init
 !=================================================================
-subroutine par_ex(COMM, mype, abort)       ! aborts the run (error exit)
+subroutine par_abort(COMM, mype)           ! aborts the run (error exit)
 
   implicit none
   integer,           intent(in)   :: COMM
   integer,           intent(in)   :: mype
-  integer, optional, intent(in)   :: abort ! ignored: par_ex always aborts, kept for compatibility
   integer                         :: error
 
-! par_ex is the error exit: it always calls MPI_ABORT with a non-zero error code,
-! with or without the argument abort. The normal end of a run is par_finalize.
+! par_abort is the error exit: it always calls MPI_ABORT with a non-zero error
+! code. The normal end of a run is par_finalize.
   write(*,*) 'Run finished unexpectedly! FESOM aborts on rank ', mype
 
   ! flush stdout and stderr so that error messages are visible before MPI_ABORT
@@ -79,6 +78,17 @@ subroutine par_ex(COMM, mype, abort)       ! aborts the run (error exit)
   call MPI_ABORT(MPI_COMM_WORLD, 1, error)
 #endif
 
+end subroutine par_abort
+!=================================================================
+subroutine par_ex(COMM, mype, abort)       ! deprecated, use par_abort
+! Kept so that existing calls compile; it aborts like par_abort. The optional
+! argument abort is ignored. To be removed once all calls use par_abort.
+  implicit none
+  integer,           intent(in)   :: COMM
+  integer,           intent(in)   :: mype
+  integer, optional, intent(in)   :: abort
+
+  call par_abort(COMM, mype)
 end subroutine par_ex
 !=================================================================
 subroutine par_finalize(COMM, mype)        ! finalizes MPI (normal end of the run)
