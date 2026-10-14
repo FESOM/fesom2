@@ -1322,7 +1322,10 @@ contains
         kpp_data_created = .true.
      end if
      viscA => kpp_viscA
-     !$ACC UPDATE DEVICE(UVnode, stress_node_surf, heat_flux, water_flux)
+     !$ACC UPDATE DEVICE(stress_node_surf, heat_flux, water_flux)
+     if (.not. uvnode_on_device) then
+        !$ACC UPDATE DEVICE(UVnode)
+     end if
      if (.not. geom_on_device) then
         !$ACC UPDATE DEVICE(mesh%zbar_3d_n, mesh%hnode)
      end if

@@ -358,6 +358,9 @@ logical                                     :: slope_out_needed = .false.
 ! an output stream reads uv_rhs on the host
 logical                                     :: uv_dev_current = .false., gmvel_on_device = .false.
 logical                                     :: uvrhs_out_needed = .false.
+! UVnode computed on the device (compute_vel_nodes); the host copy is refreshed only
+! where the host reads it (monitor, restart, output)
+logical                                     :: uvnode_on_device = .false.
 
 !_______________________________________________________________________________
 !!PS ! dummy arrays

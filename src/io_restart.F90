@@ -695,6 +695,9 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
       !$ACC UPDATE HOST(tracers%data(tr_num_acc)%valuesold, tracers%data(tr_num_acc)%valuesAB)
     end do
     !$ACC UPDATE HOST(dynamics%uv_rhsAB) ! momentum AB history (compute_vel_rhs on the device)
+    if (uvnode_on_device) then
+        !$ACC UPDATE HOST(dynamics%uvnode)
+    end if
   end if
 #endif
   ! Write restart files

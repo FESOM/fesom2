@@ -3518,7 +3518,7 @@ end subroutine
 ! .true. when the source of the stream is computed on the device and its device copy is current at
 ! output time (host and device copy are equal while the per-step downloads exist)
 logical function stream_src_on_device(entry)
-    use o_ARRAYS, only: ts_on_device, vv_on_device, redi_on_device
+    use o_ARRAYS, only: ts_on_device, vv_on_device, redi_on_device, uvnode_on_device
     use o_mixing_KPP_mod, only: kpp_on_device
     use oce_ale_pressure_bv_module, only: pbv_on_device
     use o_PARAM, only: Fer_GM
@@ -3538,6 +3538,8 @@ logical function stream_src_on_device(entry)
         stream_src_on_device = vv_on_device
     case ('redi_K')
         stream_src_on_device = redi_on_device
+    case ('unod', 'vnod')
+        stream_src_on_device = uvnode_on_device
     case ('bolus_w')
         stream_src_on_device = vv_on_device .and. Fer_GM
     end select

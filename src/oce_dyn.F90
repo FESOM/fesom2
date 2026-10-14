@@ -24,6 +24,7 @@ module oce_dyn_module
     ! OpenACC: the momentum rhs of this step is computed on the device (set in
     ! compute_vel_rhs; .false. for configurations the device path does not cover)
     logical :: mom_on_device = .false.
+    logical :: uvnode_created = .false.
 
 contains
 
@@ -184,6 +185,9 @@ end subroutine update_vel_acc
 !
 !_______________________________________________________________________________
 subroutine compute_vel_nodes(dynamics, partit, mesh)
+#ifdef ENABLE_OPENACC
+    use o_mixing_KPP_mod, only: kpp_on_device
+#endif
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -196,6 +200,43 @@ subroutine compute_vel_nodes(dynamics, partit, mesh)
     real(kind=WP), dimension(:,:,:), pointer :: UV, UVnode
     UV=>dynamics%uv(:,:,:)
     UVnode=>dynamics%uvnode(:,:,:)
+#ifdef ENABLE_OPENACC
+    ! on the device when UV is current there and the only per-step reader (KPP)
+    ! runs there too; same summation order as the host loop
+    uvnode_on_device = uv_dev_current .and. kpp_on_device
+    if (uvnode_on_device) then
+        if (.not. uvnode_created) then
+            !$ACC ENTER DATA CREATE(dynamics%uvnode)
+            uvnode_created = .true.
+        end if
+        !$ACC PARALLEL LOOP GANG VECTOR_LENGTH(32) DEFAULT(PRESENT) PRIVATE(uln, nln)
+        DO n=1, partit%myDim_nod2D
+            uln = mesh%ulevels_nod2D(n)
+            nln = mesh%nlevels_nod2D(n)
+            !$ACC LOOP VECTOR PRIVATE(tvol, tx, ty, k, elem, ule, nle)
+            DO nz=uln, nln-1
+                tvol=0.0_WP
+                tx  =0.0_WP
+                ty  =0.0_WP
+                !$ACC LOOP SEQ
+                DO k=1, mesh%nod_in_elem2D_num(n)
+                    elem=mesh%nod_in_elem2D(k,n)
+                    ule = mesh%ulevels(elem)
+                    nle = mesh%nlevels(elem)
+                    if (nle-1<nz .or. nz<ule) cycle
+                    tvol=tvol+mesh%elem_area(elem)
+                    tx=tx+UV(1,nz,elem)*mesh%elem_area(elem)
+                    ty=ty+UV(2,nz,elem)*mesh%elem_area(elem)
+                END DO
+                UVnode(1,nz,n)=tx/tvol
+                UVnode(2,nz,n)=ty/tvol
+            END DO
+        END DO
+        !$ACC END PARALLEL LOOP
+        call exchange_nod(UVnode, partit, luse_g2g=.true.)
+        return
+    end if
+#endif
     !___________________________________________________________________________
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, k, elem, nln, uln, nle, ule, tx, ty, tvol)
     DO n=1, partit%myDim_nod2D 
