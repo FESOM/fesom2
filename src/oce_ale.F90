@@ -824,6 +824,14 @@ subroutine init_thickness_ale(dynamics, partit, mesh)
     
     !___________________________________________________________________________
     mesh%hnode_new=mesh%hnode  ! Should be initialized, because only variable part is updated.
+#if defined(USE_SINGLE_PRECISION)
+    ! Seed the WP mirrors that the netCDF restart reads into. hnode_new is an
+    ! optional restart variable: a restart written before it existed leaves its
+    ! mirror untouched, and the copy-back after the read (fesom_module) must then
+    ! give back this initial state, not the zeros from init_ale.
+    mesh%hnode_wp     = real(mesh%hnode, WP)
+    mesh%hnode_new_wp = real(mesh%hnode_new, WP)
+#endif
     call exchange_elem(mesh%helem, partit)
     !!PS call check_total_volume(partit, mesh)
     
@@ -840,7 +848,7 @@ subroutine update_thickness_ale(partit, mesh)
     !___________________________________________________________________________
     integer :: n, nz, elem, elnodes(3),nzmax, nzmin
     integer      , dimension(:), allocatable :: idx
-    real(kind=WP)                            :: rescue_hnode_old(mesh%nl-1)
+    real(kind=WP_full)                       :: rescue_hnode_old(mesh%nl-1)   ! holds hnode (WP_full) for the DVD diagnostic
     !___________________________________________________________________________
     ! pointer on necessary derived types
 
