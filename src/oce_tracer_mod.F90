@@ -3,7 +3,7 @@ MODULE o_tracers
 USE MOD_MESH
 USE MOD_TRACER
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 use oce_muscl_adv_module, only: fill_up_dn_grad
 IMPLICIT NONE
 
@@ -14,7 +14,7 @@ CONTAINS
 SUBROUTINE init_tracers_AB(tr_num, tracers, partit, mesh)
     USE MOD_MESH
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     USE MOD_TRACER
     use g_config, only: flag_debug
     use o_arrays
@@ -89,7 +89,7 @@ end do
        write(*,*) '____________________________________________________________________'
        print *, achar(27)//'[0m'
        write(*,*)
-       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+       call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     end if
 
     if (tracers%data(tr_num)%AB_order==2) then
@@ -149,7 +149,7 @@ SUBROUTINE tracer_gradient_elements(ttf, ttf_grad, partit, mesh, do_overz_in)
     !computes elemental gradient of tracer
     USE MOD_MESH
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     USE MOD_TRACER
     USE o_PARAM
     USE o_ARRAYS
@@ -224,7 +224,7 @@ SUBROUTINE tracer_gradient_z(ttf, ttf_grad, partit, mesh)
     !computes vertical gradient of tracer
     USE MOD_MESH
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     USE MOD_TRACER
     USE o_PARAM
     USE o_ARRAYS
@@ -268,7 +268,7 @@ SUBROUTINE relax_to_clim(tr_num, tracers, partit, mesh)
     use o_arrays
     USE MOD_MESH
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     USE MOD_TRACER
     IMPLICIT NONE
 

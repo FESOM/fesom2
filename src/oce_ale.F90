@@ -2,7 +2,7 @@ module oce_ale_module
     USE o_PARAM
     USE MOD_MESH
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     USE MOD_DYN
     USE o_ARRAYS
     USE g_config
@@ -818,7 +818,7 @@ subroutine init_thickness_ale(dynamics, partit, mesh)
         write(*,*)
         write(*,*) '____________________________________________________________'
         write(*,*) 'The vertical ALE discretisation ', which_ale,' is currently not supported!!!'
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
         end if 
     endif
     
@@ -1467,7 +1467,7 @@ subroutine update_stiff_mat_ale(partit, mesh)
     use MOD_MESH
     use MOD_TRACER
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     use o_ARRAYS
     implicit none
     type(t_partit), intent(inout), target :: partit

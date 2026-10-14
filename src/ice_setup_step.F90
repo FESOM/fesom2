@@ -2,7 +2,7 @@ module ice_setup_step_module
     USE MOD_ICE
     USE MOD_TRACER
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     USE MOD_MESH
     USE o_param
     USE g_CONFIG
@@ -179,7 +179,7 @@ subroutine ice_timestep(step, ice, partit, mesh)
         call EVPdynamics_a(ice, partit, mesh)
     CASE DEFAULT
         if (partit%mype==0) write(*,*) 'a non existing EVP scheme specified!'
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
         stop
     END SELECT
 
@@ -440,7 +440,7 @@ end if
         if (partit%mype==0) WRITE(*,*) '     file   : ', 'namelist.tra',' open ok'
         else
         if (partit%mype==0) WRITE(*,*) 'ERROR: --> bad opening file   : ', 'namelist.tra',' ; iostat=',iost
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
         stop
     end if
     read(nm_ic_unit, nml=tracer_init2d,   iostat=iost)
@@ -516,7 +516,7 @@ end if
                             write(*,*) '            /)'
                             write(*,*) '____________________________________________________________________'
                         end if
-                        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+                        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
                         
                     end if ! --> if (file_exist) then       
                 end if ! --> IF (ice%data(current_tracer)%ID==idlist(i)) then

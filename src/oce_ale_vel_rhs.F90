@@ -2,7 +2,7 @@ module oce_ale_vel_rhs_module
     USE MOD_ICE
     USE MOD_DYN
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     USE MOD_MESH
     USE o_ARRAYS, only: ssh_gp, pgf_x, pgf_y
     USE o_PARAM
@@ -78,7 +78,7 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
             ab3= 23.0_WP/12.0_WP
     ELSE 
        write(*,*) 'unsuppported AB scheme for momentum, use 2 or 3'
-       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+       call par_abort(partit%MPI_COMM_FESOM, partit%mype)
        stop
     END IF 
 
@@ -241,7 +241,7 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
     ! array UV_rhsAB
     if (dynamics%momadv_opt==1) then
        if (partit%mype==0) write(*,*) 'in moment not adapted mom_adv advection typ for ALE, check your namelist'
-       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+       call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     elseif (dynamics%momadv_opt==2) then
         if (.not. dynamics%use_ssh_se_subcycl) then
             call momentum_adv_scalar(dynamics, partit, mesh)
@@ -250,7 +250,7 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
         end if     
     else
        if (partit%mype==0) write(*,*) 'ERROR: unknown momadv_opt=', dynamics%momadv_opt, ', check your namelist.dyn'
-       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+       call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     end if
     
     !___________________________________________________________________________
