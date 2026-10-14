@@ -385,7 +385,7 @@ subroutine pressure_bv_acc(tracers, partit, mesh)
 
     if (mesh%nl > pbv_nl_max) then
         if (partit%mype==0) write(*,*) 'pressure_bv_acc: mesh%nl =', mesh%nl, ' > pbv_nl_max =', pbv_nl_max
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     end if
     mixing_kpp = (mix_scheme_nmb==1 .or. mix_scheme_nmb==18)
     sref = S_ref_anomaly
@@ -2285,7 +2285,7 @@ subroutine pressure_force_4_zxxxx_shchepetkin_acc(partit, mesh)
 
     if (mesh%nl > pgf_nl_max) then
         if (partit%mype==0) write(*,*) 'pressure_force_4_zxxxx_shchepetkin_acc: mesh%nl =', mesh%nl, ' > pgf_nl_max'
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     end if
     ! layer thicknesses from the thickness update at the end of the previous step
     !$ACC UPDATE DEVICE(mesh%helem)
