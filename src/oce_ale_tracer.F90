@@ -1639,16 +1639,19 @@ subroutine diff_ver_part_redi_expl(tracers, partit, mesh)
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, k, elem, nz, n2, nl1, ul1, nl2, Tx, Ty, flux, flux_below, zb, zb_below, zn, zn_up)
 !$OMP DO
 #else
-!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) IF(diff_on_device) PRIVATE(k, elem, nz, nl1, ul1, Tx, Ty)
+!$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) IF(diff_on_device) PRIVATE(nl1, ul1) VECTOR_LENGTH(32)
 #endif
     !___________________________________________________________________________
     do n=1, partit%myDim_nod2D
         nl1=mesh%nlevels_nod2D(n)-1
         ul1=mesh%ulevels_nod2D(n)
         !!PS do nz=1, nl1
+        ! (OpenACC: the levels over the vector lanes, coalesced column access)
+!$ACC LOOP VECTOR PRIVATE(k, elem, Tx, Ty)
         do nz=ul1, nl1
             Tx=0.0_WP
             Ty=0.0_WP
+!$ACC LOOP SEQ
             do k=1, mesh%nod_in_elem2D_num(n)
                 elem=mesh%nod_in_elem2D(k,n)
                 !!PS if(nz.LE.(nlevels(elem)-1)) then

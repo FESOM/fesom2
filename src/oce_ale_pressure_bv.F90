@@ -3259,13 +3259,9 @@ subroutine compute_neutral_slope_acc(partit, mesh)
     ldd_c   = LDD97_c
     ldd_min = LDD97_rmin
     ldd_max = LDD97_rmax
-!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(nz, nl1, ul1, i, ro_z_inv, c1, c2, dep_scale, rssby)
+    ! one gang per node, the levels over the vector lanes (coalesced column access)
+!$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) PRIVATE(nl1, ul1, rssby) VECTOR_LENGTH(32)
     do n=1, partit%myDim_nod2D
-        do nz=1, size(slope_tapered,2)
-            do i=1, 3
-                slope_tapered(i, nz, n)=0._WP
-            end do
-        end do
         nl1=mesh%nlevels_nod2d(n)-1
         ul1=mesh%ulevels_nod2d(n)
         rssby = 0._WP
@@ -3273,7 +3269,12 @@ subroutine compute_neutral_slope_acc(partit, mesh)
             rssby = ldd_c/max(abs(mesh%coriolis_node(n)), f_min)
             rssby = min(ldd_max, max(ldd_min, rssby))
         end if
-        do nz = ul1, nl1
+!$ACC LOOP VECTOR PRIVATE(i, ro_z_inv, c1, c2, dep_scale)
+        do nz=1, size(slope_tapered,2)
+            do i=1, 3
+                slope_tapered(i, nz, n)=0._WP
+            end do
+            if (nz<ul1 .or. nz>nl1) cycle
             ro_z_inv=2._WP*g/density_0/max(bvfreq(nz,n)+bvfreq(nz+1,n), eps**2)
             neutral_slope(1,nz,n)=sigma_xy(1,nz,n)*ro_z_inv
             neutral_slope(2,nz,n)=sigma_xy(2,nz,n)*ro_z_inv
