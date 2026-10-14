@@ -10,6 +10,9 @@ MODULE gen_bulk
 
     implicit none
 
+#ifdef ENABLE_OPENACC
+    logical, save :: ncar_data_created = .false.
+#endif
     public ncar_ocean_fluxes_mode
     public core_coeff_2z
   
@@ -166,6 +169,9 @@ subroutine ncar_ocean_fluxes_mode(ice, partit, mesh)
     type(t_ice)   , intent(inout), target :: ice
     real(kind=WP), dimension(:)  , pointer :: T_oc_array, u_w, v_w
     real(kind=WP)                , pointer :: inv_rhoair, tmelt
+    real(kind=WP) :: l_inv_rhoair, l_tmelt, z_wind, z_tair, z_shum
+    integer       :: nod_size
+    logical       :: on_device
     u_w        => ice%srfoce_u(:)
     v_w        => ice%srfoce_v(:)
     T_oc_array => ice%srfoce_temp(:)
@@ -173,18 +179,41 @@ subroutine ncar_ocean_fluxes_mode(ice, partit, mesh)
     tmelt      => ice%thermo%tmelt
 
 
+    l_inv_rhoair = inv_rhoair
+    l_tmelt      = tmelt
+    z_wind   = ncar_bulk_z_wind
+    z_tair   = ncar_bulk_z_tair
+    z_shum   = ncar_bulk_z_shum
+    nod_size = partit%myDim_nod2d+partit%eDim_nod2d
+    on_device = .false.
+#ifdef ENABLE_OPENACC
+    ! independent per-node iteration: on the device, with the inputs (forcing and
+    ! surface ocean state, held on the host) copied there and the coefficients back
+    on_device = .true.
+    if (.not. ncar_data_created) then
+        !$ACC ENTER DATA CREATE(tair, shum, u_wind, v_wind, u_w, v_w, T_oc_array, cd_atm_oce_arr, ch_atm_oce_arr, ce_atm_oce_arr)
+        ncar_data_created = .true.
+    end if
+    !$ACC UPDATE DEVICE(tair, shum, u_wind, v_wind, u_w, v_w, T_oc_array)
+#endif
+#ifndef ENABLE_OPENACC
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j, m, cd_n10, ce_n10, ch_n10, cd_n10_rt, hl1, cd, ce, ch, cd_rt, x2, x, stab, &
 !$OMP                                    zeta_u, zeta_t, zeta_q, psi_m_u, psi_h_u, psi_m_t, psi_h_t, psi_m_q, psi_h_q, &
 !$OMP                                                                 ts, qs, tv, xx, dux, dvy, t, t10, q, q10, u, u10, cd_prev, ustar, tstar, qstar, bstar, test)
 !$OMP DO
-    do i=1,partit%myDim_nod2d+partit%eDim_nod2d   
+#endif
+    !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) IF(on_device) &
+    !$ACC PRIVATE(j, cd_n10, ce_n10, ch_n10, cd_n10_rt, hl1, cd, ce, ch, cd_rt, x2, x, stab, zeta_u, zeta_t, zeta_q) &
+    !$ACC PRIVATE(psi_m_u, psi_h_u, psi_m_t, psi_h_t, psi_m_q, psi_h_q, ts, qs, tv, xx, dux, dvy, t, t10, q, q10, u, u10) &
+    !$ACC PRIVATE(tstar, qstar, ustar, bstar, test, cd_prev)
+    do i=1, nod_size
         if (mesh%ulevels_nod2d(i)>1) cycle
         ! degree celcium to Kelvin
-        t      = tair(i) + tmelt 
-        ts     = t_oc_array(i) + tmelt  
+        t      = tair(i) + l_tmelt
+        ts     = t_oc_array(i) + l_tmelt
         
         q      = shum(i)
-        qs     = 0.98_WP*q1*inv_rhoair*exp(q2/ts)                   ! L-Y eqn. 5 
+        qs     = 0.98_WP*q1*l_inv_rhoair*exp(q2/ts)                   ! L-Y eqn. 5
         ! virtual potential temperature tv
         tv     = t*(1.0_WP+0.608_WP*q)
         
@@ -229,7 +258,7 @@ subroutine ncar_ocean_fluxes_mode(ice, partit, mesh)
             
             !___________________________________________________________________
             ! (2a) calculate stability parameter zeta_u = z_u/L, L...Monin-Obukov length
-            zeta_u = vonkarm*bstar*ncar_bulk_z_wind/(ustar*ustar)  ! L-Y eqn. 8a
+            zeta_u = vonkarm*bstar*z_wind/(ustar*ustar)  ! L-Y eqn. 8a
             zeta_u = sign( min(abs(zeta_u),10.0_WP), zeta_u)       ! undocumented NCAR
             x2     = sqrt(abs(1._WP-16._WP*zeta_u))                ! L-Y eqn. 8b
             x2     = max(x2, 1.0_WP)                               ! undocumented NCAR
@@ -248,7 +277,7 @@ subroutine ncar_ocean_fluxes_mode(ice, partit, mesh)
             
             !___________________________________________________________________
             ! (2b) calculate stability parameter zeta_t = z_t/L, L...Monin-Obukov length
-            zeta_t = vonkarm*bstar*ncar_bulk_z_tair/(ustar*ustar)! L-Y eqn. 8a
+            zeta_t = vonkarm*bstar*z_tair/(ustar*ustar)! L-Y eqn. 8a
             zeta_t = sign( min(abs(zeta_t),10.0_WP), zeta_t )     ! undocumented NCAR
             x2     = sqrt(abs(1._WP-16._WP*zeta_t))                   ! L-Y eqn. 8b
             x2     = max(x2, 1.0_WP)                                ! undocumented NCAR
@@ -266,7 +295,7 @@ subroutine ncar_ocean_fluxes_mode(ice, partit, mesh)
             
             !___________________________________________________________________
             ! (2c) calculate stability parameter zeta_q = z_q/L, L...Monin-Obukov length
-            zeta_q = vonkarm*bstar*ncar_bulk_z_shum/(ustar*ustar)! L-Y eqn. 8a
+            zeta_q = vonkarm*bstar*z_shum/(ustar*ustar)! L-Y eqn. 8a
             zeta_q = sign( min(abs(zeta_q),10.0_WP), zeta_q )     ! undocumented NCAR
             x2     = sqrt(abs(1._WP-16._WP*zeta_q))                   ! L-Y eqn. 8b
             x2     = max(x2, 1.0_WP)                                ! undocumented NCAR
@@ -284,11 +313,11 @@ subroutine ncar_ocean_fluxes_mode(ice, partit, mesh)
             
             !___________________________________________________________________
             ! (3a) shift wind speed to 10m and neutral stability
-            u10 = u/(1.0_WP+cd_n10_rt*(log(ncar_bulk_z_wind/10._WP)-psi_m_u)/vonkarm) ! L-Y eqn. 9a !why cd_n10_rt not cd_rt
+            u10 = u/(1.0_WP+cd_n10_rt*(log(z_wind/10._WP)-psi_m_u)/vonkarm) ! L-Y eqn. 9a !why cd_n10_rt not cd_rt
             u10 = max(u10, u10min)             ! 0.3 [m/s] floor on wind
             ! (3b) shift temperature and humidity to wind height
-            t10 = t - tstar/vonkarm*(log(ncar_bulk_z_tair/ncar_bulk_z_wind)+psi_h_u-psi_h_t)! L-Y eqn. 9b
-            q10 = q - qstar/vonkarm*(log(ncar_bulk_z_shum/ncar_bulk_z_wind)+psi_h_u-psi_h_q)! L-Y eqn. 9b
+            t10 = t - tstar/vonkarm*(log(z_tair/z_wind)+psi_h_u-psi_h_t)! L-Y eqn. 9b
+            q10 = q - qstar/vonkarm*(log(z_shum/z_wind)+psi_h_u-psi_h_q)! L-Y eqn. 9b
             
             !___________________________________________________________________
             ! (3c) recompute virtual potential temperature tv and update tubulent 
@@ -312,9 +341,9 @@ subroutine ncar_ocean_fluxes_mode(ice, partit, mesh)
             
             !___________________________________________________________________
             ! (4b) shift them to the measurement height z_wind and stability zeta_u
-            xx = (log(ncar_bulk_z_wind/10._WP)-psi_m_u)/vonkarm
+            xx = (log(z_wind/10._WP)-psi_m_u)/vonkarm
             cd = cd_n10/(1.0_WP+cd_n10_rt*xx)**2                   ! L-Y 10a
-            xx = (log(ncar_bulk_z_wind/10._WP)-psi_h_u)/vonkarm
+            xx = (log(z_wind/10._WP)-psi_h_u)/vonkarm
             ch = ch_n10/(1.0_WP+ch_n10*xx/cd_n10_rt)*sqrt(cd/cd_n10)     ! 10b (corrected code aug2007)
             ce = ce_n10/(1.0_WP+ce_n10*xx/cd_n10_rt)*sqrt(cd/cd_n10)     ! 10c (corrected code aug2007)
             
@@ -335,8 +364,14 @@ subroutine ncar_ocean_fluxes_mode(ice, partit, mesh)
         ch_atm_oce_arr(i)=ch
         ce_atm_oce_arr(i)=ce     
     end do
+    !$ACC END PARALLEL LOOP
+#ifndef ENABLE_OPENACC
 !$OMP END DO
 !$OMP END PARALLEL
+#endif
+#ifdef ENABLE_OPENACC
+    !$ACC UPDATE HOST(cd_atm_oce_arr, ch_atm_oce_arr, ce_atm_oce_arr)
+#endif
 end subroutine ncar_ocean_fluxes_mode
 !
 !---------------------------------------------------------------------------------------------------
