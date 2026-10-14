@@ -273,7 +273,7 @@ subroutine monitor_fill_ocean(mon, istep, full, ice, dynamics, tracers, partit, 
         lmin(6) = min(lmin(6), UVnode(1,2,n));    lmax(6) = max(lmax(6), UVnode(1,2,n))
         lmin(7) = min(lmin(7), UVnode(2,1,n));    lmax(7) = max(lmax(7), UVnode(2,1,n))
         lmin(8) = min(lmin(8), UVnode(2,2,n));    lmax(8) = max(lmax(8), UVnode(2,2,n))
-        lmin(9) = min(lmin(9), mesh%hnode(2,n));       lmax(9) = max(lmax(9), mesh%hnode(2,n))
+        lmin(9) = min(lmin(9), real(mesh%hnode(2,n), WP)); lmax(9) = max(lmax(9), real(mesh%hnode(2,n), WP))
         if (use_ice) lmax(10) = max(lmax(10), m_ice(n))
         do nz=1, mesh%nl-1
             lmax(11) = max(lmax(11), CFL_z(nz,n))

@@ -166,7 +166,7 @@ subroutine mle_add_gamma(partit, mesh)
         ! whole column, so mu(z) is not distorted.
         umax = 0.0_WP
         do nz = nzmin_s, nzmax_s-1
-            thick = max(mesh%hnode_new(nz,n), 1.0_WP)
+            thick = max(real(mesh%hnode_new(nz,n), WP), 1.0_WP)
             umax  = max(umax, sqrt( (gcol(1,nz)-gcol(1,nz+1))**2 &
                                   + (gcol(2,nz)-gcol(2,nz+1))**2 ) / thick)
         end do

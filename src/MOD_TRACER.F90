@@ -6,6 +6,7 @@ USE MOD_WRITE_BINARY_ARRAYS
 USE MOD_READ_BINARY_ARRAYS
 IMPLICIT NONE
 SAVE
+private :: write_acc_array, read_acc_array
 
 TYPE T_TRACER_DATA
 real(kind=WP), allocatable, dimension(:,:)    :: values    ! instant values
@@ -32,8 +33,13 @@ END TYPE T_TRACER_DATA
 
 TYPE T_TRACER_WORK
 !auxuary arrays to work with tracers:
-real(kind=WP), allocatable         :: del_ttf(:,:)
-real(kind=WP), allocatable         :: del_ttf_advhoriz(:,:), del_ttf_advvert(:,:)
+! Thickness-integrated tendencies accumulate in WP_full (real64 also in a
+! single-precision build): an edge or interface flux enters its two cells with
+! opposite signs, and the sums only telescope if the products are not rounded
+! to real32 before they are added. The fluxes themselves stay WP.
+real(kind=WP_full), allocatable    :: del_ttf(:,:)
+real(kind=WP_full), allocatable    :: del_ttf_advhoriz(:,:), del_ttf_advvert(:,:)
+real(kind=WP), allocatable         :: carry(:,:,:)   ! use_tracer_carry (SP only): thickness-weighted rounding residual of the state
 !_______________________________________________________________________________
 ! in case ldiag_DVD=.true. --> calculate discrete variance decay (DVD)
 ! dvd_trflx_h, dvd_trflx_v ... reconstructed horizontal tracer fluxes at mid 
@@ -54,7 +60,7 @@ real(kind=WP), allocatable                    :: tra_recom_sms(:,:,:)
 
 ! The fct part
 real(kind=WP),allocatable,dimension(:,:)      :: fct_LO          ! Low-order solution
-real(kind=WP),allocatable,dimension(:,:)      :: fct_LO_tend     ! Low-order tendency in flux form (tracer*thickness per step)
+real(kind=WP_full),allocatable,dimension(:,:) :: fct_LO_tend     ! Low-order tendency in flux form (tracer*thickness per step)
 real(kind=WP),allocatable,dimension(:,:)      :: edge_flux       ! per-edge horizontal flux, staged so that nodes can gather it (diffusion)
 real(kind=WP),allocatable,dimension(:,:)      :: adv_flux_hor    ! Antidif. horiz. contrib. from edges / backup for iterafive fct scheme
 real(kind=WP),allocatable,dimension(:,:)      :: adv_flux_ver    ! Antidif. vert. fluxes from nodes    / backup for iterafive fct scheme
@@ -168,13 +174,13 @@ subroutine WRITE_T_TRACER_WORK(twork, unit)
     integer                              :: iostat
     character(len=1024)                  :: iomsg
 
-    call write_bin_array(twork%del_ttf,          unit, iostat, iomsg)
-    call write_bin_array(twork%del_ttf_advhoriz, unit, iostat, iomsg)
-    call write_bin_array(twork%del_ttf_advvert,  unit, iostat, iomsg)
+    call write_acc_array(twork%del_ttf,          unit, iostat, iomsg)
+    call write_acc_array(twork%del_ttf_advhoriz, unit, iostat, iomsg)
+    call write_acc_array(twork%del_ttf_advvert,  unit, iostat, iomsg)
     call write_bin_array(twork%dvd_trflx_hor,    unit, iostat, iomsg)
     call write_bin_array(twork%dvd_trflx_ver,    unit, iostat, iomsg)
     call write_bin_array(twork%fct_LO,           unit, iostat, iomsg)
-    call write_bin_array(twork%fct_LO_tend,      unit, iostat, iomsg)
+    call write_acc_array(twork%fct_LO_tend,      unit, iostat, iomsg)
     call write_bin_array(twork%adv_flux_hor,     unit, iostat, iomsg)
     call write_bin_array(twork%edge_flux,        unit, iostat, iomsg)
     call write_bin_array(twork%adv_flux_ver,     unit, iostat, iomsg)
@@ -195,13 +201,13 @@ subroutine READ_T_TRACER_WORK(twork, unit)
     integer                              :: iostat
     character(len=1024)                  :: iomsg
 
-    call read_bin_array(twork%del_ttf,          unit, iostat, iomsg)
-    call read_bin_array(twork%del_ttf_advhoriz, unit, iostat, iomsg)
-    call read_bin_array(twork%del_ttf_advvert,  unit, iostat, iomsg)
+    call read_acc_array(twork%del_ttf,          unit, iostat, iomsg)
+    call read_acc_array(twork%del_ttf_advhoriz, unit, iostat, iomsg)
+    call read_acc_array(twork%del_ttf_advvert,  unit, iostat, iomsg)
     call read_bin_array(twork%dvd_trflx_hor,    unit, iostat, iomsg)
     call read_bin_array(twork%dvd_trflx_ver,    unit, iostat, iomsg)
     call read_bin_array(twork%fct_LO,           unit, iostat, iomsg)
-    call read_bin_array(twork%fct_LO_tend,      unit, iostat, iomsg)
+    call read_acc_array(twork%fct_LO_tend,      unit, iostat, iomsg)
     call read_bin_array(twork%adv_flux_hor,     unit, iostat, iomsg)
     call read_bin_array(twork%edge_flux,        unit, iostat, iomsg)
     call read_bin_array(twork%adv_flux_ver,     unit, iostat, iomsg)
@@ -213,6 +219,27 @@ subroutine READ_T_TRACER_WORK(twork, unit)
     call read_bin_array(twork%edge_up_dn_tri,   unit, iostat, iomsg)
     call read_bin_array(twork%edge_up_dn_grad,  unit, iostat, iomsg)
 end subroutine READ_T_TRACER_WORK
+
+! WP_full arrays go through the WP binary format of the raw dump
+subroutine write_acc_array(arr, unit, iostat, iomsg)
+    real(kind=WP_full), intent(in), allocatable :: arr(:,:)
+    integer,           intent(in)              :: unit
+    integer,           intent(out)             :: iostat
+    character(*),      intent(inout)           :: iomsg
+    real(kind=WP),     allocatable             :: tmp(:,:)
+    if (allocated(arr)) tmp = real(arr, WP)
+    call write_bin_array(tmp, unit, iostat, iomsg)
+end subroutine write_acc_array
+
+subroutine read_acc_array(arr, unit, iostat, iomsg)
+    real(kind=WP_full), intent(inout), allocatable :: arr(:,:)
+    integer,           intent(in)                 :: unit
+    integer,           intent(out)                :: iostat
+    character(*),      intent(inout)              :: iomsg
+    real(kind=WP),     allocatable                :: tmp(:,:)
+    call read_bin_array(tmp, unit, iostat, iomsg)
+    if (allocated(tmp)) arr = real(tmp, WP_full)
+end subroutine read_acc_array
 
 ! Unformatted writing for T_TRACER
 subroutine WRITE_T_TRACER(tracer, unit, iostat, iomsg)

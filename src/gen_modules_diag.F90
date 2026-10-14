@@ -834,7 +834,7 @@ subroutine compute_destinE(mode, dynamics, tracers, partit, mesh)
        zint=0.0_WP
        do nz=nzmin, nzmax-1
           ! zint is the top of layer nz; take the part of the layer above each target depth
-          heatcontent(n,:)=heatcontent(n,:)+temp(nz,n)*max(min(mesh%hnode(nz,n), whichdepth-zint), 0.0_WP)
+          heatcontent(n,:)=heatcontent(n,:)+temp(nz,n)*max(min(real(mesh%hnode(nz,n), WP), whichdepth-zint), 0.0_WP)
           zint=zint+mesh%hnode(nz, n)
        end do
        heatcontent(n,:)=1025.*3990.*heatcontent(n,:) 
@@ -1124,6 +1124,7 @@ subroutine compute_dvd(mode, dynamics, tracers, partit, mesh)
     type(t_mesh)  , intent(in)   ,  target    :: mesh
     integer                                   :: tr_num, node, elem
     real(kind=WP),  dimension(:,:)  , pointer :: trflx_h, trflx_v, tr, trold, Wvel, dump, fer_Wvel
+    real(kind=WP),  allocatable, target, save :: dump_ws(:,:)
     real(kind=WP),  dimension(:,:,:), pointer :: UV, fer_UV
     ! residual (resolved + bolus) velocities, so that the model velocities stay untouched
     real(kind=WP),  dimension(:,:,:), allocatable, target :: UV_res
@@ -1223,7 +1224,8 @@ subroutine compute_dvd(mode, dynamics, tracers, partit, mesh)
         trflx_v   => tracers%work%dvd_trflx_ver( :,:,tr_num) ! vertical advectiv tracer flux 
         trold     => tracers%data(tr_num)%valuesold(1, :, :) ! tracer^n
         tr        => tracers%data(tr_num)%values(:,:)        ! tracer^(n+1)
-        dump      => tracers%work%del_ttf
+        if (.not. allocated(dump_ws)) allocate(dump_ws(size(tracers%work%del_ttf,1), size(tracers%work%del_ttf,2)))
+        dump      => dump_ws
         
         !_______________________________________________________________________
         ! need to recompute tracer gradients 
