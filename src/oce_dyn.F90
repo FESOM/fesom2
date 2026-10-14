@@ -1,7 +1,7 @@
 module oce_dyn_module
     USE MOD_MESH
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     USE MOD_DYN
     USE o_PARAM
     USE g_CONFIG
@@ -202,7 +202,7 @@ subroutine viscosity_filter(option, dynamics, partit, mesh)
             call visc_filt_dbcksc(dynamics, partit, mesh) 
         CASE DEFAULT
             if (partit%mype==0) write(*,*) 'mixing scheme with option ' , option, 'has not yet been implemented'
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
             stop
     END SELECT
 end subroutine viscosity_filter  
@@ -887,7 +887,7 @@ subroutine check_validviscopt_5(partit, mesh)
         write(*,*) '____________________________________________________________________'
         print *, achar(27)//'[0m'
         write(*,*)
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
         end if
     else
         if (partit%mype==0) then 

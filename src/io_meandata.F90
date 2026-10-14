@@ -1,6 +1,6 @@
 module io_MEANDATA
   USE MOD_PARTIT
-  use par_support_module, only: par_ex
+  use par_support_module, only: par_abort
 #if defined(__recom)
   use recom_glovar
   use recom_config
@@ -247,7 +247,7 @@ module io_MEANDATA
                       partit%MPI_COMM_FESOM, partit%mype==0, ierr)
     if (ierr /= 0) then
        if (partit%mype==0) write(*,*) 'io_meandata: nodal redist_build failed, ierr=', ierr
-       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+       call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     end if
 
     allocate(gelem(max(1, partit%myDim_elem2D_shrinked)))
@@ -271,7 +271,7 @@ module io_MEANDATA
                       n_elem2d, out_sched_nod%n_writers, partit%MPI_COMM_FESOM, .false., ierr)
     if (ierr /= 0) then
        if (partit%mype==0) write(*,*) 'io_meandata: element redist_build failed, ierr=', ierr
-       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+       call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     end if
     deallocate(gelem)
 
@@ -282,7 +282,7 @@ module io_MEANDATA
        write(*,*) 'io_meandata: nodal and element writer sets disagree on rank ', partit%mype, &
                   ' -- nodal writers ', out_sched_nod%n_writers, &
                   ', element writers ', out_sched_elem%n_writers
-       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+       call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     end if
 
     call MPI_Comm_split(partit%MPI_COMM_FESOM, merge(1,0,out_sched_nod%is_writer), &
@@ -537,7 +537,7 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
     use MOD_MESH
     use MOD_TRACER
     use MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     use MOD_DYN
     use MOD_ICE
     use o_ARRAYS       
@@ -715,14 +715,14 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
       if (partit%mype==0) WRITE(*,*) '     file   : ', 'namelist.io',' open ok'
     else
       if (partit%mype==0) WRITE(*,*) 'ERROR: --> file not found   : ', 'namelist.io',' ; iostat=',iost
-      call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+      call par_abort(partit%MPI_COMM_FESOM, partit%mype)
       stop
     endif
 
     READ(nm_io_unit, nml=nml_general,  iostat=iost )
     if (iost/=0) then
        if (partit%mype==0) WRITE(*,*) 'ERROR: in reading nml_general block in namelist.io, invalid formatting.'
-       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+       call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     endif
 
     allocate(io_list(io_listsize))
@@ -2780,7 +2780,7 @@ end function stream0D_already_defined
 function mesh_dimname_from_dimsize(size, partit, mesh) result(name)
     use mod_mesh
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     use diagnostics
 #if defined (__icepack)
     use icedrv_main,   only: ncat ! number of ice thickness cathegories
@@ -2843,7 +2843,7 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
     use g_clock
     use mod_mesh
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     USE MOD_DYN
     USE MOD_ICE
     use fesom_version_info_module
@@ -3537,7 +3537,7 @@ subroutine output(istep, ice, dynamics, tracers, partit, mesh)
     use g_clock
     use mod_mesh
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     use MOD_DYN
     use MOD_ICE
     use mod_tracer
@@ -3647,7 +3647,7 @@ ctime=timenew+(daynew-1.)*86400
         else
             write(*,*) 'You did not specify a supported outputflag.'
             write(*,*) 'The program will stop to give you opportunity to do it.'
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
             stop
         endif
 #if defined(__XIOS)
@@ -3879,7 +3879,7 @@ end subroutine
 subroutine output_0D_streams(istep, partit)
     use g_clock
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     implicit none
     integer, intent(in) :: istep
     type(t_partit), intent(inout) :: partit
@@ -4062,7 +4062,7 @@ end subroutine create_0D_file
 subroutine do_output_callback(entry_index)
     use mod_mesh
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     integer, intent(in) :: entry_index ! index of variable in def_stream array 
     ! EO args
     type(Meandata), pointer :: entry
@@ -4185,7 +4185,7 @@ end subroutine
 subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, freq_unit, accuracy, partit, mesh, flip_array, long_description)
   use mod_mesh
   USE MOD_PARTIT
-  use par_support_module, only: par_ex
+  use par_support_module, only: par_abort
   use g_cvmix_idemix2, only: idemix2_nfbin
   implicit none
   type(t_partit),        intent(inout), target :: partit
@@ -4278,7 +4278,7 @@ end subroutine
 subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, freq_unit, accuracy, partit, mesh, long_description)
   use mod_mesh
   USE MOD_PARTIT
-  use par_support_module, only: par_ex
+  use par_support_module, only: par_abort
   implicit none
   integer,               intent(in)    :: glsize, lcsize
   character(len=*),      intent(in)    :: name, description, units
@@ -4349,7 +4349,7 @@ end subroutine
 ! build 0D (scalar) meandata streaming object for global values
 subroutine def_stream0D(name, description, units, data, freq, freq_unit, accuracy, partit, long_description)
   USE MOD_PARTIT
-  use par_support_module, only: par_ex
+  use par_support_module, only: par_abort
   use g_clock
   implicit none
   character(len=*),      intent(in)    :: name, description, units
@@ -4445,7 +4445,7 @@ end subroutine
 subroutine def_stream_after_dimension_specific(entry, name, description, units, freq, freq_unit, accuracy, partit, mesh, long_description)
     use mod_mesh
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     use io_netcdf_workaround_module
     type(Meandata), intent(inout) :: entry
     character(len=*),      intent(in)    :: name, description, units
@@ -4473,7 +4473,7 @@ subroutine def_stream_after_dimension_specific(entry, name, description, units, 
       allocate(data_strategy_nf_float_type :: entry%data_strategy)
     else
        if (partit%mype==0) write(*,*) 'not supported output accuracy:',accuracy,'for',trim(name)
-       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+       call par_abort(partit%MPI_COMM_FESOM, partit%mype)
        stop
     endif ! accuracy
 
@@ -4508,7 +4508,7 @@ subroutine def_stream_after_dimension_specific(entry, name, description, units, 
 !      write(*,*) 'total elem=', mesh%elem2D, entry_index
     else
       if(partit%mype == 0) print *,"can not determine if ",trim(name)," is node or elem based"
-      call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+      call par_abort(partit%MPI_COMM_FESOM, partit%mype)
       stop
     end if
     

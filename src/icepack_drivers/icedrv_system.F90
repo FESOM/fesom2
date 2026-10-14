@@ -7,7 +7,7 @@
       module icedrv_system
 
       use icedrv_kinds
-      use par_support_module, only: par_ex
+      use par_support_module, only: par_abort
       use icedrv_constants, only: ice_stderr
       use icepack_intfc,    only: icepack_warnings_flush, icepack_warnings_aborted
       use mod_partit
@@ -49,7 +49,7 @@
        
       ! Stop FESOM2
 
-      call par_ex(p_partit%MPI_COMM_FESOM, p_partit%mype, 1)
+      call par_abort(p_partit%MPI_COMM_FESOM, p_partit%mype)
       stop
 
       end subroutine icedrv_system_abort

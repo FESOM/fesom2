@@ -1,7 +1,7 @@
 module oce_fer_gm_module
     USE MOD_MESH
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     USE o_PARAM
     USE o_ARRAYS, only: sigma_xy, fer_gamma, bvfreq, fer_c, fer_K, fer_k, fer_scal, Ki, &
             MLD1_ind, neutral_slope, fer_tapfac, fer_GINsea_mask
@@ -354,7 +354,7 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
                 write(*,*) '____________________________________________________________________'
                 print *, achar(27)//'[0m'
                 write(*,*)
-                call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+                call par_abort(partit%MPI_COMM_FESOM, partit%mype)
                 end if 
             !___________________________________________________________________
             ! Allpy vertical scaling after Ferreira et al.(2005)

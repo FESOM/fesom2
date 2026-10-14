@@ -28,7 +28,7 @@ contains
 subroutine check_mpi_comm(rn, sn, r_mpitype, s_mpitype, rPE, sPE, partit)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 integer,        intent(in)         :: sn, rn, r_mpitype(:), s_mpitype(:), rPE(:), sPE(:)
@@ -56,7 +56,7 @@ END SUBROUTINE check_mpi_comm
 subroutine exchange_nod2D_i(nod_array2D, partit, luse_g2g)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 integer,        intent(inout)         :: nod_array2D(:)
@@ -72,7 +72,7 @@ END SUBROUTINE exchange_nod2D_i
 subroutine exchange_nod2D_i_begin(nod_array2D, partit, luse_g2g)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 integer,        intent(inout)         :: nod_array2D(:)
@@ -137,7 +137,7 @@ END SUBROUTINE exchange_nod2D_i_begin
 subroutine exchange_nod2D(nod_array2D, partit, luse_g2g)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 real(kind=WP),   intent(inout)         :: nod_array2D(:)
@@ -155,7 +155,7 @@ END SUBROUTINE exchange_nod2D
 subroutine exchange_nod2D_begin(nod_array2D, partit, luse_g2g)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 real(kind=WP),   intent(inout)         :: nod_array2D(:)
@@ -214,7 +214,7 @@ END SUBROUTINE exchange_nod2D_begin
 subroutine exchange_nod2D_2fields(nod1_array2D, nod2_array2D, partit, luse_g2g)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 real(kind=WP),   intent(inout)         :: nod1_array2D(:)
@@ -233,7 +233,7 @@ END SUBROUTINE exchange_nod2D_2fields
 subroutine exchange_nod2D_2fields_begin(nod1_array2D, nod2_array2D, partit, luse_g2g)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 real(kind=WP),   intent(inout)         :: nod1_array2D(:)
@@ -305,7 +305,7 @@ subroutine exchange_nod2D_3fields(nod1_array2D, nod2_array2D, nod3_array2D, part
 ! General version of the communication routine for 2D nodal fields
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 real(kind=WP),   intent(inout)         :: nod1_array2D(:)
@@ -326,7 +326,7 @@ subroutine exchange_nod2D_3fields_begin(nod1_array2D, nod2_array2D, nod3_array2D
 ! General version of the communication routine for 2D nodal fields
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 real(kind=WP),   intent(inout)         :: nod1_array2D(:)
@@ -414,7 +414,7 @@ END SUBROUTINE exchange_nod2D_3fields_begin
 subroutine exchange_nod3D(nod_array3D, partit, luse_g2g)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 real(kind=WP),   intent(inout)         :: nod_array3D(:,:)
@@ -433,7 +433,7 @@ END SUBROUTINE exchange_nod3D
 subroutine exchange_nod3D_begin(nod_array3D, partit, luse_g2g)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 real(kind=WP),   intent(inout)         :: nod_array3D(:,:)
@@ -459,7 +459,7 @@ end if
           print *,'Subroutine exchange_nod3D not implemented for',nl1,'layers.'
           print *,'Adding the MPI datatypes is easy, see oce_modules.F90.'
        endif
-       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+       call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     endif
 
     ! Check MPI point-to-point communication for consistency
@@ -502,7 +502,7 @@ END SUBROUTINE exchange_nod3D_begin
 subroutine exchange_nod3D_2fields(nod1_array3D,nod2_array3D, partit, luse_g2g)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 real(kind=WP),   intent(inout)         :: nod1_array3D(:,:)
@@ -521,7 +521,7 @@ subroutine exchange_nod3D_2fields_begin(nod1_array3D,nod2_array3D, partit, luse_
 ! stored in (vertical, horizontal) format
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 real(kind=WP),   intent(inout)         :: nod1_array3D(:,:)
@@ -548,7 +548,7 @@ end if
           print *,'Subroutine exchange_nod3D not implemented for',nl1,'layers.'
           print *,'Adding the MPI datatypes is easy, see oce_modules.F90.'
        endif
-       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+       call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     endif
 
     nl2 = ubound(nod2_array3D,1)
@@ -557,7 +557,7 @@ end if
           print *,'Subroutine exchange_nod3D not implemented for',nl2,'layers.'
           print *,'Adding the MPI datatypes is easy, see oce_modules.F90.'
        endif
-       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+       call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     endif
 
 #ifdef DEBUG
@@ -611,7 +611,7 @@ END SUBROUTINE exchange_nod3D_2fields_begin
 subroutine exchange_nod3D_n(nod_array3D, partit, luse_g2g)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 real(kind=WP),   intent(inout)          :: nod_array3D(:,:,:)
@@ -629,7 +629,7 @@ END SUBROUTINE exchange_nod3D_n
 subroutine exchange_nod3D_n_begin(nod_array3D, partit, luse_g2g)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 real(kind=WP),   intent(inout)          :: nod_array3D(:,:,:)
@@ -659,7 +659,7 @@ if (partit%npes>1) then
            print *,nl1,'layers and / or ',n_val,'values per element.'
            print *,'Adding the MPI datatypes is easy, see oce_modules.F90.'
         endif
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
      endif
   endif
   sn=partit%com_nod2D%sPEnum
@@ -711,7 +711,7 @@ END SUBROUTINE exchange_nod3D_n_begin
 SUBROUTINE exchange_nod_end(partit)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 
@@ -723,7 +723,7 @@ END SUBROUTINE exchange_nod_end
 SUBROUTINE exchange_elem_end(partit)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 
@@ -741,7 +741,7 @@ END SUBROUTINE exchange_elem_end
 subroutine exchange_elem3D(elem_array3D, partit, luse_g2g)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 real(kind=WP),   intent(inout)          :: elem_array3D(:,:)
@@ -757,7 +757,7 @@ END SUBROUTINE exchange_elem3D
 subroutine exchange_elem3D_begin(elem_array3D, partit, luse_g2g)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 real(kind=WP),   intent(inout)       :: elem_array3D(:,:)
@@ -852,7 +852,7 @@ if (partit%npes> 1) then
         endif
       else
          if (partit%mype==0) print *,'Sorry, no MPI datatype prepared for',nl1,'values per element (exchange_elem3D)'
-         call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+         call par_abort(partit%MPI_COMM_FESOM, partit%mype)
       endif
 
       partit%com_elem2D%nreq = rn+sn
@@ -939,7 +939,7 @@ if (partit%npes> 1) then
          endif
       else
          if (partit%mype==0) print *,'Sorry, no MPI datatype prepared for',nl1,'values per element (exchange_elem3D)'
-         call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+         call par_abort(partit%MPI_COMM_FESOM, partit%mype)
       endif
 
       partit%com_elem2D_full%nreq = rn+sn
@@ -956,7 +956,7 @@ END SUBROUTINE exchange_elem3D_begin
 subroutine exchange_elem3D_n(elem_array3D, partit, luse_g2g)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 real(kind=WP),   intent(inout)       :: elem_array3D(:,:,:)
@@ -973,7 +973,7 @@ subroutine exchange_elem3D_n_begin(elem_array3D, partit, luse_g2g)
 ! stored in (vertical, horizontal) format
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 real(kind=WP),   intent(inout)       :: elem_array3D(:,:,:)
@@ -1003,7 +1003,7 @@ end if
            print *,nl1,'layers and / or ',n_val,'values per element.'
            print *,'Adding the MPI datatypes is easy, see oce_modules.F90.'
         endif
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
      endif
   endif
 
@@ -1090,7 +1090,7 @@ END SUBROUTINE exchange_elem3D_n_begin
 subroutine exchange_elem2D(elem_array2D, partit, luse_g2g)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 real(kind=WP),   intent(inout)       :: elem_array2D(:)
@@ -1108,7 +1108,7 @@ END SUBROUTINE exchange_elem2D
 subroutine exchange_elem2D_begin(elem_array2D, partit, luse_g2g)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 real(kind=WP),   intent(inout)       :: elem_array2D(:)
@@ -1206,7 +1206,7 @@ END SUBROUTINE exchange_elem2D_begin
 subroutine exchange_elem2D_i(elem_array2D, partit, luse_g2g)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 integer,        intent(inout)       :: elem_array2D(:)
@@ -1224,7 +1224,7 @@ END SUBROUTINE exchange_elem2D_i
 subroutine exchange_elem2D_i_begin(elem_array2D, partit, luse_g2g)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 integer,        intent(inout)       :: elem_array2D(:)
@@ -1289,7 +1289,7 @@ subroutine broadcast_nod3D(arr3D, arr3Dglobal, partit)
 ! Distribute the nodal information available on 0 PE to other PEs
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 INTEGER                             :: nz, counter,nl1
@@ -1354,7 +1354,7 @@ subroutine broadcast_nod2D(arr2D, arr2Dglobal, partit)
 ! A 2D version of the previous routine
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(in), target       :: partit
 integer :: MPIerr
@@ -1404,7 +1404,7 @@ subroutine broadcast_elem3D(arr3D, arr3Dglobal, partit)
 ! Distribute the elemental information available on 0 PE to other PEs
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(in), target      :: partit
 integer :: MPIerr
@@ -1472,7 +1472,7 @@ subroutine broadcast_elem2D(arr2D, arr2Dglobal, partit)
 ! A 2D version of the previous routine
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(in), target      :: partit
 integer :: MPIerr
@@ -1522,7 +1522,7 @@ end subroutine broadcast_elem2D
 subroutine gather_nod3D(arr3D, arr3D_global, partit)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 INTEGER                                :: nl1
@@ -1582,7 +1582,7 @@ subroutine gather_real4_nod3D(arr3D, arr3D_global, partit)
 ! Use only with 3D arrays stored in (vertical, horizontal) way
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 INTEGER                             :: nl1
@@ -1641,7 +1641,7 @@ subroutine gather_int2_nod3D(arr3D, arr3D_global, partit)
 ! Use only with 3D arrays stored in (vertical, horizontal) way
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 INTEGER                             :: nl1
@@ -1697,7 +1697,7 @@ subroutine gather_nod2D(arr2D, arr2D_global, partit)
 ! Make nodal information available to master PE
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 integer                             :: n
@@ -1749,7 +1749,7 @@ subroutine gather_real4_nod2D(arr2D, arr2D_global, partit)
 ! Make nodal information available to master PE
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 integer                             :: n
@@ -1802,7 +1802,7 @@ end subroutine gather_real4_nod2D
 subroutine gather_int2_nod2D(arr2D, arr2D_global, partit)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 integer                             :: n
@@ -1857,7 +1857,7 @@ subroutine gather_elem3D(arr3D, arr3D_global, partit)
 ! Use only with 3D arrays stored in (vertical, horizontal) way
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 INTEGER                             :: nl1
@@ -1919,7 +1919,7 @@ end subroutine gather_elem3D
 subroutine gather_real4_elem3D(arr3D, arr3D_global, partit)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 INTEGER                                :: nl1
@@ -1982,7 +1982,7 @@ end subroutine gather_real4_elem3D
 subroutine gather_int2_elem3D(arr3D, arr3D_global, partit)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 INTEGER                             :: nl1
@@ -2044,7 +2044,7 @@ end subroutine gather_int2_elem3D
 subroutine gather_elem2D(arr2D, arr2D_global, partit)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 integer                             :: n
@@ -2100,7 +2100,7 @@ end subroutine gather_elem2D
 subroutine gather_real4_elem2D(arr2D, arr2D_global, partit)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 integer                             :: n
@@ -2157,7 +2157,7 @@ end subroutine gather_real4_elem2D
 subroutine gather_int2_elem2D(arr2D, arr2D_global, partit)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 integer                                :: n
@@ -2215,7 +2215,7 @@ end subroutine gather_int2_elem2D
 subroutine gather_real8to4_nod3D(arr3D, arr3D_global, partit)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 INTEGER                             :: nl1
@@ -2276,7 +2276,7 @@ end subroutine gather_real8to4_nod3D
 subroutine gather_real8to4_nod2D(arr2D, arr2D_global, partit)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 integer                             :: n
@@ -2329,7 +2329,7 @@ subroutine gather_real8to4_elem3D(arr3D, arr3D_global, partit)
 ! Use only with 3D arrays stored in (vertical, horizontal) way
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 INTEGER                             :: nl1
@@ -2387,7 +2387,7 @@ end subroutine gather_real8to4_elem3D
 subroutine gather_real8to4_elem2D(arr2D, arr2D_global, partit)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 integer                             :: n
@@ -2443,7 +2443,7 @@ subroutine gather_elem2D_i(arr2D, arr2D_global, partit)
 ! Make element information available to master PE
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 integer                       :: n
@@ -2482,7 +2482,7 @@ end subroutine gather_elem2D_i
 subroutine gather_nod2D_i(arr2D, arr2D_global, partit)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 integer              :: n
@@ -2534,7 +2534,7 @@ end subroutine gather_nod2D_i
 subroutine gather_edg2D(arr2D, arr2Dglobal, partit)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(in), target      :: partit
 integer :: MPIerr
@@ -2586,7 +2586,7 @@ end subroutine gather_edg2D
 subroutine gather_edg2D_i(arr2D, arr2Dglobal, partit)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 integer                                :: arr2D(:)
@@ -2644,7 +2644,7 @@ end subroutine gather_edg2D_i
 subroutine gather_nod2D_fbin(arr2D, arr2D_global, partit)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 integer                                :: nfbin
@@ -2699,7 +2699,7 @@ end subroutine gather_nod2D_fbin
 subroutine gather_elem2D_fbin(arr2D, arr2D_global, partit)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 integer                                :: nfbin
@@ -2754,7 +2754,7 @@ end subroutine gather_elem2D_fbin
 subroutine gather_real4_nod2D_fbin(arr2D, arr2D_global, partit)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 integer                                :: nfbin
@@ -2809,7 +2809,7 @@ end subroutine gather_real4_nod2D_fbin
 subroutine gather_real4_elem2D_fbin(arr2D, arr2D_global, partit)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 integer                                :: nfbin
@@ -2877,7 +2877,7 @@ end subroutine gather_real4_elem2D_fbin
 subroutine exchange_nod2D_fbin(nod_array, partit)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 real(kind=WP),   intent(inout)         :: nod_array(:,:)
@@ -2890,7 +2890,7 @@ END SUBROUTINE exchange_nod2D_fbin
 subroutine exchange_nod2D_fbin_begin(nod_array, partit)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 real(kind=WP),   intent(inout)         :: nod_array(:,:)
@@ -2899,7 +2899,7 @@ integer                               :: n, sn, rn
 if (partit%npes > 1) then
    if (partit%nfbin_mpi == 0) then
       if (partit%mype==0) print *,'ERROR: exchange_nod2D_fbin called but init_mpi_types_fbin was not called.'
-      call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+      call par_abort(partit%MPI_COMM_FESOM, partit%mype)
    endif
 
    sn=partit%com_nod2D%sPEnum
@@ -2925,7 +2925,7 @@ END SUBROUTINE exchange_nod2D_fbin_begin
 subroutine exchange_nod3D_fbin(nod_array, partit)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 real(kind=WP),   intent(inout)         :: nod_array(:,:,:)
@@ -2938,7 +2938,7 @@ END SUBROUTINE exchange_nod3D_fbin
 subroutine exchange_nod3D_fbin_begin(nod_array, partit)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 real(kind=WP),   intent(inout)         :: nod_array(:,:,:)
@@ -2947,14 +2947,14 @@ integer                               :: n, sn, rn, n_val
 if (partit%npes > 1) then
    if (partit%nfbin_mpi == 0) then
       if (partit%mype==0) print *,'ERROR: exchange_nod3D_fbin called but init_mpi_types_fbin was not called.'
-      call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+      call par_abort(partit%MPI_COMM_FESOM, partit%mype)
    endif
 
    ! nod_array(n_val, nfbin, nod2D)
    n_val = ubound(nod_array,1)
    if (n_val < 1 .or. n_val > 3) then
       if (partit%mype==0) print *,'exchange_nod3D_fbin: n_val must be 1..3, got', n_val
-      call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+      call par_abort(partit%MPI_COMM_FESOM, partit%mype)
    endif
 
    sn=partit%com_nod2D%sPEnum
@@ -2980,7 +2980,7 @@ END SUBROUTINE exchange_nod3D_fbin_begin
 subroutine exchange_elem2D_fbin(elem_array, partit)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 real(kind=WP),   intent(inout)          :: elem_array(:,:)
@@ -2994,7 +2994,7 @@ END SUBROUTINE exchange_elem2D_fbin
 subroutine exchange_elem2D_fbin_begin(elem_array, partit)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 real(kind=WP),   intent(inout)          :: elem_array(:,:)
@@ -3003,7 +3003,7 @@ integer                                :: n, sn, rn
 if (partit%npes > 1) then
    if (partit%nfbin_mpi == 0) then
       if (partit%mype==0) print *,'ERROR: exchange_elem2D_fbin called but init_mpi_types_fbin was not called.'
-      call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+      call par_abort(partit%MPI_COMM_FESOM, partit%mype)
    endif
 
    if (ubound(elem_array,2)<=partit%myDim_elem2D+partit%eDim_elem2D) then
@@ -3050,7 +3050,7 @@ END SUBROUTINE exchange_elem2D_fbin_begin
 subroutine exchange_elem3D_fbin(elem_array, partit)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 real(kind=WP),   intent(inout)          :: elem_array(:,:,:)
@@ -3064,7 +3064,7 @@ END SUBROUTINE exchange_elem3D_fbin
 subroutine exchange_elem3D_fbin_begin(elem_array, partit)
 use MOD_MESH
 USE MOD_PARTIT
-use par_support_module, only: par_ex
+use par_support_module, only: par_abort
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 real(kind=WP),   intent(inout)          :: elem_array(:,:,:)
@@ -3073,14 +3073,14 @@ integer                                :: n, sn, rn, n_val
 if (partit%npes > 1) then
    if (partit%nfbin_mpi == 0) then
       if (partit%mype==0) print *,'ERROR: exchange_elem3D_fbin called but init_mpi_types_fbin was not called.'
-      call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+      call par_abort(partit%MPI_COMM_FESOM, partit%mype)
    endif
 
    ! elem_array(n_val, nfbin, elem2D)
    n_val = ubound(elem_array,1)
    if (n_val < 1 .or. n_val > 4) then
       if (partit%mype==0) print *,'exchange_elem3D_fbin: n_val must be 1..4, got', n_val
-      call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+      call par_abort(partit%MPI_COMM_FESOM, partit%mype)
    endif
 
    if (ubound(elem_array,3)<=partit%myDim_elem2D+partit%eDim_elem2D) then

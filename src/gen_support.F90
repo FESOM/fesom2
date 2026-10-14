@@ -4,7 +4,7 @@
 module g_support
   USE MOD_MESH
   USE MOD_PARTIT
-  use par_support_module, only: par_ex
+  use par_support_module, only: par_abort
   use g_comm_auto
   use o_ARRAYS
   use g_config, only: dummy
@@ -308,7 +308,7 @@ end subroutine smooth_elem3D
 !
 subroutine integrate_nod_2D(data, int2D, partit, mesh)
   USE MOD_PARTIT
-  use par_support_module, only: par_ex
+  use par_support_module, only: par_abort
   use g_comm_auto
 
   IMPLICIT NONE
@@ -341,7 +341,7 @@ end subroutine integrate_nod_2D
 !
 subroutine integrate_nod_3D(data, int3D, partit, mesh)
   USE MOD_PARTIT
-  use par_support_module, only: par_ex
+  use par_support_module, only: par_abort
   use g_comm_auto
 
   IMPLICIT NONE
@@ -714,7 +714,7 @@ FUNCTION omp_min_max_sum1(arr, pos1, pos2, what, partit, nan)
 
     CASE DEFAULT
        if (partit%mype==0) write(*,*) trim(what), ' is not implemented in omp_min_max_sum case!'
-       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+       call par_abort(partit%MPI_COMM_FESOM, partit%mype)
        STOP
   END SELECT
 
@@ -790,7 +790,7 @@ FUNCTION omp_min_max_sum2(arr, pos11, pos12, pos21, pos22, what, partit, nan)
 
    CASE DEFAULT
       if (partit%mype==0) write(*,*) trim(what), ' is not implemented in omp_min_max_sum case!'
-      call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+      call par_abort(partit%MPI_COMM_FESOM, partit%mype)
       STOP
    END SELECT
 
@@ -801,7 +801,7 @@ end function omp_min_max_sum2
 !
 subroutine integrate_elem_3D(data, int3D, partit, mesh)
   USE MOD_PARTIT
-  use par_support_module, only: par_ex
+  use par_support_module, only: par_abort
   use g_comm_auto
 
   IMPLICIT NONE
@@ -841,7 +841,7 @@ end subroutine integrate_elem_3D
 !
 subroutine integrate_elem_2D(data, int2D, partit, mesh)
   USE MOD_PARTIT
-  use par_support_module, only: par_ex
+  use par_support_module, only: par_abort
   use g_comm_auto
 
   IMPLICIT NONE

@@ -35,7 +35,7 @@ module g_cvmix_idemix2
     use o_param           
     use MOD_MESH
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     use o_arrays
     use o_tracers
     use g_comm_auto 
@@ -781,7 +781,7 @@ module g_cvmix_idemix2
                     write(*,*) '____________________________________________________________________'
                     print *, achar(27)//'[0m'
                     write(*,*)
-                    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+                    call par_abort(partit%MPI_COMM_FESOM, partit%mype)
                 end if
             end if 
             
@@ -875,7 +875,7 @@ module g_cvmix_idemix2
                     write(*,*) '____________________________________________________________________'
                     print *, achar(27)//'[0m'
                     write(*,*)
-                    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+                    call par_abort(partit%MPI_COMM_FESOM, partit%mype)
                 end if
             end if
         end if
@@ -947,7 +947,7 @@ module g_cvmix_idemix2
                     write(*,*) '____________________________________________________________________'
                     print *, achar(27)//'[0m'
                     write(*,*)
-                    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+                    call par_abort(partit%MPI_COMM_FESOM, partit%mype)
                 end if 
             end if 
             t1=MPI_Wtime()
@@ -979,7 +979,7 @@ module g_cvmix_idemix2
 !                     write(*,*) '____________________________________________________________________'
 !                     print *, achar(27)//'[0m'
 !                     write(*,*)
-!                     call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+!                     call par_abort(partit%MPI_COMM_FESOM, partit%mype)
 !                 end if
 !             end if 
 !         end if ! --> if (idemix2_enable_leew) then 
@@ -1007,7 +1007,7 @@ module g_cvmix_idemix2
                     write(*,*) '____________________________________________________________________'
                     print *, achar(27)//'[0m'
                     write(*,*)
-                    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+                    call par_abort(partit%MPI_COMM_FESOM, partit%mype)
                 end if
             end if 
             
@@ -1029,7 +1029,7 @@ module g_cvmix_idemix2
                     write(*,*) '____________________________________________________________________'
                     print *, achar(27)//'[0m'
                     write(*,*)
-                    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+                    call par_abort(partit%MPI_COMM_FESOM, partit%mype)
                 end if
             end if
             

@@ -1,7 +1,7 @@
 ! ==============================================================
 subroutine setup_model(partit)
   USE MOD_PARTIT
-  use par_support_module, only: par_ex
+  use par_support_module, only: par_abort
   use o_param
 !   use i_therm_param
   use g_forcing_param
@@ -30,7 +30,7 @@ subroutine setup_model(partit)
     if(partit%mype==0) then
       write(*,*) 'ERROR: Could not open namelist file ', trim(nmlfile)
     endif
-    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+    call par_abort(partit%MPI_COMM_FESOM, partit%mype)
   endif
   read (fileunit, NML=modelname, iostat=istat)
   if (istat /= 0) call check_namelist_read(fileunit, 'modelname', nmlfile, partit)
@@ -131,7 +131,7 @@ subroutine setup_model(partit)
     if(partit%mype==0) then
       write(*,*) 'ERROR: Could not open namelist file ', trim(nmlfile)
     endif
-    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+    call par_abort(partit%MPI_COMM_FESOM, partit%mype)
   endif
   read (fileunit, NML=oce_dyn, iostat=istat)
   if (istat /= 0) call check_namelist_read(fileunit, 'oce_dyn', nmlfile, partit)
@@ -164,7 +164,7 @@ subroutine setup_model(partit)
     if(partit%mype==0) then
       write(*,*) 'ERROR: Could not open namelist file ', trim(nmlfile)
     endif
-    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+    call par_abort(partit%MPI_COMM_FESOM, partit%mype)
   endif
   read (fileunit, NML=tracer_phys, iostat=istat)
   if (istat /= 0) call check_namelist_read(fileunit, 'tracer_phys', nmlfile, partit)
@@ -176,7 +176,7 @@ subroutine setup_model(partit)
     if(partit%mype==0) then
       write(*,*) 'ERROR: Could not open namelist file ', trim(nmlfile)
     endif
-    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+    call par_abort(partit%MPI_COMM_FESOM, partit%mype)
   endif
   read (fileunit, NML=forcing_exchange_coeff, iostat=istat)
   if (istat /= 0) call check_namelist_read(fileunit, 'forcing_exchange_coeff', nmlfile, partit)
@@ -205,7 +205,7 @@ subroutine setup_model(partit)
     if(partit%mype==0) then
       write(*,*) 'ERROR: Could not open namelist file ', trim(nmlfile)
     endif
-    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+    call par_abort(partit%MPI_COMM_FESOM, partit%mype)
   endif
   read (fileunit, NML=diag_list, iostat=istat)
   if (istat /= 0) call check_namelist_read(fileunit, 'diag_list', nmlfile, partit)
@@ -227,7 +227,7 @@ subroutine setup_model(partit)
     if(partit%mype==0) then
       write(*,*) 'ERROR: Could not open namelist file ', trim(nmlfile)
     endif
-    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+    call par_abort(partit%MPI_COMM_FESOM, partit%mype)
   endif
   read (fileunit, NML=parecomsetup, iostat=istat)
   if (istat /= 0) call check_namelist_read(fileunit, 'parecomsetup', nmlfile, partit)
@@ -380,7 +380,7 @@ subroutine setup_model(partit)
         write(*,*) '____________________________________________________________________'
         print *, achar(27)//'[0m'
         write(*,*)
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     endif
     
 
@@ -399,7 +399,7 @@ subroutine read_namelist_run_config
 
   !--------------------------------------------------------------
   USE MOD_PARTIT
-  use par_support_module, only: par_ex
+  use par_support_module, only: par_abort
   use g_config
   implicit none
 
@@ -424,7 +424,7 @@ subroutine get_run_steps(nsteps, partit)
   !--------------------------------------------------------------  
   use g_clock
   USE MOD_PARTIT
-  use par_support_module, only: par_ex
+  use par_support_module, only: par_abort
   implicit none
 
   type(t_partit), intent(inout) :: partit
@@ -461,7 +461,7 @@ subroutine get_run_steps(nsteps, partit)
   else
      write(*,*) 'Run length unit ', run_length_unit, ' is not defined.'
      write(*,*) 'Please check and update the code.'
-     call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+     call par_abort(partit%MPI_COMM_FESOM, partit%mype)
      stop
   end if
 
@@ -473,7 +473,7 @@ end subroutine get_run_steps
 
 subroutine check_namelist_read(fileunit, nml_name, nmlfile, partit)
     use MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     use, intrinsic :: iso_fortran_env, only: error_unit
     implicit none
     integer,          intent(in) :: fileunit
@@ -488,7 +488,7 @@ subroutine check_namelist_read(fileunit, nml_name, nmlfile, partit)
         write(error_unit,'(A)') 'ERROR: Could not read namelist '//trim(nml_name)//' from '//trim(nmlfile)
         write(error_unit,'(A)') 'Invalid line in namelist: '//trim(line)
     endif
-    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+    call par_abort(partit%MPI_COMM_FESOM, partit%mype)
 end subroutine check_namelist_read
 
 ! ==============================================================

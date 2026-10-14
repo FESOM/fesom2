@@ -36,7 +36,7 @@ MODULE g_sbf
    USE iso_fortran_env, only: error_unit, real64
    USE MOD_MESH
    USE MOD_PARTIT
-   use par_support_module, only: par_ex
+   use par_support_module, only: par_abort
    USE o_ARRAYS
    USE o_PARAM
    USE g_comm_auto
@@ -462,7 +462,7 @@ CONTAINS
                 write(error_unit,*) '          message block in gen_surface_forcing.F90.'
                 write(error_unit,*) '____________________________________________________________'
                 write(error_unit,*) achar(27)//'[0m'
-                call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+                call par_abort(partit%MPI_COMM_FESOM, partit%mype)
             end if
         elseif ((trim(flf%calendar).eq.'julian')    .or. &
                 (trim(flf%calendar).eq.'gregorian') .or. &
@@ -483,7 +483,7 @@ CONTAINS
                 write(error_unit,*) '          gen_surface_forcing.F90'
                 write(error_unit,*) '____________________________________________________________'
                 write(error_unit,*) achar(27)//'[0m'
-                call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+                call par_abort(partit%MPI_COMM_FESOM, partit%mype)
             end if 
         else
             write(error_unit,*) achar(27)//'[31m'
@@ -502,7 +502,7 @@ CONTAINS
             write(error_unit,*) '        example with ncdump -h forcing_file.nc '
             write(error_unit,*) '____________________________________________________________'
             write(error_unit,*) achar(27)//'[0m'
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
         end if ! --> if ((trim(flf%calendar).eq.'none')   .or. & ...
     end if !--> if (partit%mype==0 .and. use_flpyrcheck) then
       
@@ -1221,7 +1221,7 @@ CONTAINS
          if (partit%mype==0) WRITE(*,*) '     file   : ', 'namelist.forcing',' open ok'
       else
          if (partit%mype==0) WRITE(error_unit,*) 'ERROR: --> bad opening file   : ', 'namelist.forcing',' ; iostat=',iost
-         call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+         call par_abort(partit%MPI_COMM_FESOM, partit%mype)
       endif
       READ( nm_sbc_unit, nml=nam_sbc, iostat=iost )
       close( nm_sbc_unit )
@@ -1397,7 +1397,7 @@ CONTAINS
                     write(error_unit,*) achar(27)//'[0m'
                     write(error_unit,*)
                 end if
-                call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+                call par_abort(partit%MPI_COMM_FESOM, partit%mype)
             end if
             
         else
@@ -1418,7 +1418,7 @@ CONTAINS
                 write(error_unit,*) achar(27)//'[0m'
                 write(error_unit,*)
             end if
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
         
         end if 
     end if     
@@ -1467,7 +1467,7 @@ CONTAINS
                 write(error_unit,*) achar(27)//'[0m'
                 write(error_unit,*)
             end if
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
 
         end if
 
@@ -1501,7 +1501,7 @@ CONTAINS
                 write(error_unit,*) achar(27)//'[0m'
                 write(error_unit,*)
             end if
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
 
         end if
 
@@ -1528,7 +1528,7 @@ CONTAINS
             write(error_unit,*) achar(27)//'[0m'
             write(error_unit,*)
         end if
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
 
     end if   
     
@@ -1562,7 +1562,7 @@ CONTAINS
                     write(error_unit,*) achar(27)//'[0m'
                     write(error_unit,*)
                 end if
-                call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+                call par_abort(partit%MPI_COMM_FESOM, partit%mype)
                 
             end if 
         elseif (chl_data_source == 'Const.' .or. chl_data_source == 'None') then
@@ -1595,7 +1595,7 @@ CONTAINS
                 write(error_unit,*) achar(27)//'[0m'
                 write(error_unit,*)
             end if
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
             
         end if ! --> if (chl_data_source == 'Sweeney') then
     end if ! --> if (use_sw_pene) then
@@ -1624,7 +1624,7 @@ CONTAINS
 !#if defined(__usetp)
 !        endif !(partit%my_fesom_group==0) then
 !#endif
-!            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+!            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
 !            stop
 !        endif
 !        READ( nm_sbc_unit+1, nml=nam_rsbc, iostat=iost )
@@ -1669,7 +1669,7 @@ CONTAINS
 #if defined(__usetp)
         endif !(partit%my_fesom_group==0) then
 #endif
-          call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+          call par_abort(partit%MPI_COMM_FESOM, partit%mype)
           stop
       endif
 
@@ -1878,7 +1878,7 @@ CONTAINS
                         write(error_unit,*) achar(27)//'[0m'
                         write(error_unit,*)
                     end if
-                    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+                    call par_abort(partit%MPI_COMM_FESOM, partit%mype)
                 end if 
             
             end if ! --> if(runoff_climatology) then
@@ -2018,7 +2018,7 @@ SUBROUTINE sbc_do_recom(partit, mesh)
             if (status.ne.nf90_noerr)then
                 write(error_unit,*) 'ERROR: CANNOT READ CO2 FILE CORRECTLY !!!!!'
                 write(error_unit,*) 'Error in opening netcdf file '//filename
-                call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+                call par_abort(partit%MPI_COMM_FESOM, partit%mype)
                 stop
             endif
 	
@@ -2499,7 +2499,7 @@ END SUBROUTINE sbc_do_recom
 
       if (iost .ne. NF90_NOERR) then
          write(error_unit,*) 'ERROR: I/O status= "',trim(nf90_strerror(iost)),'";',iost,' file= ',fname
-         call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+         call par_abort(partit%MPI_COMM_FESOM, partit%mype)
          stop
       endif
    END SUBROUTINE check_nferr
@@ -2544,7 +2544,7 @@ END SUBROUTINE sbc_do_recom
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
       if (iost /= NF90_NOERR) then
-         call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+         call par_abort(partit%MPI_COMM_FESOM, partit%mype)
       end if
 
       if (partit%mype == 0) then
@@ -2553,7 +2553,7 @@ END SUBROUTINE sbc_do_recom
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
       if (iost /= NF90_NOERR) then
          if (partit%mype == 0) write(*,*) 'ERROR: variable not found in mask file: ', trim(nm_ocean_mask_var)
-         call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+         call par_abort(partit%MPI_COMM_FESOM, partit%mype)
       end if
 
       ! Read the data (nlon-2 x nlat, excluding halo columns)
@@ -3661,7 +3661,7 @@ subroutine read_runoff_mapper(file, vari, R, partit, mesh)
    use o_param
    USE MOD_MESH
    USE MOD_PARTIT
-   use par_support_module, only: par_ex
+   use par_support_module, only: par_abort
    USE g_forcing_arrays,    only: runoff
    use g_support
    use netcdf
@@ -3697,7 +3697,7 @@ subroutine read_runoff_mapper(file, vari, R, partit, mesh)
    if (status.ne.nf90_noerr)then
       write(error_unit,*) 'ERROR: CANNOT READ 2D netCDF FILE CORRECTLY !!!!!'
       write(error_unit,*) 'Error in opening netcdf file '//file
-      call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+      call par_abort(partit%MPI_COMM_FESOM, partit%mype)
       stop
    endif
 
@@ -3819,7 +3819,7 @@ subroutine read_runoff_mapper(file, vari, R, partit, mesh)
          write(error_unit,*) 'RUNOFF MAPPER ERROR: total number of arrival points does not sum up among partitions: ', status, number_arrival_points
          write(error_unit,*) 'two different grid points have same distance to a target point!'
       end if
-      call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+      call par_abort(partit%MPI_COMM_FESOM, partit%mype)
       STOP
    end if
    RUNOFF_MAPPER%dim=partit%myDim_nod2d+partit%eDim_nod2D
@@ -3849,7 +3849,7 @@ subroutine read_runoff_mapper(file, vari, R, partit, mesh)
                write(error_unit,*) 'RUNOFF MAPPER ERROR: arrival point has an index outside of permitted range', j, drain_num
                write(error_unit,*) 'two different grid points have same distance to a target point!'
             end if
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
             STOP
          end if
          dist=distance_on_sphere(lon_sparse(i), lat_sparse(i), mesh%geo_coord_nod2D(1,n), mesh%geo_coord_nod2D(2,n))

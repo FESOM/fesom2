@@ -4,7 +4,7 @@ MODULE io_BLOWUP
 	use g_comm_auto
     USE MOD_MESH
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     USE MOD_TRACER  
     USE MOD_DYN
     USE MOD_ICE
@@ -412,7 +412,7 @@ MODULE io_BLOWUP
 				deallocate(aux2)
 			else
 				if (partit%mype==0) write(*,*) 'not supported shape of array in restart file'
-				call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+				call par_abort(partit%MPI_COMM_FESOM, partit%mype)
 				stop
 			end if
 		end do
@@ -503,7 +503,7 @@ MODULE io_BLOWUP
 			if (status .ne. NF90_NOERR) then
 				if (partit%mype==0) write(*,*) 'error counter=', k
 				if (partit%mype==0) call handle_err(status, partit)
-				call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+				call par_abort(partit%MPI_COMM_FESOM, partit%mype)
 				stop
 			end if
 		end do

@@ -1,7 +1,7 @@
 module oce_setup_step_module
     USE MOD_MESH
     USE MOD_PARTIT
-    use par_support_module, only: par_ex, par_abort
+    use par_support_module, only: par_abort
     USE MOD_TRACER
     USE MOD_DYN
     USE o_PARAM
@@ -258,7 +258,7 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
                 'SPP, cavities, icebergs, age tracer, transient tracers, ', &
                 'KPP nonlocal fluxes, 3D climatology relaxation, ', &
                 'salinity diagnostics (extflds/trflx/salt3D/DVD/cmor)'
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
         end if
     end if
     if (.not.r_restart) then
@@ -333,7 +333,7 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
         if (partit%mype==0) WRITE(*,*) '     file   : ', 'namelist.tra',' open ok'
         else
         if (partit%mype==0) WRITE(*,*) 'ERROR: --> bad opening file   : ', 'namelist.tra',' ; iostat=',iost
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
         stop
     end if
 
@@ -569,7 +569,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
         if (partit%mype==0) write(*,*) '     file   : ', 'namelist.dyn',' open ok'
     else
         if (partit%mype==0) write(*,*) 'ERROR: --> bad opening file   : ', 'namelist.dyn',' ; iostat=',iost
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
         stop
     end if
     ! parameters without an initial value here take the default of the derived
@@ -633,7 +633,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
             ! let rank 0 finish writing before any rank aborts
             flush(6)
             call MPI_Barrier(partit%MPI_COMM_FESOM, partit%MPIerr)
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
         end if
         if (trim(which_ALE)=='zlevel') then
             ! only the zstar thickness update is implemented, with zlevel the layer
@@ -642,7 +642,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
             ! let rank 0 finish writing before any rank aborts
             flush(6)
             call MPI_Barrier(partit%MPI_COMM_FESOM, partit%MPIerr)
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
         end if
         dynamics%se_BTsteps      = se_BTsteps
         dynamics%se_BTtheta      = se_BTtheta
@@ -1255,7 +1255,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
         end do
         if (alk_check /= 0) then
             if (partit%mype==0) write(*,*) 'not a single tracer ID = 1003 = alkalinity. this should not happen'
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
             stop
         end if
     endif ! restore_alkalinity
@@ -1602,7 +1602,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 if (partit%mype==0) write(*,*) 'invalid ID '//trim(id_string)//' specified for '//trim(i_string)//' th tracer!!!'
                 if (partit%mype==0) write(*,*) 'the model will stop!'
             end if
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
             stop
         END SELECT
     END DO

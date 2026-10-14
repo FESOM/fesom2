@@ -11,7 +11,7 @@ module par_support_module
     implicit none
 
     private
-    public :: par_init, par_abort, par_ex, par_finalize, init_mpi_types, init_mpi_types_fbin, &
+    public :: par_init, par_abort, par_finalize, init_mpi_types, init_mpi_types_fbin, &
               init_gatherLists, status_check
 
 contains
@@ -80,17 +80,6 @@ subroutine par_abort(COMM, mype)           ! aborts the run (error exit)
 
 end subroutine par_abort
 !=================================================================
-subroutine par_ex(COMM, mype, abort)       ! deprecated, use par_abort
-! Kept so that existing calls compile; it aborts like par_abort. The optional
-! argument abort is ignored. To be removed once all calls use par_abort.
-  implicit none
-  integer,           intent(in)   :: COMM
-  integer,           intent(in)   :: mype
-  integer, optional, intent(in)   :: abort
-
-  call par_abort(COMM, mype)
-end subroutine par_ex
-!=================================================================
 subroutine par_finalize(COMM, mype)        ! finalizes MPI (normal end of the run)
 
 ! In case we are letting oasis orchestrate MPI, we need to shut down through
@@ -116,7 +105,7 @@ subroutine par_finalize(COMM, mype)        ! finalizes MPI (normal end of the ru
   flush(error_unit)
 
 ! The model is finalized here: MPI_Barrier and MPI_Finalize, or the termination
-! of the coupler. Error exits must call par_ex instead.
+! of the coupler. Error exits must call par_abort instead.
 !---------------------------------------------------------------
 #if !defined(__oasis) && !defined(__yac)
           ! TODO: this is where fesom standalone, and ifsinterface get to in case of normal exit.
@@ -804,7 +793,7 @@ res=0
 call MPI_Allreduce (partit%pe_status, res, 1, MPI_INTEGER, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
 if (res /= 0 ) then
     if (partit%mype==0) write(*,*) 'Something Broke. Flushing and stopping...'
-    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+    call par_abort(partit%MPI_COMM_FESOM, partit%mype)
 endif
 end subroutine status_check
 

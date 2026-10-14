@@ -18,7 +18,7 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
     use o_param
     USE MOD_MESH
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     use g_interp
     use netcdf
     implicit none
@@ -69,7 +69,7 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
     ! broadcast found_error variable to all other processes --> create kill signal
     ! for all processes
     call MPI_BCast(found_error, 1, MPI_LOGICAL, 0, partit%MPI_COMM_FESOM, ierror)
-    if (found_error) call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+    if (found_error) call par_abort(partit%MPI_COMM_FESOM, partit%mype)
 
     !___________________________________________________________________________
     ! read dimensions from netcdf file, checkfor the naming of dimensions
@@ -111,7 +111,7 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
     ! broadcast found_error variable to all other processes --> create kill signal
     ! for all processes
     call MPI_BCast(found_error, 1, MPI_LOGICAL, 0, partit%MPI_COMM_FESOM, ierror)
-    if (found_error) call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+    if (found_error) call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     
     ! broadcast len of lon/lat to all processes
     call MPI_BCast(latlen, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
@@ -140,7 +140,7 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
     ! broadcast found_error variable to all other processes --> create kill signal
     ! for all processes
     call MPI_BCast(found_error, 1, MPI_LOGICAL, 0, partit%MPI_COMM_FESOM, ierror)
-    if (found_error) call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+    if (found_error) call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     
     ! broadcast latitude array to all processes
     call MPI_BCast(lat, latlen, MPI_WP, 0, partit%MPI_COMM_FESOM, ierror)  
@@ -168,7 +168,7 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
     ! broadcast found_error variable to all other processes --> create kill signal
     ! for all processes
     call MPI_BCast(found_error, 1, MPI_LOGICAL, 0, partit%MPI_COMM_FESOM, ierror)
-    if (found_error) call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+    if (found_error) call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     
     ! broadcast longitude array to all processes
     call MPI_BCast(lon, lonlen, MPI_WP, 0, partit%MPI_COMM_FESOM, ierror)  
@@ -199,7 +199,7 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
             print *, achar(27)//'[0m'
             write(*,*)
             found_error = .True.
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
         end if
         istart= (/1,1,itime/)
         icount= (/lonlen,latlen,1/)
@@ -216,7 +216,7 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
     ! broadcast found_error variable to all other processes --> create kill signal
     ! for all processes
     call MPI_BCast(found_error, 1, MPI_LOGICAL, 0, partit%MPI_COMM_FESOM, ierror)
-    if (found_error) call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+    if (found_error) call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     
     ! broadcast 2d data array to all processes
     call MPI_BCast(ncdata, lonlen*latlen, MPI_WP, 0, partit%MPI_COMM_FESOM, ierror)
@@ -320,7 +320,7 @@ subroutine read_other_NetCDF_3d(file, vname, zvname, model_3Darray, do_onvert, p
     use o_param
     USE MOD_MESH
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     use g_interp
     use netcdf
     implicit none
@@ -370,7 +370,7 @@ subroutine read_other_NetCDF_3d(file, vname, zvname, model_3Darray, do_onvert, p
     ! broadcast found_error variable to all other processes --> create kill signal
     ! for all processes
     call MPI_BCast(found_error, 1, MPI_LOGICAL, 0, partit%MPI_COMM_FESOM, ierror)
-    if (found_error) call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+    if (found_error) call par_abort(partit%MPI_COMM_FESOM, partit%mype)
 
     !___________________________________________________________________________
     ! read dimensions from netcdf file, checkfor the naming of dimensions
@@ -429,7 +429,7 @@ subroutine read_other_NetCDF_3d(file, vname, zvname, model_3Darray, do_onvert, p
     ! broadcast found_error variable to all other processes --> create kill signal
     ! for all processes
     call MPI_BCast(found_error, 1, MPI_LOGICAL, 0, partit%MPI_COMM_FESOM, ierror)
-    if (found_error) call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+    if (found_error) call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     
     ! broadcast len of lon/lat to all processes
     call MPI_BCast(latlen, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
@@ -459,7 +459,7 @@ subroutine read_other_NetCDF_3d(file, vname, zvname, model_3Darray, do_onvert, p
     ! broadcast found_error variable to all other processes --> create kill signal
     ! for all processes
     call MPI_BCast(found_error, 1, MPI_LOGICAL, 0, partit%MPI_COMM_FESOM, ierror)
-    if (found_error) call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+    if (found_error) call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     
     ! broadcast latitude array to all processes
     call MPI_BCast(lat, latlen, MPI_WP, 0, partit%MPI_COMM_FESOM, ierror)  
@@ -487,7 +487,7 @@ subroutine read_other_NetCDF_3d(file, vname, zvname, model_3Darray, do_onvert, p
     ! broadcast found_error variable to all other processes --> create kill signal
     ! for all processes
     call MPI_BCast(found_error, 1, MPI_LOGICAL, 0, partit%MPI_COMM_FESOM, ierror)
-    if (found_error) call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+    if (found_error) call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     
     ! broadcast longitude array to all processes
     call MPI_BCast(lon, lonlen, MPI_WP, 0, partit%MPI_COMM_FESOM, ierror)  
@@ -522,7 +522,7 @@ subroutine read_other_NetCDF_3d(file, vname, zvname, model_3Darray, do_onvert, p
 !     ! broadcast found_error variable to all other processes --> create kill signal
 !     ! for all processes
 !     call MPI_BCast(found_error, 1, MPI_LOGICAL, 0, MPI_COMM_FESOM, ierror)
-!     if (found_error) call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+!     if (found_error) call par_abort(partit%MPI_COMM_FESOM, partit%mype)
 !     
 !     ! broadcast longitude array to all processes
 !     call MPI_BCast(z, zlen, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)  
@@ -560,7 +560,7 @@ subroutine read_other_NetCDF_3d(file, vname, zvname, model_3Darray, do_onvert, p
     ! broadcast found_error variable to all other processes --> create kill signal
     ! for all processes
     call MPI_BCast(found_error, 1, MPI_LOGICAL, 0, partit%MPI_COMM_FESOM, ierror)
-    if (found_error) call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+    if (found_error) call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     
     ! broadcast 2d data array to all processes
     call MPI_BCast(ncdata   , lonlen*latlen*zlen, MPI_WP, 0, partit%MPI_COMM_FESOM, ierror)
@@ -584,7 +584,7 @@ subroutine read_other_NetCDF_3d(file, vname, zvname, model_3Darray, do_onvert, p
     ! broadcast found_error variable to all other processes --> create kill signal
     ! for all processes
     call MPI_BCast(found_error, 1, MPI_LOGICAL, 0, partit%MPI_COMM_FESOM, ierror)
-    if (found_error) call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+    if (found_error) call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     
     ! create interpolation coordinates
     ! do data interpolation on vertices
@@ -653,7 +653,7 @@ subroutine read_surf_hydrography_NetCDF(file, vari, itime, model_2Darray, partit
     use o_param
     USE MOD_MESH
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     use g_rotate_grid
     use, intrinsic :: ISO_FORTRAN_ENV, only: real64
     use g_interp
@@ -687,7 +687,7 @@ subroutine read_surf_hydrography_NetCDF(file, vari, itime, model_2Darray, partit
   if (status.ne.nf90_noerr)then
      print*,'ERROR: CANNOT READ runoff FILE CORRECTLY !!!!!'
      print*,'Error in opening netcdf file '//file
-     call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+     call par_abort(partit%MPI_COMM_FESOM, partit%mype)
      stop
   endif
 
@@ -774,7 +774,7 @@ subroutine read_2ddata_on_grid_NetCDF(file, vari, itime, model_2Darray, partit, 
   use o_param
   USE MOD_MESH
   USE MOD_PARTIT
-  use par_support_module, only: par_ex
+  use par_support_module, only: par_abort
   use g_rotate_grid
   use g_interp
   use netcdf
@@ -801,7 +801,7 @@ subroutine read_2ddata_on_grid_NetCDF(file, vari, itime, model_2Darray, partit, 
   if (status.ne.nf90_noerr)then
      print*,'ERROR: CANNOT READ runoff FILE CORRECTLY !!!!!'
      print*,'Error in opening netcdf file '//file
-     call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+     call par_abort(partit%MPI_COMM_FESOM, partit%mype)
      stop
   endif
 

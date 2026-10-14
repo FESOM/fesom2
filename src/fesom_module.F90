@@ -6,7 +6,7 @@ module fesom_main_storage_module
   USE MOD_ICE
   USE MOD_TRACER
   USE MOD_PARTIT
-  use par_support_module, only: par_ex, par_finalize
+  use par_support_module, only: par_abort, par_finalize
   USE MOD_DYN
   USE o_ARRAYS
   USE o_PARAM
@@ -286,7 +286,7 @@ contains
             if(mype_fesom_world == 0) then
                 write(*,*) 'MPI_comm_split mismatch npes_fesom_world, num_fesom_groups', npes_fesom_world, num_fesom_groups
             end if
-            call par_ex(f%MPI_COMM_FESOM, f%mype)
+            call par_abort(f%MPI_COMM_FESOM, f%mype)
             stop
         end if
 
@@ -302,33 +302,33 @@ contains
         call MPI_comm_split(f%MPI_COMM_FESOM_WORLD, f%my_fesom_group, 0, f%MPI_COMM_FESOM, f%MPIerr)
         if (f%MPIerr /= MPI_SUCCESS) then
             write(*,*) 'MPI_comm_split(MPI_COMM_FESOM_WORLD, my_fesom_group, 0, MPI_COMM_FESOM, MPIERR) failed'
-            call par_ex(f%MPI_COMM_FESOM, f%mype)
+            call par_abort(f%MPI_COMM_FESOM, f%mype)
             stop
         end if
 
         call MPI_comm_size(f%MPI_COMM_FESOM, npes_check, f%MPIerr)
         if(f%MPIerr /= MPI_SUCCESS) then
             write(*,*) 'MPI_comm_size(MPI_COMM_FESOM, npes_check, MPIERR) failed'
-            call par_ex(f%MPI_COMM_FESOM, f%mype)
+            call par_abort(f%MPI_COMM_FESOM, f%mype)
             stop
         end if
 
         call MPI_comm_rank(f%MPI_COMM_FESOM, mype_check, f%MPIerr)
         if(f%MPIerr /= MPI_SUCCESS) then
             write(*,*) 'MPI_comm_rank(MPI_COMM_FESOM, mype_check, MPIERR) failed'
-            call par_ex(f%MPI_COMM_FESOM, f%mype)
+            call par_abort(f%MPI_COMM_FESOM, f%mype)
             stop
         end if
 
         if(npes_check /= f%npes) then
             write(*,*) 'npes mismatch, npes, npes_check', f%npes, npes_check
-            call par_ex(f%MPI_COMM_FESOM, f%mype)
+            call par_abort(f%MPI_COMM_FESOM, f%mype)
             stop
         end if
 
         if(mype_check /= f%mype) then
             write(*,*) 'mype mismatch, mype, mype_check', f%mype, mype_check
-            call par_ex(f%MPI_COMM_FESOM, f%mype)
+            call par_abort(f%MPI_COMM_FESOM, f%mype)
             stop
         end if
 
@@ -337,33 +337,33 @@ contains
         call MPI_comm_split(f%MPI_COMM_FESOM_WORLD, f%mype, f%my_fesom_group, f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, f%MPIERR)
         if (f%MPIERR /= MPI_SUCCESS) then
             write(*,*) 'MPI_comm_split(MPI_COMM_FESOM_WORLD, mype, my_fesom_group, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, MPIERR) failed'
-            call par_ex(f%MPI_COMM_FESOM, f%mype)
+            call par_abort(f%MPI_COMM_FESOM, f%mype)
             stop
         end if
 
         call MPI_comm_size(f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, npes_check, f%MPIERR)
         if(f%MPIERR /= MPI_SUCCESS) then
             write(*,*) 'MPI_comm_size(MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, npes_check, MPIERR) failed'
-            call par_ex(f%MPI_COMM_FESOM, f%mype)
+            call par_abort(f%MPI_COMM_FESOM, f%mype)
             stop
         end if
 
         call MPI_comm_rank(f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, mype_check, f%MPIERR)
         if(f%MPIERR /= MPI_SUCCESS) then
             write(*,*) 'MPI_comm_rank(MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, mype_check, MPIERR) failed'
-            call par_ex(f%MPI_COMM_FESOM, f%mype)
+            call par_abort(f%MPI_COMM_FESOM, f%mype)
             stop
         end if
 
         if(npes_check /= num_fesom_groups) then
             write(*,*) 'npes mismatch, num_fesom_groups, npes_check', num_fesom_groups, npes_check
-            call par_ex(f%MPI_COMM_FESOM, f%mype)
+            call par_abort(f%MPI_COMM_FESOM, f%mype)
             stop
         end if
 
         if(mype_check /= f%my_fesom_group) then
             write(*,*) 'mype mismatch, my_fesom_group, mype_check', f%my_fesom_group, mype_check
-            call par_ex(f%MPI_COMM_FESOM, f%mype)
+            call par_abort(f%MPI_COMM_FESOM, f%mype)
             stop
         end if
 
@@ -822,7 +822,7 @@ contains
     !    read  (f%mype+300) f%tracers_copy
     !    close (f%mype+300)
     
-    !call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype)
+    !call par_abort(f%partit%MPI_COMM_FESOM, f%partit%mype)
     !stop
     !         
     !    if (f%mype==10) write(,) f%mesh1%ssh_stiff%values-f%mesh%ssh_stiff%value    
