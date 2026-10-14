@@ -42,6 +42,7 @@ Section &restart_log
 - **restart_length=1**, **restart_length_unit='y'** cadence for portable netCDF restarts (units: ``y``, ``m``, ``d``, ``h``, ``s``, or ``off`` to disable). When a portable restart is written, the raw/binary formats are written as well unless explicitly disabled.
 - **raw_restart_length=1**, **raw_restart_length_unit='y'** frequency of raw binary “core dump” restarts. If the unit is ``off`` only the portable restarts are produced.
 - **bin_restart_length=1**, **bin_restart_length_unit='y'** frequency of derived-type binary restarts (Fortran binary) used for fast restarts on identical hardware/compiler stacks.
+- With the unit ``'y'`` the years for restarts and output are counted from the start of the current run, i.e. of the leg in a chain of runs: ``restart_length=2`` writes a restart at the end of a two-year leg whatever the calendar year. A yearly frequency longer than the leg (for example ``restart_length=5`` with one-year legs) is therefore never reached.
 - **logfile_outfreq=960** number of model steps between status lines written to the stdout/stderr log.
 
 Section &ale_def
