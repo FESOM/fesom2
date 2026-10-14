@@ -18,6 +18,9 @@ module oce_dyn_module
               compute_ke_wrho, compute_apegen, compute_PePm, &
               check_viscopt, check_validviscopt_5
     public :: mom_on_device
+#ifdef ENABLE_OPENACC
+    public :: update_vel_acc
+#endif
     ! OpenACC: the momentum rhs of this step is computed on the device (set in
     ! compute_vel_rhs; .false. for configurations the device path does not cover)
     logical :: mom_on_device = .false.
@@ -128,6 +131,55 @@ SUBROUTINE update_vel(dynamics, partit, mesh)
 !!PS !$OMP END PARALLEL DO
     call exchange_elem(UV, partit)
 end subroutine update_vel
+#ifdef ENABLE_OPENACC
+!
+!
+!_______________________________________________________________________________
+! update_vel on the device (no kinetic-energy diagnostic): d_eta comes from the SSH solve on the host;
+! UV stays current on the device (uv_dev_current) and is copied back once for the host code.
+SUBROUTINE update_vel_acc(dynamics, partit, mesh)
+    IMPLICIT NONE
+    type(t_dyn)   , intent(inout), target :: dynamics
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
+    integer       :: elem, n1, n2, n3, nz, nzmin, nzmax
+    real(kind=WP) :: e1, e2, e3, Fx, Fy
+    logical, save :: data_created = .false.
+    real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
+    real(kind=WP), dimension(:)    , pointer :: d_eta
+    UV     => dynamics%uv(:,:,:)
+    UV_rhs => dynamics%uv_rhs(:,:,:)
+    d_eta  => dynamics%d_eta(:)
+    if (.not. data_created) then
+        !$ACC ENTER DATA CREATE(d_eta)
+        data_created = .true.
+    end if
+    !$ACC UPDATE DEVICE(d_eta)
+!$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) PRIVATE(n1, n2, n3, e1, e2, e3, Fx, Fy, nzmin, nzmax) VECTOR_LENGTH(32)
+    DO elem=1, partit%myDim_elem2D
+        n1=mesh%elem2D_nodes(1,elem)
+        n2=mesh%elem2D_nodes(2,elem)
+        n3=mesh%elem2D_nodes(3,elem)
+        e1=-g*theta*dt*d_eta(n1)
+        e2=-g*theta*dt*d_eta(n2)
+        e3=-g*theta*dt*d_eta(n3)
+        Fx=mesh%gradient_sca(1,elem)*e1+mesh%gradient_sca(2,elem)*e2+mesh%gradient_sca(3,elem)*e3
+        Fy=mesh%gradient_sca(4,elem)*e1+mesh%gradient_sca(5,elem)*e2+mesh%gradient_sca(6,elem)*e3
+        nzmin = mesh%ulevels(elem)
+        nzmax = mesh%nlevels(elem)
+!$ACC LOOP VECTOR
+        DO nz=nzmin, nzmax-1
+            UV(1,nz,elem)= UV(1,nz,elem) + UV_rhs(1,nz,elem) + Fx
+            UV(2,nz,elem)= UV(2,nz,elem) + UV_rhs(2,nz,elem) + Fy
+        END DO
+    END DO
+!$ACC END PARALLEL LOOP
+    call exchange_elem(UV, partit, luse_g2g=.true.)
+    uv_dev_current = .true.
+    ! host readers: node velocities, ice coupling, diagnostics, output
+    !$ACC UPDATE HOST(UV)
+end subroutine update_vel_acc
+#endif
 !
 !
 !_______________________________________________________________________________

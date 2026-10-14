@@ -353,6 +353,11 @@ logical                                     :: ts_on_device = .false.
 logical                                     :: geom_on_device = .false.
 ! an output stream reads sigma_xy, neutral_slope, slope_tapered or fer_tapfac on the host
 logical                                     :: slope_out_needed = .false.
+! OpenACC: UV on the device equals the host copy (velocity update on the device; host
+! writes to UV clear it); GM bolus velocity computed on the device in this step;
+! an output stream reads uv_rhs on the host
+logical                                     :: uv_dev_current = .false., gmvel_on_device = .false.
+logical                                     :: uvrhs_out_needed = .false.
 
 !_______________________________________________________________________________
 !!PS ! dummy arrays

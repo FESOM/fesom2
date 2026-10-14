@@ -165,6 +165,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     gm_on_device = Fer_GM .and. trim(which_ALE)=='zstar' .and. mom_on_device
 #endif
     if (Fer_GM .and. .not. gm_on_device) then
+        uv_dev_current = .false.
 !$OMP PARALLEL DO
         do elem=1, partit%myDim_elem2D+partit%eDim_elem2D
            UV(:, :, elem)    =UV(:, :, elem) + fer_UV(:, :, elem)
@@ -202,6 +203,9 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         end if
 #ifdef ENABLE_OPENACC
         if (gm_on_device) then
+            ! the bolus velocity is added to the device copy of UV for the tracer step
+            ! (not removed again): the next step uploads UV from the host
+            uv_dev_current = .false.
             nlu = size(UV,2)
             nlw = size(Wvel,1)
             !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(nz)
@@ -516,6 +520,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     ! subtract the the bolus velocities back from 3D velocities:
     ! (the device copies keep the bolus part until the next upload)
     if (Fer_GM .and. .not. gm_on_device) then
+        uv_dev_current = .false.
 !$OMP PARALLEL DO
         do elem=1, partit%myDim_elem2D+partit%eDim_elem2D
            UV(:, :, elem)    =UV(:, :, elem) - fer_UV(:, :, elem)

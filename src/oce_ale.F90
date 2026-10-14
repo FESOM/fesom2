@@ -30,6 +30,9 @@ module oce_ale_module
     use oce_mle_module, only: mle_add_gamma
     use oce_ale_ssh_splitexpl_subcycl_module, only: impl_vert_visc_ale_vtransp
     use oce_dyn_module, only: update_vel, viscosity_filter, check_viscopt, compute_ke_wrho, compute_apegen, compute_PePm, mom_on_device
+#ifdef ENABLE_OPENACC
+    use oce_dyn_module, only: update_vel_acc
+#endif
     use oce_ale_pressure_bv_module, only: sw_alpha_beta, compute_sigma_xy, compute_neutral_slope, sxy_on_device
     use par_support_module, only: status_check
 #if defined (__cvmix)
@@ -2154,7 +2157,10 @@ subroutine compute_hbar_rhs_acc(dynamics, partit, mesh)
     UV         => dynamics%uv(:,:,:)
     ssh_rhs_old=> dynamics%ssh_rhs_old(:)
     ! ssh_rhs_old and water_flux are on the device (compute_ssh_rhs_ale_acc)
-    !$ACC UPDATE DEVICE(UV, water_flux)
+    !$ACC UPDATE DEVICE(water_flux)
+    if (.not. uv_dev_current) then
+        !$ACC UPDATE DEVICE(UV)
+    end if
 
 !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(ed, el1, el2, k, nz, nzmin, nzmax, c1, c2, deltaX1, deltaX2, deltaY1, deltaY2)
     do n=1, partit%myDim_nod2D+partit%eDim_nod2D
@@ -2796,11 +2802,14 @@ subroutine vert_vel_ale_acc(dynamics, partit, mesh)
     end if
     ! hnode_new: the zstar update sets only the levels above nlevels_nod2D_min, the rest
     ! keeps its values, and all of it is brought back to the host below
-    !$ACC UPDATE DEVICE(UV, mesh%hbar, mesh%hbar_old, water_flux)
+    !$ACC UPDATE DEVICE(mesh%hbar, mesh%hbar_old, water_flux)
+    if (.not. uv_dev_current) then
+        !$ACC UPDATE DEVICE(UV)
+    end if
     if (.not. geom_on_device) then
         !$ACC UPDATE DEVICE(mesh%helem, mesh%zbar_3d_n, mesh%hnode_new)
     end if
-    if (fer) then
+    if (fer .and. .not. gmvel_on_device) then
         !$ACC UPDATE DEVICE(fer_UV)
     end if
 
@@ -4027,8 +4036,8 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     end if
 #ifdef ENABLE_OPENACC
     ! UV_rhs stays on the device through the momentum rhs, the viscosity filter and the implicit
-    ! viscosity; update_vel and the SSH rhs read it on the host
-    if (mom_on_device) then
+    ! viscosity; with the velocity update on the device only output streams read it on the host
+    if (mom_on_device .and. (dynamics%ldiag_ke .or. uvrhs_out_needed)) then
         !$ACC UPDATE HOST(dynamics%uv_rhs)
     end if
 #endif
@@ -4121,7 +4130,16 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         ! u^(n+1) = u* + [-g * tau * theta * grad(eta^(n+1)-eta^(n)) ]
         if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call update_vel'//achar(27)//'[0m'
         ! ke will be computed inside there if dynamics%ldiag_ke is .TRUE.
+#if defined(_OPENACC)
+        if (mom_on_device .and. .not. dynamics%ldiag_ke) then
+            call update_vel_acc(dynamics, partit, mesh)
+        else
+            uv_dev_current = .false.
+            call update_vel(dynamics, partit, mesh)
+        end if
+#else
         call update_vel(dynamics, partit, mesh)
+#endif
         
         ! --> eta_(n) --> eta_(n+1) = eta_(n) + deta = eta_(n) + (eta_(n+1) + eta_(n))
         t5=MPI_Wtime()
@@ -4203,6 +4221,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
 #if defined(_OPENACC)
         gm_on_dev = sxy_on_device .and. gm_device_ok(mesh)
         redi_on_device = gm_on_dev .and. Redi
+        gmvel_on_device = gm_on_dev
 #endif
         if (gm_on_dev) then
             call init_Redi_GM_acc(dynamics, partit, mesh)

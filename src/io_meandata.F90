@@ -2387,6 +2387,8 @@ END DO ! --> DO i=1, io_listsize
         select case (trim(io_list(i)%id))
         case ('sigma_x', 'sigma_y', 'slope_x', 'slope_y', 'slope_z', 'slopetap_x', 'slopetap_y', 'slopetap_z', 'fer_tapfac')
             slope_out_needed = .true.
+        case ('u_rhs', 'v_rhs')
+            uvrhs_out_needed = .true.
         end select
     end do
 
