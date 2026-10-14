@@ -374,10 +374,11 @@ subroutine ssh_cg_iterate_acc(x, rhs, solverinfo, partit, mesh, iter, converged,
   call MPI_Allreduce(MPI_IN_PLACE, s_old, 1, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
   rtol=solverinfo%soltol*sqrt(s_old/real(mesh%nod2D,WP_full))
 
-  ! r0 = b - A x0
-  !$ACC PARALLEL LOOP DEFAULT(PRESENT) PRIVATE(acc)
+  ! r0 = b - A x0 (one thread per row: the rows have a few entries only)
+  !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(acc, j)
   do row=1, nrow
      acc = 0.0_WP_full
+     !$ACC LOOP SEQ
      do j=rptr(row), rptr(row+1)-1
         acc = acc + real(values(j),WP_full)*real(x(cind(j)),WP_full)
      end do
@@ -387,9 +388,10 @@ subroutine ssh_cg_iterate_acc(x, rhs, solverinfo, partit, mesh, iter, converged,
 
   ! z0 = M^-1 r0, p0 = z0, r.z
   s_old = 0.0_WP_full
-  !$ACC PARALLEL LOOP DEFAULT(PRESENT) PRIVATE(acc) REDUCTION(+:s_old)
+  !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(acc, j) REDUCTION(+:s_old)
   do row=1, nrow
      acc = 0.0_WP_full
+     !$ACC LOOP SEQ
      do j=rptr(row), rptr(row+1)-1
         acc = acc + real(pr_values(j),WP_full)*real(rr(cind(j)),WP_full)
      end do
@@ -405,9 +407,10 @@ subroutine ssh_cg_iterate_acc(x, rhs, solverinfo, partit, mesh, iter, converged,
      ! A p and p.Ap
      call exchange_nod(pp, partit, luse_g2g=.true.)
      s_aux = 0.0_WP_full
-     !$ACC PARALLEL LOOP DEFAULT(PRESENT) PRIVATE(acc) REDUCTION(+:s_aux)
+     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(acc, j) REDUCTION(+:s_aux)
      do row=1, nrow
         acc = 0.0_WP_full
+        !$ACC LOOP SEQ
         do j=rptr(row), rptr(row+1)-1
            acc = acc + real(values(j),WP_full)*real(pp(cind(j)),WP_full)
         end do
@@ -433,9 +436,10 @@ subroutine ssh_cg_iterate_acc(x, rhs, solverinfo, partit, mesh, iter, converged,
      call exchange_nod(rr, partit, luse_g2g=.true.)
      sp1 = 0.0_WP_full
      sp2 = 0.0_WP_full
-     !$ACC PARALLEL LOOP DEFAULT(PRESENT) PRIVATE(acc) REDUCTION(+:sp1, sp2)
+     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(acc, j) REDUCTION(+:sp1, sp2)
      do row=1, nrow
         acc = 0.0_WP_full
+        !$ACC LOOP SEQ
         do j=rptr(row), rptr(row+1)-1
            acc = acc + real(pr_values(j),WP_full)*real(rr(cind(j)),WP_full)
         end do
