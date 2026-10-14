@@ -1695,6 +1695,31 @@ Module REcoM_GloVar
   Real(kind=8),allocatable,dimension(:,:)   :: NPPc3D
   Real(kind=8),allocatable,dimension(:,:)   :: NPPp3D           ! Phaeocystis
 
+  Real(kind=8),allocatable,dimension(:,:)   :: grazmicro_tot3D
+  Real(kind=8),allocatable,dimension(:,:)   :: grazmicro_n3D
+  Real(kind=8),allocatable,dimension(:,:)   :: grazmicro_d3D
+  Real(kind=8),allocatable,dimension(:,:)   :: grazmicro_c3D
+  Real(kind=8),allocatable,dimension(:,:)   :: grazmicro_p3D
+
+  Real(kind=8),allocatable,dimension(:,:)   :: grazmeso_tot3D
+  Real(kind=8),allocatable,dimension(:,:)   :: grazmeso_n3D
+  Real(kind=8),allocatable,dimension(:,:)   :: grazmeso_d3D
+  Real(kind=8),allocatable,dimension(:,:)   :: grazmeso_c3D
+  Real(kind=8),allocatable,dimension(:,:)   :: grazmeso_p3D
+  Real(kind=8),allocatable,dimension(:,:)   :: grazmeso_mic3D
+  Real(kind=8),allocatable,dimension(:,:)   :: grazmeso_det3D
+  Real(kind=8),allocatable,dimension(:,:)   :: grazmeso_det23D
+
+  Real(kind=8),allocatable,dimension(:,:)   :: grazmacro_tot3D
+  Real(kind=8),allocatable,dimension(:,:)   :: grazmacro_n3D
+  Real(kind=8),allocatable,dimension(:,:)   :: grazmacro_d3D
+  Real(kind=8),allocatable,dimension(:,:)   :: grazmacro_c3D 
+  Real(kind=8),allocatable,dimension(:,:)   :: grazmacro_p3D
+  Real(kind=8),allocatable,dimension(:,:)   :: grazmacro_mic3D
+  Real(kind=8),allocatable,dimension(:,:)   :: grazmacro_mes3D
+  Real(kind=8),allocatable,dimension(:,:)   :: grazmacro_det3D
+  Real(kind=8),allocatable,dimension(:,:)   :: grazmacro_det23D
+
   Real(kind=8),allocatable,dimension(:,:)   :: photn
   Real(kind=8),allocatable,dimension(:,:)   :: photd
   Real(kind=8),allocatable,dimension(:,:)   :: photc
@@ -2562,7 +2587,38 @@ subroutine update_3d_diags(n, nzmax)
     REMOCt3D(1:nzmax,n)  = vertREMOCt(1:nzmax)
     REMON3D(1:nzmax,n)   = vertREMON(1:nzmax)
 
+    ! --------------------------------------------------------------------------
+    ! 3D Grazing parameters
+    ! --------------------------------------------------------------------------
 
+    grazmicro_tot3D(1:nzmax,n)  = vertgrazmicro_tot(1:nzmax) 
+    grazmicro_n3D(1:nzmax,n)    = vertgrazmicro_n(1:nzmax)   
+    grazmicro_d3D(1:nzmax,n)    = vertgrazmicro_d(1:nzmax)   
+    grazmicro_c3D(1:nzmax,n)    = vertgrazmicro_c(1:nzmax)
+    grazmicro_p3D(1:nzmax,n)    = vertgrazmicro_p(1:nzmax)
+    
+    grazmeso_tot3D(1:nzmax,n)   = vertgrazmeso_tot(1:nzmax) 
+    grazmeso_n3D(1:nzmax,n)     = vertgrazmeso_n(1:nzmax)
+    grazmeso_d3D(1:nzmax,n)     = vertgrazmeso_d(1:nzmax)
+    grazmeso_c3D(1:nzmax,n)     = vertgrazmeso_c(1:nzmax)
+    grazmeso_p3D(1:nzmax,n)     = vertgrazmeso_p(1:nzmax)
+    grazmeso_mic3D(1:nzmax,n)   = vertgrazmeso_mic(1:nzmax)
+    grazmeso_det3D(1:nzmax,n)   = vertgrazmeso_det(1:nzmax)
+    grazmeso_det23D(1:nzmax,n)  = vertgrazmeso_det2(1:nzmax)
+    
+    grazmacro_tot3D(1:nzmax,n)  = vertgrazmacro_tot(1:nzmax)
+    grazmacro_n3D(1:nzmax,n)    = vertgrazmacro_n(1:nzmax)
+    grazmacro_d3D(1:nzmax,n)    = vertgrazmacro_d(1:nzmax)
+    grazmacro_c3D(1:nzmax,n)    = vertgrazmacro_c(1:nzmax)
+    grazmacro_p3D(1:nzmax,n)    = vertgrazmacro_p(1:nzmax)
+    grazmacro_mic3D(1:nzmax,n)  = vertgrazmacro_mic(1:nzmax)
+    grazmacro_mes3D(1:nzmax,n)  = vertgrazmacro_mes(1:nzmax)
+    grazmacro_det3D(1:nzmax,n)  = vertgrazmacro_det(1:nzmax)
+    grazmacro_det23D(1:nzmax,n) = vertgrazmacro_det2(1:nzmax)
+
+    ! --------------------------------------------------------------------------
+    ! 3D Limitation (Light, Nutrients & CO2)
+    ! --------------------------------------------------------------------------
 
     TPhyCO2(1:nzmax,n)             = VTPhyCO2(1:nzmax)
     TDiaCO2(1:nzmax,n)             = VTDiaCO2(1:nzmax)

@@ -2089,6 +2089,237 @@ CASE ('DISSOSi3D         ')
    endif
 
 ! =====================================================================
+! 3D GRAZING
+! Description: 3D Grazing parameters of Micro-, Meso- and Macrozooplankton
+! =====================================================================
+
+! MICROZOOPLANKTON
+
+CASE ('grazmicro_tot3D        ')
+    ! =====================================================================
+    ! Variable: grazmicro_tot3D
+    ! Description: Total grazing of Microzooplankton
+    ! Units: mmolC/(m2d) 
+    ! =====================================================================
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'grazmicro_tot3D','Total grazing flux of Microzooplankton', 'mmolC/(m2d)', grazmicro_tot3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('grazmicro_n3D        ')
+    ! =====================================================================
+    ! Variable: grazmicro_n3D
+    ! Description: Grazing flux of Microzooplankton on Small Phytoplankton
+    ! Units: mmolC/(m2d) 
+    ! =====================================================================
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'grazmicro_n3D', 'Grazing flux of Microzooplankton on Small Phytoplankton', 'mmolC/(m2d)', grazmicro_n3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('grazmicro_d3D        ')
+    ! =====================================================================
+    ! Variable: grazmicro_d3D
+    ! Description: Grazing flux of Microzooplankton on Diatoms
+    ! Units: mmolC/(m2d) 
+    ! =====================================================================
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'grazmicro_d3D','Grazing flux of Microzooplankton on Diatoms', 'mmolC/(m2d)', grazmicro_d3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('grazmicro_c3D        ')
+    ! =====================================================================
+    ! Variable: grazmicro_c3D
+    ! Description: Grazing flux of Microzooplankton on Coccolithophores
+    ! Units: mmolC/(m2d) 
+    ! =====================================================================
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'grazmicro_c3D','Grazing flux of Microzooplankton on Coccolithophores', 'mmolC/(m2d)', grazmicro_c3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('grazmicro_p3D        ')
+    ! =====================================================================
+    ! Variable: grazmicro_p3D
+    ! Description: Grazing flux of Microzooplankton on Phaeocystis
+    ! Units: mmolC/(m2d) 
+    ! =====================================================================
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'grazmicro_p3D','Grazing flux of Microzooplankton on Phaeocystis', 'mmolC/(m2d)', grazmicro_p3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+! MESOZOOPLANKTON 
+
+CASE ('grazmeso_tot3D        ')
+    ! =====================================================================
+    ! Variable: grazmeso_tot3D
+    ! Description: Total grazing of Mesozooplankton
+    ! Units: mmolC/(m2d) 
+    ! =====================================================================
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'grazmeso_tot3D','Total grazing flux of Mesozooplankton', 'mmolC/(m2d)', grazmeso_tot3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('grazmeso_n3D        ')
+    ! =====================================================================
+    ! Variable: grazmeso_n3D
+    ! Description: Grazing flux of Mesozooplankton on Small Phytoplankton 
+    ! Units: mmolC/(m2d) 
+    ! =====================================================================
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'grazmeso_n3D', 'Grazing flux of Mesozooplankton on Small Phytoplankton', 'mmolC/(m2d)', grazmeso_n3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('grazmeso_d3D        ')
+    ! =====================================================================
+    ! Variable: grazmeso_d3D
+    ! Description: Grazing flux of Mesozooplankton on Diatoms
+    ! Units: mmolC/(m2d) 
+    ! =====================================================================
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'grazmeso_d3D','Grazing flux of Mesozooplankton on Diatoms', 'mmolC/(m2d)', grazmeso_d3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('grazmeso_c3D        ')
+    ! =====================================================================
+    ! Variable: grazmeso_c3D
+    ! Description: Grazing flux of Mesozooplankton on Coccolithophores
+    ! Units: mmolC/(m2d) 
+    ! =====================================================================
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'grazmeso_c3D','Grazing flux of Mesozooplankton on Coccolithophores', 'mmolC/(m2d)', grazmeso_c3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('grazmeso_p3D        ')
+    ! =====================================================================
+    ! Variable: grazmeso_p3D
+    ! Description: Grazing flux of Mesozooplankton on Phaeocystis 
+    ! Units: mmolC/(m2d) 
+    ! =====================================================================
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'grazmeso_p3D','Grazing flux of Mesozooplankton on Phaeocystis', 'mmolC/(m2d)', grazmeso_p3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('grazmeso_mic3D        ')
+    ! =====================================================================
+    ! Variable: grazmeso_mic3D
+    ! Description: Grazing flux of Mesozooplankton on Microzooplankton
+    ! Units: mmolC/(m2d) 
+    ! =====================================================================
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'grazmeso_mic3D', 'Grazing flux of Mesozooplankton on Microzooplankton', 'mmolC/(m2d)', grazmeso_mic3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('grazmeso_det3D        ')
+    ! =====================================================================
+    ! Variable: grazmeso_det3D
+    ! Description: Grazing flux of Mesozooplankton on small Detritus
+    ! Units: mmolC/(m2d) 
+    ! =====================================================================
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'grazmeso_det3D', 'Grazing flux of Mesozooplankton on small Detritus', 'mmolC/(m2d)', grazmeso_det3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+CASE ('grazmeso_det23D        ')
+    ! =====================================================================
+    ! Variable: grazmeso_det23D
+    ! Description: Grazing flux of Mesozooplankton on large Detritus
+    ! Units: mmolC/(m2d) 
+    ! =====================================================================
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'grazmeso_det23D', 'Grazing flux of Mesozooplankton on large Detritus', 'mmolC/(m2d)', grazmeso_det23D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+
+! MACROZOOPLANKTON 
+
+CASE ('grazmacro_tot3D        ')
+    ! =====================================================================
+    ! Variable: grazmacro_tot3D
+    ! Description: Total grazing of Macrozooplankton
+    ! Units: mmolC/(m2d)
+    ! =====================================================================
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'grazmacro_tot3D','Total grazing flux of Macrozooplankton', 'mmolC/(m2d)', grazmacro_tot3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+CASE ('grazmacro_n3D        ')
+    ! =====================================================================
+    ! Variable: grazmacro_n3D
+    ! Description: Grazing flux of Macrozooplankton on Small Phytoplankton
+    ! Units: mmolC/(m2d)
+    ! =====================================================================
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'grazmacro_n3D', 'Grazing flux of Macrozooplankton on Small Phytoplankton', 'mmolC/(m2d)', grazmacro_n3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('grazmacro_d3D        ')
+    ! =====================================================================
+    ! Variable: grazmacro_d3D
+    ! Description: Grazing flux of Macrozooplankton on Diatoms
+    ! Units: mmolC/(m2d)
+    ! =====================================================================
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'grazmacro_d3D','Grazing flux of Macrozooplankton on Diatoms', 'mmolC/(m2d)', grazmacro_d3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('grazmacro_c3D        ')
+    ! =====================================================================
+    ! Variable: grazmacro_c3D
+    ! Description: Grazing flux of Macrozooplankton on Coccolithophores
+    ! Units: mmolC/(m2d)
+    ! =====================================================================
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'grazmacro_c3D','Grazing flux of Macrozooplankton on Coccolithophores', 'mmolC/(m2d)', grazmacro_c3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('grazmacro_p3D        ')
+    ! =====================================================================
+    ! Variable: grazmacro_p3D
+    ! Description: Grazing flux of Macrozooplankton on Phaeocystis
+    ! Units: mmolC/(m2d)
+    ! =====================================================================
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'grazmacro_p3D','Grazing flux of Macrozooplankton on Phaeocystis', 'mmolC/(m2d)', grazmacro_p3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('grazmacro_mic3D        ')
+    ! =====================================================================
+    ! Variable: grazmacro_mic3D
+    ! Description: Grazing flux of Macrozooplankton on Microzooplankton
+    ! Units: mmolC/(m2d) 
+    ! =====================================================================
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'grazmacro_mic3D', 'Grazing flux of Macrozooplankton on Microzooplankton', 'mmolC/(m2d)', grazmacro_mic3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('grazmacro_mes3D        ')
+    ! =====================================================================
+    ! Variable: grazmacro_mes3D
+    ! Description: Grazing flux of Macrozooplankton on Mesozooplankton
+    ! Units: mmolC/(m2d) 
+    ! =====================================================================
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'grazmacro_mes3D', 'Grazing flux of Macrozooplankton on Mesozooplankton', 'mmolC/(m2d)', grazmacro_mes3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('grazmacro_det3D        ')
+    ! =====================================================================
+    ! Variable: grazmacro_det3D
+    ! Description: Grazing flux of Macrozooplankton on small Detritus
+    ! Units: mmolC/(m2d) 
+    ! =====================================================================
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'grazmacro_det3D', 'Grazing flux of Macrozooplankton on small Detritus', 'mmolC/(m2d)', grazmacro_det3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+CASE ('grazmacro_det23D        ')
+    ! =====================================================================
+    ! Variable: grazmacro_det23D
+    ! Description: Grazing flux of Macrozooplankton on large Detritus
+    ! Units: mmolC/(m2d) 
+    ! =====================================================================
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'grazmacro_det23D', 'Grazing flux of Macrozooplankton on large Detritus', 'mmolC/(m2d)', grazmacro_det23D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+
+
+! =====================================================================
 ! TEMPERATURE EFFECTS ON PHOTOSYNTHESIS
 ! Description: Temperature-dependent growth rate modifiers
 ! =====================================================================

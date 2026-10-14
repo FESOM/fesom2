@@ -332,6 +332,31 @@ subroutine recom_init(tracers, partit, mesh)
     allocate(REMOCt3D     ( nl-1, node_size ))
     allocate(REMON3D      ( nl-1, node_size ))
 
+    allocate(grazmicro_tot3D ( nl-1, node_size ))
+    allocate(grazmicro_n3D   ( nl-1, node_size ))
+    allocate(grazmicro_d3D   ( nl-1, node_size ))
+    allocate(grazmicro_c3D   ( nl-1, node_size ))
+    allocate(grazmicro_p3D   ( nl-1, node_size ))
+
+    allocate(grazmeso_tot3D  ( nl-1, node_size ))
+    allocate(grazmeso_n3D    ( nl-1, node_size ))
+    allocate(grazmeso_d3D    ( nl-1, node_size ))
+    allocate(grazmeso_c3D    ( nl-1, node_size ))
+    allocate(grazmeso_p3D    ( nl-1, node_size ))
+    allocate(grazmeso_mic3D  ( nl-1, node_size ))
+    allocate(grazmeso_det3D  ( nl-1, node_size ))
+    allocate(grazmeso_det23D ( nl-1, node_size ))
+    
+    allocate(grazmacro_tot3D  ( nl-1, node_size ))
+    allocate(grazmacro_n3D    ( nl-1, node_size ))
+    allocate(grazmacro_d3D    ( nl-1, node_size ))
+    allocate(grazmacro_c3D    ( nl-1, node_size ))
+    allocate(grazmacro_p3D    ( nl-1, node_size ))
+    allocate(grazmacro_mic3D  ( nl-1, node_size ))
+    allocate(grazmacro_mes3D  ( nl-1, node_size ))
+    allocate(grazmacro_det3D  ( nl-1, node_size ))
+    allocate(grazmacro_det23D ( nl-1, node_size ))
+
     respmeso     = 0.d0
     respmacro    = 0.d0
     respmicro    = 0.d0
@@ -375,6 +400,32 @@ subroutine recom_init(tracers, partit, mesh)
     REMOC3D     = 0.d0
     REMOCt3D    = 0.d0
     REMON3D     = 0.d0
+
+    ! 3D Grazing 
+    grazmicro_tot3D  = 0.d0
+    grazmicro_n3D    = 0.d0
+    grazmicro_d3D    = 0.d0
+    grazmicro_c3D    = 0.d0
+    grazmicro_p3D    = 0.d0
+
+    grazmeso_tot3D   = 0.d0
+    grazmeso_n3D     = 0.d0
+    grazmeso_d3D     = 0.d0
+    grazmeso_c3D     = 0.d0
+    grazmeso_p3D     = 0.d0
+    grazmeso_mic3D   = 0.d0
+    grazmeso_det3D   = 0.d0
+    grazmeso_det23D  = 0.d0
+
+    grazmacro_tot3D  = 0.d0
+    grazmacro_n3D    = 0.d0
+    grazmacro_d3D    = 0.d0
+    grazmacro_c3D    = 0.d0
+    grazmacro_p3D    = 0.d0
+    grazmacro_mic3D  = 0.d0
+    grazmacro_mes3D  = 0.d0
+    grazmacro_det3D  = 0.d0
+    grazmacro_det23D = 0.d0
 
 !! From Hannahs new temperature function (not sure if needed as diagnostic):
 
