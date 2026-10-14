@@ -3831,11 +3831,11 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
 #if defined (FESOM_PROFILING)
         call fesom_profiler_start("mix_kpp")
 #endif
-#if defined(_OPENACC)
+#if defined(ENABLE_OPENACC)
         kpp_on_device = sxy_on_device .and. kpp_device_ok(mesh)
 #endif
         call oce_mixing_KPP(Av, Kv_double, dynamics, tracers, partit, mesh)
-#if defined(_OPENACC)
+#if defined(ENABLE_OPENACC)
         ! the DVD diagnostic reads the nonlocal KPP terms on the host
         if (kpp_on_device .and. ldiag_DVD) then
             !$ACC UPDATE HOST(ghats, blmc)
@@ -3844,7 +3844,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
 #if defined (FESOM_PROFILING)
         call fesom_profiler_end("mix_kpp")
 #endif
-#if defined(_OPENACC)
+#if defined(ENABLE_OPENACC)
         if (kpp_on_device) then
             ! Kv_double and Av are on the device: Kv copy and mo_convect there
             call mo_convect_acc(ice, partit, mesh)
@@ -3857,7 +3857,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
 !$OMP END PARALLEL DO
 
         call mo_convect(ice, partit, mesh)
-#if defined(_OPENACC)
+#if defined(ENABLE_OPENACC)
         end if
 #endif
         
@@ -4130,7 +4130,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         ! u^(n+1) = u* + [-g * tau * theta * grad(eta^(n+1)-eta^(n)) ]
         if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call update_vel'//achar(27)//'[0m'
         ! ke will be computed inside there if dynamics%ldiag_ke is .TRUE.
-#if defined(_OPENACC)
+#if defined(ENABLE_OPENACC)
         if (mom_on_device .and. .not. dynamics%ldiag_ke) then
             call update_vel_acc(dynamics, partit, mesh)
         else
@@ -4218,7 +4218,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
 #if defined (FESOM_PROFILING)
         call fesom_profiler_start("gm_init_redi")
 #endif
-#if defined(_OPENACC)
+#if defined(ENABLE_OPENACC)
         gm_on_dev = sxy_on_device .and. gm_device_ok(mesh)
         redi_on_device = gm_on_dev .and. Redi
         gmvel_on_device = gm_on_dev
@@ -4351,7 +4351,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     !___________________________________________________________________________
     ! Update hnode=hnode_new, helem
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call update_thickness_ale'//achar(27)//'[0m'
-#if defined(_OPENACC)
+#if defined(ENABLE_OPENACC)
     if (vv_on_device .and. trim(which_ale)=='zstar' .and. .not. ldiag_DVD) then
         call update_thickness_ale_acc(partit, mesh)
     else
