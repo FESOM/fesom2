@@ -2765,6 +2765,7 @@ subroutine vert_vel_ale_acc(dynamics, partit, mesh)
     type(t_mesh),   intent(inout), target :: mesh
     integer       :: n, k, nz, ed, el1, el2, nzmin, nzmax, nbad_w, nbad_h, nlw
     real(kind=WP) :: dx1, dy1, dx2, dy2, c1, c2, dd, dd1, dddt, cflmax, wsplit_maxcfl
+    real(kind=WP)                       :: wsum, fsum
     logical       :: fer, plus, use_wsplit
     logical, save :: data_created = .false.
     real(kind=WP), dimension(:,:,:), pointer :: UV, fer_UV
@@ -2803,60 +2804,61 @@ subroutine vert_vel_ale_acc(dynamics, partit, mesh)
         !$ACC UPDATE DEVICE(fer_UV)
     end if
 
-    ! divergence of the layer transports, gathered per node over its edges
-!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(k, nz, ed, el1, el2, nzmin, nzmax, dx1, dy1, dx2, dy2, c1, c2, plus)
+    ! divergence of the layer transports, gathered per node over its edges: one gang per node, the
+    ! levels over the vector lanes, each level summing its edges in edge order
+!$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(64)
     do n=1, partit%myDim_nod2D+partit%eDim_nod2D
+!$ACC LOOP VECTOR PRIVATE(k, ed, el1, el2, plus, dx1, dy1, dx2, dy2, c1, c2, wsum, fsum)
         do nz=1, nlw
-            Wvel(nz, n)=0.0_WP
-            if (fer) fer_Wvel(nz, n)=0.0_WP
-        end do
-        do k=1, mesh%nod_in_edge2D_num(n)
-            ed   = mesh%nod_in_edge2D(k,n)
-            el1  = mesh%edge_tri(1,ed)
-            el2  = mesh%edge_tri(2,ed)
-            plus = mesh%nod_in_edge2D_sgn(k,n)>0
-            dx1  = mesh%edge_cross_dxdy(1,ed)
-            dy1  = mesh%edge_cross_dxdy(2,ed)
-            nzmin = mesh%ulevels(el1)
-            nzmax = mesh%nlevels(el1)-1
-            do nz=nzmin, nzmax
-                c1=( UV(2,nz,el1)*dx1 - UV(1,nz,el1)*dy1 )*mesh%helem(nz,el1)
-                if (plus) then
-                    Wvel(nz, n)=Wvel(nz, n)+c1
-                else
-                    Wvel(nz, n)=Wvel(nz, n)-c1
-                end if
-                if (fer) then
-                    c2=(fer_UV(2,nz,el1)*dx1- fer_UV(1,nz,el1)*dy1)*mesh%helem(nz,el1)
+            wsum=0.0_WP
+            fsum=0.0_WP
+!$ACC LOOP SEQ
+            do k=1, mesh%nod_in_edge2D_num(n)
+                ed   = mesh%nod_in_edge2D(k,n)
+                el1  = mesh%edge_tri(1,ed)
+                el2  = mesh%edge_tri(2,ed)
+                plus = mesh%nod_in_edge2D_sgn(k,n)>0
+                if (nz>=mesh%ulevels(el1) .and. nz<=mesh%nlevels(el1)-1) then
+                    dx1  = mesh%edge_cross_dxdy(1,ed)
+                    dy1  = mesh%edge_cross_dxdy(2,ed)
+                    c1=( UV(2,nz,el1)*dx1 - UV(1,nz,el1)*dy1 )*mesh%helem(nz,el1)
                     if (plus) then
-                        fer_Wvel(nz, n)=fer_Wvel(nz, n)+c2
+                        wsum=wsum+c1
                     else
-                        fer_Wvel(nz, n)=fer_Wvel(nz, n)-c2
+                        wsum=wsum-c1
+                    end if
+                    if (fer) then
+                        c2=(fer_UV(2,nz,el1)*dx1- fer_UV(1,nz,el1)*dy1)*mesh%helem(nz,el1)
+                        if (plus) then
+                            fsum=fsum+c2
+                        else
+                            fsum=fsum-c2
+                        end if
+                    end if
+                end if
+                if (el2>0) then
+                    if (nz>=mesh%ulevels(el2) .and. nz<=mesh%nlevels(el2)-1) then
+                        dx2 = mesh%edge_cross_dxdy(3,ed)
+                        dy2 = mesh%edge_cross_dxdy(4,ed)
+                        c1=-(UV(2,nz,el2)*dx2 - UV(1,nz,el2)*dy2)*mesh%helem(nz,el2)
+                        if (plus) then
+                            wsum=wsum+c1
+                        else
+                            wsum=wsum-c1
+                        end if
+                        if (fer) then
+                            c2=-(fer_UV(2,nz,el2)*dx2-fer_UV(1,nz,el2)*dy2)*mesh%helem(nz,el2)
+                            if (plus) then
+                                fsum=fsum+c2
+                            else
+                                fsum=fsum-c2
+                            end if
+                        end if
                     end if
                 end if
             end do
-            if (el2>0) then
-                dx2 = mesh%edge_cross_dxdy(3,ed)
-                dy2 = mesh%edge_cross_dxdy(4,ed)
-                nzmin = mesh%ulevels(el2)
-                nzmax = mesh%nlevels(el2)-1
-                do nz=nzmin, nzmax
-                    c1=-(UV(2,nz,el2)*dx2 - UV(1,nz,el2)*dy2)*mesh%helem(nz,el2)
-                    if (plus) then
-                        Wvel(nz, n)=Wvel(nz, n)+c1
-                    else
-                        Wvel(nz, n)=Wvel(nz, n)-c1
-                    end if
-                    if (fer) then
-                        c2=-(fer_UV(2,nz,el2)*dx2-fer_UV(1,nz,el2)*dy2)*mesh%helem(nz,el2)
-                        if (plus) then
-                            fer_Wvel(nz, n)=fer_Wvel(nz, n)+c2
-                        else
-                            fer_Wvel(nz, n)=fer_Wvel(nz, n)-c2
-                        end if
-                    end if
-                end do
-            end if
+            Wvel(nz, n)=wsum
+            if (fer) fer_Wvel(nz, n)=fsum
         end do
     end do
 !$ACC END PARALLEL LOOP

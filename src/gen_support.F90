@@ -961,13 +961,16 @@ subroutine smooth_nod3D_acc(arr, N_smooth, partit, mesh)
         !$ACC ENTER DATA CREATE(smth_vol, smth_work)
     end if
     do q=1, N_smooth
-!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(uln, nln, nz, j, el, ule, nle, v, w)
+        ! one gang per node, the levels over the vector lanes (coalesced column access)
+!$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) PRIVATE(uln, nln) VECTOR_LENGTH(32)
         DO n=1, partit%myDim_nod2D
             uln = mesh%ulevels_nod2d(n)
             nln = min(nlev,mesh%nlevels_nod2d(n))
+!$ACC LOOP VECTOR PRIVATE(j, el, ule, nle, v, w)
             DO nz=uln, nln
                 v = 0._WP
                 w = 0._WP
+!$ACC LOOP SEQ
                 DO j=1, mesh%nod_in_elem2D_num(n)
                     el = mesh%nod_in_elem2D(j,n)
                     ule = max( uln, mesh%ulevels(el) )
@@ -985,10 +988,11 @@ subroutine smooth_nod3D_acc(arr, N_smooth, partit, mesh)
             END DO
         END DO
 !$ACC END PARALLEL LOOP
-!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(uln, nln, nz)
+!$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) PRIVATE(uln, nln) VECTOR_LENGTH(32)
         DO n=1, partit%myDim_nod2D
             uln = mesh%ulevels_nod2d(n)
             nln = min(nlev,mesh%nlevels_nod2d(n))
+!$ACC LOOP VECTOR
             DO nz=uln,nln
                 arr(nz, n) = smth_work(nz, n) * smth_vol(nz,n)
             END DO
