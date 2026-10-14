@@ -346,6 +346,8 @@ logical                                     :: pgf_on_device = .false.
 ! OpenACC: vert_vel_ale ran on the device in this step (w, w_e, UV, helem, zbar_3d_n,
 ! hnode_new current there); Ki and slope_tapered computed on the device (GM/Redi)
 logical                                     :: vv_on_device = .false., redi_on_device = .false.
+! OpenACC: temperature and salinity on the device equal the host copies after the tracer step
+logical                                     :: ts_on_device = .false.
 
 !_______________________________________________________________________________
 !!PS ! dummy arrays

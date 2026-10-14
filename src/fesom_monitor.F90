@@ -14,7 +14,7 @@ module fesom_monitor_module
     use MOD_DYN
     use MOD_ICE
     use g_config, only: use_ice
-    use o_ARRAYS, only: water_flux, heat_flux, pgf_x, pgf_y, Av, Kv, density_dmoc, pgf_on_device
+    use o_ARRAYS, only: water_flux, heat_flux, pgf_x, pgf_y, Av, Kv, density_dmoc, pgf_on_device, ts_on_device
     use diagnostics, only: ldiag_dMOC
 
     implicit none
@@ -220,6 +220,7 @@ subroutine monitor_fill_ocean(mon, istep, full, ice, dynamics, tracers, partit, 
         else
             snf(4) = snf(4) + 1
         end if
+        if (ts_on_device) cycle
         do nz=mesh%ulevels_nod2D(n), mesh%nlevels_nod2D(n)-1
             x = temp(nz,n)
             if (ieee_is_finite(x)) then
@@ -236,6 +237,8 @@ subroutine monitor_fill_ocean(mon, istep, full, ice, dynamics, tracers, partit, 
         end do
     end do
 !$OMP END PARALLEL DO
+    ! the same 3-D ranges from the device copies (equal to the host ones after the tracer step)
+    if (ts_on_device) call monitor_ts_range_acc(temp, salt, mesh, partit, smin(5:6), smax(5:6), snf(5:6))
     ! One reduction per step: min as max of the negated value, and the largest
     ! per-rank non-finite count, all exact in WP_full. The global counts are
     ! summed only when some rank has a non-finite value, which every rank sees.
@@ -361,5 +364,41 @@ contains
     end function lv
 
 end subroutine monitor_fill_ocean
+!
+! min, max (finite values) and number of non-finite values of T and S over the
+! wet levels of the owned nodes, computed on the device
+subroutine monitor_ts_range_acc(temp, salt, mesh, partit, tsmin, tsmax, tsnf)
+    real(kind=WP), dimension(:,:), intent(in) :: temp, salt
+    type(t_mesh)   , intent(in)   , target    :: mesh
+    type(t_partit) , intent(inout), target    :: partit
+    real(kind=WP)      , intent(inout)        :: tsmin(2), tsmax(2)
+    integer(kind=int64), intent(inout)        :: tsnf(2)
+    real(kind=WP)       :: tmin, tmax, smin_, smax_, x
+    integer(kind=int64) :: tnf, snf_
+    integer             :: n, nz
+    tmin = tsmin(1); tmax = tsmax(1); smin_ = tsmin(2); smax_ = tsmax(2)
+    tnf  = 0; snf_ = 0
+    !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(nz, x) &
+    !$ACC REDUCTION(min:tmin, smin_) REDUCTION(max:tmax, smax_) REDUCTION(+:tnf, snf_)
+    do n=1, partit%myDim_nod2D
+        do nz=mesh%ulevels_nod2D(n), mesh%nlevels_nod2D(n)-1
+            x = temp(nz,n)
+            if (x == x .and. abs(x) <= huge(x)) then
+                tmin = min(tmin, x); tmax = max(tmax, x)
+            else
+                tnf = tnf + 1
+            end if
+            x = salt(nz,n)
+            if (x == x .and. abs(x) <= huge(x)) then
+                smin_ = min(smin_, x); smax_ = max(smax_, x)
+            else
+                snf_ = snf_ + 1
+            end if
+        end do
+    end do
+    !$ACC END PARALLEL LOOP
+    tsmin(1) = tmin; tsmax(1) = tmax; tsmin(2) = smin_; tsmax(2) = smax_
+    tsnf(1)  = tsnf(1) + tnf; tsnf(2) = tsnf(2) + snf_
+end subroutine monitor_ts_range_acc
 
 end module fesom_monitor_module

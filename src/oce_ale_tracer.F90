@@ -66,6 +66,8 @@ module oce_ale_tracer_module
     ! ... and its implicit vertical diffusion (diff_ver_part_impl_ale): T and S without the
     ! features that need host data inside the column loop (icebergs, depth hosing, toy forcing)
     logical :: impl_on_device = .false.
+    ! device copy of T (1) and S (2) equal to the host copy at the end of diff_tracers_ale
+    logical :: tr_dev_current(2) = .false.
     ! column work arrays of diff_ver_part_impl_ale have this fixed size: as private arrays of
     ! run-time size they would come from the per-thread device heap
     integer, parameter :: impl_nl_max = 128
@@ -123,6 +125,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     integer                                  :: i, tr_num, node, elem, nzmax, nzmin
     real(kind=WP)                            :: ttf_rhs_bak (mesh%nl-1, partit%myDim_nod2D+partit%eDim_elem2D) ! local variable
     integer                                  :: nz, n, nu1, nl1
+    real(kind=WP), dimension(:,:), pointer   :: salt_dev
     !___________________________________________________________________________
     ! pointer on necessary derived types
     logical :: gm_on_device = .false.
@@ -538,6 +541,23 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
                tracers%data(2)%values(nzmin:nzmax,node) = 3._WP - S_ref_anomaly
         end where
     end do
+#ifdef ENABLE_OPENACC
+    ! keep the device copies equal to the host (the monitor reads them there)
+    ts_on_device = tr_dev_current(1) .and. tr_dev_current(2) .and. ptracers_restore_total==0
+    if (ts_on_device) then
+        salt_dev => tracers%data(2)%values
+        !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(nz, nzmin, nzmax)
+        do node=1, partit%myDim_nod2D+partit%eDim_nod2D
+            nzmax=mesh%nlevels_nod2D(node)-1
+            nzmin=mesh%ulevels_nod2D(node)
+            do nz=nzmin, nzmax
+                if (salt_dev(nz,node) > 45._WP - S_ref_anomaly) salt_dev(nz,node) = 45._WP - S_ref_anomaly
+                if (salt_dev(nz,node) < 3._WP - S_ref_anomaly)  salt_dev(nz,node) = 3._WP - S_ref_anomaly
+            end do
+        end do
+        !$ACC END PARALLEL LOOP
+    end if
+#endif
 !$OMP END PARALLEL DO
 
     !---age-code-begin
@@ -901,6 +921,11 @@ endif
     if (tracers%data(tr_num)%smooth_bh_tra) then
        call diff_part_bh(tr_num, dynamics, tracers, partit, mesh)  ! alpply biharmonic diffusion (implemented as filter)
     end if
+#ifdef ENABLE_OPENACC
+    if (tracers%data(tr_num)%ID==1 .or. tracers%data(tr_num)%ID==2) &
+        tr_dev_current(tracers%data(tr_num)%ID) = impl_on_device .and. tracers%data(tr_num)%i_vert_diff &
+                                                  .and. .not. tracers%data(tr_num)%smooth_bh_tra
+#endif
     if (conservation_freq > 0) call conservation_probe('bh_filter', 'b', tr_num, tracers, partit, mesh)
 
 contains
