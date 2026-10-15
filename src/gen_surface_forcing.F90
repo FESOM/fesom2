@@ -1212,10 +1212,10 @@ CONTAINS
                         chl_data_source, nm_chl_data_file, chl_const, use_runoff_mapper, runoff_basins_file, runoff_radius, &
                         use_ocean_only_forcing, nm_ocean_mask_file, nm_ocean_mask_var, ocean_mask_threshold
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
+!#include "associate_part_def.h"
+!#include "associate_mesh_def.h"
+!#include "associate_part_ass.h"
+!#include "associate_mesh_ass.h"
 
       ! OPEN and read namelist for SBC
       open(unit=nm_sbc_unit, file='namelist.forcing', action='read', form='formatted', access='sequential', status='old', iostat=iost )
@@ -1977,7 +1977,7 @@ SUBROUTINE sbc_do_recom(partit, mesh)
         if (partit%my_fesom_group==0) then
 #endif
 
-            if (mype==0) write(*,*) 'Updating CO2 climatology from ', trim(filename)
+            if (partit%mype==0) write(*,*) 'Updating CO2 climatology from ', trim(filename)
 #if defined(__usetp)
         endif !(partit%my_fesom_group==0) then
 #endif
@@ -2085,7 +2085,7 @@ SUBROUTINE sbc_do_recom(partit, mesh)
 #if defined(__usetp)
         if (partit%my_fesom_group==0) then
 #endif 
-            if (mype == 0) write(*, *) 'Updating iron deposition (', trim(fe_data_source), &
+            if (partit%mype==0) write(*, *) 'Updating iron deposition (', trim(fe_data_source), &
                     ') for month ', i, ' variable ', trim(varname), ' from ', trim(filename)
 
 #if defined(__usetp)
@@ -2098,7 +2098,7 @@ SUBROUTINE sbc_do_recom(partit, mesh)
         ! dust iron deliberately off: GloFeDust keeps its initial value 0
 
     case default
-        if (mype == 0) write(*, *) 'ERROR: fe_data_source = "', trim(fe_data_source), &
+        if (partit%mype==0) write(*, *) 'ERROR: fe_data_source = "', trim(fe_data_source), &
                 '" not supported. Use "Albani", "Mahowald_clim", "Mahowald" or "none".'
         call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)   ! or FESOM's usual abort call
     end select
