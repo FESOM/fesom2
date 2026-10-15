@@ -341,6 +341,26 @@ real(kind=WP), allocatable,dimension(:,:)   :: density_m_rho0_slev
 real(kind=WP), allocatable,dimension(:,:)   :: density_ref
 real(kind=WP), allocatable,dimension(:,:)   :: density_dmoc
 real(kind=WP), allocatable,dimension(:,:)   :: pgf_x, pgf_y
+! OpenACC: pgf_x/pgf_y of this step were computed on the device (host copy not current)
+logical                                     :: pgf_on_device = .false.
+! OpenACC: vert_vel_ale ran on the device in this step (w, w_e, UV, helem, zbar_3d_n,
+! hnode_new current there); Ki and slope_tapered computed on the device (GM/Redi)
+logical                                     :: vv_on_device = .false., redi_on_device = .false.
+! OpenACC: temperature and salinity on the device equal the host copies after the tracer step
+logical                                     :: ts_on_device = .false.
+! OpenACC: the layer geometry (hnode, hnode_new, helem, zbar_3d_n, Z_3d_n) on the device is
+! current (zstar thickness update on the device); its uploads are skipped
+logical                                     :: geom_on_device = .false.
+! an output stream reads sigma_xy, neutral_slope, slope_tapered or fer_tapfac on the host
+logical                                     :: slope_out_needed = .false.
+! OpenACC: UV on the device equals the host copy (velocity update on the device; host
+! writes to UV clear it); GM bolus velocity computed on the device in this step;
+! an output stream reads uv_rhs on the host
+logical                                     :: uv_dev_current = .false., gmvel_on_device = .false.
+logical                                     :: uvrhs_out_needed = .false.
+! UVnode computed on the device (compute_vel_nodes); the host copy is refreshed only
+! where the host reads it (monitor, restart, output)
+logical                                     :: uvnode_on_device = .false.
 
 !_______________________________________________________________________________
 !!PS ! dummy arrays

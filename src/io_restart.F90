@@ -187,6 +187,10 @@ subroutine ini_ocean_io(dynamics, tracers, partit, mesh)
   !___Define the netCDF variables for 3D fields_______________________________
 #ifdef ENABLE_NVHPC_WORKAROUNDS
   dynamics_workaround => dynamics
+  tracers_workaround  => tracers
+  if (allocated(tracer_restart_name)) deallocate(tracer_restart_name)
+  allocate(tracer_restart_name(tracers%num_tracers))
+  tracer_restart_name = ''
 #endif
   call oce_files%def_elem_var('u', 'zonal velocity',        'm/s', dynamics%uv(1,:,:), mesh, partit)
   call oce_files%def_elem_var('v', 'meridional velocity',   'm/s', dynamics%uv(2,:,:), mesh, partit)
@@ -287,6 +291,9 @@ subroutine ini_ocean_io(dynamics, tracers, partit, mesh)
          write(longname,'(A15,i4.4)') 'passive tracer ', j
          units='none'
      END SELECT
+#ifdef ENABLE_NVHPC_WORKAROUNDS
+     tracer_restart_name(j) = trname
+#endif
      if ((tracers%data(j)%ID==101) .or. (tracers%data(j)%ID==102) .or. (tracers%data(j)%ID==103) .or. (tracers%data(j)%ID==304)) then
         call oce_files%def_node_var_optional(trim(trname), trim(longname), trim(units), tracers%data(j)%values(:,:), mesh, partit)
 #if defined(__recom)
@@ -557,6 +564,9 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
 
   ! Local variables
   logical :: is_portable_restart_write, is_raw_restart_write, is_bin_restart_write
+#ifdef ENABLE_OPENACC
+  integer :: tr_num_acc
+#endif
   logical, save :: initialized_raw = .false.
   logical, save :: initialized_bin = .false.
   logical, save :: initialized_io = .false.
@@ -677,6 +687,19 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
     is_bin_restart_write = .false.
   end if
 
+#ifdef ENABLE_OPENACC
+  ! The Adams-Bashforth fields are kept on the device (init_tracers_AB); bring them
+  ! to the host before any restart that writes them.
+  if (is_portable_restart_write .or. is_raw_restart_write .or. is_bin_restart_write) then
+    do tr_num_acc=1, tracers%num_tracers
+      !$ACC UPDATE HOST(tracers%data(tr_num_acc)%valuesold, tracers%data(tr_num_acc)%valuesAB)
+    end do
+    !$ACC UPDATE HOST(dynamics%uv_rhsAB) ! momentum AB history (compute_vel_rhs on the device)
+    if (uvnode_on_device) then
+        !$ACC UPDATE HOST(dynamics%uvnode)
+    end if
+  end if
+#endif
   ! Write restart files
   if(is_portable_restart_write) then
 

@@ -322,7 +322,6 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
     real(kind=WP)  :: gamma0_tra, gamma1_tra, gamma2_tra
     integer        :: AB_order = 2
     namelist /tracer_listsize/ num_tracers
-    namelist /tracer_list    / nml_tracer_list
     namelist /tracer_general / smooth_bh_tra, gamma0_tra, gamma1_tra, gamma2_tra, i_vert_diff, AB_order, ltra_diag
     !___________________________________________________________________________
     ! pointer on necessary derived types
@@ -339,8 +338,10 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
     end if
 
     READ(nm_unit, nml=tracer_listsize, iostat=iost)
+    if (iost /= 0) call check_namelist_read(nm_unit, 'tracer_listsize', 'namelist.tra', partit)
     allocate(nml_tracer_list(num_tracers))
-    READ(nm_unit, nml=tracer_list,     iostat=iost)
+    call read_tracer_list(nm_unit, num_tracers, nml_tracer_list, iost)
+    if (iost /= 0) call check_namelist_read(nm_unit, 'tracer_list', 'namelist.tra', partit)
     read(nm_unit, nml=tracer_init3d,   iostat=iost)
     READ(nm_unit, nml=tracer_general,  iostat=iost)
     close(nm_unit)
@@ -503,6 +504,20 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
 
     end if
 END SUBROUTINE tracer_init
+!
+!
+!_______________________________________________________________________________
+! nvfortran reads only the first record of a namelist array of derived type when the array is
+! allocatable: read the tracer list through an automatic array of the same name
+subroutine read_tracer_list(nm_unit, num_tracers, list, iost)
+    integer,                    intent(in)  :: nm_unit, num_tracers
+    type(nml_tracer_list_type), intent(out) :: list(num_tracers)
+    integer,                    intent(out) :: iost
+    type(nml_tracer_list_type)              :: nml_tracer_list(num_tracers)
+    namelist /tracer_list/ nml_tracer_list
+    read(nm_unit, nml=tracer_list, iostat=iost)
+    list = nml_tracer_list
+end subroutine read_tracer_list
 !
 !
 !_______________________________________________________________________________

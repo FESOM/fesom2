@@ -199,6 +199,7 @@ MODULE io_BLOWUP
 		integer                               :: istep
 		
 		ctime=timeold+(dayold-1.)*86400
+		!$ACC UPDATE HOST(dynamics%uv_rhsAB) ! momentum AB history lives on the device
 		call ini_blowup_io(yearnew, ice, dynamics, tracers, partit, mesh)
 		if(partit%mype==0) write(*,*)'Do output (netCDF, blowup) ...'
 		if(partit%mype==0) write(*,*)' --> call assoc_ids(bid)'

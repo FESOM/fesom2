@@ -12,6 +12,9 @@ module ice_setup_step_module
     USE ice_maEVP_module, only: EVPdynamics_a, EVPdynamics_m
 #if !defined (__oasis) && !defined (__ifsinterface) && !defined (__yac)
     use ice_thermo_oce_module, only: thermodynamics, cut_off
+#ifdef ENABLE_OPENACC
+    use ice_thermo_oce_module, only: thermodynamics_acc, thermo_device_ok
+#endif
 #else
     use ice_thermo_oce_module, only: cut_off
 #endif
@@ -276,7 +279,15 @@ subroutine ice_timestep(step, ice, partit, mesh)
     !___________________________________________________________________________
     ! ===== Thermodynamic part
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call thermodynamics...'//achar(27)//'[0m'
+#if defined(ENABLE_OPENACC) && !defined(__oasis) && !defined(__ifsinterface) && !defined(__yac)
+    if (thermo_device_ok(ice)) then
+        call thermodynamics_acc(ice, partit, mesh)
+    else
+        call thermodynamics(ice, partit, mesh)
+    end if
+#else
     call thermodynamics(ice, partit, mesh)
+#endif
 #endif /* (__icepack) */
 
 
