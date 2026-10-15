@@ -33,7 +33,7 @@ module g_cvmix_idemix
     use o_param           
     use mod_mesh
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     use o_arrays
     use g_comm_auto 
     use g_read_other_NetCDF
@@ -260,7 +260,7 @@ module g_cvmix_idemix
                 write(*,*) '        --> check your namelist.cvmix, idemix_surforc_file &  '
                 write(*,*) '            idemix_botforc_file'
                 write(*,*) '____________________________________________________________________'
-                call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+                call par_abort(partit%MPI_COMM_FESOM, partit%mype)
             end if
         end if 
         
@@ -320,7 +320,7 @@ module g_cvmix_idemix
                 write(*,*) '        --> check your namelist.cvmix, idemix_surforc_file &  '
                 write(*,*) '            idemix_botforc_file'
                 write(*,*) '____________________________________________________________________'
-                call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+                call par_abort(partit%MPI_COMM_FESOM, partit%mype)
             end if 
             
         end if 

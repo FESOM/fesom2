@@ -4,7 +4,7 @@ MODULE io_BLOWUP
 	use g_comm_auto
     USE MOD_MESH
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     USE MOD_TRACER  
     USE MOD_DYN
     USE MOD_ICE
@@ -199,6 +199,7 @@ MODULE io_BLOWUP
 		integer                               :: istep
 		
 		ctime=timeold+(dayold-1.)*86400
+		!$ACC UPDATE HOST(dynamics%uv_rhsAB) ! momentum AB history lives on the device
 		call ini_blowup_io(yearnew, ice, dynamics, tracers, partit, mesh)
 		if(partit%mype==0) write(*,*)'Do output (netCDF, blowup) ...'
 		if(partit%mype==0) write(*,*)' --> call assoc_ids(bid)'
@@ -414,7 +415,7 @@ MODULE io_BLOWUP
 				deallocate(aux2)
 			else
 				if (partit%mype==0) write(*,*) 'not supported shape of array in restart file'
-				call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+				call par_abort(partit%MPI_COMM_FESOM, partit%mype)
 				stop
 			end if
 		end do
@@ -505,7 +506,7 @@ MODULE io_BLOWUP
 			if (status .ne. NF90_NOERR) then
 				if (partit%mype==0) write(*,*) 'error counter=', k
 				if (partit%mype==0) call handle_err(status, partit)
-				call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+				call par_abort(partit%MPI_COMM_FESOM, partit%mype)
 				stop
 			end if
 		end do

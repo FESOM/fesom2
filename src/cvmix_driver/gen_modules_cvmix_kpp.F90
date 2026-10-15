@@ -29,7 +29,7 @@ module g_cvmix_kpp
     USE MOD_DYN
     USE mod_tracer
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     USE MOD_MESH
     use o_arrays
     use g_comm_auto 
@@ -813,7 +813,7 @@ module g_cvmix_kpp
             else
                 write(*,*) " --> Error: this kpp_internalmix scheme is not supported"
                 write(*,*) "     for the mixing below the OBL, either KPP or PP !"
-                call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+                call par_abort(partit%MPI_COMM_FESOM, partit%mype)
             end if 
             
             

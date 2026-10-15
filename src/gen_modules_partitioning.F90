@@ -11,7 +11,7 @@ module par_support_module
     implicit none
 
     private
-    public :: par_init, par_ex, init_mpi_types, init_mpi_types_fbin, &
+    public :: par_init, par_abort, par_finalize, init_mpi_types, init_mpi_types_fbin, &
               init_gatherLists, status_check
 
 contains
@@ -55,7 +55,32 @@ subroutine par_init(partit)    ! initializes MPI
   end if
 end subroutine par_init
 !=================================================================
-subroutine par_ex(COMM, mype, abort)       ! finalizes MPI
+subroutine par_abort(COMM, mype)           ! aborts the run (error exit)
+
+  implicit none
+  integer,           intent(in)   :: COMM
+  integer,           intent(in)   :: mype
+  integer                         :: error
+
+! par_abort is the error exit: it always calls MPI_ABORT with a non-zero error
+! code. The normal end of a run is par_finalize.
+  write(*,*) 'Run finished unexpectedly! FESOM aborts on rank ', mype
+
+  ! flush stdout and stderr so that error messages are visible before MPI_ABORT
+  flush(output_unit)
+  flush(error_unit)
+
+#if !defined(__oasis) && !defined(__yac)
+  ! standalone and ifsinterface
+  call MPI_ABORT(COMM, 1, error)
+#else
+  ! coupled (oasis or yac): abort MPI_COMM_WORLD so that the coupled partners stop too
+  call MPI_ABORT(MPI_COMM_WORLD, 1, error)
+#endif
+
+end subroutine par_abort
+!=================================================================
+subroutine par_finalize(COMM, mype)        ! finalizes MPI (normal end of the run)
 
 ! In case we are letting oasis orchestrate MPI, we need to shut down through
 ! oasis as well, thus we are including it here.
@@ -74,61 +99,41 @@ subroutine par_ex(COMM, mype, abort)       ! finalizes MPI
   implicit none
   integer,           intent(in)   :: COMM
   integer,           intent(in)   :: mype
-  integer, optional, intent(in)   :: abort
   integer                         :: error
 
-  ! flush stdout and stderr so that error messages are visible before MPI_ABORT
   flush(output_unit)
   flush(error_unit)
 
-! For standalone runs we
-! when there is error par_ex should be called with abort argument to abort abruptly,
-! in all other cases model will be finalized here, call the MPI_barrier and MPI_finalize
+! The model is finalized here: MPI_Barrier and MPI_Finalize, or the termination
+! of the coupler. Error exits must call par_abort instead.
 !---------------------------------------------------------------
-!TODO: logic is convoluted here, not defined oasis and model needs to abort doesn't happen using par_ex 
 #if !defined(__oasis) && !defined(__yac)
-  if (present(abort)) then
-     if (mype==0) write(*,*) 'Run finished unexpectedly!'
-     call MPI_ABORT(COMM, 1, error)
-  else
           ! TODO: this is where fesom standalone, and ifsinterface get to in case of normal exit.
           !1. barrier may hang so have to be careful
           !2. when using fesom as interface using finalize is bad here as there may 
           !   be other MPI tasks running in calling library like IFS, better 
           !   better practice in that case would be to free the communicator.
-          !3. or change all the cases in fesom that call par_ex to properly use abort in all cases other then normal closure.
-     call  MPI_Barrier(COMM, error)
-     call  MPI_Finalize(error)
-  endif
+  call  MPI_Barrier(COMM, error)
+  call  MPI_Finalize(error)
 
 #else 
-! TODO logic below is convoluted, COMM that is passed should be used for MPI_ABORT
-! changes are easy but need to be tested with coupled configurations 
 ! From here on the two coupled options
 !-------------------------------------
 #if defined (__oifs)
   !For OpenIFS coupled runs we use the new OASIS nameing scheme (oasis)
-  if (present(abort)) then
-    if (mype==0) write(*,*) 'Run finished unexpectedly!'
-    !SLcall MPI_ABORT(COMM, 1 )
-    call MPI_ABORT(MPI_COMM_WORLD, 1, error)
-  else
 #ifdef __oasis
-    call oasis_terminate
+  call oasis_terminate
 #elif __yac
-    CALL yac_ffinalize()
-    CALL MPI_Finalize(error)
+  CALL yac_ffinalize()
+  CALL MPI_Finalize(error)
 #endif
- endif
 #elif defined(__yac)
  CALL yac_ffinalize()
  CALL MPI_Finalize(error)
 #else
   !For ECHAM coupled runs we use the old OASIS nameing scheme (prism / prism_proto)
-  if (.not. present(abort)) then
-     if (mype==0) print *, 'FESOM calls MPI_Barrier before calling prism_terminate'
-     call  MPI_Barrier(MPI_COMM_WORLD, error)
-  end if
+  if (mype==0) print *, 'FESOM calls MPI_Barrier before calling prism_terminate'
+  call  MPI_Barrier(MPI_COMM_WORLD, error)
   call prism_terminate_proto(error)
   if (mype==0) print *, 'FESOM calls MPI_Barrier before calling MPI_Finalize'
   call  MPI_Barrier(MPI_COMM_WORLD, error)
@@ -142,7 +147,7 @@ subroutine par_ex(COMM, mype, abort)       ! finalizes MPI
 ! we should be fine shutting the whole model down
 if (mype==0) print *, 'fesom should stop with exit status = 0'
 
-end subroutine par_ex
+end subroutine par_finalize
 !=======================================================================
 subroutine init_mpi_types(partit, mesh)
   implicit none
@@ -788,7 +793,7 @@ res=0
 call MPI_Allreduce (partit%pe_status, res, 1, MPI_INTEGER, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
 if (res /= 0 ) then
     if (partit%mype==0) write(*,*) 'Something Broke. Flushing and stopping...'
-    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+    call par_abort(partit%MPI_COMM_FESOM, partit%mype)
 endif
 end subroutine status_check
 

@@ -1,7 +1,7 @@
 module iceberg_step
  USE MOD_MESH
  use MOD_PARTIT
- use par_support_module, only: par_ex
+ use par_support_module, only: par_abort
  use MOD_ICE
  USE MOD_DYN
  use iceberg_params
@@ -458,7 +458,7 @@ type(t_dyn)   , intent(inout), target :: dynamics
   if(iceberg_elem .EQ. 0) then
         write(*,*) 'IB ',ib,' rot. coords:', lon_deg, lat_deg !,lon_rad, lat_rad
         write(*,*) 'FATAL: iceberg ', ib, ' outside model domain on rank ', partit%mype
-   	call par_ex (partit%MPI_COMM_FESOM, partit%mype, abort=1)
+   	call par_abort (partit%MPI_COMM_FESOM, partit%mype)
    	stop 'ICEBERG OUTSIDE MODEL DOMAIN OR IN ICE SHELF REGION'
   end if
   

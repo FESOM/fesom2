@@ -194,3 +194,140 @@ subroutine pmlktmo(qfm,qtm,qw,obuk)
     obuk=max(ttmp,10.)
 
 end subroutine pmlktmo
+#ifdef ENABLE_OPENACC
+!
+!
+!===============================================================================
+! The Kv copy after KPP and mo_convect on the device (Kv_double and Av = viscAE current there); mo_length
+! and pmlktmo are inlined with the same arithmetic. Kv and Av are copied back for the host code.
+subroutine mo_convect_acc(ice, partit, mesh)
+    USE o_PARAM
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_ICE
+    USE o_ARRAYS
+    USE g_config
+    use g_comm_auto
+    IMPLICIT NONE
+    type(t_ice), intent(in), target :: ice
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh),   intent(in),    target :: mesh
+    integer                               :: node, elem, nz, n1, n2, n3, nzmin, nzmax, iter
+    integer                               :: myDim_nod2D, nod_size, myDim_elem2D, nl
+    real(kind=WP), dimension(:), pointer  :: u_ice, v_ice, a_ice
+    logical, save                         :: data_created = .false.
+    real(kind=WP)             :: uabs, ret, rtc, qfm, qtm, qw, ustar, tau, obuk, mlen
+    real(kind=WP), parameter  :: cosgam = 0.913632  ! cos(24.*3.14/180.), as in mo_length
+    real(kind=WP), parameter  :: qhw   = 1/7.0      ! as in pmlktmo
+    real(kind=WP), parameter  :: betas = 0.0008
+    real(kind=WP), parameter  :: betat = 0.00004
+    real(kind=WP)             :: a1, f0, f1, ttmp, qrho, l_dt
+
+    u_ice => ice%uice(:)
+    v_ice => ice%vice(:)
+    a_ice => ice%data(1)%values(:)
+    myDim_nod2D  = partit%myDim_nod2D
+    nod_size     = partit%myDim_nod2D+partit%eDim_nod2D
+    myDim_elem2D = partit%myDim_elem2D
+    nl           = mesh%nl
+    l_dt         = dt
+    if (.not. data_created) then
+        !$ACC ENTER DATA CREATE(Kv) COPYIN(mesh%geo_coord_nod2D)
+        if (use_momix) then
+            !$ACC ENTER DATA COPYIN(mo, mixlength)
+        end if
+        data_created = .true.
+    end if
+    if (use_momix) then
+        ! computed on the host (ice step)
+        !$ACC UPDATE DEVICE(u_ice, v_ice, a_ice)
+    end if
+
+    !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(nz)
+    do node=1, myDim_nod2D
+        do nz=1, nl
+            Kv(nz, node)=Kv_double(nz, node, 1)
+        end do
+    end do
+    !$ACC END PARALLEL LOOP
+    call exchange_nod(Kv, partit, luse_g2g=.true.)
+
+    !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) &
+    !$ACC PRIVATE(nz, nzmin, nzmax, uabs, ret, rtc, qfm, qtm, qw, ustar, tau, obuk, mlen, a1, f0, f1, ttmp, qrho, iter)
+    do node=1, nod_size
+        nzmax = mesh%nlevels_nod2d(node)
+        nzmin = mesh%ulevels_nod2d(node)
+        if (use_momix) then
+            do nz=1, nl
+                mo(nz, node) = 0._WP
+            end do
+            if (mesh%geo_coord_nod2D(2,node)<=momix_lat*rad .and. nzmin<=1) then
+                ! mo_length
+                qfm   = water_flux(node) * 34._WP
+                qtm   = - 2.38e-7_WP * heat_flux(node)
+                tau   = sqrt(stress_node_surf(1,node)**2+stress_node_surf(2,node)**2)
+                ustar = sqrt(tau/1030._WP)
+                uabs  = sqrt(u_ice(node)**2+v_ice(node)**2)
+                qw    = 1.25_WP * ustar**3 * (1._WP-a_ice(node)) + 0.005_WP * uabs**3 * cosgam * a_ice(node)
+                ! pmlktmo
+                qrho=betas*qfm-betat*qtm
+                ttmp=60._WP
+                if(qrho>0.) then
+                   ttmp=0._WP
+                else
+                   do iter=1,5
+                      a1 = exp(-ttmp*qhw)
+                      f0 = 2._WP* qw * a1 + 9.81_WP * qrho * ttmp
+                      f1 =-2._WP* qw * a1 * qhw + 9.81_WP * qrho
+                      ttmp = ttmp - f0 / f1
+                      ttmp = max(ttmp,10._WP)
+                   enddo
+                end if
+                obuk=max(ttmp,10.)
+                rtc=l_dt/(10.0_WP * 86400.0_WP)
+                mlen = mixlength(node)
+                if (obuk.lt.mlen) then
+                   ret = (obuk-mlen)*rtc
+                   mlen = mlen+ret
+                else
+                   mlen=obuk
+                endif
+                mixlength(node) = mlen
+                do nz = nzmin+1,nzmax-1
+                    if(abs(mesh%zbar_3d_n(nz,node)) <= mixlength(node)) then
+                        mo(nz,node)=momix_kv
+                        Kv(nz,node)=Kv(nz,node)+mo(nz,node)
+                    end if
+                end do
+            end if
+        end if
+        do nz=nzmin+1, nzmax-1
+            if (use_instabmix .and. bvfreq(nz, node) < 0._WP)  Kv(nz,node)=max(Kv(nz,node),instabmix_kv)
+            if (nzmin>1) cycle
+            if (use_windmix .and. nz<=windmix_nl+1) Kv(nz,node)=max(Kv(nz,node), windmix_kv)
+        end do
+    end do
+    !$ACC END PARALLEL LOOP
+
+    !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(nz, nzmin, nzmax, n1, n2, n3)
+    do elem=1, myDim_elem2D
+        n1 = mesh%elem2D_nodes(1,elem)
+        n2 = mesh%elem2D_nodes(2,elem)
+        n3 = mesh%elem2D_nodes(3,elem)
+        nzmax = mesh%nlevels(elem)
+        nzmin = mesh%ulevels(elem)
+        do nz=nzmin+1,nzmax-1
+            if (use_instabmix .and. (bvfreq(nz,n1) < 0._WP .or. bvfreq(nz,n2) < 0._WP .or. bvfreq(nz,n3) < 0._WP)) &
+                Av(nz,elem)=max(Av(nz,elem),instabmix_kv)
+            if (nzmin>1) cycle
+            if (use_momix) then
+                if ((mesh%geo_coord_nod2D(2,n1)+mesh%geo_coord_nod2D(2,n2)+mesh%geo_coord_nod2D(2,n3))/3.0<=momix_lat*rad) &
+                    Av(nz,elem)=Av(nz,elem)+(mo(nz,n1)+mo(nz,n2)+mo(nz,n3))/3.0_WP
+            end if
+            if (use_windmix .and. nz<=windmix_nl+1) Av(nz,elem)=max(Av(nz,elem), windmix_kv)
+        end do
+    end do
+    !$ACC END PARALLEL LOOP
+    !$ACC UPDATE HOST(Kv, Av)
+end subroutine mo_convect_acc
+#endif

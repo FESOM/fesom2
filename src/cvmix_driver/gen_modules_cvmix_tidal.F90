@@ -16,7 +16,7 @@ module g_cvmix_tidal
     use o_param           
     use mod_mesh
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     use o_arrays
     use g_comm_auto 
     use g_read_other_NetCDF
@@ -195,7 +195,7 @@ module g_cvmix_tidal
                 write(*,*) '        --> check your namelist.cvmix, tidal_botforc_file &  '
                 write(*,*) '____________________________________________________________________'
             end if 
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
         end if 
         
         !_______________________________________________________________________

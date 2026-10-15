@@ -13,7 +13,7 @@ module oce_density_kernels
     implicit none
 
     private
-    public :: densityJM_components
+    public :: densityJM_components, densityJM_components_abs
 
 contains
 
@@ -65,6 +65,18 @@ contains
 !   - In-situ density includes pressure → used for dynamics and PGF calculations
 SUBROUTINE densityJM_components(t, s, bulk_0, bulk_pz, bulk_pz2, rhopot)
 IMPLICIT NONE
+  real(kind=WP),  intent(IN)            :: t,s
+  real(kind=WP),  intent(OUT)           :: bulk_0, bulk_pz, bulk_pz2, rhopot
+  ! EOS needs absolute salinity (S_ref=0 unless use_salt_anomaly)
+  call densityJM_components_abs(t, s + S_ref_anomaly, bulk_0, bulk_pz, bulk_pz2, rhopot)
+end subroutine densityJM_components
+!
+!
+! Same as densityJM_components, for absolute salinity s_abs (= s + S_ref_anomaly);
+! also callable on the device.
+SUBROUTINE densityJM_components_abs(t, s_abs, bulk_0, bulk_pz, bulk_pz2, rhopot)
+!$ACC ROUTINE SEQ
+IMPLICIT NONE
 
   !
   ! - calculates in-situ density as a function of potential temperature
@@ -78,9 +90,9 @@ IMPLICIT NONE
   ! N. Rakowski 2014 the split form
   !---------------------------------------------------------------------------
   
-  real(kind=WP),  intent(IN)            :: t,s
+  real(kind=WP),  intent(IN)            :: t, s_abs
   real(kind=WP),  intent(OUT)           :: bulk_0, bulk_pz, bulk_pz2, rhopot
-  real(kind=WP)                         :: s_sqrt, s_abs
+  real(kind=WP)                         :: s_sqrt
 
   real(kind=WP), parameter   :: a0    = 19092.56,     at   = 209.8925
   real(kind=WP), parameter   :: at2   = -3.041638,    at3  = -1.852732e-3
@@ -109,7 +121,6 @@ IMPLICIT NONE
 
   !compute secant bulk modulus
 
-  s_abs = s + S_ref_anomaly   ! EOS needs absolute salinity (S_ref=0 unless use_salt_anomaly)
   s_sqrt = sqrt(s_abs)
 
   bulk_0 =  a0      + t*(at   + t*(at2  + t*(at3 + t*at4)))      &
@@ -126,6 +137,6 @@ IMPLICIT NONE
                + s_abs*(bs + t*(bst + t*(bst2 + t*(bst3 + t*bst4)))  &
                   + s_sqrt*(bss + t*(bsst + t*bsst2))            &
                        + s_abs* bss2)
-end subroutine densityJM_components
+end subroutine densityJM_components_abs
 
 end module oce_density_kernels

@@ -18,6 +18,8 @@
 ! Probes inside the tracer step (conservation_probe) give the thickness-weighted
 ! integral of temperature and salinity after each stage; their differences are
 ! printed as CONSP lines and attribute a residual to a stage.
+! In OpenACC builds the host copies are not current between the stages, so the probes are off
+! there (no CONSP lines); the budgets use the end-of-step state, which is on the host.
 !
 ! All sums are WP_full, in a fixed order over the owned nodes (no threads), with
 ! one MPI reduction, as in the monitor record.
@@ -167,6 +169,9 @@ subroutine conservation_probe(name, phase, tr_num, tracers, partit, mesh)
     integer            :: n, nz, k, ierr
 
     if (conservation_freq <= 0 .or. tr_num > 2) return
+#ifdef ENABLE_OPENACC
+    return
+#endif
     k = 0
     do n = 1, np
         if (pname(n) == name) k = n

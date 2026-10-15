@@ -6,7 +6,7 @@ module fesom_main_storage_module
   USE MOD_ICE
   USE MOD_TRACER
   USE MOD_PARTIT
-  use par_support_module, only: par_ex
+  use par_support_module, only: par_abort, par_finalize
   USE MOD_DYN
   USE o_ARRAYS
   USE o_PARAM
@@ -286,7 +286,7 @@ contains
             if(mype_fesom_world == 0) then
                 write(*,*) 'MPI_comm_split mismatch npes_fesom_world, num_fesom_groups', npes_fesom_world, num_fesom_groups
             end if
-            call par_ex(f%MPI_COMM_FESOM, f%mype)
+            call par_abort(f%MPI_COMM_FESOM, f%mype)
             stop
         end if
 
@@ -302,33 +302,33 @@ contains
         call MPI_comm_split(f%MPI_COMM_FESOM_WORLD, f%my_fesom_group, 0, f%MPI_COMM_FESOM, f%MPIerr)
         if (f%MPIerr /= MPI_SUCCESS) then
             write(*,*) 'MPI_comm_split(MPI_COMM_FESOM_WORLD, my_fesom_group, 0, MPI_COMM_FESOM, MPIERR) failed'
-            call par_ex(f%MPI_COMM_FESOM, f%mype)
+            call par_abort(f%MPI_COMM_FESOM, f%mype)
             stop
         end if
 
         call MPI_comm_size(f%MPI_COMM_FESOM, npes_check, f%MPIerr)
         if(f%MPIerr /= MPI_SUCCESS) then
             write(*,*) 'MPI_comm_size(MPI_COMM_FESOM, npes_check, MPIERR) failed'
-            call par_ex(f%MPI_COMM_FESOM, f%mype)
+            call par_abort(f%MPI_COMM_FESOM, f%mype)
             stop
         end if
 
         call MPI_comm_rank(f%MPI_COMM_FESOM, mype_check, f%MPIerr)
         if(f%MPIerr /= MPI_SUCCESS) then
             write(*,*) 'MPI_comm_rank(MPI_COMM_FESOM, mype_check, MPIERR) failed'
-            call par_ex(f%MPI_COMM_FESOM, f%mype)
+            call par_abort(f%MPI_COMM_FESOM, f%mype)
             stop
         end if
 
         if(npes_check /= f%npes) then
             write(*,*) 'npes mismatch, npes, npes_check', f%npes, npes_check
-            call par_ex(f%MPI_COMM_FESOM, f%mype)
+            call par_abort(f%MPI_COMM_FESOM, f%mype)
             stop
         end if
 
         if(mype_check /= f%mype) then
             write(*,*) 'mype mismatch, mype, mype_check', f%mype, mype_check
-            call par_ex(f%MPI_COMM_FESOM, f%mype)
+            call par_abort(f%MPI_COMM_FESOM, f%mype)
             stop
         end if
 
@@ -337,33 +337,33 @@ contains
         call MPI_comm_split(f%MPI_COMM_FESOM_WORLD, f%mype, f%my_fesom_group, f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, f%MPIERR)
         if (f%MPIERR /= MPI_SUCCESS) then
             write(*,*) 'MPI_comm_split(MPI_COMM_FESOM_WORLD, mype, my_fesom_group, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, MPIERR) failed'
-            call par_ex(f%MPI_COMM_FESOM, f%mype)
+            call par_abort(f%MPI_COMM_FESOM, f%mype)
             stop
         end if
 
         call MPI_comm_size(f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, npes_check, f%MPIERR)
         if(f%MPIERR /= MPI_SUCCESS) then
             write(*,*) 'MPI_comm_size(MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, npes_check, MPIERR) failed'
-            call par_ex(f%MPI_COMM_FESOM, f%mype)
+            call par_abort(f%MPI_COMM_FESOM, f%mype)
             stop
         end if
 
         call MPI_comm_rank(f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, mype_check, f%MPIERR)
         if(f%MPIERR /= MPI_SUCCESS) then
             write(*,*) 'MPI_comm_rank(MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, mype_check, MPIERR) failed'
-            call par_ex(f%MPI_COMM_FESOM, f%mype)
+            call par_abort(f%MPI_COMM_FESOM, f%mype)
             stop
         end if
 
         if(npes_check /= num_fesom_groups) then
             write(*,*) 'npes mismatch, num_fesom_groups, npes_check', num_fesom_groups, npes_check
-            call par_ex(f%MPI_COMM_FESOM, f%mype)
+            call par_abort(f%MPI_COMM_FESOM, f%mype)
             stop
         end if
 
         if(mype_check /= f%my_fesom_group) then
             write(*,*) 'mype mismatch, my_fesom_group, mype_check', f%my_fesom_group, mype_check
-            call par_ex(f%MPI_COMM_FESOM, f%mype)
+            call par_abort(f%MPI_COMM_FESOM, f%mype)
             stop
         end if
 
@@ -826,7 +826,7 @@ contains
     !    read  (f%mype+300) f%tracers_copy
     !    close (f%mype+300)
     
-    !call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype)
+    !call par_abort(f%partit%MPI_COMM_FESOM, f%partit%mype)
     !stop
     !         
     !    if (f%mype==10) write(,) f%mesh1%ssh_stiff%values-f%mesh%ssh_stiff%value    
@@ -891,17 +891,28 @@ contains
 #endif
     !$ACC ENTER DATA COPYIN (f%dynamics)
     !$ACC ENTER DATA CREATE (f%dynamics%w, f%dynamics%w_e, f%dynamics%uv)
+    ! momentum rhs (compute_vel_rhs): uv_rhsAB holds the Adams-Bashforth history and lives
+    ! on the device from here on (host copy refreshed before restart and blowup output)
+    !$ACC ENTER DATA COPYIN (f%dynamics%work) CREATE (f%dynamics%uv_rhs, f%dynamics%eta_n, f%dynamics%work%uvnode_rhs)
+    !$ACC ENTER DATA COPYIN (f%dynamics%uv_rhsAB, f%mesh%coriolis, f%mesh%areasvol_inv) CREATE (pgf_x, pgf_y)
+    ! viscosity filter (visc_filt_bcksct_acc); u_b/v_b exist only for opt_visc 5
+    !$ACC ENTER DATA COPYIN (f%mesh%elem_edges) CREATE (f%dynamics%work%u_c, f%dynamics%work%v_c, f%dynamics%work%u_b, f%dynamics%work%v_b)
+    ! implicit vertical viscosity (impl_vert_visc_ale_acc)
+    !$ACC ENTER DATA COPYIN (f%mesh%zbar_e_bot) CREATE (Av, stress_surf, f%dynamics%w_i)
     !$ACC ENTER DATA CREATE (f%tracers%work%del_ttf)
     !$ACC ENTER DATA CREATE (f%tracers%data, f%tracers%work) 
     do tr_num=1, f%tracers%num_tracers
     !$ACC ENTER DATA CREATE (f%tracers%data(tr_num)%values, f%tracers%data(tr_num)%valuesAB)
-    !$ACC ENTER DATA CREATE (f%tracers%data(tr_num)%valuesold)
+    !$ACC ENTER DATA COPYIN (f%tracers%data(tr_num)%valuesold) ! AB history lives on the device from here on
     !$ACC ENTER DATA CREATE (f%tracers%data(tr_num)%tra_adv_ph, f%tracers%data(tr_num)%tra_adv_pv)
     end do
     !$ACC ENTER DATA CREATE (f%tracers%work%fct_ttf_min, f%tracers%work%fct_ttf_max, f%tracers%work%fct_plus, f%tracers%work%fct_minus)
     !$ACC ENTER DATA CREATE (f%tracers%work%adv_flux_hor, f%tracers%work%adv_flux_ver, f%tracers%work%fct_LO, f%tracers%work%fct_LO_tend)
     !$ACC ENTER DATA CREATE (f%tracers%work%del_ttf_advvert, f%tracers%work%del_ttf_advhoriz, f%tracers%work%edge_up_dn_grad)
+    !$ACC ENTER DATA COPYIN (f%tracers%work%edge_up_dn_tri) ! fill_up_dn_grad on the device
     !$ACC ENTER DATA CREATE (tr_xy, tr_z, relax2clim, Sclim, Tclim)
+    !$ACC ENTER DATA CREATE (Ki, slope_tapered)   ! Redi inputs, updated every step in solve_tracers_ale
+    !$ACC ENTER DATA COPYIN (f%mesh%zbar_n_bot)
   end subroutine fesom_init
 
 
@@ -1480,7 +1491,7 @@ contains
 #endif
     ! Enhanced profiler report. It reduces over MPI_COMM_FESOM, so every rank has to
     ! call it once while MPI is still up: here, before the REcoM group loop and before
-    ! par_ex. In the OpenIFS-coupled build par_ex calls oasis_terminate, which finalizes
+    ! par_finalize. In the OpenIFS-coupled build par_finalize calls oasis_terminate, which finalizes
     ! MPI, so a report after it aborts every rank ("MPI_Comm_f2c() was called after
     ! MPI_FINALIZE") once the run is otherwise complete.
 #if defined (FESOM_PROFILING)
@@ -1531,6 +1542,7 @@ contains
     !$ACC EXIT DATA DELETE (f%tracers%work%del_ttf_advvert, f%tracers%work%del_ttf_advhoriz, f%tracers%work%edge_up_dn_grad)
     !$ACC EXIT DATA DELETE (f%tracers%work%del_ttf)
     !$ACC EXIT DATA DELETE (tr_xy, tr_z, relax2clim, Sclim, Tclim)
+    !$ACC EXIT DATA DELETE (Ki, slope_tapered, f%mesh%zbar_n_bot)
     !$ACC EXIT DATA DELETE (f%tracers%data, f%tracers%work)
     !$ACC EXIT DATA DELETE (f%dynamics%w, f%dynamics%w_e, f%dynamics%uv)
     !$ACC EXIT DATA DELETE (f%dynamics, f%tracers)
@@ -1631,8 +1643,8 @@ contains
 #endif
 
 #if defined (__oifs) 
-    ! OpenIFS coupled version has to call oasis_terminate through par_ex
-    call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype)
+    ! OpenIFS coupled version has to call oasis_terminate through par_finalize
+    call par_finalize(f%partit%MPI_COMM_FESOM, f%partit%mype)
 #endif
 
 #if defined(__recom) && defined (__usetp)
@@ -1646,9 +1658,9 @@ contains
     
 #if defined(__recom) && defined(__usetp) && defined(__oifs)
     ! FESOM program group 0 already performed the OASIS-coordinated shutdown
-    ! (oasis_terminate, via the #if defined(__oifs) call par_ex(...) block in the
+    ! (oasis_terminate, via the #if defined(__oifs) call par_finalize(...) block in the
     ! per-group stats loop above) and is therefore already MPI-finalized at this
-    ! point. Calling par_ex/oasis_terminate a second time here would re-enter
+    ! point. Calling par_finalize/oasis_terminate a second time here would re-enter
     ! oasis_terminate's global MPI_Barrier(mpi_comm_global_world,...) + MPI_Finalize
     ! sequence on an already-finalized MPI session -- undefined behaviour that
     ! aborts group 0's ranks while group 1 (and OIFS/rnfmap/lpj_guess/xios, whose
@@ -1669,10 +1681,10 @@ contains
     ! mpi/pmix_v3 "Error handler invoked" step cancellation above, independent of
     ! any PMIx/UCX tuning.
     if (f%my_fesom_group /= 0) then
-        call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype)
+        call par_finalize(f%partit%MPI_COMM_FESOM, f%partit%mype)
     end if
 #else
-    if(f%fesom_did_mpi_init) call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype) ! finalize MPI before FESOM prints its stats block, otherwise there is sometimes output from other processes from an earlier time in the programm AFTER the starts block (with parastationMPI)
+    if(f%fesom_did_mpi_init) call par_finalize(f%partit%MPI_COMM_FESOM, f%partit%mype) ! finalize MPI before FESOM prints its stats block, otherwise there is sometimes output from other processes from an earlier time in the programm AFTER the starts block (with parastationMPI)
 #endif
 
 #if defined(__recom) && defined(__usetp)

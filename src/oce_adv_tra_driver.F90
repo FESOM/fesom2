@@ -2,7 +2,7 @@ module oce_adv_tra_driver_module
     USE MOD_MESH
     USE MOD_TRACER
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     USE MOD_DYN
     USE g_comm_auto
     USE diagnostics, only: ldiag_DVD
@@ -98,8 +98,13 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
         ! Low-order tendency: each node gathers the horizontal fluxes of its incident edges
         ! (mesh%nod_in_edge2D, sign +1 for the edge's first node, -1 for its second) in
         ! ascending edge order, so the result does not depend on the number of threads.
+        ! (also the OpenACC version without atomics: reproducible gather, no host round trip)
+#if !defined(ENABLE_OPENACC) || defined(DISABLE_OPENACC_ATOMICS)
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, k, edge, el, nl1, nu1, nl2, nu2, nu12, nl12, nz)
+#else
+        !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(k, edge, el, nl1, nu1, nl2, nu2, nu12, nl12, nz) VECTOR_LENGTH(acc_vl)
+#endif
         do n=1, partit%myDim_nod2D+partit%eDim_nod2D
             do k=1, mesh%nod_in_edge2D_num(n)
                 edge=mesh%nod_in_edge2D(k,n)
@@ -120,7 +125,11 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
                 end do
             end do
         end do
+#ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
+#else
+        !$ACC END PARALLEL LOOP
+#endif
 #else
 #if !defined(DISABLE_OPENACC_ATOMICS)
         !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
@@ -312,7 +321,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
              call adv_tra_hor_upw1(vel, ttfAB, partit, mesh,        adv_flux_hor,                                 o_init_zero=do_zero_flux)
         CASE DEFAULT !unknown
             if (partit%mype==0) write(*,*) 'Unknown horizontal advection type ',  trim(tracers%data(tr_num)%tra_adv_hor), '! Check your namelists!'
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     END SELECT
     if (trim(tracers%data(tr_num)%tra_adv_lim)=='FCT') then
        pwvel=>w
@@ -334,7 +343,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
             call adv_tra_ver_upw1 (   pwvel, ttfAB, partit, mesh,       adv_flux_ver, o_init_zero=do_zero_flux)
         CASE DEFAULT !unknown
             if (partit%mype==0) write(*,*) 'Unknown vertical advection type ',  trim(tracers%data(tr_num)%tra_adv_ver), '! Check your namelists!'
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
         ! --> be aware the vertical implicite part in case without FCT is done in
         !     oce_ale_tracer.F90 --> subroutine diff_ver_part_impl_ale(tr_num, partit, mesh)
         !     for do_wimpl=.true.
@@ -514,8 +523,13 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
     ! Horizontal: each node gathers the fluxes of its incident edges (mesh%nod_in_edge2D,
     ! sign +1 for the edge's first node, -1 for its second). No two threads write the same
     ! node, and the summation order per node is the ascending edge order at any thread count.
+    ! (also the OpenACC version without atomics: reproducible gather, no host round trip)
+#if !defined(ENABLE_OPENACC) || defined(DISABLE_OPENACC_ATOMICS)
 #ifndef ENABLE_OPENACC
 !$OMP DO
+#else
+    !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(k, edge, el, nl1, nu1, nl2, nu2, nu12, nl12, nz) VECTOR_LENGTH(acc_vl)
+#endif
     do n=1, partit%myDim_nod2D+partit%eDim_nod2D
         do k=1, mesh%nod_in_edge2D_num(n)
             edge=mesh%nod_in_edge2D(k,n)
@@ -536,8 +550,12 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
             end do
         end do
     end do
+#ifndef ENABLE_OPENACC
 !$OMP END DO
 !$OMP END PARALLEL
+#else
+    !$ACC END PARALLEL LOOP
+#endif
 #else
 #if !defined(DISABLE_OPENACC_ATOMICS)
     !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
