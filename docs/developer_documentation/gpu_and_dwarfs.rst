@@ -19,9 +19,9 @@ paths set the corresponding compiler flags:
 
 The relevant options are:
 
-- **ENABLE_OPENACC=OFF** compile the OpenACC code paths. The directives are inactive without it, and the model builds and runs exactly as a CPU code.
+- **ENABLE_OPENACC** (default OFF) compile the OpenACC code paths. The directives are inactive without it, and the model builds and runs exactly as a CPU code. It is the only switch: the sources check it against the compiler's ``_OPENACC`` macro and stop with an error when the two disagree (``-acc`` passed without the option, or the option set for a compiler that does not enable OpenACC).
 - **DISABLE_OPENACC_ATOMICS=ON** compile the kernels that would otherwise use ``atomic`` statements in a form that does not depend on the order in which threads accumulate. Atomics make the result depend on that order, so leaving this option at its default keeps GPU runs reproducible. Switch it off only when measuring the performance the atomics would buy.
-- **GPU_COMPUTE_CAPABILITY=cc80** intended target architecture, combined with the CUDA version into a ``GPU_FLAGS`` cache variable. Both are currently unused: the NVHPC flags in ``src/CMakeLists.txt`` name ``cc80`` and ``cuda12.2`` directly, so changing these options has no effect and a different architecture has to be set in the build file itself.
+- **GPU_COMPUTE_CAPABILITY=cc80** target architecture of the NVHPC ``-gpu`` flag (Release: ``-gpu=<arch>,pinned``). **GPU_FLAGS** (default ``cuda12.2,<arch>``) are the ``-gpu`` sub-options of the Debug build, which also names the CUDA version.
 
 With the Cray compiler the build adds ``-hacc``. With NVHPC it adds
 ``-acc=verystrict`` together with the ``-gpu`` flags derived from the
@@ -38,8 +38,9 @@ advection chain (``oce_adv_tra_driver.F90``, ``oce_adv_tra_hor.F90``,
 ``oce_tracer_mod.F90``), the halo exchange (``gen_halo_exchange.F90``) and
 the data movement around the time loop in ``fesom_module.F90``. The ocean
 dynamics and the I/O layer have no directives. Sections that had to be
-restructured for the accelerator are guarded with ``#ifndef ENABLE_OPENACC``,
-so the CPU formulation stays in the file next to the ported one. To find the
+restructured for the accelerator are guarded with ``#ifndef ENABLE_OPENACC``
+(never with the compiler's ``_OPENACC``), so the CPU formulation stays in the
+file next to the ported one. To find the
 current extent of the port, search the sources for ``acc`` directives rather
 than relying on this list.
 

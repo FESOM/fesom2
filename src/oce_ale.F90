@@ -25,11 +25,15 @@ module oce_ale_module
     USE oce_ale_vel_rhs_module, only: compute_vel_rhs
     USE oce_ale_tracer_module, only: solve_tracers_ale
     USE ieee_arithmetic
-    use oce_fer_gm_module, only: fer_solve_Gamma, fer_gamma2vel, init_Redi_GM
+    use oce_fer_gm_module, only: fer_solve_Gamma, fer_gamma2vel, init_Redi_GM, gm_device_ok, &
+                                 init_Redi_GM_acc, fer_solve_Gamma_acc, fer_gamma2vel_acc
     use oce_mle_module, only: mle_add_gamma
     use oce_ale_ssh_splitexpl_subcycl_module, only: impl_vert_visc_ale_vtransp
-    use oce_dyn_module, only: update_vel, viscosity_filter, check_viscopt, compute_ke_wrho, compute_apegen, compute_PePm
-    use oce_ale_pressure_bv_module, only: sw_alpha_beta, compute_sigma_xy, compute_neutral_slope
+    use oce_dyn_module, only: update_vel, viscosity_filter, check_viscopt, compute_ke_wrho, compute_apegen, compute_PePm, mom_on_device
+#ifdef ENABLE_OPENACC
+    use oce_dyn_module, only: update_vel_acc
+#endif
+    use oce_ale_pressure_bv_module, only: sw_alpha_beta, compute_sigma_xy, compute_neutral_slope, sxy_on_device
     use par_support_module, only: status_check
 #if defined (__cvmix)
     use g_cvmix_tke
@@ -1047,6 +1051,52 @@ subroutine update_thickness_ale(partit, mesh)
 !$OMP BARRIER
 
 end subroutine update_thickness_ale
+#if defined(ENABLE_OPENACC)
+!
+!
+!===============================================================================
+! zstar part of update_thickness_ale on the device (hnode_new is current there after vert_vel_ale_acc);
+! the new geometry stays on the device (geom_on_device) and is copied back for the host code.
+subroutine update_thickness_ale_acc(partit, mesh)
+    implicit none
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(inout), target :: mesh
+    integer :: n, nz, elem, n1, n2, n3, nzmax, nzmin, nod_size, myDim_elem2D
+
+    nod_size     = partit%myDim_nod2D+partit%eDim_nod2D
+    myDim_elem2D = partit%myDim_elem2D
+    !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(nz, nzmin, nzmax)
+    do n=1, nod_size
+        nzmin = mesh%ulevels_nod2D(n)
+        nzmax = mesh%nlevels_nod2D_min(n)-2
+        if (nzmin == 1) then
+            do nz=nzmax, nzmin,-1
+                mesh%hnode(nz,n)     = mesh%hnode_new(nz,n)
+                mesh%zbar_3d_n(nz,n) = mesh%zbar_3d_n(nz+1,n) + mesh%hnode_new(nz,n)
+                mesh%Z_3d_n(nz,n)    = mesh%zbar_3d_n(nz+1,n) + mesh%hnode_new(nz,n)/2.0_WP
+            end do
+        end if
+    end do
+    !$ACC END PARALLEL LOOP
+    !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(nz, nzmin, nzmax, n1, n2, n3)
+    do elem=1, myDim_elem2D
+        nzmin = mesh%ulevels(elem)
+        nzmax = mesh%nlevels(elem)-1
+        if (nzmin == 1) then
+            n1 = mesh%elem2D_nodes(1, elem)
+            n2 = mesh%elem2D_nodes(2, elem)
+            n3 = mesh%elem2D_nodes(3, elem)
+            do nz=nzmin, nzmax-1
+                mesh%helem(nz,elem)=(mesh%hnode(nz,n1)+mesh%hnode(nz,n2)+mesh%hnode(nz,n3))/3.0_WP
+            end do
+        end if
+    end do
+    !$ACC END PARALLEL LOOP
+    call exchange_elem(mesh%helem, partit, luse_g2g=.true.)
+    geom_on_device = .true.
+    !$ACC UPDATE HOST(mesh%hnode, mesh%zbar_3d_n, mesh%Z_3d_n, mesh%helem)
+end subroutine update_thickness_ale_acc
+#endif
 !
 !
 !===============================================================================
@@ -1632,6 +1682,104 @@ subroutine update_stiff_mat_ale(partit, mesh)
 !DS
 
 end subroutine update_stiff_mat_ale
+#if defined(ENABLE_OPENACC) && !defined(DIAG_STIFF_DRIFT)
+!
+!
+!===============================================================================
+! update_stiff_mat_ale on the device: every row adds its incident edges in the host order and writes
+! only its own entries, so the rows run in parallel with unchanged results.
+subroutine update_stiff_mat_ale_acc(partit, mesh)
+    use, intrinsic :: iso_fortran_env, only: real64
+    use g_config,only: dt
+    use o_PARAM
+    use MOD_MESH
+    USE MOD_PARTIT
+    implicit none
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(inout), target :: mesh
+    integer                             :: n, i, j, k, row, ed, n2, myDim_nod2D
+    integer                             :: el(2), elnodes(3), elem, npos(3), offset
+    real(kind=WP)                       :: factor, fy(3)
+    logical, save                       :: data_created = .false.
+    real(kind=WP),     pointer          :: values(:)
+#if defined(USE_SINGLE_PRECISION)
+    real(kind=real64), pointer          :: values_full(:)
+#endif
+    integer,           pointer          :: rowptr(:)
+
+#if defined(USE_SINGLE_PRECISION)
+    if (.not. allocated(mesh%ssh_stiff%values_full)) then
+        allocate(mesh%ssh_stiff%values_full(size(mesh%ssh_stiff%values)))
+        mesh%ssh_stiff%values_full = real(mesh%ssh_stiff%values, real64)
+    end if
+    values_full => mesh%ssh_stiff%values_full
+#endif
+    values => mesh%ssh_stiff%values
+    rowptr => mesh%ssh_stiff%rowptr
+    if (.not. data_created) then
+        ! the values are cumulative: start from the host copy once, then keep them on the device
+#if defined(USE_SINGLE_PRECISION)
+        !$ACC ENTER DATA COPYIN(values, values_full)
+#else
+        !$ACC ENTER DATA COPYIN(values)
+#endif
+        !$ACC ENTER DATA CREATE(mesh%dhe)
+        data_created = .true.
+    end if
+    !$ACC UPDATE DEVICE(mesh%dhe)
+
+    factor=g*dt*alpha*theta
+    myDim_nod2D=partit%myDim_nod2D
+    !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(offset, n2, ed, el, j, i, elem, elnodes, k, n, npos, fy)
+    do row=1, myDim_nod2D
+        offset=rowptr(row)-rowptr(1)
+        do n2=1, mesh%nod_in_edge2D_num(row)
+            ed=mesh%nod_in_edge2D(n2,row)
+            el(1)=mesh%edge_tri(1,ed)
+            el(2)=mesh%edge_tri(2,ed)
+            j=1
+            if (mesh%nod_in_edge2D_sgn(n2,row)<0) j=2
+            do i=1, 2
+                elem=el(i)
+                if (elem<1) cycle
+                elnodes(1)=mesh%elem2D_nodes(1,elem)
+                elnodes(2)=mesh%elem2D_nodes(2,elem)
+                elnodes(3)=mesh%elem2D_nodes(3,elem)
+                do k=1, 3
+                   do n=1, rowptr(row+1)-rowptr(row)
+                      if (elnodes(k)==mesh%nn_pos(n, row)) then
+                          npos(k)=offset+n
+                          EXIT
+                      end if
+                   end do
+                end do
+                do k=1, 3
+                    fy(k) = -mesh%dhe(elem)* &
+                            ( mesh%gradient_sca(k,elem)   * mesh%edge_cross_dxdy(2*i  ,ed)   &
+                             -mesh%gradient_sca(k+3,elem) * mesh%edge_cross_dxdy(2*i-1,ed) )
+                    if (i==2) fy(k)=-fy(k)
+                    if (j==2) fy(k)=-fy(k)
+#if defined(USE_SINGLE_PRECISION)
+                    values_full(npos(k))=values_full(npos(k)) + real(fy(k)*factor, real64)
+#else
+                    values(npos(k))=values(npos(k)) + fy(k)*factor
+#endif
+                end do
+            end do
+        end do
+    end do
+    !$ACC END PARALLEL LOOP
+#if defined(USE_SINGLE_PRECISION)
+    !$ACC PARALLEL LOOP DEFAULT(PRESENT)
+    do n=1, size(values)
+        values(n) = real(values_full(n), WP)
+    end do
+    !$ACC END PARALLEL LOOP
+    !$ACC UPDATE HOST(values_full)
+#endif
+    !$ACC UPDATE HOST(values)
+end subroutine update_stiff_mat_ale_acc
+#endif
 !
 !
 !===============================================================================
@@ -1659,6 +1807,13 @@ subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
     UV_rhs     => dynamics%uv_rhs(:,:,:)
     ssh_rhs    => dynamics%ssh_rhs(:)
     ssh_rhs_old=> dynamics%ssh_rhs_old(:)
+#ifdef ENABLE_OPENACC
+    ! UV and UV_rhs of this step are on the device with the momentum
+    if (mom_on_device) then
+        call compute_ssh_rhs_ale_acc(dynamics, partit, mesh)
+        return
+    end if
+#endif
 
     !___________________________________________________________________________
     ! loop over local edges
@@ -1759,6 +1914,87 @@ subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
     call exchange_nod(ssh_rhs, partit)
 !$OMP BARRIER
 end subroutine compute_ssh_rhs_ale
+#ifdef ENABLE_OPENACC
+!
+!
+!===============================================================================
+! compute_ssh_rhs_ale on the device: the same per-node gather over the incident edges in ascending
+! edge order; the water flux and ssh_rhs_old come from the host, ssh_rhs goes back for the solver.
+subroutine compute_ssh_rhs_ale_acc(dynamics, partit, mesh)
+    implicit none
+    type(t_mesh)  , intent(inout), target :: mesh
+    type(t_partit), intent(inout), target :: partit
+    type(t_dyn)   , intent(inout), target :: dynamics
+    integer       :: ed, el1, el2, nz, n, k, nzmin, nzmax
+    real(kind=WP) :: c1, c2, deltaX1, deltaX2, deltaY1, deltaY2, alph
+    logical       :: linfs, fw2press
+    logical, save :: data_created = .false.
+    real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
+    real(kind=WP), dimension(:)    , pointer :: ssh_rhs, ssh_rhs_old
+    UV         => dynamics%uv(:,:,:)
+    UV_rhs     => dynamics%uv_rhs(:,:,:)
+    ssh_rhs    => dynamics%ssh_rhs(:)
+    ssh_rhs_old=> dynamics%ssh_rhs_old(:)
+    alph     = alpha
+    linfs    = trim(which_ALE)=='linfs'
+    fw2press = use_cavity_fw2press
+    if (.not. data_created) then
+        !$ACC ENTER DATA CREATE(dynamics%ssh_rhs, dynamics%ssh_rhs_old, water_flux)
+        data_created = .true.
+    end if
+    !$ACC UPDATE DEVICE(ssh_rhs_old, water_flux)
+
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(ed, el1, el2, nz, k, nzmin, nzmax, c1, c2, deltaX1, deltaX2, deltaY1, deltaY2)
+    do n=1, partit%myDim_nod2D+partit%eDim_nod2D
+        ssh_rhs(n)=0.0_WP
+        do k=1, mesh%nod_in_edge2D_num(n)
+            ed =mesh%nod_in_edge2D(k,n)
+            el1=mesh%edge_tri(1,ed)
+            el2=mesh%edge_tri(2,ed)
+            c1=0.0_WP
+            deltaX1=mesh%edge_cross_dxdy(1,ed)
+            deltaY1=mesh%edge_cross_dxdy(2,ed)
+            nzmin = mesh%ulevels(el1)
+            nzmax = mesh%nlevels(el1)-1
+            do nz=nzmin, nzmax
+                c1=c1+alph*((UV(2,nz,el1)+UV_rhs(2,nz,el1))*deltaX1- &
+                            (UV(1,nz,el1)+UV_rhs(1,nz,el1))*deltaY1)*mesh%helem(nz,el1)
+            end do
+            c2=0.0_WP
+            if(el2>0) then
+                deltaX2=mesh%edge_cross_dxdy(3,ed)
+                deltaY2=mesh%edge_cross_dxdy(4,ed)
+                nzmin = mesh%ulevels(el2)
+                nzmax = mesh%nlevels(el2)-1
+                do nz=nzmin, nzmax
+                    c2=c2-alph*((UV(2,nz,el2)+UV_rhs(2,nz,el2))*deltaX2- &
+                                (UV(1,nz,el2)+UV_rhs(1,nz,el2))*deltaY2)*mesh%helem(nz,el2)
+                end do
+            end if
+            if (mesh%nod_in_edge2D_sgn(k,n)>0) then
+                ssh_rhs(n)=ssh_rhs(n)+(c1+c2)
+            else
+                ssh_rhs(n)=ssh_rhs(n)-(c1+c2)
+            end if
+        end do
+        if (n <= partit%myDim_nod2D) then
+            nzmin = mesh%ulevels_nod2D(n)
+            if (.not. linfs) then
+                if (nzmin>1) then
+                    if (fw2press) ssh_rhs(n)=ssh_rhs(n)-alph*water_flux(n)*mesh%areasvol(nzmin,n)
+                else
+                    ssh_rhs(n)=ssh_rhs(n)-alph*water_flux(n)*mesh%areasvol(nzmin,n)+(1.0_WP-alph)*ssh_rhs_old(n)
+                end if
+            else
+                ssh_rhs(n)=ssh_rhs(n)+(1.0_WP-alph)*ssh_rhs_old(n)
+            end if
+        end if
+    end do
+!$ACC END PARALLEL LOOP
+    !$ACC UPDATE HOST(ssh_rhs)
+    call exchange_nod(ssh_rhs, partit)
+end subroutine compute_ssh_rhs_ale_acc
+#endif
 !
 !
 !===============================================================================
@@ -1792,6 +2028,12 @@ subroutine compute_hbar_ale(dynamics, partit, mesh)
     ssh_rhs    => dynamics%ssh_rhs(:)
     ssh_rhs_old=> dynamics%ssh_rhs_old(:)
 
+#ifdef ENABLE_OPENACC
+    if (mom_on_device .and. .not. trim(which_ALE)=='linfs') then
+        ! divergence of the transports on the device (as in compute_ssh_rhs_ale_acc)
+        call compute_hbar_rhs_acc(dynamics, partit, mesh)
+    else
+#endif
     !___________________________________________________________________________
     ! compute the rhs
 
@@ -1865,6 +2107,9 @@ subroutine compute_hbar_ale(dynamics, partit, mesh)
         call exchange_nod(ssh_rhs_old, partit)
 !$OMP BARRIER
     end if 
+#ifdef ENABLE_OPENACC
+    end if
+#endif
     !___________________________________________________________________________
     ! update the thickness
 !$OMP PARALLEL DO
@@ -1894,6 +2139,71 @@ subroutine compute_hbar_ale(dynamics, partit, mesh)
     end do
 !$OMP END PARALLEL DO
 end subroutine compute_hbar_ale
+#ifdef ENABLE_OPENACC
+!
+!
+!===============================================================================
+! The ssh_rhs_old part of compute_hbar_ale (zstar/zlevel) on the device: the same per-node gather
+! over the incident edges in ascending edge order; ssh_rhs_old goes back to the host.
+subroutine compute_hbar_rhs_acc(dynamics, partit, mesh)
+    implicit none
+    type(t_dyn)   , intent(inout), target :: dynamics
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh),   intent(inout), target :: mesh
+    integer       :: ed, el1, el2, n, k, nz, nzmin, nzmax
+    real(kind=WP) :: c1, c2, deltaX1, deltaX2, deltaY1, deltaY2
+    real(kind=WP), dimension(:,:,:), pointer :: UV
+    real(kind=WP), dimension(:)    , pointer :: ssh_rhs_old
+    UV         => dynamics%uv(:,:,:)
+    ssh_rhs_old=> dynamics%ssh_rhs_old(:)
+    ! ssh_rhs_old and water_flux are on the device (compute_ssh_rhs_ale_acc)
+    !$ACC UPDATE DEVICE(water_flux)
+    if (.not. uv_dev_current) then
+        !$ACC UPDATE DEVICE(UV)
+    end if
+
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(ed, el1, el2, k, nz, nzmin, nzmax, c1, c2, deltaX1, deltaX2, deltaY1, deltaY2)
+    do n=1, partit%myDim_nod2D+partit%eDim_nod2D
+        ssh_rhs_old(n)=0.0_WP
+        do k=1, mesh%nod_in_edge2D_num(n)
+            ed =mesh%nod_in_edge2D(k,n)
+            el1=mesh%edge_tri(1,ed)
+            el2=mesh%edge_tri(2,ed)
+            c1=0.0_WP
+            deltaX1=mesh%edge_cross_dxdy(1,ed)
+            deltaY1=mesh%edge_cross_dxdy(2,ed)
+            nzmin = mesh%ulevels(el1)
+            nzmax = mesh%nlevels(el1)-1
+            do nz=nzmin, nzmax
+                c1=c1+(UV(2,nz,el1)*deltaX1-UV(1,nz,el1)*deltaY1)*mesh%helem(nz,el1)
+            end do
+            c2=0.0_WP
+            if(el2>0) then
+                deltaX2=mesh%edge_cross_dxdy(3,ed)
+                deltaY2=mesh%edge_cross_dxdy(4,ed)
+                nzmin = mesh%ulevels(el2)
+                nzmax = mesh%nlevels(el2)-1
+                do nz=nzmin, nzmax
+                    c2=c2-(UV(2,nz,el2)*deltaX2-UV(1,nz,el2)*deltaY2)*mesh%helem(nz,el2)
+                end do
+            end if
+            if (mesh%nod_in_edge2D_sgn(k,n)>0) then
+                ssh_rhs_old(n)=ssh_rhs_old(n)+(c1+c2)
+            else
+                ssh_rhs_old(n)=ssh_rhs_old(n)-(c1+c2)
+            end if
+        end do
+        if (n <= partit%myDim_nod2D) then
+            if (mesh%ulevels_nod2D(n) == 1) then
+                ssh_rhs_old(n)=ssh_rhs_old(n)-water_flux(n)*mesh%areasvol(mesh%ulevels_nod2D(n),n)
+            end if
+        end if
+    end do
+!$ACC END PARALLEL LOOP
+    !$ACC UPDATE HOST(ssh_rhs_old)
+    call exchange_nod(ssh_rhs_old, partit)
+end subroutine compute_hbar_rhs_acc
+#endif
 !
 !
 !===============================================================================
@@ -1940,6 +2250,14 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
         fer_Wvel=> dynamics%fer_w(:,:)
     end if
     
+#ifdef ENABLE_OPENACC
+    ! the device version covers zstar with the momentum on the device
+    vv_on_device = trim(which_ALE)=='zstar' .and. mom_on_device
+    if (vv_on_device) then
+        call vert_vel_ale_acc(dynamics, partit, mesh)
+        return
+    end if
+#endif
     if ( .not. dynamics%use_ssh_se_subcycl) then
         d_eta       => dynamics%d_eta(:)
         ssh_rhs     => dynamics%ssh_rhs(:)
@@ -2440,6 +2758,214 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
     call compute_Wvel_split(dynamics, partit, mesh)
     
 end subroutine vert_vel_ale
+#ifdef ENABLE_OPENACC
+!
+!
+!===============================================================================
+! vert_vel_ale on the device for zstar (see vert_vel_ale), followed by compute_CFLz and compute_Wvel_split:
+! the same edge contributions per node in the same order; the results go back to the host.
+subroutine vert_vel_ale_acc(dynamics, partit, mesh)
+    implicit none
+    type(t_dyn)   , intent(inout), target :: dynamics
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh),   intent(inout), target :: mesh
+    integer       :: n, k, nz, ed, el1, el2, nzmin, nzmax, nbad_w, nbad_h, nlw
+    real(kind=WP) :: dx1, dy1, dx2, dy2, c1, c2, dd, dd1, dddt, cflmax, wsplit_maxcfl
+    real(kind=WP)                       :: wsum, fsum
+    logical       :: fer, plus, use_wsplit
+    logical, save :: data_created = .false.
+    real(kind=WP), dimension(:,:,:), pointer :: UV, fer_UV
+    real(kind=WP), dimension(:,:)  , pointer :: Wvel, Wvel_e, Wvel_i, CFL_z, fer_Wvel
+    UV     => dynamics%uv(:,:,:)
+    Wvel   => dynamics%w(:,:)
+    Wvel_e => dynamics%w_e(:,:)
+    Wvel_i => dynamics%w_i(:,:)
+    CFL_z  => dynamics%cfl_z(:,:)
+    fer    = Fer_GM
+    if (fer) then
+        fer_UV   => dynamics%fer_uv(:,:,:)
+        fer_Wvel => dynamics%fer_w(:,:)
+    else
+        ! not referenced on the device path (fer=.false.), kept associated for DEFAULT(PRESENT)
+        fer_UV   => dynamics%uv(:,:,:)
+        fer_Wvel => dynamics%w(:,:)
+    end if
+    use_wsplit    = dynamics%use_wsplit
+    wsplit_maxcfl = dynamics%wsplit_maxcfl
+    nlw = size(Wvel,1)
+    if (.not. data_created) then
+        !$ACC ENTER DATA CREATE(dynamics%cfl_z, mesh%hbar, mesh%hbar_old, water_flux)
+        if (fer) then
+            !$ACC ENTER DATA CREATE(dynamics%fer_uv, dynamics%fer_w)
+        end if
+        data_created = .true.
+    end if
+    ! hnode_new: the zstar update sets only the levels above nlevels_nod2D_min, the rest
+    ! keeps its values, and all of it is brought back to the host below
+    !$ACC UPDATE DEVICE(mesh%hbar, mesh%hbar_old, water_flux)
+    if (.not. uv_dev_current) then
+        !$ACC UPDATE DEVICE(UV)
+    end if
+    if (.not. geom_on_device) then
+        !$ACC UPDATE DEVICE(mesh%helem, mesh%zbar_3d_n, mesh%hnode_new)
+    end if
+    if (fer .and. .not. gmvel_on_device) then
+        !$ACC UPDATE DEVICE(fer_UV)
+    end if
+
+    ! divergence of the layer transports, gathered per node over its edges: one gang per node, the
+    ! levels over the vector lanes, each level summing its edges in edge order
+!$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(64)
+    do n=1, partit%myDim_nod2D+partit%eDim_nod2D
+!$ACC LOOP VECTOR PRIVATE(k, ed, el1, el2, plus, dx1, dy1, dx2, dy2, c1, c2, wsum, fsum)
+        do nz=1, nlw
+            wsum=0.0_WP
+            fsum=0.0_WP
+!$ACC LOOP SEQ
+            do k=1, mesh%nod_in_edge2D_num(n)
+                ed   = mesh%nod_in_edge2D(k,n)
+                el1  = mesh%edge_tri(1,ed)
+                el2  = mesh%edge_tri(2,ed)
+                plus = mesh%nod_in_edge2D_sgn(k,n)>0
+                if (nz>=mesh%ulevels(el1) .and. nz<=mesh%nlevels(el1)-1) then
+                    dx1  = mesh%edge_cross_dxdy(1,ed)
+                    dy1  = mesh%edge_cross_dxdy(2,ed)
+                    c1=( UV(2,nz,el1)*dx1 - UV(1,nz,el1)*dy1 )*mesh%helem(nz,el1)
+                    if (plus) then
+                        wsum=wsum+c1
+                    else
+                        wsum=wsum-c1
+                    end if
+                    if (fer) then
+                        c2=(fer_UV(2,nz,el1)*dx1- fer_UV(1,nz,el1)*dy1)*mesh%helem(nz,el1)
+                        if (plus) then
+                            fsum=fsum+c2
+                        else
+                            fsum=fsum-c2
+                        end if
+                    end if
+                end if
+                if (el2>0) then
+                    if (nz>=mesh%ulevels(el2) .and. nz<=mesh%nlevels(el2)-1) then
+                        dx2 = mesh%edge_cross_dxdy(3,ed)
+                        dy2 = mesh%edge_cross_dxdy(4,ed)
+                        c1=-(UV(2,nz,el2)*dx2 - UV(1,nz,el2)*dy2)*mesh%helem(nz,el2)
+                        if (plus) then
+                            wsum=wsum+c1
+                        else
+                            wsum=wsum-c1
+                        end if
+                        if (fer) then
+                            c2=-(fer_UV(2,nz,el2)*dx2-fer_UV(1,nz,el2)*dy2)*mesh%helem(nz,el2)
+                            if (plus) then
+                                fsum=fsum+c2
+                            else
+                                fsum=fsum-c2
+                            end if
+                        end if
+                    end if
+                end if
+            end do
+            Wvel(nz, n)=wsum
+            if (fer) fer_Wvel(nz, n)=fsum
+        end do
+    end do
+!$ACC END PARALLEL LOOP
+
+    ! cumulative sum from the bottom, division by the area, zstar distribution
+    nbad_w = 0
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(nz, nzmin, nzmax, dd, dd1, dddt) REDUCTION(+:nbad_w)
+    do n=1, partit%myDim_nod2D
+        nzmin = mesh%ulevels_nod2D(n)
+        nzmax = mesh%nlevels_nod2d(n)-1
+        do nz=nzmax,nzmin,-1
+            Wvel(nz,n)=Wvel(nz,n)+Wvel(nz+1,n)
+            if (fer) fer_Wvel(nz,n)=fer_Wvel(nz,n)+fer_Wvel(nz+1,n)
+        end do
+        do nz=nzmin,nzmax
+            Wvel(nz,n)=Wvel(nz,n)/mesh%area(nz,n)
+            if (fer) fer_Wvel(nz,n)=fer_Wvel(nz,n)/mesh%area(nz,n)
+            if (Wvel(nz,n)/=Wvel(nz,n)) nbad_w = nbad_w + 1
+        end do
+        nzmax = mesh%nlevels_nod2D_min(n)-1
+        if (nzmin==1) then
+            dd1=mesh%zbar_3d_n(nzmax,n)
+            dd=mesh%zbar_3d_n(nzmin,n)-dd1
+            dd=(mesh%hbar(n)-mesh%hbar_old(n))/dd
+            dddt=dd/dt
+            do nz=nzmin, nzmax-1
+                Wvel(nz,n)    =Wvel(nz,n) -(mesh%zbar_3d_n(nz,n)-dd1)*dddt
+                mesh%hnode_new(nz,n)=mesh%hnode(nz,n)+(mesh%zbar_3d_n(nz,n)-mesh%zbar_3d_n(nz+1,n))*dd
+            end do
+            Wvel(nzmin,n)=Wvel(nzmin,n)-water_flux(n)
+        end if
+    end do
+!$ACC END PARALLEL LOOP
+    if (nbad_w > 0) write(*,*) ' --> subroutine vert_vel_ale_acc --> found NaN in Wvel at ', nbad_w, &
+                               ' points, mype =', partit%mype, ', mstep =', mstep
+    call exchange_nod(Wvel, partit, luse_g2g=.true.)
+    call exchange_nod(mesh%hnode_new, partit, luse_g2g=.true.)
+    if (fer) call exchange_nod(fer_Wvel, partit, luse_g2g=.true.)
+
+    ! negative layer thickness, CFL and the explicit/implicit split
+    nbad_h = 0
+    cflmax = 0.0_WP
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(nz, nzmin, nzmax, c1, c2, dd) REDUCTION(+:nbad_h) REDUCTION(max:cflmax)
+    do n=1, partit%myDim_nod2D+partit%eDim_nod2D
+        do nz=1, size(mesh%hnode_new,1)
+            if (mesh%hnode_new(nz,n) < 0.0_WP) nbad_h = nbad_h + 1
+        end do
+        do nz=1, size(CFL_z,1)
+            CFL_z(nz,n)=0._WP
+        end do
+        nzmin = mesh%ulevels_nod2D(n)
+        nzmax = mesh%nlevels_nod2D(n)-1
+        do nz=nzmin,nzmax
+            c1=abs(Wvel(nz,n)  *dt/mesh%hnode_new(nz,n))
+            c2=abs(Wvel(nz+1,n)*dt/mesh%hnode_new(nz,n))
+            CFL_z(nz,  n)=CFL_z(nz,n)+c1
+            CFL_z(nz+1,n)=               c2
+        end do
+        do nz=1, size(CFL_z,1)
+            cflmax=max(cflmax, CFL_z(nz,n))
+        end do
+        do nz=nzmin, nzmax+1
+            Wvel_e(nz, n)=Wvel(nz, n)
+            Wvel_i(nz, n)=0.0_WP
+            if (use_wsplit .and. (CFL_z(nz, n) > wsplit_maxcfl)) then
+                dd=max((CFL_z(nz, n)-wsplit_maxcfl), 0.0_WP)/max(wsplit_maxcfl, 1.e-12)
+                Wvel_e(nz, n)=(1.0_WP/(1.0_WP+dd))*Wvel(nz, n)
+                Wvel_i(nz, n)=(dd    /(1.0_WP+dd))*Wvel(nz, n)
+            end if
+        end do
+    end do
+!$ACC END PARALLEL LOOP
+    if (nbad_h > 0) write(*,*) ' --> fatal problem <--: layerthickness of a layer became smaller than zero at ', nbad_h, &
+                               ' points, mype =', partit%mype, ', mstep =', mstep
+    ! tracer step, diagnostics and the next step use them on the host
+    !$ACC UPDATE HOST(Wvel, Wvel_e, Wvel_i, CFL_z, mesh%hnode_new)
+    if (fer) then
+        !$ACC UPDATE HOST(fer_Wvel)
+    end if
+    if (cflmax > 1.0_WP .and. flag_warn_cflz) then
+        do n=1, partit%myDim_nod2D
+            nzmin = mesh%ulevels_nod2D(n)
+            nzmax = mesh%nlevels_nod2D(n)-1
+            do nz=nzmin, nzmax
+                if (abs(CFL_z(nz,n)-cflmax) < 1.e-12 .and. CFL_z(nz,n) > 1.75_WP .and. CFL_z(nz,n)<=2.5_WP ) then
+                    print '(A, A, F4.2, A, I6, A, F7.2,A,F6.2, A, I3,I3,I3)', achar(27)//'[33m'//' --> WARNING CFLz>1.75:'//achar(27)//'[0m',&
+                          'CFLz_max=',cflmax,',mstep=',mstep,',glon/glat=',mesh%geo_coord_nod2D(1,n)/rad,'/',mesh%geo_coord_nod2D(2,n)/rad,&
+                          ',nz/nzmin/nzmax=',nz,nzmin,nzmax
+                elseif (abs(CFL_z(nz,n)-cflmax) < 1.e-12 .and. CFL_z(nz,n) > 2.5_WP) then
+                    print '(A, A, F4.2, A, I6, A, F7.2,A,F6.2, A, I3,I3,I3)', achar(27)//'[31m'//' --> WARNING CFLz>2.5:'//achar(27)//'[0m',&
+                          'CFLz_max=',cflmax,',mstep=',mstep,',glon/glat=',mesh%geo_coord_nod2D(1,n)/rad,'/',mesh%geo_coord_nod2D(2,n)/rad,&
+                          ',nz/nzmin/nzmax=',nz,nzmin,nzmax
+                end if
+            end do
+        end do
+    end if
+end subroutine vert_vel_ale_acc
+#endif
 
 !
 !
@@ -2827,6 +3353,12 @@ subroutine impl_vert_visc_ale(dynamics, partit, mesh)
     UV     =>dynamics%uv(:,:,:)
     UV_rhs =>dynamics%uv_rhs(:,:,:)
     Wvel_i =>dynamics%w_i(:,:)
+#ifdef ENABLE_OPENACC
+    if (mom_on_device) then
+        call impl_vert_visc_ale_acc(dynamics, partit, mesh)
+        return
+    end if
+#endif
 
     !___________________________________________________________________________
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(a, b, c, ur, vr, cp, up, vp, elem, nz, nzmin, nzmax, elnodes, &
@@ -3010,6 +3542,156 @@ subroutine impl_vert_visc_ale(dynamics, partit, mesh)
 !$OMP END DO
 !$OMP END PARALLEL
 end subroutine impl_vert_visc_ale
+#ifdef ENABLE_OPENACC
+!
+!
+!_______________________________________________________________________________
+! impl_vert_visc_ale on the device: one water column per thread, same arithmetic as the host version,
+! column work arrays of fixed size visc_nl_max.
+subroutine impl_vert_visc_ale_acc(dynamics, partit, mesh)
+    IMPLICIT NONE
+    type(t_dyn)   , intent(inout), target :: dynamics
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(inout), target :: mesh
+    !___________________________________________________________________________
+    integer, parameter         ::  visc_nl_max = 128
+    real(kind=WP)              ::  a(visc_nl_max), b(visc_nl_max), c(visc_nl_max), ur(visc_nl_max), vr(visc_nl_max)
+    real(kind=WP)              ::  cp(visc_nl_max), up(visc_nl_max), vp(visc_nl_max)
+    real(kind=WP)              ::  zbar_n(visc_nl_max), Z_n(visc_nl_max)
+    integer                    ::  nz, elem, nzmin, nzmax, n1, n2, n3
+    real(kind=WP)              ::  zinv, m, friction, wu, wd
+    logical                    ::  constant_drag
+    !___________________________________________________________________________
+    real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
+    real(kind=WP), dimension(:,:)  , pointer :: Wvel_i
+    UV     =>dynamics%uv(:,:,:)
+    UV_rhs =>dynamics%uv_rhs(:,:,:)
+    Wvel_i =>dynamics%w_i(:,:)
+
+    if (mesh%nl > visc_nl_max) then
+        if (partit%mype==0) write(*,*) 'impl_vert_visc_ale_acc: mesh%nl =', mesh%nl, ' > visc_nl_max =', visc_nl_max
+        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
+    end if
+    ! toy configurations with a linear bottom drag
+    constant_drag = toy_ocean .and. ((TRIM(which_toy)=="dbgyre") .or. (TRIM(which_toy)=="neverworld2") &
+                                     .or. (TRIM(which_toy)=="soufflet"))
+    ! computed on the host in this step (mixing, forcing) or last updated on the device
+    ! in the tracer part of the previous step
+    !$ACC UPDATE DEVICE(stress_surf, dynamics%w_i)
+    ! with KPP on the device Av is computed there (mo_convect_acc)
+    if (.not. kpp_on_device) then
+        !$ACC UPDATE DEVICE(Av)
+    end if
+    if (.not. geom_on_device) then
+        !$ACC UPDATE DEVICE(mesh%helem)
+    end if
+
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(a, b, c, ur, vr, cp, up, vp, zbar_n, Z_n, &
+!$ACC                                                    nz, nzmin, nzmax, n1, n2, n3, zinv, m, friction, wu, wd)
+    DO elem=1,partit%myDim_elem2D
+        n1 = mesh%elem2D_nodes(1,elem)
+        n2 = mesh%elem2D_nodes(2,elem)
+        n3 = mesh%elem2D_nodes(3,elem)
+        nzmin = mesh%ulevels(elem)
+        nzmax = mesh%nlevels(elem)
+        do nz=1, mesh%nl
+            zbar_n(nz)=0.0_WP
+        end do
+        do nz=1, mesh%nl-1
+            Z_n(nz)=0.0_WP
+        end do
+        zbar_n(nzmax)=mesh%zbar_e_bot(elem)
+        Z_n(nzmax-1)=zbar_n(nzmax) + mesh%helem(nzmax-1,elem)/2.0_WP
+        do nz=nzmax-1,nzmin+1,-1
+            zbar_n(nz) = zbar_n(nz+1) + mesh%helem(nz,elem)
+            Z_n(nz-1) = zbar_n(nz) + mesh%helem(nz-1,elem)/2.0_WP
+        end do
+        zbar_n(nzmin) = zbar_n(nzmin+1) + mesh%helem(nzmin,elem)
+
+        ! operator, regular part
+        do nz=nzmin+1, nzmax-2
+            zinv=1.0_WP*dt/(zbar_n(nz)-zbar_n(nz+1))
+            a(nz)=-Av(nz,elem)/(Z_n(nz-1)-Z_n(nz))*zinv
+            c(nz)=-Av(nz+1,elem)/(Z_n(nz)-Z_n(nz+1))*zinv
+            b(nz)=-a(nz)-c(nz)+1.0_WP
+            wu=(Wvel_i(nz,  n1)+Wvel_i(nz,  n2)+Wvel_i(nz,  n3))/3._WP
+            wd=(Wvel_i(nz+1,n1)+Wvel_i(nz+1,n2)+Wvel_i(nz+1,n3))/3._WP
+            a(nz)=a(nz)+min(0._WP, wu)*zinv
+            b(nz)=b(nz)+max(0._WP, wu)*zinv
+            b(nz)=b(nz)-min(0._WP, wd)*zinv
+            c(nz)=c(nz)-max(0._WP, wd)*zinv
+        end do
+        ! the last row
+        zinv=1.0_WP*dt/(zbar_n(nzmax-1)-zbar_n(nzmax))
+        a(nzmax-1)=-Av(nzmax-1,elem)/(Z_n(nzmax-2)-Z_n(nzmax-1))*zinv
+        b(nzmax-1)=-a(nzmax-1)+1.0_WP
+        c(nzmax-1)=0.0_WP
+        wu=(Wvel_i(nzmax-1,n1)+Wvel_i(nzmax-1,n2)+Wvel_i(nzmax-1,n3))/3._WP
+        a(nzmax-1)=a(nzmax-1)+min(0._WP, wu)*zinv
+        b(nzmax-1)=b(nzmax-1)+max(0._WP, wu)*zinv
+        ! the first row
+        zinv=1.0_WP*dt/(zbar_n(nzmin)-zbar_n(nzmin+1))
+        c(nzmin)=-Av(nzmin+1,elem)/(Z_n(nzmin)-Z_n(nzmin+1))*zinv
+        a(nzmin)=0.0_WP
+        b(nzmin)=-c(nzmin)+1.0_WP
+        wu=(Wvel_i(nzmin,  n1)+Wvel_i(nzmin,  n2)+Wvel_i(nzmin,  n3))/3._WP
+        wd=(Wvel_i(nzmin+1,n1)+Wvel_i(nzmin+1,n2)+Wvel_i(nzmin+1,n3))/3._WP
+        b(nzmin)=b(nzmin)+wu*zinv
+        b(nzmin)=b(nzmin)-min(0._WP, wd)*zinv
+        c(nzmin)=c(nzmin)-max(0._WP, wd)*zinv
+
+        ! rhs, surface forcing in the first row
+        do nz=nzmin, nzmax-1
+            ur(nz)=UV_rhs(1,nz,elem)
+            vr(nz)=UV_rhs(2,nz,elem)
+        end do
+        ur(nzmin)= ur(nzmin)+zinv*stress_surf(1,elem)/density_0
+        vr(nzmin)= vr(nzmin)+zinv*stress_surf(2,elem)/density_0
+
+        ! bottom friction in the last row
+        zinv=1.0_WP*dt/(zbar_n(nzmax-1)-zbar_n(nzmax))
+        if (constant_drag) then
+            friction=-C_d
+        else
+            friction=-C_d*sqrt(UV(1,nzmax-1,elem)**2+UV(2,nzmax-1,elem)**2)
+        end if
+        ur(nzmax-1)=ur(nzmax-1)+zinv*friction*UV(1,nzmax-1,elem)
+        vr(nzmax-1)=vr(nzmax-1)+zinv*friction*UV(2,nzmax-1,elem)
+
+        ! solve for the difference to time step n
+        do nz=nzmin+1, nzmax-2
+            ur(nz)=ur(nz)-a(nz)*UV(1,nz-1,elem)-(b(nz)-1.0_WP)*UV(1,nz,elem)-c(nz)*UV(1,nz+1,elem)
+            vr(nz)=vr(nz)-a(nz)*UV(2,nz-1,elem)-(b(nz)-1.0_WP)*UV(2,nz,elem)-c(nz)*UV(2,nz+1,elem)
+        end do
+        ur(nzmin)=ur(nzmin)-(b(nzmin)-1.0_WP)*UV(1,nzmin,elem)-c(nzmin)*UV(1,nzmin+1,elem)
+        vr(nzmin)=vr(nzmin)-(b(nzmin)-1.0_WP)*UV(2,nzmin,elem)-c(nzmin)*UV(2,nzmin+1,elem)
+        ur(nzmax-1)=ur(nzmax-1)-a(nzmax-1)*UV(1,nzmax-2,elem)-(b(nzmax-1)-1.0_WP)*UV(1,nzmax-1,elem)
+        vr(nzmax-1)=vr(nzmax-1)-a(nzmax-1)*UV(2,nzmax-2,elem)-(b(nzmax-1)-1.0_WP)*UV(2,nzmax-1,elem)
+
+        ! sweep
+        cp(nzmin) = c(nzmin)/b(nzmin)
+        up(nzmin) = ur(nzmin)/b(nzmin)
+        vp(nzmin) = vr(nzmin)/b(nzmin)
+        do nz = nzmin+1,nzmax-1
+            m = b(nz)-cp(nz-1)*a(nz)
+            cp(nz) = c(nz)/m
+            up(nz) = (ur(nz)-up(nz-1)*a(nz))/m
+            vp(nz) = (vr(nz)-vp(nz-1)*a(nz))/m
+        enddo
+        ur(nzmax-1) = up(nzmax-1)
+        vr(nzmax-1) = vp(nzmax-1)
+        do nz = nzmax-2, nzmin, -1
+            ur(nz) = up(nz)-cp(nz)*ur(nz+1)
+            vr(nz) = vp(nz)-cp(nz)*vr(nz+1)
+        end do
+        do nz=nzmin,nzmax-1
+            UV_rhs(1,nz,elem)=ur(nz)
+            UV_rhs(2,nz,elem)=vr(nz)
+        end do
+    end do
+!$ACC END PARALLEL LOOP
+end subroutine impl_vert_visc_ale_acc
+#endif
 !
 !
 !===============================================================================
@@ -3028,6 +3710,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     integer           :: nz, elem, nzmin, nzmax !for KE diagnostic
     integer           :: tr_num  ! for cavity NaN cleanup
     integer           :: n_cavity_nan  ! NaN count reported by the cavity cleanup
+    logical           :: gm_on_dev = .false.  ! GM/Redi coefficients and bolus velocity on the device
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer :: eta_n
@@ -3045,7 +3728,13 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     !___________________________________________________________________________
     ! calculate equation of state, density, pressure and mixed layer depths
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call pressure_bv'//achar(27)//'[0m'
-    call pressure_bv(tracers, partit, mesh)            !!!!! HeRE change is made. It is linear EoS now.
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_start("pd_pressure_bv")
+#endif
+    call pressure_bv(tracers, partit, mesh)
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_end("pd_pressure_bv")
+#endif            !!!!! HeRE change is made. It is linear EoS now.
 
     !___________________________________________________________________________
     ! calculate calculate pressure gradient force
@@ -3053,7 +3742,13 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     if (trim(which_ale)=='linfs') then
         call pressure_force_4_linfs(tracers, partit, mesh)
     else  
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("pd_pressure_force")
+#endif
         call pressure_force_4_zxxxx(tracers, partit, mesh)
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("pd_pressure_force")
+#endif
     end if
     
     !___________________________________________________________________________
@@ -3065,14 +3760,32 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     !___________________________________________________________________________
     ! calculate alpha and beta
     ! it will be used for KPP, Redi, GM etc. Shall we keep it on in general case?
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_start("pd_alpha_beta")
+#endif
     call sw_alpha_beta(tracers%data(1)%values, tracers%data(2)%values, partit, mesh)
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_end("pd_alpha_beta")
+#endif
 
     ! computes the xy gradient of a neutral surface; will be used by Redi, GM etc.
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_start("pd_sigma_xy")
+#endif
     call compute_sigma_xy(tracers%data(1)%values,tracers%data(2)%values, partit, mesh)
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_end("pd_sigma_xy")
+#endif
 
     ! compute both: neutral slope and tapered neutral slope. Can be later combined with compute_sigma_xy
     ! will be primarily used for computing Redi diffusivities. etc?
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_start("pd_neutral_slope")
+#endif
     call compute_neutral_slope(partit, mesh)
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_end("pd_neutral_slope")
+#endif
  
     !___________________________________________________________________________
     call status_check(partit)
@@ -3115,7 +3828,28 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! use FESOM2.0 tuned k-profile parameterization for vertical mixing 
     if (mix_scheme_nmb==1 .or. mix_scheme_nmb==18 ) then
         if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call oce_mixing_KPP'//achar(27)//'[0m' 
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("mix_kpp")
+#endif
+#if defined(ENABLE_OPENACC)
+        kpp_on_device = sxy_on_device .and. kpp_device_ok(mesh)
+#endif
         call oce_mixing_KPP(Av, Kv_double, dynamics, tracers, partit, mesh)
+#if defined(ENABLE_OPENACC)
+        ! the DVD diagnostic reads the nonlocal KPP terms on the host
+        if (kpp_on_device .and. ldiag_DVD) then
+            !$ACC UPDATE HOST(ghats, blmc)
+        end if
+#endif
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("mix_kpp")
+#endif
+#if defined(ENABLE_OPENACC)
+        if (kpp_on_device) then
+            ! Kv_double and Av are on the device: Kv copy and mo_convect there
+            call mo_convect_acc(ice, partit, mesh)
+        else
+#endif
 !$OMP PARALLEL DO
         do node=1, partit%myDim_nod2D+partit%eDim_nod2D
            Kv(:, node)=Kv_double(:, node, 1)
@@ -3123,6 +3857,9 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
 !$OMP END PARALLEL DO
 
         call mo_convect(ice, partit, mesh)
+#if defined(ENABLE_OPENACC)
+        end if
+#endif
         
     ! use FESOM2.0 tuned pacanowski & philander parameterization for vertical 
     ! mixing     
@@ -3184,7 +3921,13 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! force to UV_rhs
     ! UV_rhs = dt*[ (R_advec + R_coriolis)_AB2^n + R_pressure^n ]
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call compute_vel_rhs'//achar(27)//'[0m'
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_start("mom_vel_rhs") ! TEMP sub-timing (step 6 planning)
+#endif
     call compute_vel_rhs(ice, dynamics, partit, mesh)
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_end("mom_vel_rhs")
+#endif
      
     !___________________________________________________________________________
     ! Energy diagnostic contribution
@@ -3220,7 +3963,13 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! UV_rhs = dt*[ (R_advec + R_coriolis)^n + R_pressure + R_hviscos] 
     ! UV_rhs = UV_rhs + dt*R_hviscos
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call viscosity_filter'//achar(27)//'[0m'
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_start("mom_visc_filter") ! TEMP sub-timing
+#endif
     call viscosity_filter(dynamics%opt_visc, dynamics, partit, mesh)
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_end("mom_visc_filter")
+#endif
     
     !___________________________________________________________________________
     ! Energy diagnostic contribution
@@ -3274,11 +4023,24 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call impl_vert_visc_ale'//achar(27)//'[0m'
     if(dynamics%use_ivertvisc) then
         if ( .not. dynamics%use_ssh_se_subcycl ) then
+#if defined (FESOM_PROFILING)
+            call fesom_profiler_start("mom_impl_visc") ! TEMP sub-timing
+#endif
             call impl_vert_visc_ale(dynamics,partit, mesh)
+#if defined (FESOM_PROFILING)
+            call fesom_profiler_end("mom_impl_visc")
+#endif
         else
             call impl_vert_visc_ale_vtransp(dynamics, partit, mesh)
         end if 
     end if
+#ifdef ENABLE_OPENACC
+    ! UV_rhs stays on the device through the momentum rhs, the viscosity filter and the implicit
+    ! viscosity; with the velocity update on the device only output streams read it on the host
+    if (mom_on_device .and. (dynamics%ldiag_ke .or. uvrhs_out_needed)) then
+        !$ACC UPDATE HOST(dynamics%uv_rhs)
+    end if
+#endif
     
     !___________________________________________________________________________
     if (dynamics%ldiag_ke) then
@@ -3320,15 +4082,39 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! Update stiffness matrix by dhe=hbar(n+1/2)-hbar(n-1/2) on elements, only
     ! needed for zlevel and zstar
     if (.not. dynamics%use_ssh_se_subcycl) then
-        if (.not. trim(which_ale)=='linfs') call update_stiff_mat_ale(partit, mesh)
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("ssh_stiff_update")
+#endif
+        if (.not. trim(which_ale)=='linfs') then
+#if defined(ENABLE_OPENACC) && !defined(DIAG_STIFF_DRIFT)
+            call update_stiff_mat_ale_acc(partit, mesh)
+#else
+            call update_stiff_mat_ale(partit, mesh)
+#endif
+        end if
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("ssh_stiff_update")
+#endif
         if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call compute_ssh_rhs_ale'//achar(27)//'[0m'
         ! ssh_rhs=-alpha*\nabla\int(U_n+U_rhs)dz-(1-alpha)*...
         ! see "FESOM2: from finite elements to finte volumes, S. Danilov..." eq. (18) rhs
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("ssh_rhs")
+#endif
         call compute_ssh_rhs_ale(dynamics, partit, mesh)
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("ssh_rhs")
+#endif
 
         ! Take updated ssh matrix and solve --> new ssh!
         t30=MPI_Wtime() 
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("ssh_cg")
+#endif
         call solve_ssh_ale(dynamics, partit, mesh)
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("ssh_cg")
+#endif
         
         if ((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) then
             if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call relax_zonal_vel'//achar(27)//'[0m'
@@ -3344,7 +4130,16 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         ! u^(n+1) = u* + [-g * tau * theta * grad(eta^(n+1)-eta^(n)) ]
         if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call update_vel'//achar(27)//'[0m'
         ! ke will be computed inside there if dynamics%ldiag_ke is .TRUE.
+#if defined(ENABLE_OPENACC)
+        if (mom_on_device .and. .not. dynamics%ldiag_ke) then
+            call update_vel_acc(dynamics, partit, mesh)
+        else
+            uv_dev_current = .false.
+            call update_vel(dynamics, partit, mesh)
+        end if
+#else
         call update_vel(dynamics, partit, mesh)
+#endif
         
         ! --> eta_(n) --> eta_(n+1) = eta_(n) + deta = eta_(n) + (eta_(n+1) + eta_(n))
         t5=MPI_Wtime()
@@ -3420,7 +4215,22 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     !___________________________________________________________________________
     ! Do horizontal and vertical scaling of GM/Redi  diffusivity 
     if (Fer_GM .or. Redi) then
-        call init_Redi_GM(partit, mesh)
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("gm_init_redi")
+#endif
+#if defined(ENABLE_OPENACC)
+        gm_on_dev = sxy_on_device .and. gm_device_ok(mesh)
+        redi_on_device = gm_on_dev .and. Redi
+        gmvel_on_device = gm_on_dev
+#endif
+        if (gm_on_dev) then
+            call init_Redi_GM_acc(dynamics, partit, mesh)
+        else
+            call init_Redi_GM(partit, mesh)
+        end if
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("gm_init_redi")
+#endif
     end if
     
     ! Implementation of Gent & McWiliams parameterization after R. Ferrari et al., 2010
@@ -3428,7 +4238,17 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     if (Fer_GM .or. use_mle) then
         if (Fer_GM) then
             if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call fer_solve_Gamma'//achar(27)//'[0m'
-            call fer_solve_Gamma(partit, mesh)
+#if defined (FESOM_PROFILING)
+            call fesom_profiler_start("gm_solve_gamma")
+#endif
+            if (gm_on_dev) then
+                call fer_solve_Gamma_acc(dynamics, partit, mesh)
+            else
+                call fer_solve_Gamma(partit, mesh)
+            end if
+#if defined (FESOM_PROFILING)
+            call fesom_profiler_end("gm_solve_gamma")
+#endif
         end if
         ! Fox-Kemper mixed-layer eddies add to the same streamfunction, so the bolus
         ! velocity, the vertical velocity from continuity, tracer advection and the
@@ -3437,7 +4257,17 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
             if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call mle_add_gamma'//achar(27)//'[0m'
             call mle_add_gamma(partit, mesh)
         end if
-        call fer_gamma2vel(dynamics, partit, mesh)
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("gm_gamma2vel")
+#endif
+        if (gm_on_dev) then
+            call fer_gamma2vel_acc(dynamics, partit, mesh)
+        else
+            call fer_gamma2vel(dynamics, partit, mesh)
+        end if
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("gm_gamma2vel")
+#endif
     end if
     t7=MPI_Wtime()
 #if defined (FESOM_PROFILING)
@@ -3521,7 +4351,16 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     !___________________________________________________________________________
     ! Update hnode=hnode_new, helem
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call update_thickness_ale'//achar(27)//'[0m'
+#if defined(ENABLE_OPENACC)
+    if (vv_on_device .and. trim(which_ale)=='zstar' .and. .not. ldiag_DVD) then
+        call update_thickness_ale_acc(partit, mesh)
+    else
+        geom_on_device = .false.
+        call update_thickness_ale(partit, mesh)
+    end if
+#else
     call update_thickness_ale(partit, mesh)
+#endif
     t10=MPI_Wtime()
 #if defined (FESOM_PROFILING)
     call fesom_profiler_end("oce_thickness_update")

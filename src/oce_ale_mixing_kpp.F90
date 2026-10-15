@@ -16,6 +16,9 @@ MODULE o_mixing_KPP_mod
   USE g_forcing_arrays
   USE g_comm_auto
   USE g_support
+#if defined (FESOM_PROFILING)
+  use fesom_profiler
+#endif
   IMPLICIT NONE
   
   private 
@@ -24,6 +27,7 @@ MODULE o_mixing_KPP_mod
   public oce_mixing_kpp
 
   public hbl, ghats, blmc, Bo,dbsfc !!!!! ghats is nonzero only for scalars in unstable forcing conditions
+  public kpp_on_device, kpp_device_ok
 
   private bldepth    ! only within o_mixing_kpp_mod
   private wscale
@@ -86,6 +90,12 @@ MODULE o_mixing_KPP_mod
   logical                    :: limit_hbl_ekmmob =.false. !.true.
 
   integer                                   :: n          ! to perform loop iterations 
+  ! OpenACC: run oce_mixing_KPP on the device (set by the caller when its inputs are
+  ! on the device, see kpp_device_ok)
+  logical                    :: kpp_on_device = .false.
+  logical                    :: kpp_data_created = .false., kpp_blmc_created = .false.
+  integer, parameter         :: kpp_nlmax = 128
+  real(KIND=WP), dimension(:,:), allocatable, target :: kpp_viscA ! viscA of the device version (nodes)
 
 contains
 
@@ -277,6 +287,12 @@ contains
      real(KIND=WP), dimension(mesh%nl, partit%myDim_nod2D +partit%eDim_nod2D, tracers%num_tracers), intent(inout) :: diffK !for T and S
      real(kind=WP), dimension(:,:,:), pointer :: UVnode
     UVnode=>dynamics%uvnode(:,:,:)
+#ifdef ENABLE_OPENACC
+     if (kpp_on_device) then
+        call oce_mixing_KPP_acc(viscAE, diffK, dynamics, tracers, partit, mesh)
+        return
+     end if
+#endif
 
 !$OMP PARALLEL DO
      DO node=1, partit%myDim_nod2D+partit%eDim_nod2D
@@ -356,29 +372,69 @@ contains
 ! compute interior mixing coefficients everywhere, due to constant 
 ! internal wave activity, static instability, and local shear 
 ! instability.
+#if defined (FESOM_PROFILING)
+     call fesom_profiler_start("kpp_ri_iwmix")
+#endif
      CALL ri_iwmix(viscA, diffK, dynamics, tracers, partit, mesh)
+#if defined (FESOM_PROFILING)
+     call fesom_profiler_end("kpp_ri_iwmix")
+#endif
 ! add double diffusion
      IF (double_diffusion) then
         CALL ddmix(diffK, tracers, partit, mesh)
      END IF
 
 ! boundary layer mixing coefficients: diagnose new b.l. depth
+#if defined (FESOM_PROFILING)
+     call fesom_profiler_start("kpp_bldepth")
+#endif
      CALL bldepth(partit, mesh)
+#if defined (FESOM_PROFILING)
+     call fesom_profiler_end("kpp_bldepth")
+#endif
 ! boundary layer diffusivities
+#if defined (FESOM_PROFILING)
+     call fesom_profiler_start("kpp_blmix")
+#endif
      CALL blmix_kpp(viscA, diffK, partit, mesh)
+#if defined (FESOM_PROFILING)
+     call fesom_profiler_end("kpp_blmix")
+#endif
 ! enhance diffusivity at interface kbl - 1
+#if defined (FESOM_PROFILING)
+     call fesom_profiler_start("kpp_enhance")
+#endif
      CALL enhance(viscA, diffK, partit, mesh)
+#if defined (FESOM_PROFILING)
+     call fesom_profiler_end("kpp_enhance")
+#endif
     
+#if defined (FESOM_PROFILING)
+     call fesom_profiler_start("kpp_smooth_final")
+#endif
      if (smooth_blmc) then
         call exchange_nod(blmc(:,:,1), partit)
         call exchange_nod(blmc(:,:,2), partit)
         call exchange_nod(blmc(:,:,3), partit)
+#ifdef ENABLE_OPENACC
+        ! blmc smoothing on the device (smooth_nod3D_acc)
+        if (.not. kpp_blmc_created) then
+            !$ACC ENTER DATA CREATE(blmc)
+            kpp_blmc_created = .true.
+        end if
+        !$ACC UPDATE DEVICE(blmc)
+        do j=1, 3
+           call smooth_nod3D_acc(blmc(:,:,j), 3, partit, mesh)
+        end do
+        !$ACC UPDATE HOST(blmc)
+#else
         do j=1, 3
           !_____________________________________________________________________  
           ! all loops go over myDim_nod2D so no halo information --> for smoothing 
           ! haloinfo is required --> therefor exchange_nod
          call smooth_nod(blmc(:,:,j), 3, partit, mesh)
         end do
+#endif
      end if
 !$OMP BARRIER
 ! then combine blmc and viscA/diffK
@@ -424,6 +480,9 @@ contains
         IF (viscAE(nzmin,elem) < minmix) viscAE(nzmin,elem) = minmix    
      END DO
 !$OMP END PARALLEL DO
+#if defined (FESOM_PROFILING)
+     call fesom_profiler_end("kpp_smooth_final")
+#endif
   END SUBROUTINE oce_mixing_kpp
 
 
@@ -1164,4 +1223,472 @@ contains
      END DO
 !$OMP END PARALLEL DO
   end subroutine enhance
+!=======================================================================
+! The configurations oce_mixing_KPP_acc covers: no horizontal smoothing of hbl or
+! the Richardson number, no double diffusion, constant background diffusivity.
+  logical function kpp_device_ok(mesh)
+     type(t_mesh), intent(in) :: mesh
+     kpp_device_ok = (.not. smooth_hbl) .and. (.not. smooth_Ri_hor) .and. (.not. double_diffusion) &
+                     .and. Kv0_const .and. mesh%nl <= kpp_nlmax
+  end function kpp_device_ok
+#ifdef ENABLE_OPENACC
+!=======================================================================
+! wscale for the device; the lookup tables and their spacing are passed in
+  SUBROUTINE wscale_acc(zehat, us, wm, ws, wmt_d, wst_d, dz, du)
+     !$ACC ROUTINE SEQ
+     IMPLICIT NONE
+     real(KIND=WP), intent(in)     :: zehat, us, dz, du
+     real(KIND=WP), intent(in)     :: wmt_d(0:nni+1,0:nnj+1), wst_d(0:nni+1,0:nnj+1)
+     real(KIND=WP), intent(out)    :: wm, ws
+     real(KIND=WP)                 :: zdiff, udiff, zfrac, ufrac, fzfrac
+     real(KIND=WP)                 :: wam, wbm, was, wbs, u3
+     integer                       :: iz, izp1, ju, jup1
+     IF (zehat <= zmax) THEN
+        zdiff = zehat-zmin
+        iz    = INT( zdiff/dz)
+        iz    = MIN( iz , nni )
+        iz    = MAX( iz , 0  )
+        izp1  = iz + 1
+        udiff = us-umin
+        ju    = INT( MIN(udiff/du,real(nnj,WP)))
+        ju    = MAX( ju , 0  )
+        jup1  = ju+1
+        zfrac = zdiff/dz - real(iz,WP)
+        ufrac = udiff/du - real(ju,WP)
+        fzfrac= 1._WP-zfrac
+        wam   = (fzfrac)  * wmt_d(iz,jup1) + zfrac * wmt_d(izp1,jup1)
+        wbm   = (fzfrac)  * wmt_d(iz,ju  ) + zfrac * wmt_d(izp1,ju  )
+        wm    = (1._WP-ufrac)* wbm          + ufrac * wam
+        was   = (fzfrac)  * wst_d(iz,jup1) + zfrac * wst_d(izp1,jup1)
+        wbs   = (fzfrac)  * wst_d(iz,ju  ) + zfrac * wst_d(izp1,ju  )
+        ws    = (1._WP-ufrac)* wbs          + ufrac * was
+     ELSE
+        u3    = us*us*us
+        wm    = vonk * us * u3 / ( u3 + conc1*zehat + epsln )
+        ws    = wm
+     ENDIF
+  END SUBROUTINE wscale_acc
+!=======================================================================
+! oce_mixing_KPP on the device: the per-column computations of the driver, ri_iwmix, bldepth, blmix_kpp
+! and enhance (independent columns, results match the host); host inputs are uploaded, results brought back.
+  SUBROUTINE oce_mixing_KPP_acc(viscAE, diffK, dynamics, tracers, partit, mesh)
+     IMPLICIT NONE
+     type(t_mesh),   intent(in),    target :: mesh
+     type(t_partit), intent(inout), target :: partit
+     type(t_tracer), intent(in),    target :: tracers
+     type(t_dyn),    intent(in),    target :: dynamics
+     real(KIND=WP), dimension(mesh%nl, partit%myDim_elem2D+partit%eDim_elem2D), intent(inout)                     :: viscAE
+     real(KIND=WP), dimension(mesh%nl, partit%myDim_nod2D +partit%eDim_nod2D, tracers%num_tracers), intent(inout) :: diffK
+     integer                    :: node, elem, nz, j, k, mr, nzmin, nzmax, nl1, nu1, kn, knm1, knp1
+     integer                    :: myDim_nod2D, nod_size, myDim_elem2D, nl, n1, n2, n3
+     real(KIND=WP)              :: u_loc, v_loc, usurf, vsurf, minmix
+     real(KIND=WP)              :: dz_inv, shear, ri_prev, tmp, Rigg, ratio, frit
+     real(KIND=WP)              :: Ritop, bvsq, Vtsq, hekman, hmonob, hlimit
+     real(KIND=WP)              :: Rib_km1, Rib_k, coeff_sw, zk, zkm1, sigma, zehat, wm, ws, dzup
+     real(KIND=WP)              :: delhat, R, dvdzup, dvdzdn, viscp, difsp, diftp, visch, difsh, difth, f1
+     real(KIND=WP)              :: sig, a1, a2, a3, Gm, Gs, Gt
+     real(KIND=WP)              :: gat1m, gat1t, gat1s, dat1m, dat1s, dat1t
+     real(KIND=WP)              :: delta, dkmp5, dstar
+     real(KIND=WP)              :: dthick(kpp_nlmax), diff_col(kpp_nlmax,3)
+     real(KIND=WP)              :: l_deltaz, l_deltau, l_cg, l_Vtc
+     real(KIND=WP), parameter   :: Riinfty = 0.8_WP
+     real(KIND=WP), parameter   :: cekman = 0.7_WP
+     real(KIND=WP), parameter   :: cmonob = 1.0_WP
+     integer, parameter         :: num_smoothings = 1
+     real(kind=WP), dimension(:,:,:), pointer :: UVnode
+     real(kind=WP), dimension(:,:),   pointer :: viscA, salt
+
+     UVnode => dynamics%uvnode(:,:,:)
+     salt   => tracers%data(2)%values(:,:)
+     myDim_nod2D = partit%myDim_nod2D
+     nod_size    = partit%myDim_nod2D+partit%eDim_nod2D
+     myDim_elem2D= partit%myDim_elem2D
+     nl          = mesh%nl
+     l_deltaz = deltaz
+     l_deltau = deltau
+     l_cg     = cg
+     l_Vtc    = Vtc
+     if (.not. kpp_data_created) then
+        allocate(kpp_viscA(mesh%nl, nod_size))
+        kpp_viscA = 0.0_WP
+        !$ACC ENTER DATA COPYIN(kpp_viscA, ghats, wmt, wst, Kv_double, dVsq, ustar, Bo, bfsfc, stable, caseA, dkm1, kbl, hbl) &
+        !$ACC CREATE(dynamics%uvnode, stress_node_surf, heat_flux, water_flux, sw_3d)
+        if (.not. kpp_blmc_created) then
+           !$ACC ENTER DATA CREATE(blmc)
+           kpp_blmc_created = .true.
+        end if
+        ! levels below the bottom are not written here: start from the host values
+        !$ACC UPDATE DEVICE(Av)
+        kpp_data_created = .true.
+     end if
+     viscA => kpp_viscA
+     !$ACC UPDATE DEVICE(stress_node_surf, heat_flux, water_flux)
+     if (.not. uvnode_on_device) then
+        !$ACC UPDATE DEVICE(UVnode)
+     end if
+     if (.not. geom_on_device) then
+        !$ACC UPDATE DEVICE(mesh%zbar_3d_n, mesh%hnode)
+     end if
+     if (use_sw_pene) then
+        !$ACC UPDATE DEVICE(sw_3d)
+     end if
+
+     !__________________________________________________________________________
+     ! driver: viscA, dVsq, ustar, Bo
+     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
+     DO node=1, nod_size
+        DO nz=1, nl
+           viscA(nz, node) = 0.0_WP
+        END DO
+     END DO
+     !$ACC END PARALLEL LOOP
+     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(nz, nzmin, nzmax, usurf, vsurf, u_loc, v_loc)
+     DO node=1, myDim_nod2D
+        nzmin = mesh%ulevels_nod2D(node)
+        nzmax = mesh%nlevels_nod2D(node)
+        dVsq (nzmin,node) = 0.0_WP
+        dbsfc(nzmin,node) = 0.0_WP
+        usurf = UVnode(1,nzmin,node)
+        vsurf = UVnode(2,nzmin,node)
+        DO nz=nzmin+1, nzmax-1
+           u_loc = 0.5_WP * ( UVnode(1,nz-1,node) + UVnode(1,nz,node) )
+           v_loc = 0.5_WP * ( UVnode(2,nz-1,node) + UVnode(2,nz,node) )
+           dVsq(nz,node) = ( usurf - u_loc )**2 + ( vsurf - v_loc )**2
+        END DO
+        dVsq ( nzmax, node ) = dVsq  ( nzmax-1, node )
+        ustar(node) = sqrt( sqrt( stress_node_surf(1,node)**2 + stress_node_surf(2,node)**2 )*density_0_r )
+        Bo(node)  = -g * ( sw_alpha(nzmin,node) * heat_flux(node)  / vcpw             &
+                         + sw_beta (nzmin,node) * water_flux(node) * (salt(nzmin,node)+S_ref_anomaly))
+     END DO
+     !$ACC END PARALLEL LOOP
+
+     !__________________________________________________________________________
+     ! ri_iwmix (Kv0_const, no horizontal smoothing)
+#if defined (FESOM_PROFILING)
+     call fesom_profiler_start("kpp_ri_iwmix")
+#endif
+     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) &
+     !$ACC PRIVATE(nz, mr, nzmin, nzmax, dz_inv, shear, ri_prev, tmp, Rigg, ratio, frit)
+     DO node=1, myDim_nod2D
+        nzmin = mesh%ulevels_nod2D(node)
+        nzmax = mesh%nlevels_nod2D(node)
+        DO nz=nzmin+1,nzmax-1
+           dz_inv = 1.0_WP / (mesh%Z_3d_n(nz-1,node)-mesh%Z_3d_n(nz,node))
+           shear  = ( UVnode(1, nz-1, node) - UVnode(1, nz, node) )**2 + &
+                    ( UVnode(2, nz-1, node) - UVnode(2, nz, node) )**2
+           shear  = shear * dz_inv * dz_inv
+           diffK(nz,node,1) = MAX( bvfreq(nz,node), 0.0_WP ) / (shear + epsln)
+        END DO
+        diffK(nzmin,node,1)=diffK(nzmin+1,node,1)
+        diffK(nzmax,node,1)=diffK(nzmax-1,node,1)
+        IF(smooth_Ri_ver .and. nzmax > 2) then
+           DO mr=1, num_smoothings
+              ri_prev = 0.25_WP * diffK(1, node, 1)
+              DO nz=nzmin+1, nzmax-1
+                 tmp = diffK(nz,node,1)
+                 diffK(nz,node,1) = ri_prev + 0.5_WP * diffK(nz,node,1) + 0.25_WP * diffK(nz+1,node,1)
+                 ri_prev = 0.25_WP * tmp
+              END DO
+           END DO
+        END IF
+        do nz=nzmin+1, nzmax-1
+           Rigg  = AMAX1( diffK(nz,node,1) , 0.0_WP)
+           ratio = AMIN1( Rigg/Riinfty , 1.0_WP )
+           frit  = (1.0_WP - ratio*ratio)
+           frit  = frit*frit*frit
+           viscA(nz,node) =  visc_sh_limit * frit + A_ver
+           diffK(nz,node,1) = diff_sh_limit * frit + K_ver
+           diffK(nz,node,2) = diffK(nz,node,1)
+        end do
+        viscA( nzmin, node    ) = viscA( nzmin+1, node    )
+        diffK( nzmin, node, 1 ) = diffK( nzmin+1, node, 1 )
+        diffK( nzmin, node, 2 ) = diffK( nzmin+1, node, 2 )
+        viscA( nzmax, node    ) = viscA( nzmax-1, node    )
+        diffK( nzmax, node, 1 ) = diffK( nzmax-1, node, 1 )
+        diffK( nzmax, node, 2 ) = diffK( nzmax-1, node, 2 )
+     END DO
+     !$ACC END PARALLEL LOOP
+#if defined (FESOM_PROFILING)
+     call fesom_profiler_end("kpp_ri_iwmix")
+     call fesom_profiler_start("kpp_bldepth")
+#endif
+     !__________________________________________________________________________
+     ! bldepth (no hbl smoothing, so its two node loops merge)
+     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) &
+     !$ACC PRIVATE(nz, nzmin, nzmax, coeff_sw, Rib_km1, Rib_k, zk, zkm1, sigma, zehat, wm, ws, bvsq, Vtsq, Ritop, dzup, hekman, hmonob, hlimit)
+     DO node=1, myDim_nod2D
+        kbl(node) = mesh%nlevels_nod2D(node)
+        hbl(node) = ABS( mesh%zbar_3d_n( mesh%nlevels_nod2d(node),node ) )
+        nzmin = mesh%ulevels_nod2D(node)
+        nzmax = mesh%nlevels_nod2D(node)
+        coeff_sw = 0.0_WP
+        IF (use_sw_pene)  THEN
+           coeff_sw = g * sw_alpha(nzmin,node)
+        END IF
+        Rib_km1 = 0.0_WP
+        bfsfc(node) = Bo(node)
+        DO nz=nzmin+1,nzmax
+           zk   = ABS( mesh%zbar_3d_n(nz,  node) )
+           zkm1 = ABS( mesh%zbar_3d_n(nz-1,node) )
+           IF (use_sw_pene)  THEN
+              bfsfc(node) = Bo(node) + coeff_sw * ( sw_3d(nzmin,node) - sw_3d(nz,node) )
+           END IF
+           stable(node) = 0.5_WP + SIGN( 0.5_WP, bfsfc(node) )
+           sigma  = stable(node) + ( 1.0_WP - stable(node) ) * epsilon_kpp
+           zehat= vonk * sigma * zk * bfsfc(node)
+           call wscale_acc(zehat, ustar(node), wm, ws, wmt, wst, l_deltaz, l_deltau)
+           bvsq = bvfreq(nz ,node)
+           Vtsq = zk * ws * SQRT(ABS(bvsq)) * l_Vtc
+           Ritop = zk    *   dbsfc( nz ,node )
+           Rib_k = Ritop /  (dVsq ( nz ,node ) + Vtsq + epsln )
+           dzup  = zk    -   zkm1
+           IF (Rib_k > Ricr) THEN
+              hbl(node) = zkm1 + dzup*(Ricr-Rib_km1)/(Rib_k-Rib_km1+epsln)
+              kbl(node) = nz
+              EXIT
+           ELSE
+              Rib_km1=Rib_k
+           END IF
+           IF (use_sw_pene)  THEN
+              bfsfc(node) = Bo(node) + &
+                            coeff_sw * &
+                            ( sw_3d(nzmin,node) - &
+                                            ( sw_3d(nz-1,node) + &
+                                                               ( sw_3d(nz,node) - sw_3d(nz-1,node) ) * ( hbl(node) - zkm1 ) / dzup &
+                                            ) &
+                            )
+              stable(node) = 0.5_WP + SIGN( 0.5_WP, bfsfc(node) )
+              bfsfc (node) = bfsfc(node) + stable(node) * epsln
+           END IF
+        END DO
+        IF (bfsfc(node) > 0.0_WP .and. nzmin==1) THEN
+           hekman = cekman * ustar(node) / MAX( ABS (mesh%coriolis_node(node) ), epsln)
+           hmonob = cmonob * ustar(node) * ustar(node) * ustar(node)     &
+                /vonk / (bfsfc(node) + epsln)
+           hlimit = stable(node) * AMIN1( hekman, hmonob )
+           hbl(node) = AMIN1( hbl(node), hlimit )
+           hbl(node) = MAX( hbl(node), ABS(mesh%zbar_3d_n(2,node)) )
+        END IF
+        ! second node loop of bldepth
+        kbl(node) = nzmax
+        DO nz=nzmin+1,nzmax
+           IF (ABS(mesh%zbar_3d_n(nz,node)) > hbl(node)) THEN
+              kbl(node) = nz
+              EXIT
+           END IF
+        END DO
+        IF (use_sw_pene)  THEN
+           coeff_sw = g * sw_alpha(nzmin,node)
+           bfsfc(node) = Bo(node) + &
+                         coeff_sw * &
+                         ( sw_3d(nzmin,node) - &
+                                         ( sw_3d(kbl(node)-1, node) + &
+                                                                    ( sw_3d(kbl(node), node) - sw_3d(kbl(node)-1, node) ) &
+                                                                    * ( hbl(node) + mesh%zbar_3d_n( kbl(node)-1,node) ) &
+                                                                    / ( mesh%zbar_3d_n( kbl(node)-1,node) - mesh%zbar_3d_n(kbl(node),node) ) ) )
+           stable(node)=0.5_WP + SIGN(0.5_WP, bfsfc(node))
+           bfsfc(node) =bfsfc(node) + stable(node) * epsln
+        END IF
+        dzup         = mesh%zbar_3d_n(kbl(node)-1,node) - mesh%zbar_3d_n(kbl(node),node)
+        caseA(node)  = 0.5_WP + SIGN( 0.5_WP, ABS( mesh%zbar_3d_n(kbl(node),node) ) - 0.5_WP * dzup - hbl(node) )
+     END DO
+     !$ACC END PARALLEL LOOP
+#if defined (FESOM_PROFILING)
+     call fesom_profiler_end("kpp_bldepth")
+     call fesom_profiler_start("kpp_blmix")
+#endif
+     !__________________________________________________________________________
+     ! blmix_kpp
+     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
+     DO node=1, nod_size
+        DO nz=1, nl
+           blmc(nz, node, 1) = 0.0_WP
+           blmc(nz, node, 2) = 0.0_WP
+           blmc(nz, node, 3) = 0.0_WP
+        END DO
+     END DO
+     !$ACC END PARALLEL LOOP
+     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) &
+     !$ACC PRIVATE(nz, nl1, nu1, kn, knm1, knp1, dthick, diff_col, sigma, zehat, wm, ws, delhat, R, dvdzup, dvdzdn) &
+     !$ACC PRIVATE(viscp, difsp, diftp, visch, difsh, difth, f1, gat1m, gat1t, gat1s, dat1m, dat1s, dat1t, sig, a1, a2, a3, Gm, Gs, Gt)
+     DO node=1, myDim_nod2D
+        nl1=mesh%nlevels_nod2d(node)
+        nu1=mesh%ulevels_nod2d(node)
+        if (nl1 >= 3 .and. nl1-nu1 >= 2) then
+        DO nz=nu1+1, nl1-1
+           dthick(nz)=0.5_WP*(mesh%hnode(nz-1,node)+mesh%hnode(nz,node))
+        END DO
+        dthick(nu1)=mesh%hnode(nu1,node)*0.5_WP
+        dthick(nl1)=mesh%hnode(nl1-1,node)*0.5_WP
+        DO nz=nu1, nl1-1
+           diff_col(nz,1)=viscA(nz,node)
+           diff_col(nz,2)=diffK(nz,node,1)
+           diff_col(nz,3)=diffK(nz,node,2)
+        END DO
+        diff_col(nl1,1)=diff_col(nl1-1,1)
+        diff_col(nl1,2)=diff_col(nl1-1,2)
+        diff_col(nl1,3)=diff_col(nl1-1,3)
+        sigma = stable(node) * 1.0_WP + (1.0_WP-stable(node)) * epsilon_kpp
+        zehat= vonk * sigma * hbl(node) * bfsfc(node)
+        call wscale_acc(zehat, ustar(node), wm, ws, wmt, wst, l_deltaz, l_deltau)
+        kn = INT(caseA(node)+epsln) *(kbl(node) -1) +   &
+             (1-INT(caseA(node)+epsln)) * kbl(node)
+        kn   = MIN(kn,nl1-1)
+        knm1 = MAX(kn-1,nu1)
+        knp1 = MIN(kn+1,nl1)
+        delhat = ABS(mesh%Z_3d_n(kn,node))-hbl(node)
+        R      = 1.0_WP - delhat / dthick(kn)
+        dvdzup = (diff_col(knm1,1) - diff_col(kn,1))/dthick(kn)
+        dvdzdn = (diff_col(kn,1) - diff_col(knp1,1))/dthick(knp1)
+        viscp  = 0.5_WP * ( (1.0_WP - R) * (dvdzup + ABS(dvdzup))+         &
+            R  * (dvdzdn + abs(dvdzdn)) )
+        dvdzup = (diff_col(knm1,3) - diff_col(kn,3))/dthick(kn)
+        dvdzdn = (diff_col(kn,3) - diff_col(knp1,3))/dthick(knp1)
+        difsp  = 0.5_WP * ( (1.0_WP - R) * (dvdzup + ABS(dvdzup))+         &
+             R  * (dvdzdn + ABS(dvdzdn)) )
+        dvdzup = (diff_col(knm1,2) - diff_col(kn,2))/dthick(kn)
+        dvdzdn = (diff_col(kn,2) - diff_col(knp1,2))/dthick(knp1)
+        diftp  = 0.5_WP * ( (1.0_WP - R) * (dvdzup + ABS(dvdzup))+         &
+             R  * (dvdzdn + ABS(dvdzdn)) )
+        visch  = diff_col(kn,1) + viscp * delhat
+        difsh  = diff_col(kn,3) + difsp * delhat
+        difth  = diff_col(kn,2) + diftp * delhat
+        f1 = stable(node) * conc1 * bfsfc(node) / (ustar(node)**4+epsln)
+        gat1m = visch / (hbl(node) + epsln) / (wm + epsln)
+        dat1m = -viscp / (wm+epsln) + f1 * visch
+        dat1m = min(dat1m, 0.0_WP)
+        gat1s = difsh  / (hbl(node) + epsln) / (ws + epsln)
+        dat1s = -difsp / (ws+epsln) + f1 * difsh
+        dat1s = min(dat1s, 0.0_WP)
+        gat1t = difth /  (hbl(node) + epsln) / (ws + epsln)
+        dat1t = -diftp / (ws+epsln) + f1 * difth
+        dat1t = min(dat1t, 0.0_WP)
+        DO nz=nu1+1,nl1-1
+           if (nz >= kbl(node)) exit
+           sig   = ABS(mesh%Z_3d_n(nz,node)) / (hbl(node)+epsln)
+           sigma = stable(node) * sig                          &
+                + (1.0_WP - stable(node)) * AMIN1(sig, epsilon_kpp)
+           zehat= vonk * sigma * hbl(node) * bfsfc(node)
+           call wscale_acc(zehat, ustar(node), wm, ws, wmt, wst, l_deltaz, l_deltau)
+           a1 = sig    - 2.0_WP
+           a2 = 3.0_WP - 2.0_WP * sig
+           a3 = sig    - 1.0_WP
+           Gm = a1 + a2 * gat1m + a3 * dat1m
+           Gs = a1 + a2 * gat1s + a3 * dat1s
+           Gt = a1 + a2 * gat1t + a3 * dat1t
+           blmc(nz,node,1) = hbl(node) * wm * sig * (1.0_WP + sig * Gm)
+           blmc(nz,node,2) = hbl(node) * ws * sig * (1.0_WP + sig * Gt)
+           blmc(nz,node,3) = hbl(node) * ws * sig * (1.0_WP + sig * Gs)
+           ghats(nz,node) = (1.0_WP - stable(node)) * l_cg    &
+                      / (ws * hbl(node) + epsln)
+        END DO
+        sig   =  ABS(mesh%zbar_3d_n(kbl(node)-1,node))  / (hbl(node) + epsln)
+        sigma =  stable(node) * sig                  &
+              + (1.0_WP - stable(node)) * MIN(sig, epsilon_kpp)
+        zehat= vonk * sigma * hbl(node) * bfsfc(node)
+        call wscale_acc(zehat, ustar(node), wm, ws, wmt, wst, l_deltaz, l_deltau)
+        a1 = sig    - 2.0_WP
+        a2 = 3.0_WP - 2.0_WP * sig
+        a3 = sig    - 1.0_WP
+        Gm = a1 + a2 * gat1m + a3 * dat1m
+        Gs = a1 + a2 * gat1s + a3 * dat1s
+        Gt = a1 + a2 * gat1t + a3 * dat1t
+        dkm1(node,1) = hbl(node) * wm * sig * (1.0_WP + sig * Gm)
+        dkm1(node,2) = hbl(node) * ws * sig * (1.0_WP + sig * Gt)
+        dkm1(node,3) = hbl(node) * ws * sig * (1.0_WP + sig * Gs)
+        end if
+     END DO
+     !$ACC END PARALLEL LOOP
+#if defined (FESOM_PROFILING)
+     call fesom_profiler_end("kpp_blmix")
+     call fesom_profiler_start("kpp_enhance")
+#endif
+     !__________________________________________________________________________
+     ! enhance
+     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(k, delta, dkmp5, dstar)
+     DO node=1, myDim_nod2D
+        k     = kbl(node) - 1
+        delta = (hbl(node) + mesh%zbar_3d_n(k,node)) / (mesh%zbar_3d_n(k,node) - mesh%zbar_3d_n(k+1,node))
+        dkmp5 = caseA(node) * viscA(k,node)      &
+              + ( 1.0_WP - caseA(node) )    * blmc( k, node, 1 )
+        dstar = ( 1.0_WP - delta )**2 * dkm1( node, 1 ) + delta**2 * dkmp5
+        blmc( k, node, 1 ) = (1.0_WP - delta) * viscA(k,node)  &
+              + delta * dstar
+        dkmp5 = caseA(node) * diffK(k,node,1)  &
+              + ( 1.0_WP - caseA(node) ) * blmc( k, node, 2 )
+        dstar = ( 1.0_WP - delta )**2 * dkm1( node, 2 ) + delta**2 * dkmp5
+        blmc( k, node, 2 ) = ( 1.0_WP - delta ) * diffK( k, node, 1)  &
+             + delta * dstar
+        dkmp5 = caseA(node) * diffK(k,node,2)  &
+              + ( 1.0_WP - caseA(node) ) * blmc( k, node, 3 )
+        dstar = ( 1.0_WP - delta )**2 * dkm1( node, 3 ) + delta**2 * dkmp5
+        blmc( k, node, 3 ) = ( 1.0_WP - delta ) * diffK( k, node, 2 )  &
+             + delta * dstar
+        ghats(k,node) = (1.0_WP-caseA(node)) * ghats(k,node)
+     END DO
+     !$ACC END PARALLEL LOOP
+#if defined (FESOM_PROFILING)
+     call fesom_profiler_end("kpp_enhance")
+     call fesom_profiler_start("kpp_smooth_final")
+#endif
+     !__________________________________________________________________________
+     ! blmc smoothing (needs the halos), combination, exchanges, viscAE
+     if (smooth_blmc) then
+        if (partit%npes > 1) then
+           !$ACC UPDATE HOST(blmc)
+           call exchange_nod(blmc(:,:,1), partit)
+           call exchange_nod(blmc(:,:,2), partit)
+           call exchange_nod(blmc(:,:,3), partit)
+           !$ACC UPDATE DEVICE(blmc)
+        end if
+        do j=1, 3
+           call smooth_nod3D_acc(blmc(:,:,j), 3, partit, mesh)
+        end do
+     end if
+     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(nz, nzmin, nzmax)
+     DO node=1, myDim_nod2D
+        nzmin = mesh%ulevels_nod2D(node)
+        nzmax = mesh%nlevels_nod2D(node)
+        DO nz=nzmin+1,nzmax-1
+          IF (nz < kbl(node)) then
+             viscA(nz,node  ) = MAX(viscA(nz,node  ), blmc(nz,node,1))
+             diffK(nz,node,1) = MAX(diffK(nz,node,1), blmc(nz,node,2))
+             diffK(nz,node,2) = MAX(diffK(nz,node,2), blmc(nz,node,3))
+          ELSE
+             ghats(nz,node)=0.0_WP
+          ENDIF
+        END DO
+     END DO
+     !$ACC END PARALLEL LOOP
+     ! ghats and blmc stay on the device for the tracer diffusion (the caller brings
+     ! them back for the DVD diagnostic)
+     ! diffK (Kv_double) and viscAE (Av) stay on the device for mo_convect_acc, which
+     ! copies Kv and Av back; ghats is exchanged on the device
+     !$ACC UPDATE HOST(hbl, kbl, Bo, ustar, bfsfc, stable, caseA)
+     call exchange_nod(ghats, partit, luse_g2g=.true.)
+     if (partit%npes > 1) then
+        !$ACC UPDATE HOST(viscA)
+        call exchange_nod(viscA, partit)
+        !$ACC UPDATE DEVICE(viscA)
+     end if
+     minmix=3.0e-3_WP
+     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(n1, n2, n3, nz, nzmin, nzmax)
+     DO elem    = 1, myDim_elem2D
+        n1 = mesh%elem2D_nodes(1,elem)
+        n2 = mesh%elem2D_nodes(2,elem)
+        n3 = mesh%elem2D_nodes(3,elem)
+        nzmin   = mesh%ulevels(elem)
+        nzmax   = mesh%nlevels(elem)
+        DO nz=nzmin,nzmax-1
+           viscAE(nz, elem) = (viscA(nz, n1)+viscA(nz, n2)+viscA(nz, n3))/3.0_WP
+        END DO
+        viscAE( nzmax, elem ) = viscAE( nzmax-1, elem)
+        IF (viscAE(nzmin,elem) < minmix) viscAE(nzmin,elem) = minmix
+     END DO
+     !$ACC END PARALLEL LOOP
+#if defined (FESOM_PROFILING)
+     call fesom_profiler_end("kpp_smooth_final")
+#endif
+  END SUBROUTINE oce_mixing_KPP_acc
+#endif
 END MODULE o_mixing_KPP_mod

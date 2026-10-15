@@ -268,8 +268,13 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
 
     ! Limiter sums: each node gathers max(0, ±flux) / min(0, ±flux) over its incident edges
     ! (mesh%nod_in_edge2D with sign) in ascending edge order.
+    ! (also the OpenACC version without atomics: reproducible gather, no host round trip)
+#if !defined(ENABLE_OPENACC) || defined(DISABLE_OPENACC_ATOMICS)
 #ifndef ENABLE_OPENACC
 !$OMP DO
+#else
+    !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(k, edge, el, nl1, nu1, nl2, nu2, nu12, nl12, nz) VECTOR_LENGTH(acc_vl)
+#endif
     do n=1, partit%myDim_nod2D+partit%eDim_nod2D
        do k=1, mesh%nod_in_edge2D_num(n)
           edge=mesh%nod_in_edge2D(k,n)
@@ -344,11 +349,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
 #ifndef ENABLE_OPENACC
 !$OMP END DO
 #else
-#if !defined(DISABLE_OPENACC_ATOMICS)
     !$ACC END PARALLEL LOOP
-#else
-    !$ACC UPDATE DEVICE(fct_plus, fct_minus)
-#endif
 #endif
     !___________________________________________________________________________
     ! b2. Limiting factors

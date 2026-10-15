@@ -1222,6 +1222,7 @@ subroutine compute_dvd(mode, dynamics, tracers, partit, mesh)
         ! upper lower cell prism face and for tracer^n and tracer^(n+1)
         trflx_h   => tracers%work%dvd_trflx_hor( :,:,tr_num) ! horizontal advectiv tracer flux through mid edge face using AB tracer
         trflx_v   => tracers%work%dvd_trflx_ver( :,:,tr_num) ! vertical advectiv tracer flux 
+        !$ACC UPDATE HOST(tracers%data(tr_num)%valuesold) ! AB history is kept on the device
         trold     => tracers%data(tr_num)%valuesold(1, :, :) ! tracer^n
         tr        => tracers%data(tr_num)%values(:,:)        ! tracer^(n+1)
         if (.not. allocated(dump_ws)) allocate(dump_ws(size(tracers%work%del_ttf,1), size(tracers%work%del_ttf,2)))
