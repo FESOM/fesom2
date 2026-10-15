@@ -1681,7 +1681,7 @@ CONTAINS
 
       if (iost /= 0) then
           if (partit%mype == 0) write(*, *) 'ERROR: reading nam_rsbc from namelist.recom, iostat=', iost
-          call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+          call par_abort(partit%MPI_COMM_FESOM, partit%mype)
       end if
 
    END SUBROUTINE sbc_ini_recom
@@ -2127,7 +2127,7 @@ SUBROUTINE sbc_do_recom(partit, mesh)
     case default
         if (partit%mype==0) write(*, *) 'ERROR: fe_data_source = "', trim(fe_data_source), &
                 '" not supported. Use "Albani", "Mahowald_clim", "Mahowald" or "none".'
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)   ! or FESOM's usual abort call
+        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     end select
 
     ! ----------------------------------------------------------------
