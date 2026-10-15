@@ -85,7 +85,7 @@ module io_MEANDATA
   character(len=1), save         :: filesplit_freq='y'
   integer, save                  :: compression_level=0
   type io_entry
-        CHARACTER(len=15)        :: id        ='unknown   '
+        CHARACTER(len=35)        :: id        ='unknown   '
         INTEGER                  :: freq      =0
         CHARACTER                :: unit      =''
         INTEGER                  :: precision =0
@@ -2776,10 +2776,10 @@ CASE ('Silim_d              ')
 #endif
 
 ! =====================================================================
-! DIFFUSION AND ADVECTION of DIN, DIC & ALK
+! DIFFUSION AND ADVECTION of DIN, DIC & ALK & DSi
 ! =====================================================================
 
-! DIN 
+! DIN ----------------------------- 
 
 CASE ('DIN_hor_adv               ')
 ! horizontal advection
@@ -2835,7 +2835,7 @@ CASE ('DIN_recom_sms             ')
        call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIN_recom_sms', 'Recom SMS', '[mmol/m3]', tracers%work%tra_recom_sms(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     endif
 
-! DIC
+! DIC -----------------------------
 
 CASE ('DIC_hor_adv               ')
 ! horizontal advection
@@ -2891,7 +2891,7 @@ CASE ('DIC_recom_sms             ')
        call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_recom_sms', 'Recom SMS', '[mmol/m3]', tracers%work%tra_recom_sms(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     endif
 
-! ALK
+! Alk -----------------------------
 
 CASE ('Alk_hor_adv               ')
 ! horizontal advection
@@ -2941,6 +2941,67 @@ CASE ('Alk_recom_sms             ')
        call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'Alk_recom_sms', 'Recom SMS', '[mmol/m3]', tracers%work%tra_recom_sms(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     endif
 
+
+! DSi -----------------------------
+
+CASE ('DSi_hor_adv               ')
+! horizontal advection
+    if (use_REcoM) then
+       call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DSi_hor_adv', 'Horizontal advection part of dissolved Silicic Acid', '[mmol/m3]', tracers%work%tra_advhoriz(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('DSi_lo_hor_adv            ')
+! horizontal advection LO
+    if (use_REcoM) then
+       call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DSi_lo_hor_adv', 'LO Horizontal advection part of dissolved Silicic Acid', '[mmol/m3]', tracers%work%tra_advhoriz_LO(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('DSi_ver_adv               ')
+! vertical advection
+    if (use_REcoM) then
+       call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DSi_ver_adv', 'Vertical advection part of dissolved Silicic Acid', '[mmol/m3]', tracers%work%tra_advvert(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('DSi_lo_ver_adv            ')
+! vertical advection LO
+    if (use_REcoM) then
+       call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DSi_lo_ver_adv', 'LO Vertical advection part of dissolved Silicic Acid', '[mmol/m3]', tracers%work%tra_advvert_LO(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('DSi_tra_diff_part_hor_redi')
+! horizontal diffusion
+    if (use_REcoM) then
+       call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DSi_tra_diff_part_hor_redi', 'Horizontal diffusion of dissolved Silicic Acid (includes Redi diffusivity if Redi=.true.)', '[mmol/m3]', tracers%work%tra_diff_part_hor_redi(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('DSi_tra_diff_part_ver_expl')
+! vertical diffusion (Explicit)
+    if (use_REcoM) then
+       call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DSi_tra_diff_part_ver_expl', 'Vertical diffusion of dissolved Silicic Acid (Explicit)', '[mmol/m3]', tracers%work%tra_diff_part_ver_expl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('DSi_tra_diff_part_ver_redi_expl')
+! projection of horizontal Redi diffussivity onto vertical
+    if (use_REcoM) then
+       call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DSi_tra_diff_part_ver_redi_expl', 'Projection of horizontal Redi diffussivity onto vertical for dissolved Silicic Acid (Explicit)', '[mmol/m3]', tracers%work%tra_diff_part_ver_redi_expl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('DSi_tra_diff_part_ver_impl')
+! vertical diffusion (Implicit)
+    if (use_REcoM) then
+       call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DSi_tra_diff_part_ver_impl', 'Vertical diffusion of dissolved Silicic Acid (Implicit)', '[mmol/m3]', tracers%work%tra_diff_part_ver_impl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('DSi_recom_sms             ')
+! recom_sms
+    if (use_REcoM) then
+       call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DSi_recom_sms', 'Recom SMS', '[mmol/m3]', tracers%work%tra_recom_sms(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+
+! =====================================================================
+! OTRACERS
+! =====================================================================
 
 CASE ('otracers  ')
     do j=3, tracers%num_tracers
@@ -3060,43 +3121,6 @@ CASE ('otracers  ')
          if (use_REcoM) then
          call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DSi', 'DSi', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
          endif
-
-
-            if (tracers%data(j)%ltra_diag) then
-               ! horizontal advection
-               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DSi_hor_adv', 'Horizontal advection part of dissolved Silicic Acid', '[mmol/m3]', tracers%work%tra_advhoriz(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-                ! horizontal advection LO
-               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DSi_lo_hor_adv', 'LO Horizontal advection part of dissolved Silicic Acid', '[mmol/m3]', tracers%work%tra_advhoriz_LO(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
-               ! vertical advection
-               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DSi_ver_adv', 'Vertical advection part of dissolved Silicic Acid', '[mmol/m3]', tracers%work%tra_advvert(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
-               ! vertical advection LO
-               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DSi_lo_ver_adv', 'LO Vertical advection part of dissolved Silicic Acid', '[mmol/m3]', tracers%work%tra_advvert_LO(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
-               ! horizontal diffusion
-               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DSi_tra_diff_part_hor_redi', 'Horizontal diffusion of dissolved Silicic Acid (includes Redi diffusivity if Redi=.true.)', '[mmol/m3]', tracers%work%tra_diff_part_hor_redi(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
-               if (tracers%data(j)%i_vert_diff) then
-               ! vertical diffusion (Explicit)
-                   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DSi_tra_diff_part_ver_expl', 'Vertical diffusion of dissolved Silicic Acid (Explicit)', '[mmol/m3]', tracers%work%tra_diff_part_ver_expl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-               end if
-
-               ! projection of horizontal Redi diffussivity onto vertical
-               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DSi_tra_diff_part_ver_redi_expl', 'Projection of horizontal Redi diffussivity onto vertical for dissolved Silicic Acid (Explicit)', '[mmol/m3]', tracers%work%tra_diff_part_ver_redi_expl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
-               ! vertical diffusion (Implicit)
-               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DSi_tra_diff_part_ver_impl', 'Vertical diffusion of dissolved Silicic Acid (Implicit)', '[mmol/m3]', tracers%work%tra_diff_part_ver_impl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
-               ! recom_sms
-               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DSi_recom_sms', 'Recom SMS', '[mmol/m3]', tracers%work%tra_recom_sms(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-            end if
-
-
-
-
-
-
 
       else if (tracers%data(j)%ID==1019) then
          if (use_REcoM) then

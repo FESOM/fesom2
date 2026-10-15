@@ -22,7 +22,7 @@ set(OASIS_WITH_YAC      OFF CACHE BOOL "Useing a version of OASIS compiled with 
 set(ASYNC_ICEBERGS      ON  CACHE BOOL "compile fesom with or without support for asynchronous iceberg computations")
 set(VERBOSE             OFF CACHE BOOL "toggle debug output")
 #add_subdirectory(oasis3-mct/lib/psmile)
-add_subdirectory(src)
+add_subdirectory(src/)
 
 foreach( _file fesom-config.cmake fesom-config-version.cmake fesom-targets.cmake )
   execute_process( COMMAND ${CMAKE_COMMAND} -E create_symlink ${PROJECT_BINARY_DIR}/src/${_file} ${PROJECT_BINARY_DIR}/${_file}  )
