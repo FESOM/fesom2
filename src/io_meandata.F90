@@ -72,7 +72,7 @@ module io_MEANDATA
 !
 !--------------------------------------------------------------------------------------------
 !
-  type(Meandata), save, target   :: io_stream(250) ! todo: find a way to increase the array withhout move_alloc to keep the derived types in Meandata intact
+  type(Meandata), save, target   :: io_stream(300) ! todo: find a way to increase the array withhout move_alloc to keep the derived types in Meandata intact
   integer, save                  :: io_NSTREAMS=0
   real(kind=WP)                  :: ctime !current time in seconds from the beginning of the year
 !
@@ -2307,6 +2307,7 @@ CASE ('grazmacro_det3D        ')
    if (use_REcoM) then
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'grazmacro_det3D', 'Grazing flux of Macrozooplankton on small Detritus', 'mmolC/(m2d)', grazmacro_det3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
    endif
+
 CASE ('grazmacro_det23D        ')
     ! =====================================================================
     ! Variable: grazmacro_det23D
