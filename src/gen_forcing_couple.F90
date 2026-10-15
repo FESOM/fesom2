@@ -501,10 +501,6 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
      prec_rain(n) = atmdata(i_prec ,n)/1000._WP
      prec_snow(n) = atmdata(i_snow ,n)/1000._WP
      
-     if (l_snow) then
-        prec_rain(n) = max(prec_rain(n) - prec_snow(n), 0.0_WP)
-     end if
-
      if (l_mslp) then
         press_air(n) = atmdata(i_mslp ,n) ! unit should be Pa
      end if
