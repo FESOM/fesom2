@@ -32,54 +32,44 @@ num_tracers = 100         ! number of tracers to allocate (must be ≥ actual nu
 !101 , 'UPW1'  , 'UPW1'    , 'NON ' , 0.      , 0.            ! example passive tracer
 &tracer_list
 nml_tracer_list =
-1  ,   'MFCT',       'QR4C',       'FCT ',        1.,          1., 
-2  ,   'MFCT',       'QR4C',       'FCT ',        1.,          1.,
-1001,  'MFCT',       'QR4C',       'FCT ',        1.,          1.,
-1002,  'MFCT',       'QR4C',       'FCT ',        1.,          1.,
-1003,  'MFCT',       'QR4C',       'FCT ',        1.,          1.,
-1004,  'MFCT',       'QR4C',       'FCT ',        1.,          1.,
-1005,  'MFCT',       'QR4C',       'FCT ',        1.,          1.,
-1006,  'MFCT',       'QR4C',       'FCT ',        1.,          1.,
-1007,  'MFCT',       'QR4C',       'FCT ',        1.,          1.,
-1008,  'MFCT',       'QR4C',       'FCT ',        1.,          1.,
-1009,  'MFCT',       'QR4C',       'FCT ',        1.,          1.,
-1010,  'MFCT',       'QR4C',       'FCT ',        1.,          1.,
-1011,  'MFCT',       'QR4C',       'FCT ',        1.,          1.,
-1012,  'MFCT',       'QR4C',       'FCT ',        1.,          1.,
-1013,  'MFCT',       'QR4C',       'FCT ',        1.,          1.,
-1014,  'MFCT',       'QR4C',       'FCT ',        1.,          1.,
-1015,  'MFCT',       'QR4C',       'FCT ',        1.,          1.,
-1016,  'MFCT',       'QR4C',       'FCT ',        1.,          1.,
-1017,  'MFCT',       'QR4C',       'FCT ',        1.,          1.,
-1018,  'MFCT',       'QR4C',       'FCT ',        1.,          1.,
-1019,  'MFCT',       'QR4C',       'FCT ',        1.,          1.,
-1020,  'MFCT',       'QR4C',       'FCT ',        1.,          1.,
-1021,  'MFCT',       'QR4C',       'FCT ',        1.,          1.,
-1022,  'MFCT',       'QR4C',       'FCT ',        1.,          1.,
-1037,  'MFCT',       'QR4C',       'FCT ',        1.,          1.,
-!1023, 'MFCT',       'QR4C',       'FCT ',        1.,          1.,
-!1024, 'MFCT',       'QR4C',       'FCT ',        1.,          1.,
-!1025, 'MFCT',       'QR4C',       'FCT ',        1.,          1.,
-!1026, 'MFCT',       'QR4C',       'FCT ',        1.,          1.,
-!1027, 'MFCT',       'QR4C',       'FCT ',        1.,          1.,
-!1028, 'MFCT',       'QR4C',       'FCT ',        1.,          1.,
-!1029, 'MFCT',       'QR4C',       'FCT ',        1.,          1.,
-!1030, 'MFCT',       'QR4C',       'FCT ',        1.,          1.,
-!1031, 'MFCT',       'QR4C',       'FCT ',        1.,          1.,
-!1032, 'MFCT',       'QR4C',       'FCT ',        1.,          1.,
-!1033, 'MFCT',       'QR4C',       'FCT ',        1.,          1.,
-!101, 'UPW1',       'UPW1',       'NON ',        0.,          0.
+1  ,   'MFCT',       'QR4C',       'FCT ',        0.,          1., 
+2  ,   'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1001,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1002,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1003,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1004,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1005,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1006,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1007,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1008,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1009,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1010,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1011,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1012,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1013,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1014,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1015,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1016,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1017,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1018,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1019,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1020,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1021,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1022,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1037,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
 /
 
 ! ============================================================================
 ! 3D TRACER INITIAL CONDITIONS (OCEAN)
 ! ============================================================================
 &tracer_init3d
-n_ic3d   = 8  ! number of 3D tracers to initialize from files
-idlist   = 1019, 1022, 1018, 1003, 1002, 1001, 2, 1 ! tracer IDs to initialize (1=temperature, 2=salinity)
-filelist = 'fe_pisces_opa_eq_init_3D_changed_name.nc', 'woa18_all_o00_01_mmol_fesom2.nc', 'woa13_all_i00_01_fesom2.nc', 'GLODAPv2.2016b.TAlk_fesom2_mmol_fix_z_Fillvalue.nc', 'GLODAPv2.2016b.TCO2_fesom2_mmol_fix_z_Fillvalue.nc', 'woa13_all_n00_01_fesom2.nc', 'phc3.0_winter.nc', 'phc3.0_winter.nc' ! netCDF files in ClimateDataPath (one per tracer)
-varlist  = 'Fe', 'oxygen_mmol', 'i_an', 'TAlk_mmol', 'TCO2_mmol', 'n_an', 'salt', 'temp' ! variable names in the netCDF files
+n_ic3d   = 9                                       ! number of 3D tracers to initialize from files
+idlist   = 1019, 1022, 1018, 1003, 1002, 1001, 2, 1, 1037 ! their IDs (0 is temperature, 1 is salinity, etc.). The reading order is defined here!
+filelist = 'fe_pisces_opa_eq_init_3D_changed_name.nc', 'woa18_all_o00_01_mmol_fesom2.nc', 'woa13_all_i00_01_fesom2.nc', 'GLODAPv2.2016b.TAlk_fesom2_mmol_fix_z_Fillvalue.nc', 'GLODAPv2.2016b.PI_TCO2_fesom2_mmol_fix_z_Fillvalue.nc', 'woa13_all_n00_01_fesom2.nc', 'phc3.0_winter.nc', 'phc3.0_winter.nc', 'dicremin_fromAnnualAOU_WOA2023_noneg.nc' ! list of files in ClimateDataPath to read (one file per tracer), same order as idlist
+varlist  = 'Fe', 'oxygen_mmol', 'i_an', 'TAlk_mmol', 'PI_TCO2_mmol', 'n_an', 'salt', 'temp', 'DICremin'                 ! variable names in the netCDF files
 t_insitu = .true.                                  ! if true, convert in-situ temperature to potential temperature
+ic_extrap_det = .false.                            ! deterministic decomposition-independent hole filling (default: historical fill, bit-for-bit)
+ic_extrap_tol = 1.e-3                              ! relaxation tolerance of the deterministic fill (used only with ic_extrap_det=.true.)
 /
 
 ! ============================================================================
@@ -106,6 +96,7 @@ gamma2_tra    = 0.            ! additional biharmonic diffusion coefficient [dim
 
 ! --- Vertical Diffusion and Time Stepping ---
 i_vert_diff   = .true.        ! use implicit vertical diffusion (recommended for stability)
+AB_order      = 2             ! Adams-Bashforth time stepping order (2 or 3)
 ltra_diag     = .false.       ! per-tracer diagnostics in the advection (extra cost)
 /
 
@@ -114,7 +105,7 @@ ltra_diag     = .false.       ! per-tracer diagnostics in the advection (extra c
 ! ============================================================================
 &tracer_phys
 ! --- Monin-Obukhov Mixing (TB04) ---
-use_momix          = .true.            ! enable Monin-Obukhov mixing (Timmermann & Beckmann 2004)
+use_momix          = .false.           ! enable Monin-Obukhov mixing (Timmermann & Beckmann 2004)
 momix_lat          = -50.0             ! latitude threshold for TB04 [degrees] (90 = global, -50 = south of 50°S)
 momix_kv           = 0.01              ! mixing coefficient within MO length [m²/s]
 
@@ -133,7 +124,7 @@ diff_sh_limit      = 5.0e-3            ! maximum diffusivity due to shear instab
 ! --- Background Diffusivity ---
 Kv0_const          = .true.            ! use constant background vertical diffusivity
 K_ver              = 1.0e-5            ! background vertical diffusivity [m²/s]
-K_hor              = 3000.             ! background horizontal diffusivity [m²/s]
+K_hor              = 0.                ! background horizontal diffusivity [m²/s]
 
 ! --- Double Diffusion (KPP) ---
 double_diffusion   = .false.           ! enable double diffusion parameterization (for KPP)
