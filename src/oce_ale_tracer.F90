@@ -2333,9 +2333,61 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
       call par_abort(partit%MPI_COMM_FESOM, partit%mype)
       stop
   END SELECT
+#if defined(__recom)
+  if (id > 1000 .and. id < 1100) call recom4_dump_bc(n, id, bc_surface)
+#endif
   RETURN
 END FUNCTION
-
+#if defined(__recom)
+!===============================================================================
+! RECOM4 reference dump: the surface boundary condition of a REcoM tracer,
+! split into the terms recom4_step receives (own, virtual, restoring, river,
+! erosion; per second), plus FESOM's bc_surface. Same terms and factors as in
+! bc_surface above; MEDUSA loopback is not recorded (not in RECOM4 v1).
+!===============================================================================
+subroutine recom4_dump_bc(n, id, bc)
+  use recom4_dump, only: recom4_dump_surface
+  implicit none
+  integer,       intent(in) :: n, id
+  real(kind=WP), intent(in) :: bc
+  real(kind=WP)             :: t(6)   ! own, virtual, restoring, river, erosion, bc_surface
+ 
+  t = 0.0_WP
+  SELECT CASE (id)
+    CASE (1001) ! DIN
+      t(1) = AtmNInput(n)
+      t(2) = virtual_din(n)
+      t(4) = RiverDIN2D(n) * is_riverinput
+      t(5) = ErosionTON2D(n) * is_erosioninput
+    CASE (1002) ! DIC
+      t(1) = GloCO2flux_seaicemask(n)
+      t(2) = virtual_dic(n)
+      t(4) = RiverDIC2D(n) * is_riverinput
+      t(5) = ErosionTOC2D(n) * is_erosioninput
+    CASE (1003) ! Alk
+      t(2) = virtual_alk(n)
+      t(3) = relax_alk(n)
+      t(4) = RiverAlk2D(n) * is_riverinput
+    CASE (1011) ! DON
+      t(4) = RiverDON2D(n) * is_riverinput
+    CASE (1012) ! DOC
+      t(4) = RiverDOC2D(n) * is_riverinput
+    CASE (1018) ! DSi
+      t(2) = virtual_dsi(n)
+      t(4) = RiverDSi2D(n) * is_riverinput
+      t(5) = ErosionTSi2D(n) * is_erosioninput
+    CASE (1019) ! DFe
+      t(1) = AtmFeInput(n)
+      t(2) = virtual_dfe(n)
+      if (useRivFe) t(4) = RiverFe(n)
+    CASE (1022) ! O2
+      t(1) = GloO2flux_seaicemask(n)
+      t(2) = virtual_oxy(n)
+  END SELECT
+  t(6) = bc
+  call recom4_dump_surface(n, mstep, id, t)
+end subroutine recom4_dump_bc
+#endif
 !===============================================================================
 ! This function returns a boundary conditions for a specified transient tracer ID and surface node.
 ! Different to function bc_surface, SST, SSS, and sea ice concentrations are always needed as
