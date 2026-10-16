@@ -618,7 +618,10 @@ end subroutine solve_tracers_ale
 !
 !===============================================================================
 subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
-
+#if defined(__recom)
+    use recom4_dump, only: recom4_dump_transport_in, recom4_dump_transport_bf, &
+            recom4_dump_transport_sink
+#endif
     implicit none
     integer       , intent(in)   , target :: tr_num
     type(t_dyn)   , intent(inout), target :: dynamics
@@ -730,6 +733,15 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
 ! 1) Remineralization from the benthos
 !    Nutrient fluxes come from the bottom boundary
 !    Unit [mmol/m2/s]
+! RECOM4 reference dump: what the REcoM part of the tracer step receives
+if (any(recom_remin_tracer_id == tracers%data(tr_num)%ID) .or. &
+    any(recom_sinking_tracer_id == tracers%data(tr_num)%ID)) then
+    call recom4_dump_transport_in(tracers%data(tr_num)%ID, mstep, dt, &
+            mesh%ulevels_nod2D, mesh%nlevels_nod2D, mesh%nod_in_elem2D_num, &
+            mesh%nod_in_elem2D, mesh%nlevels, mesh%elem_area, mesh%area, mesh%areasvol, &
+            mesh%hnode, mesh%hnode_new, mesh%zbar_3d_n, mesh%z_3d_n, mesh%geo_coord_nod2D, &
+            tracers%data(1)%values, tracers%data(2)%values, tracers%data(tr_num)%values)
+end if
 
 if (any(recom_remin_tracer_id == tracers%data(tr_num)%ID)) then
 
@@ -751,6 +763,8 @@ if (any(recom_remin_tracer_id == tracers%data(tr_num)%ID)) then
         tracers%data(tr_num)%values(nzmin:nzmax,n)=tracers%data(tr_num)%values(nzmin:nzmax,n)+ &
                                                 dtr_bf(nzmin:nzmax,n)
         end do
+        call recom4_dump_transport_bf(tracers%data(tr_num)%ID, mstep, &
+                mesh%ulevels_nod2D, mesh%nlevels_nod2D, dtr_bf, tracers%data(tr_num)%values)
 end if
 
 ! 2) Sinking in water column
@@ -831,6 +845,9 @@ if (any(recom_sinking_tracer_id == tracers%data(tr_num)%ID)) then
         tracers%data(tr_num)%values(nzmin:nzmax,n)=tracers%data(tr_num)%values(nzmin:nzmax,n)+ &
                                                 str_bf(nzmin:nzmax,n)
         end do
+        call recom4_dump_transport_sink(tracers%data(tr_num)%ID, mstep, &
+                mesh%ulevels_nod2D, mesh%nlevels_nod2D, vert_sink, str_bf, &
+                tracers%data(tr_num)%values)
 endif
 #endif
     !___________________________________________________________________________
