@@ -2046,6 +2046,7 @@ CASE ('dMOC      ')
        call def_stream((/std_dens_N, mesh%elem2D/),  (/std_dens_N, partit%myDim_elem2D/), 'std_frwt_flux',  'FW bouyancy flux      ', 'm^3/s' ,std_dens_flux, 3,   io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
        call def_stream((/std_dens_N, mesh%nod2D /),  (/std_dens_N,  partit%myDim_nod2D/), 'std_dens_DIV',   'm3/s',                   'm3/s'   ,std_dens_DIV(:,:),      io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
        if (Fer_GM) call def_stream((/std_dens_N, mesh%nod2D /),  (/std_dens_N,  partit%myDim_nod2D/), 'std_dens_DIVbolus',   'm3/s',  'm3/s'   ,std_dens_DIV_fer(:,:),  io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+       call def_stream((/std_dens_N, mesh%elem2D/),  (/std_dens_N, partit%myDim_elem2D/), 'std_dens_H'    , 'density thickness'     , 'm'     , std_dens_H(:,:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
        call def_stream((/mesh%nl-1,       mesh%nod2D /),  (/mesh%nl-1,       partit%myDim_nod2D /), 'density_dMOC',   'density'               , 'kg/m3',      density_dmoc(:,:),      io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
        call def_stream(mesh%elem2D,                                partit%myDim_elem2D  , 'density_flux_e', 'density flux at elems ', 'm/s',      dens_flux_e(:),         io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
        if (ldiag_diapmix) then
@@ -2466,6 +2467,7 @@ END DO ! --> DO i=1, io_listsize
        call def_stream((/std_dens_N, mesh%elem2D/),  (/std_dens_N, partit%myDim_elem2D/), 'std_frwt_flux',  'FW bouyancy flux      ', 'm^3/s' ,std_dens_flux, 3,   1, 'y', i_real4, partit, mesh)
        call def_stream((/std_dens_N, mesh%nod2D /),  (/std_dens_N,  partit%myDim_nod2D/), 'std_dens_DIV',   'm3/s',                   'm3/s'   ,std_dens_DIV(:,:),      1, 'y', i_real4, partit, mesh)
        if (Fer_GM) call def_stream((/std_dens_N, mesh%nod2D /),  (/std_dens_N,  partit%myDim_nod2D/), 'std_dens_DIVbolus',   'm3/s',                   'm3/s'   ,std_dens_DIV_fer(:,:),  1, 'y', i_real4, partit, mesh)
+       call def_stream((/std_dens_N, mesh%elem2D/),  (/std_dens_N, partit%myDim_elem2D/), 'std_dens_H'    , 'density thickness'     , 'm'     , std_dens_H(:,:),        1, 'y', i_real4, partit, mesh)
        call def_stream((/mesh%nl-1,       mesh%nod2D /),  (/mesh%nl-1,       partit%myDim_nod2D /), 'density_dMOC',   'density'               , 'kg/m3',      density_dmoc(:,:),      1, 'y', i_real4, partit, mesh)
        call def_stream(mesh%elem2D,                                partit%myDim_elem2D  , 'density_flux_e', 'density flux at elems ', 'm/s',      dens_flux_e(:),         1, 'y', i_real4, partit, mesh)
        if (ldiag_diapmix) then
