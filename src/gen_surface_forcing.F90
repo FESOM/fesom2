@@ -110,8 +110,10 @@ MODULE g_sbf
    real(wp),                save   :: chl_const            = 0.1
 
 #if defined (__recom)
-   character(10),           save   :: fe_data_source       ='Albani'
+   character(16),           save   :: fe_data_source       ='Albani'
    character(len=MAX_PATH), save   :: nm_fe_data_file      ='DustClimMonthlyAlbani.nc'
+   character(len=MAX_PATH), save   :: nm_fe_data_file_mahowald_clim ='DustClimMonthlyMahowald.nc'
+   character(len=MAX_PATH), save   :: nm_fe_data_file_mahowald      ='DustMonthlyMahowald.nc'
 
    character(len=MAX_PATH), save   :: nm_aen_data_file     ='AeolianNitrogenDep.nc '
 
@@ -1210,10 +1212,10 @@ CONTAINS
                         chl_data_source, nm_chl_data_file, chl_const, use_runoff_mapper, runoff_basins_file, runoff_radius, &
                         use_ocean_only_forcing, nm_ocean_mask_file, nm_ocean_mask_var, ocean_mask_threshold
 
-!#if defined(__recom)
-!      namelist /nam_rsbc/ fe_data_source, nm_fe_data_file, nm_aen_data_file, nm_river_data_file, nm_erosion_data_file, nm_co2_data_file
-!#endif
-
+!#include "associate_part_def.h"
+!#include "associate_mesh_def.h"
+!#include "associate_part_ass.h"
+!#include "associate_mesh_ass.h"
 
       ! OPEN and read namelist for SBC
       open(unit=nm_sbc_unit, file='namelist.forcing', action='read', form='formatted', access='sequential', status='old', iostat=iost )
@@ -1648,7 +1650,8 @@ CONTAINS
       type(t_partit), intent(inout), target :: partit
       integer            :: iost  ! I/O status
 
-      namelist /nam_rsbc/ fe_data_source, nm_fe_data_file, nm_aen_data_file, &
+      namelist /nam_rsbc/ fe_data_source, nm_fe_data_file, nm_fe_data_file_mahowald_clim, &
+                          nm_fe_data_file_mahowald, nm_aen_data_file, &
                            nm_river_data_file, nm_erosion_data_file, nm_co2_data_file
 
       ! OPEN and read namelist for SBC REcoM
@@ -1675,6 +1678,12 @@ CONTAINS
 
       READ( nm_sbc_unit+1, nml=nam_rsbc, iostat=iost )
       close( nm_sbc_unit+1 )
+
+      if (iost /= 0) then
+          if (partit%mype == 0) write(*, *) 'ERROR: reading nam_rsbc from namelist.recom, iostat=', iost
+          call par_abort(partit%MPI_COMM_FESOM, partit%mype)
+      end if
+
    END SUBROUTINE sbc_ini_recom
 #endif
 
@@ -1926,6 +1935,9 @@ SUBROUTINE sbc_do_recom(partit, mesh)
     integer                   :: n_lb
     integer, dimension(2)     :: istart, icount
     real(kind=8)              :: total_runoff
+    integer                   :: iyear
+    character(len=32)         :: varname
+
     type(t_partit), intent(inout), target :: partit
     type(t_mesh),   intent(in),    target :: mesh
 
@@ -1992,7 +2004,7 @@ SUBROUTINE sbc_do_recom(partit, mesh)
         if (partit%my_fesom_group==0) then
 #endif
 
-            if (partit%mype==0) write(*,*) 'Updating CO2 climatology for month       ', i,' from ', trim(filename)
+            if (partit%mype==0) write(*,*) 'Updating CO2 climatology from ', trim(filename)
 #if defined(__usetp)
         endif !(partit%my_fesom_group==0) then
 #endif
@@ -2061,31 +2073,62 @@ SUBROUTINE sbc_do_recom(partit, mesh)
 
     ! ----------------------------------------------------------------
     !  Iron (Fe) deposition
+    !   fe_data_source = 'Albani'        : Albani monthly climatology
+    !                  = 'Mahowald_clim' : Mahowald monthly climatology
+    !                  = 'Mahowald'      : Mahowald interannual for 1979-2008,
+    !                                      Mahowald climatology outside that range
+    !                  = 'none'          : no dust iron (GloFeDust stays 0)
     ! ----------------------------------------------------------------
-    if (fe_data_source=='Albani') then
+    select case (trim(fe_data_source))
+    case ('Albani', 'Mahowald_clim', 'Mahowald')
         if (update_monthly_flag) then
+            ! month (and year) to load: the current one at the first step, else the next
             i=month
+            iyear = yearnew
             if (mstep > 1) i=i+1
-            if (i > 12) i=1
-            filename=trim(make_clim_path(nm_fe_data_file))
+            if (i > 12) then
+                i = 1
+                iyear = yearnew + 1      ! December -> January of the next year
+            end if
+
+            select case (trim(fe_data_source))
+            case ('Albani')
+                filename = trim(make_clim_path(nm_fe_data_file))
+                varname  = 'DustClim'
+            case ('Mahowald_clim')
+                filename = trim(make_clim_path(nm_fe_data_file_mahowald_clim))
+                varname  = 'DustClim'
+            case ('Mahowald')
+                if (iyear < 1979 .or. iyear > 2008) then
+                    ! no interannual data for this year: fall back to the climatology
+                    filename = trim(make_clim_path(nm_fe_data_file_mahowald_clim))
+                    varname  = 'DustClim'
+                else
+                    filename = trim(make_clim_path(nm_fe_data_file_mahowald))
+                    write(varname, '(a,i4.4)') 'Dust', iyear
+                end if
+            end select
+
 #if defined(__usetp)
         if (partit%my_fesom_group==0) then
 #endif 
-            if (partit%mype==0) write(*,*) 'Updating iron climatology for month       ', i,' from ', trim(filename)
+            if (partit%mype==0) write(*, *) 'Updating iron deposition (', trim(fe_data_source), &
+                    ') for month ', i, ' variable ', trim(varname), ' from ', trim(filename)
+
 #if defined(__usetp)
         endif
 #endif
-            call read_2ddata_on_grid_NetCDF(filename,'DustClim', i, GloFeDust, partit, mesh)
+            call read_2ddata_on_grid_NetCDF(filename, trim(varname), i, GloFeDust, partit, mesh)
         end if
-    else
-#if defined(__usetp)
-        if (partit%my_fesom_group==0) then
-#endif 
-        if (partit%mype==0) write(*,*) 'Albani is switched off --> Check namelist.recom'
-#if defined(__usetp)
-        endif
-#endif
-    end if
+
+    case ('none')
+        ! dust iron deliberately off: GloFeDust keeps its initial value 0
+
+    case default
+        if (partit%mype==0) write(*, *) 'ERROR: fe_data_source = "', trim(fe_data_source), &
+                '" not supported. Use "Albani", "Mahowald_clim", "Mahowald" or "none".'
+        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
+    end select
 
     ! ----------------------------------------------------------------
     !  Nitrogen (N) deposition
@@ -2142,7 +2185,7 @@ SUBROUTINE sbc_do_recom(partit, mesh)
             i=month
             if (mstep > 1) i=i+1
             if (i > 12) i=1
-            filename=trim(nm_river_data_file)
+            filename=trim(make_clim_path(nm_river_data_file))
 #if defined(__usetp)
         if (partit%my_fesom_group==0) then
 #endif
@@ -2167,7 +2210,7 @@ SUBROUTINE sbc_do_recom(partit, mesh)
             call read_2ddata_on_grid_NetCDF(filename, 'DON', i, RiverDON2D, partit, mesh)
             ! write(*,*) mype, 'RiverDON2D', maxval(RiverDON2D(:)), minval(RiverDON2D(:))     
 
-            RiverDSi2D = RiverDIN2D * (16/15)
+            RiverDSi2D = RiverDIN2D * (16.0_WP / 15.0_WP)
         end if
     else
         is_riverinput = 0.0d0
@@ -2211,7 +2254,7 @@ SUBROUTINE sbc_do_recom(partit, mesh)
             i=month
             if (mstep > 1) i=i+1
             if (i > 12) i=1
-            filename=trim(nm_erosion_data_file)
+            filename=trim(make_clim_path(nm_erosion_data_file))
 #if defined(__usetp)
         if (partit%my_fesom_group==0) then
 #endif

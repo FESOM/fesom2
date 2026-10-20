@@ -37,9 +37,9 @@ module gen_forcing_couple_module
 #elif defined(__yac)
   use cpl_yac_driver
 #endif
-#if defined(__recom) && defined(__usetp)
-  use g_config, only: num_fesom_groups
-#endif
+!#if defined(__recom) && defined(__usetp)
+!  use g_config, only: num_fesom_groups
+!#endif
 
     implicit none
 
