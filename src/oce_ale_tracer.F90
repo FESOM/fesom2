@@ -289,6 +289,15 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     request_count = 0
 #endif
 
+#if defined(__recom)
+    ! CMIP7 sinking diagnostics (REcoM ExpFlux, BotFlux) are rates of this time step,
+    ! summed over the tracers in ver_sinking_recom and ver_sinking_recom_benthos below
+    if (Diags) then
+        ExpFlux = 0.0_WP
+        BotFlux = 0.0_WP
+    end if
+#endif
+
 #if defined(__recom) && defined(__usetp)
     do tr_num = tr_num_start, tr_num_end
 #else
@@ -523,6 +532,15 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 !            Sinkingvel1(:,:) = Sinkingvel1(:,:) + Sinkvel1_tr(:, :, tr_num)
 !            Sinkingvel2(:,:) = Sinkingvel2(:,:) + Sinkvel2_tr(:, :, tr_num)
         end do
+
+! Each tracer is stepped in one FESOM group only, so the sinking diagnostics hold the
+! contributions of this group's tracers: sum them over the groups
+        if (Diags .and. num_fesom_groups > 1) then
+            call MPI_Allreduce(MPI_IN_PLACE, ExpFlux, size(ExpFlux), MPI_WP, MPI_SUM, &
+                               partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%MPIerr)
+            call MPI_Allreduce(MPI_IN_PLACE, BotFlux, size(BotFlux), MPI_WP, MPI_SUM, &
+                               partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%MPIerr)
+        end if
 #endif
 
     !___________________________________________________________________________
