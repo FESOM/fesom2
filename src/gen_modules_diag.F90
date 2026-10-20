@@ -1820,9 +1820,16 @@ subroutine dvd_add_advflux_ver(do_SDdvd, tr_num, dvd_tot, trflx_v, Wvel, trstar,
             ! surface and bulk dvd, bulk xchi 
             do nz=nu1+1,nl1-1
                 
-                ! compute trstar on zlev interface
-                !PStrstar_zlev = 0.5_WP*(trstar(nz-1, node)+trstar(nz, node))
-                trstar_zlev = (trstar(nz-1, node)*mesh%hnode(nz-1, node)+trstar(nz, node)*mesh%hnode(nz, node))/(mesh%hnode(nz-1,node)+mesh%hnode(nz,node))
+                ! trstar on zlev interface: must be the SIMPLE mean, also on an
+                ! uneven vertical grid. It is not an interpolation of Tstar to the
+                ! interface but follows from the variance budget of the two cells
+                ! sharing the face (continuity term T^2*dV/dt):
+                !   Tstar_(k-1)^2 - Tstar_k^2 = (Tstar_(k-1)+Tstar_k)*(Tstar_(k-1)-Tstar_k)
+                ! --> Xchi = 2*U*(T^tilde - 0.5*(Tstar_(k-1)+Tstar_k))*(Tstar_(k-1)-Tstar_k)
+                ! (Banerjee et al. 2024). Grid spacing enters only via T^tilde.
+                ! A layer-thickness-weighted mean adds a spurious, non-dissipative
+                ! term ~ W*(Tstar_(k-1)-Tstar_k)^2*(h_(k-1)-h_k)/(h_(k-1)+h_k)
+                trstar_zlev = 0.5_WP*(trstar(nz-1, node)+trstar(nz, node))
                 
                 ! --> here we are on full depth levels eq. 26 for small dt
                 xchi(nz) = 2.0_WP*(-trflx_v(nz, node))*(trstar(nz-1, node)-trstar(nz, node))
