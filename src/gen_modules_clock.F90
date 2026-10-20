@@ -9,7 +9,8 @@ module g_clock
   real(kind=WP)            :: timeold, timenew     !time in a day, unit: sec
   integer                  :: dayold, daynew       !day in a year
   integer                  :: yearold, yearnew     !year before and after time step
-  integer                  :: yearstart            !year when simulation started
+  integer                  :: yearstart            !year in which the current run (leg) started
+  integer                  :: yearinit             !year in which the experiment started (yearnew of &clockinit)
   integer                  :: month, day_in_month  !month and day in a month
   integer                  :: fleapyear            !1 fleapyear, 0 not 
   integer                  :: ndpyr                !number of days in yearnew 
@@ -82,6 +83,11 @@ contains
     integer                               :: file_unit
     character(512)                        :: errmsg
  
+    ! at this point yearnew still holds the value of &clockinit in namelist.config:
+    ! the first year of the experiment. The clock file read below replaces it by
+    ! the current date.
+    yearinit=yearnew
+
     ! init clock for this run - read clock file FIRST
     open(newunit=file_unit, file=trim(RestartInPath)//trim(runid)//'.clock', action='read', &
         status='old', iostat=ierr, iomsg=errmsg)
@@ -110,8 +116,9 @@ contains
     else
        r_restart=.true.
     end if
-!   For simulations with transient tracer input data
-    if (use_transit) ti_transit = yearnew - yearstart + ti_start_transit
+!   For simulations with transient tracer input data: the index into the input
+!   file counts from the start of the experiment, not from the start of this leg
+    if (use_transit) ti_transit = yearnew - yearinit + ti_start_transit
 
 
     ! year as character string 
@@ -152,6 +159,7 @@ contains
             print *, achar(27)//'[5;7;31m'//' --> THIS IS A RESTART RUN !!!                              '//achar(27)//'[0m'
             write(*,"(A, F8.2, I4, I5)") '     > clock restarted at time:', timenew, daynew, yearnew
             write(*,"(A, I5)") '     > yearstart for annual_event:', yearstart
+            if (use_transit) write(*,"(A, I5, A, I5)") '     > transient tracers: experiment start year', yearinit, ', input index', ti_transit
             write(*,*)
         else
             write(*,*)
@@ -159,6 +167,7 @@ contains
             print *, achar(27)//'[7;32m'//' --> THIS IS A INITIALISATION RUN !!!                       '//achar(27)//'[0m'
             write(*,"(A, F8.2, I4, I5)")'     > clock initialized at time:', timenew, daynew, yearnew
             write(*,"(A, I5)") '     > yearstart for annual_event:', yearstart
+            if (use_transit) write(*,"(A, I5, A, I5)") '     > transient tracers: experiment start year', yearinit, ', input index', ti_transit
             write(*,*)
         end if
     end if
