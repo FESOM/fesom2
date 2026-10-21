@@ -28,7 +28,7 @@ program fesom_meshdiag
   ! Local variables
   integer           :: provided, MPIerr
   logical           :: mpi_is_initialized
-  real(kind=WP)     :: t0, t1, t2
+  real(kind=WP_full)     :: t0, t1, t2
   type(t_mesh)      :: mesh
   type(t_partit)    :: partit
   type(t_dyn)       :: dynamics

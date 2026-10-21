@@ -108,8 +108,8 @@ SUBROUTINE nemogcmcoup_mlinit( mype, npes, icomm, &
    ! Local variables
 
    ! dummy argument with explicit INTENT(OUT) declaration needs an explicit value
-   pdep=0.
-   pmask=0.
+   pdep=0._wpIFS
+   pmask=0._wpIFS
 
    WRITE(0,*)'nemogcmcoup_mlinit should not be called when coupling to fesom.'
    CALL abort

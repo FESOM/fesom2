@@ -88,7 +88,7 @@ type(t_partit), intent(inout), target :: partit
  integer        :: vert_nodes(1000)
  integer        :: nchunk, chunk_size, ipos, iofs, mesh_check, flag_checkisrot, flag_checkmustrot
  real(kind=WP)  :: x, y, rx, ry, xp, yp, dbox, offset
- real(kind=WP)  :: t0, t1
+ real(kind=WP_full)  :: t0, t1
  character*10   :: mype_string,npes_string
  character(len=MAX_PATH)  :: file_name
  character(len=MAX_PATH)  :: dist_mesh_dir
@@ -795,7 +795,7 @@ subroutine find_levels(partit, mesh)
     integer                                :: nchunk, chunk_size, ipos, iofs, mesh_check
     integer, allocatable, dimension(:)     :: mapping
     integer, allocatable, dimension(:)     :: ibuff
-    real(kind=WP)                          :: t0, t1
+    real(kind=WP_full)                          :: t0, t1
     t0=MPI_Wtime()
     !___________________________________________________________________________
     allocate(mesh%nlevels(partit%myDim_elem2D+partit%eDim_elem2D+partit%eXDim_elem2D))
@@ -991,7 +991,7 @@ subroutine find_levels_cavity(partit, mesh)
     integer, allocatable, dimension(:)  :: mapping
     integer, allocatable, dimension(:)  :: ibuff
     real(kind=WP), allocatable, dimension(:)  :: rbuff
-    real(kind=WP)                       :: t0, t1
+    real(kind=WP_full)                       :: t0, t1
     logical                             :: file_exist=.False.
     integer                             :: elem, elnodes(3), ule,  uln(3), node, j, nz
     integer, allocatable, dimension(:) :: numelemtonode
@@ -1491,7 +1491,7 @@ subroutine find_levels_min_e2n(partit, mesh)
     type(t_mesh),   intent(inout), target :: mesh
     type(t_partit), intent(inout), target :: partit
     integer                             :: node, k
-    real(kind=WP)                       :: t0, t1
+    real(kind=WP_full)                       :: t0, t1
     
     
     t0=MPI_Wtime()
@@ -1527,7 +1527,7 @@ type(t_mesh),   intent(inout), target :: mesh
 type(t_partit), intent(inout), target :: partit
 real(kind=WP)               ::  a(2), b(2), c(2),  r
 integer                     ::  n, nx, elnodes(3)
-real(kind=WP)               :: t0, t1
+real(kind=WP_full)               :: t0, t1
 
 
 
@@ -1572,7 +1572,7 @@ integer                               :: counter, n, m, nn, k, q, fileID
 integer                               :: elems(2), elem
 integer                               :: elnodes(3), ed(2), eledges(3)
 integer, allocatable                  :: aux(:)         
-real(kind=WP)                         :: t0, t1
+real(kind=WP_full)                         :: t0, t1
 integer                               :: nchunk, chunk_size, ipos, iofs, mesh_check
 integer, allocatable, dimension(:)    :: mapping
 integer, allocatable, dimension(:,:)  :: ibuff
@@ -1805,7 +1805,7 @@ integer                     :: elem, eledges(3), elem1, j, n, node, enum,elems(3
 integer, allocatable        :: temp_i(:)
 integer                     :: mymax(partit%npes), rmax(partit%npes)
 real(kind=WP)               :: gx,gy,rx,ry
-real(kind=WP)               :: t0, t1
+real(kind=WP_full)               :: t0, t1
 
 
 CALL MPI_BARRIER(partit%MPI_COMM_FESOM, partit%MPIerr)
@@ -2011,7 +2011,7 @@ SUBROUTINE mesh_areas(partit, mesh)
     real(kind=WP_full)                        :: area_acc, area_acc2, area_glob, area_glob2
     real(kind=WP), allocatable,dimension(:)   :: work_array
     integer, allocatable,dimension(:,:)       :: cavity_contribut
-    real(kind=WP)                             :: t0, t1
+    real(kind=WP_full)                             :: t0, t1
 type(t_mesh),   intent(inout), target :: mesh
 type(t_partit), intent(inout), target :: partit
 
@@ -2288,7 +2288,7 @@ real(kind=WP)	     :: a(2), b(2), ax, ay, dfactor, lon, lat
 real(kind=WP)	     :: deltaX31, deltaX21, deltaY31, deltaY21
 real(kind=WP)        :: x(3), y(3), cxx, cxy, cyy, d
 real(kind=WP), allocatable :: center_x(:), center_y(:), temp(:) 
-real(kind=WP)              :: t0, t1
+real(kind=WP_full)              :: t0, t1
 integer                    :: i, nn, ns
 type(t_mesh),   intent(inout), target :: mesh
 type(t_partit), intent(inout), target :: partit

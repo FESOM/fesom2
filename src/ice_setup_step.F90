@@ -83,7 +83,7 @@ subroutine ice_timestep(step, ice, partit, mesh)
     type(t_mesh)  , intent(in)   , target :: mesh
     !___________________________________________________________________________
     integer                               :: i
-    REAL(kind=WP)                         :: t0,t1, t2, t3
+    REAL(kind=WP_full)                         :: t0,t1, t2, t3
 #if defined (__icepack)
     real(kind=WP)                         :: time_evp, time_advec, time_therm
 #endif
