@@ -696,7 +696,13 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
           "TCphotLL_phyto", "TCphotLL_dia", "TCphotLL_cocco", "TCphotLL_phaeo", &
           "TqLF_phyto", "TqLF_diatoms", "TqLF_cocco", "TqLF_phaeo", &
           "TTemp_phyto", "TTemp_diatoms", "TTemp_cocco", "TTemp_phaeo", &
-          "TSi_assimDia" /)
+          "TSi_assimDia", &
+          ! CMIP7 REcoM diagnostics: flux into the benthos, sinking fluxes, grazing on
+          ! phytoplankton, Si uptake and Fe scavenging
+          "bflxN", "bflxC", "bflxSi", "bflxCalc", "expN", "expC", "expSi", "expCalc", &
+          "graz", "intpbsi", "scavFe", &
+          "dpO2s", "O2min", "intDIC", "intDOC", "intPOC", "limNn", "limFen", "limNd", "limFed", &
+          "O2sat", "OmegaA", "CO3satA" /)
         integer :: k
         if (partit%mype==0) WRITE(*,*) 'XIOS mode: skipping namelist.io; registering all ', &
                                  size(xios_ids), ' known streams. XML decides output.'
@@ -1263,6 +1269,52 @@ CASE ('benCalc   ')
     if (use_REcoM) then
     call def_stream(mesh%nod2D,  partit%myDim_nod2D,   'benCalc','Benthos calcite','mmol', Benthos(:,4), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
+! CMIP7 REcoM diagnostics (need Diags): flux into the benthos (froc, fric, exp*ob), Si uptake (intpbsi), Fe scavenging (frfe)
+! CMIP7 REcoM state diagnostics (need Diags): dpo2, o2min, intdic, intdoc, intpoc
+CASE ('dpO2s     ')
+    if (use_REcoM .and. Diags) then
+    call def_stream(mesh%nod2D,  partit%myDim_nod2D,   'dpO2s','Surface O2 partial pressure difference ocean minus atmosphere','Pa', dpO2s(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+CASE ('O2min     ')
+    if (use_REcoM .and. Diags) then
+    call def_stream(mesh%nod2D,  partit%myDim_nod2D,   'O2min','O2 at the shallowest local minimum of the profile','mmolO/m3', O2min(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+CASE ('intDIC    ')
+    if (use_REcoM .and. Diags) then
+    call def_stream(mesh%nod2D,  partit%myDim_nod2D,   'intDIC','Column inventory of dissolved inorganic carbon','mmolC/m2', intDIC(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+CASE ('intDOC    ')
+    if (use_REcoM .and. Diags) then
+    call def_stream(mesh%nod2D,  partit%myDim_nod2D,   'intDOC','Column inventory of dissolved organic carbon','mmolC/m2', intDOC(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+CASE ('intPOC    ')
+    if (use_REcoM .and. Diags) then
+    call def_stream(mesh%nod2D,  partit%myDim_nod2D,   'intPOC','Column inventory of particulate organic carbon (phytoplankton, zooplankton, detritus)','mmolC/m2', intPOC(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+CASE ('bflxN     ')
+    if (use_REcoM .and. Diags) then
+    call def_stream(mesh%nod2D,  partit%myDim_nod2D,   'bflxN','Particulate organic nitrogen flux into the benthos','mmolN/m2/s', BotFlux(:,1), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+CASE ('bflxC     ')
+    if (use_REcoM .and. Diags) then
+    call def_stream(mesh%nod2D,  partit%myDim_nod2D,   'bflxC','Particulate organic carbon flux into the benthos','mmolC/m2/s', BotFlux(:,2), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+CASE ('bflxSi    ')
+    if (use_REcoM .and. Diags) then
+    call def_stream(mesh%nod2D,  partit%myDim_nod2D,   'bflxSi','Biogenic silica flux into the benthos','mmolSi/m2/s', BotFlux(:,3), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+CASE ('bflxCalc  ')
+    if (use_REcoM .and. Diags) then
+    call def_stream(mesh%nod2D,  partit%myDim_nod2D,   'bflxCalc','Calcite flux into the benthos','mmolC/m2/s', BotFlux(:,4), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+CASE ('intpbsi   ')
+    if (use_REcoM .and. Diags) then
+    call def_stream(mesh%nod2D,  partit%myDim_nod2D,   'intpbsi','Depth-integrated silicate uptake by diatoms','mmolSi/m2/d', SiProd(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+CASE ('scavFe    ')
+    if (use_REcoM .and. Diags) then
+    call def_stream(mesh%nod2D,  partit%myDim_nod2D,   'scavFe','Depth-integrated iron scavenging onto particles','umolFe/m2/d', ScavFe(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
 ! ciso 
 CASE ('benC_13   ')
     if (use_REcoM) then
@@ -1496,6 +1548,57 @@ CASE ('NPPn3D         ')
 CASE ('NPPd3D         ')
    if (use_REcoM) then
    call def_stream((/mesh%nl-1, mesh%nod2D/),  (/mesh%nl-1, partit%myDim_nod2D/),   'NPPd3D','Net primary production of diatoms', 'mmolC/(m3*d)', NPPd3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+! CMIP7 REcoM diagnostics (need Diags): sinking fluxes at the layer interfaces (expc, expcalc, epn, epsi), grazing on phytoplankton (graz)
+CASE ('expN      ')
+   if (use_REcoM .and. Diags) then
+   call def_stream((/mesh%nl, mesh%nod2D/),  (/mesh%nl, partit%myDim_nod2D/),   'expN','Downward flux of particulate organic nitrogen (sinking)', 'mmolN/m2/s', ExpFlux(:,:,1), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+CASE ('expC      ')
+   if (use_REcoM .and. Diags) then
+   call def_stream((/mesh%nl, mesh%nod2D/),  (/mesh%nl, partit%myDim_nod2D/),   'expC','Downward flux of particulate organic carbon (sinking)', 'mmolC/m2/s', ExpFlux(:,:,2), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+CASE ('expSi     ')
+   if (use_REcoM .and. Diags) then
+   call def_stream((/mesh%nl, mesh%nod2D/),  (/mesh%nl, partit%myDim_nod2D/),   'expSi','Downward flux of biogenic silica (sinking)', 'mmolSi/m2/s', ExpFlux(:,:,3), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+CASE ('expCalc   ')
+   if (use_REcoM .and. Diags) then
+   call def_stream((/mesh%nl, mesh%nod2D/),  (/mesh%nl, partit%myDim_nod2D/),   'expCalc','Downward flux of calcite (sinking)', 'mmolC/m2/s', ExpFlux(:,:,4), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+! CMIP7 REcoM diagnostics: N and Fe limitation (limn*, limfe*; light: TCphotLL_*), o2sat, aragonite saturation (co3satarag)
+CASE ('limNn     ')
+   if (use_REcoM .and. Diags) then
+   call def_stream((/mesh%nl-1, mesh%nod2D/),  (/mesh%nl-1, partit%myDim_nod2D/),   'limNn','Nitrogen limitation of photosynthesis of small phytoplankton', '1', limN_phy3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+CASE ('limFen    ')
+   if (use_REcoM .and. Diags) then
+   call def_stream((/mesh%nl-1, mesh%nod2D/),  (/mesh%nl-1, partit%myDim_nod2D/),   'limFen','Iron limitation of photosynthesis of small phytoplankton', '1', limFe_phy3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+CASE ('limNd     ')
+   if (use_REcoM .and. Diags) then
+   call def_stream((/mesh%nl-1, mesh%nod2D/),  (/mesh%nl-1, partit%myDim_nod2D/),   'limNd','Nitrogen limitation of photosynthesis of diatoms', '1', limN_dia3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+CASE ('limFed    ')
+   if (use_REcoM .and. Diags) then
+   call def_stream((/mesh%nl-1, mesh%nod2D/),  (/mesh%nl-1, partit%myDim_nod2D/),   'limFed','Iron limitation of photosynthesis of diatoms', '1', limFe_dia3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+CASE ('O2sat     ')
+   if (use_REcoM .and. Diags) then
+   call def_stream((/mesh%nl-1, mesh%nod2D/),  (/mesh%nl-1, partit%myDim_nod2D/),   'O2sat','O2 at saturation (1 atm moist air)', 'mmolO/m3', O2sat3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+CASE ('OmegaA    ')
+   if (use_REcoM) then
+   call def_stream((/mesh%nl-1, mesh%nod2D/),  (/mesh%nl-1, partit%myDim_nod2D/),   'OmegaA','Aragonite saturation state (MOCSY)', 'none', OmegaA3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+CASE ('CO3satA   ')
+   if (use_REcoM) then
+   call def_stream((/mesh%nl-1, mesh%nod2D/),  (/mesh%nl-1, partit%myDim_nod2D/),   'CO3satA','Carbonate ion concentration at aragonite saturation (MOCSY)', '[mol/m3]', CO3satA3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+CASE ('graz      ')
+   if (use_REcoM .and. Diags) then
+   call def_stream((/mesh%nl-1, mesh%nod2D/),  (/mesh%nl-1, partit%myDim_nod2D/),   'graz','Grazing on phytoplankton by all zooplankton', 'mmolC/(m3*d)', Graz3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
    endif
 
 CASE ('NPPc3D         ')
