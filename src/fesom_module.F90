@@ -102,24 +102,24 @@ use mod_transit, only: year_ce, r14c_nh, r14c_tz, r14c_sh, r14c_ti, xCO2_ti, xf1
     integer, pointer  :: my_fesom_group, MPI_COMM_FESOM_WORLD, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS
 #endif
     type(t_monitor)   :: ocean_monitor   ! global ocean scalars after the last step
-    real(kind=WP)     :: t0, t1, t2, t3, t4, t5, t6, t7, t8 
-    real(kind=WP)     :: t_start   , t_end 
-    real(kind=WP)     :: t_iceb_s  , t_iceb_e  , rtime_iceb_full, t_iceb_s0, t_iceb_e0, t_iceb_s1, t_iceb_e1
-    real(kind=WP)     :: t_ice_s   , t_ice_e   , rtime_ice_full
-    real(kind=WP)     :: t_ice_o2iflx_s        , rtime_ice_o2iflx
-    real(kind=WP)     :: t_ice_rfrc_s          , rtime_ice_readforc
-    real(kind=WP)     :: t_ice_step_s          , rtime_ice_step, rtime_ice_step_evp, rtime_ice_adv, rtime_ice_therm
-    real(kind=WP)     :: t_ice_oflx_s          , rtime_ice_oflx
-    real(kind=WP)     :: t_oce_s   , t_oce_e   , rtime_oce_full 
-    real(kind=WP)     :: t_diag_s  , t_diag_e  , rtime_compute_diag
-    real(kind=WP)     :: t_io_s    , t_io_e    , rtime_write_means
-    real(kind=WP)     :: t_rstart_s, t_rstart_e, rtime_write_restart
+    real(kind=WP_full) :: t0, t1, t2, t3, t4, t5, t6, t7, t8 
+    real(kind=WP_full)     :: t_start   , t_end 
+    real(kind=WP_full)     :: t_iceb_s  , t_iceb_e  , rtime_iceb_full, t_iceb_s0, t_iceb_e0, t_iceb_s1, t_iceb_e1
+    real(kind=WP_full)     :: t_ice_s   , t_ice_e   , rtime_ice_full
+    real(kind=WP_full)     :: t_ice_o2iflx_s        , rtime_ice_o2iflx
+    real(kind=WP_full)     :: t_ice_rfrc_s          , rtime_ice_readforc
+    real(kind=WP_full)     :: t_ice_step_s          , rtime_ice_step, rtime_ice_step_evp, rtime_ice_adv, rtime_ice_therm
+    real(kind=WP_full)     :: t_ice_oflx_s          , rtime_ice_oflx
+    real(kind=WP_full)     :: t_oce_s   , t_oce_e   , rtime_oce_full 
+    real(kind=WP_full)     :: t_diag_s  , t_diag_e  , rtime_compute_diag
+    real(kind=WP_full)     :: t_io_s    , t_io_e    , rtime_write_means
+    real(kind=WP_full)     :: t_rstart_s, t_rstart_e, rtime_write_restart
     
     real(kind=real32) :: rtime_setup_mesh, rtime_setup_ocean, rtime_setup_forcing 
     real(kind=real32) :: rtime_setup_ice,  rtime_setup_other, rtime_setup_restart
     real(kind=real32) :: runtime_alltimesteps
 #if defined (__recom)
-    real(kind=WP)     :: t_recom_s, t_recom_e, rtime_compute_recom
+    real(kind=WP_full)     :: t_recom_s, t_recom_e, rtime_compute_recom
     real(kind=real32) :: rtime_setup_recom
 #endif
 

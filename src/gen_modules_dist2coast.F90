@@ -39,7 +39,7 @@ module g_dist2coast
         integer                                    :: elem, node, elnodes(3), node_size, elem_size 
         real(kind=WP)                              :: lon_e, lat_e, lonr(3), xmin
         character(len=10)                          :: mode
-        real(kind=WP)                              :: t0, t1, t2, t3
+        real(kind=WP_full)                              :: t0, t1, t2, t3
         
         !_______________________________________________________________________
         mode = 'elem'

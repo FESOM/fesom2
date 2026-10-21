@@ -1239,7 +1239,7 @@ subroutine init_stiff_mat_ale(partit, mesh)
     integer, allocatable                :: mapping(:)
     character*10                        :: npes_string
     character(MAX_PATH)                 :: dist_mesh_dir, file_name
-    real(kind=WP)                       :: t0, t1
+    real(kind=WP_full)                       :: t0, t1
     integer                             :: ierror              ! MPI, return error code
     !___________________________________________________________________________
     ! pointer on necessary derived types
