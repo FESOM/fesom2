@@ -328,6 +328,7 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
    USE scripremap
    USE interinfo
 
+   USE o_PARAM, ONLY : WP
    IMPLICIT NONE
    
    ! Arguments
@@ -336,12 +337,12 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
    LOGICAL :: licelvls
 
    !type(t_mesh), target :: mesh
-   real(kind=wpIFS), dimension(:,:), pointer :: coord_nod2D
+   real(kind=WP), dimension(:,:), pointer :: coord_nod2D   ! FESOM's arrays: WP, not wpIFS (single-precision builds)
    integer, dimension(:,:)         , pointer :: elem2D_nodes
    integer, pointer :: myDim_nod2D, eDim_nod2D
    integer, pointer :: myDim_elem2D, eDim_elem2D, eXDim_elem2D
-   real(kind=wpIFS), dimension(:), pointer :: a_ice, m_ice, m_snow, ice_temp, ice_alb
-   real(kind=wpIFS)              , pointer :: tmelt
+   real(kind=WP), dimension(:), pointer :: a_ice, m_ice, m_snow, ice_temp, ice_alb   ! FESOM's arrays: WP, not wpIFS (single-precision builds)
+   real(kind=WP)              , pointer :: tmelt   ! FESOM's arrays: WP, not wpIFS (single-precision builds)
    
    ! Message passing information
    INTEGER, INTENT(IN) :: mype, npes, icomm
@@ -358,7 +359,8 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
    REAL(wpIFS), DIMENSION(nopoints,maxnfield)  :: zrecvnf
    REAL(wpIFS), DIMENSION(nopoints,maxnfielduv) :: zrecvnfUV
    INTEGER			     :: elnodes(3)
-   REAL(wpIFS)			     :: rlon, rlat	
+   ! vector_r2g works in FESOM's WP, so the rotation goes through WP copies
+   REAL(WP)                        :: rlon, rlat, ru, rv
 
    ! Loop variables
    INTEGER :: n, elem, ierr, jf
@@ -448,12 +450,16 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
    ENDDO
 !$OMP END PARALLEL DO
    ! Rotate vectors (U,V) to geographical coordinates (r2g)
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, rlon, rlat)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, rlon, rlat, ru, rv)
 !$OMP DO
    DO n=1,myDim_nod2D
       rlon=coord_nod2D(1,n)
       rlat=coord_nod2D(2,n)
-      CALL vector_r2g(zsendnf(n,nfield-1), zsendnf(n,nfield), rlon, rlat, 0) ! 0-flag for rot. coord
+      ru=zsendnf(n,nfield-1)
+      rv=zsendnf(n,nfield)
+      CALL vector_r2g(ru, rv, rlon, rlat, 0) ! 0-flag for rot. coord
+      zsendnf(n,nfield-1)=ru
+      zsendnf(n,nfield)=rv
    ENDDO
 !$OMP END DO
 !$OMP BARRIER
@@ -561,6 +567,7 @@ SUBROUTINE nemogcmcoup_exflds_get( mype, npes, icomm, &
    USE fesom_main_storage_module, only: fesom => f
    USE o_ARRAYS, only : MLD1
    USE diagnostics, only : ldiag_extflds, zisotherm, saltzavg, tempzavg
+   USE o_PARAM, ONLY : WP
    IMPLICIT NONE
    
    ! Arguments
@@ -576,7 +583,7 @@ SUBROUTINE nemogcmcoup_exflds_get( mype, npes, icomm, &
    INTEGER :: nfield = 0
    REAL(wpIFS), DIMENSION(fesom%partit%myDim_nod2D,maxnfield)  :: zsendnf
    REAL(wpIFS), DIMENSION(nopoints,maxnfield)  :: zrecvnf
-   real(kind=wpIFS), dimension(:,:), pointer :: coord_nod2D
+   real(kind=WP), dimension(:,:), pointer :: coord_nod2D   ! FESOM's arrays: WP, not wpIFS (single-precision builds)
    integer, pointer :: myDim_nod2D, eDim_nod2D
 
    ! Loop variables
@@ -617,7 +624,7 @@ SUBROUTINE nemogcmcoup_exflds_get( mype, npes, icomm, &
    else
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
       DO n=1,myDim_nod2D
-         zsendnf(n,nfield)=-1. ! set to -1 as placeholder
+         zsendnf(n,nfield)=-1._wpIFS ! set to -1 as placeholder
       ENDDO
 !$OMP END PARALLEL DO
    end if
@@ -642,7 +649,7 @@ SUBROUTINE nemogcmcoup_exflds_get( mype, npes, icomm, &
    else
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
       DO n=1,myDim_nod2D
-         zsendnf(n,nfield)=-1. ! set to -1 as placeholder
+         zsendnf(n,nfield)=-1._wpIFS ! set to -1 as placeholder
       ENDDO
 !$OMP END PARALLEL DO
    end if
@@ -659,7 +666,7 @@ SUBROUTINE nemogcmcoup_exflds_get( mype, npes, icomm, &
    else
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
       DO n=1,myDim_nod2D
-         zsendnf(n,nfield)=-1. ! set to -1 as placeholder
+         zsendnf(n,nfield)=-1._wpIFS ! set to -1 as placeholder
       ENDDO
 !$OMP END PARALLEL DO
    end if
@@ -757,6 +764,7 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    USE scripremap
    USE interinfo
 
+   USE o_PARAM, ONLY : WP
    IMPLICIT NONE
 
    ! =================================================================== !
@@ -786,8 +794,8 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    ! Local variables
    INTEGER		:: n, jf
    integer, pointer     :: myDim_nod2D, eDim_nod2D
-   REAL(wpIFS), parameter 	:: rhofwt = 1000.        ! density of freshwater
-   REAL(wpIFS), parameter  :: lfus = 333.7          ! latent heat of fusion [J/g]
+   REAL(wpIFS), parameter 	:: rhofwt = 1000._wpIFS        ! density of freshwater
+   REAL(wpIFS), parameter  :: lfus = 333.7_wpIFS          ! latent heat of fusion [J/g]
 
    ! Packed send/receive buffers
    INTEGER , PARAMETER :: maxnfield = 11
@@ -796,10 +804,10 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    REAL(wpIFS), DIMENSION(fesom%partit%myDim_nod2D,maxnfield) :: zrecvnf
 
    ! associate only the necessary things
-   real(kind=wpIFS), dimension(:,:), pointer :: coord_nod2D
-   real(kind=wpIFS), dimension(:)  , pointer :: stress_atmice_x, stress_atmice_y
-   real(kind=wpIFS), dimension(:)  , pointer :: oce_heat_flux, ice_heat_flux, a_ice
-   real(kind=wpIFS), dimension(:)  , pointer :: enthalpyoffuse
+   real(kind=WP), dimension(:,:), pointer :: coord_nod2D   ! FESOM's arrays: WP, not wpIFS (single-precision builds)
+   real(kind=WP), dimension(:)  , pointer :: stress_atmice_x, stress_atmice_y   ! FESOM's arrays: WP, not wpIFS (single-precision builds)
+   real(kind=WP), dimension(:)  , pointer :: oce_heat_flux, ice_heat_flux, a_ice   ! FESOM's arrays: WP, not wpIFS (single-precision builds)
+   real(kind=WP), dimension(:)  , pointer :: enthalpyoffuse   ! FESOM's arrays: WP, not wpIFS (single-precision builds)
    myDim_nod2D        => fesom%partit%myDim_nod2D
    eDim_nod2D         => fesom%partit%eDim_nod2D
    coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D) => fesom%mesh%coord_nod2D(:,:)  
@@ -814,17 +822,17 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    ! TODO
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
    DO n=1,myDim_nod2D+eDim_nod2D
-      shortwave(n)      =0.
-      prec_rain(n)      =0.
-      prec_snow(n)      =0.
-      evap_no_ifrac(n)  =0.
-      sublimation(n)    =0.
-      ice_heat_flux(n)  =0.
-      oce_heat_flux(n)  =0.
-      stress_atmice_x(n)=0.
-      stress_atmice_y(n)=0.
-      stress_atmoce_x(n)=0.
-      stress_atmoce_y(n)=0.
+      shortwave(n)      =0._WP
+      prec_rain(n)      =0._WP
+      prec_snow(n)      =0._WP
+      evap_no_ifrac(n)  =0._WP
+      sublimation(n)    =0._WP
+      ice_heat_flux(n)  =0._WP
+      oce_heat_flux(n)  =0._WP
+      stress_atmice_x(n)=0._WP
+      stress_atmice_y(n)=0._WP
+      stress_atmoce_x(n)=0._WP
+      stress_atmoce_y(n)=0._WP
    END DO
 !$OMP END PARALLEL DO
    ! =================================================================== !
@@ -1006,8 +1014,8 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
 !$OMP DO
    do n=1, myDim_nod2D
       ice_heat_flux(n)=zrecvnf(n, nfield)
-      if (a_ice(n) <= 1.e-12) then
-         ice_heat_flux(n)=0.0
+      if (a_ice(n) <= 1.e-12_WP) then
+         ice_heat_flux(n)=0.0_WP
       end if
    end do
 !$OMP END DO
@@ -1165,7 +1173,7 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    ! prec_snow*rho [kg/m2/s] * lfus [J/kg] = W/m2
 !$OMP DO
    do n=1, myDim_nod2D
-      enthalpyoffuse(n)= - rhofwt * prec_snow(n) * lfus * 1000.
+      enthalpyoffuse(n)= - rhofwt * prec_snow(n) * lfus * 1000._wpIFS
    end do
 !$OMP END DO
 !$OMP BARRIER
@@ -1211,7 +1219,7 @@ subroutine ocean_update_runoff(NBASIN_RUNOFF, BASIN_RUNOFF)
       runoff(n)=sum(RUNOFF_MAPPER%values(i:j)*REAL(BASIN_RUNOFF(RUNOFF_MAPPER%colind(i:j)), WP))
    end do
    call integrate_nod(runoff, total_runoff, fesom%partit, fesom%mesh)
-   if (fesom%partit%mype==0) write(*,*) 'total runoff=', total_runoff*1.e-6
+   if (fesom%partit%mype==0) write(*,*) 'total runoff=', total_runoff*1.e-6_WP
 end subroutine ocean_update_runoff
 
 SUBROUTINE nemogcmcoup_step( istp, icdate, ictime )

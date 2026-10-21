@@ -116,11 +116,21 @@ message(STATUS "ENABLE_IFS_INTERFACE: ${ENABLE_IFS_INTERFACE}")
 #     skipped for __oifs (early return), so its remaining hardcoded-double
 #     calls are not reached by an OIFS build.
 #
+# The IFS interface (ENABLE_IFS_INTERFACE) is single-precision-safe as well:
+#
+#   * ifs_interface/ is explicit in every real kind. The exchange with the
+#     IFS stays real64 (wpIFS, scripdp); only the pointers into FESOM's own
+#     arrays, and the vector rotation done in place on them, follow WP. The
+#     interpolation (ifs_modules.F90) used to declare four buffers as
+#     default REAL and send them as mpi_double_precision, which relied on
+#     -r8. All five files now compile to identical machine code with -r4
+#     and -r8, so nothing there depends on the default real kind.
+#
 # The other coupled modes are NOT yet converted and stay refused:
 #   * FESOM_COUPLED without OIFS (OASIS/ECHAM) -- net_rec_from_atm's raw
 #     double exchange IS reached and is still typed to WP; needs the partner
 #     precision reconciled.
-#   * USE_YAC (cpl_yac_driver.F90) and ENABLE_IFS_INTERFACE -- untouched.
+#   * USE_YAC (cpl_yac_driver.F90) -- untouched.
 #   * RECOM_COUPLED -- REcoM's own WP (REcoM_declarations, recom_modules.F90)
 #     is hardcoded to kind 8 and never follows this switch, while routines
 #     REcoM shares with the main model (e.g. read_2ddata_on_grid_NetCDF in
@@ -145,9 +155,6 @@ if(USE_SINGLE_PRECISION AND NOT FESOM_ALLOW_SINGLE_PRECISION_COUPLED)
    if(USE_YAC)
       list(APPEND _fesom_sp_coupled_modes "USE_YAC (YAC)")
    endif()
-   if(ENABLE_IFS_INTERFACE)
-      list(APPEND _fesom_sp_coupled_modes "ENABLE_IFS_INTERFACE (IFS interface)")
-   endif()
    if(RECOM_COUPLED)
       list(APPEND _fesom_sp_coupled_modes "RECOM_COUPLED (REcoM biogeochemistry)")
    endif()
@@ -158,8 +165,8 @@ if(USE_SINGLE_PRECISION AND NOT FESOM_ALLOW_SINGLE_PRECISION_COUPLED)
          "These coupling paths still pass MPI_DOUBLE_PRECISION for real(kind=WP) "
          "buffers (or have not been reviewed), or (RECOM_COUPLED) mix REcoM's own "
          "always-double WP with the main model's WP, which corrupts memory or fails "
-         "to compile when WP is real32. OIFS-via-OASIS coupling (OIFS_COUPLED) has "
-         "been converted and is allowed.\n"
+         "to compile when WP is real32. OIFS-via-OASIS coupling (OIFS_COUPLED) and the "
+         "IFS interface (ENABLE_IFS_INTERFACE) have been converted and are allowed.\n"
          "Build these configurations in double precision (USE_SINGLE_PRECISION=OFF), "
          "or set FESOM_ALLOW_SINGLE_PRECISION_COUPLED=ON if you are developing the fix.")
    endif()
