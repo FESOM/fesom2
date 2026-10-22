@@ -138,11 +138,7 @@ subroutine forcing_array_setup(partit, mesh)
   flux_correction_total=0.0_WP  
 #endif 
 
-! TODO: __cpl_yac is absent here, as in the pre-rework guard. Declaration
-! and use agree, so this is self-consistent, but YAC does not get
-! residualifwflx or the rhofwt/rhowat freshwater conversion. Widening the
-! guard changes YAC results, so it is left to a separate change.
-#if defined (__cpl_oasis) || defined (__cpl_direct)
+#if defined (__cpl_enabled)
   allocate(residualifwflx(n2))
   residualifwflx = 0.0_WP
 

@@ -22,6 +22,10 @@ module cpl_config
   public :: is_coupled_to_icon_a, is_coupled_to_ifs
   public :: cpl_comp_name, cpl_grid_name, cpl_config_file
   public :: compute_oasis_corners
+  public :: fesom_provides_ice_surface
+  public :: fesom_receives_ice_flux_at_sent_surface
+  public :: fesom_receives_ice_flux_for_skin_balance
+  public :: fesom_receives_area_weighted_evaporation
 
   !____________________________________________________________________________
   ! &coupling_partner -- the external components FESOM is coupled to.
@@ -56,6 +60,31 @@ module cpl_config
 
   namelist /coupling_partner/ is_coupled_to_echam, is_coupled_to_oifs, &
                               is_coupled_to_icon_a, is_coupled_to_ifs
+
+  !____________________________________________________________________________
+  ! What FESOM provides to and receives from the configured atmosphere, as
+  ! far as the sea-ice model is concerned. Derived from &coupling_partner by
+  ! check_cpl_config, not read from the namelist.
+  ! The ice physics tests these rather than the compiled interface, so it
+  ! follows the partner whichever coupler carries it. All .false. in a
+  ! standalone build.
+
+  ! FESOM computes the ice surface temperature, carried as an advected ice
+  ! tracer, and the ice albedo, and sends both to the atmosphere. The same
+  ! partners also send the solid runoff whose enthalpy of fusion FESOM takes
+  ! from the ocean. OpenIFS and IFS.
+  logical :: fesom_provides_ice_surface = .false.
+  ! The received ice heat flux was evaluated at the surface temperature FESOM
+  ! last sent (coupled slab): FESOM linearises its own skin solve around that
+  ! temperature, and ice growth follows the received flux. OpenIFS.
+  logical :: fesom_receives_ice_flux_at_sent_surface = .false.
+  ! The received ice heat flux forces FESOM's own skin solve, and ice growth
+  ! follows that surface energy balance (residual plus conductive flux)
+  ! instead of the flux itself. IFS.
+  logical :: fesom_receives_ice_flux_for_skin_balance = .false.
+  ! Evaporation and sublimation arrive already weighted by the open-water
+  ! and ice fractions. IFS.
+  logical :: fesom_receives_area_weighted_evaporation = .false.
 
   !____________________________________________________________________________
   ! Interface-specific settings. The two groups are mutually exclusive -- only
@@ -215,6 +244,23 @@ contains
                   'does not use OASIS'
     end if
 #endif
+
+    !__________________________________________________________________________
+    ! What FESOM provides to and receives from the selected atmosphere.
+    fesom_provides_ice_surface               = is_coupled_to_oifs .or. is_coupled_to_ifs
+    fesom_receives_ice_flux_at_sent_surface  = is_coupled_to_oifs
+    fesom_receives_ice_flux_for_skin_balance = is_coupled_to_ifs
+    fesom_receives_area_weighted_evaporation = is_coupled_to_ifs
+    if (mype == 0) then
+       write(*,*) '        fesom_provides_ice_surface               = ', &
+                  fesom_provides_ice_surface
+       write(*,*) '        fesom_receives_ice_flux_at_sent_surface  = ', &
+                  fesom_receives_ice_flux_at_sent_surface
+       write(*,*) '        fesom_receives_ice_flux_for_skin_balance = ', &
+                  fesom_receives_ice_flux_for_skin_balance
+       write(*,*) '        fesom_receives_area_weighted_evaporation = ', &
+                  fesom_receives_area_weighted_evaporation
+    end if
   end subroutine check_cpl_config
 
   !____________________________________________________________________________
