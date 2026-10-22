@@ -258,11 +258,16 @@ contains
 
     integer :: ierror
 
+    ! Every rank reaches this together (the checks are on namelist values all
+    ! ranks hold), so only rank 0 aborts and the others wait for it. If any
+    ! rank could abort, the first one would kill rank 0 before it had written
+    ! the message.
     if (mype == 0) then
        write(error_unit,'(A)') 'ERROR: '//trim(message)
+       flush(error_unit)
+       call MPI_Abort(comm, 1, ierror)
     end if
-    flush(error_unit)
-    call MPI_Abort(comm, 1, ierror)
+    call MPI_Barrier(comm, ierror)
   end subroutine cpl_config_abort
 
 end module cpl_config
