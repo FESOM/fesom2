@@ -15,7 +15,7 @@ module ice_thermo_oce_module
 
     private
     public :: cut_off
-#if !defined (__oasis) && !defined (__ifsinterface) && !defined (__yac)
+#if !defined (__cpl_enabled)
     public :: thermodynamics, therm_ice, budget, obudget, flooding, &
               TFrez, compute_solar_zenith_angle, albw_taylor, &
               albw_briegleb, open_water_albedo_at
@@ -36,30 +36,33 @@ subroutine cut_off(ice, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_ice),    intent(inout), target :: ice
     integer                               :: n
-#if defined (__oifs)
+    ! TODO: still compile-time, as in ice_thermo_cpl.F90 -- the cold-ice
+    ! reporting below belongs to the OpenIFS skin solve, the clamp to the
+    ! in-process IFS interface.
+#if defined (__cpl_oasis50)
     integer                               :: n_coldice
     integer, save                         :: n_coldwarn = 0
 #endif
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
-#if defined (__oifs) || defined (__ifsinterface)
     real(kind=WP), dimension(:), pointer  :: ice_temp
-#endif /* (__oifs) */
+    logical                               :: l_ist
     a_ice    => ice%data(1)%values(:)
     m_ice    => ice%data(2)%values(:)
     m_snow   => ice%data(3)%values(:)
-#if defined (__oifs) || defined (__ifsinterface)
-    ice_temp => ice%data(4)%values(:)
-#endif /* (__oifs) */
+    l_ist = ice%ist_itracer_idx > 0
+    if (l_ist) then
+       ice_temp => ice%data(ice%ist_itracer_idx)%values(:)
+    end if
 
-#if defined (__oifs)
+#if defined (__cpl_oasis50)
     n_coldice = 0
 #endif
 
     !___________________________________________________________________________
     ! upper cutoff: a_ice
-#if defined (__oifs)
+#if defined (__cpl_oasis50)
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n) REDUCTION(+:n_coldice)
 #else
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
@@ -71,10 +74,10 @@ DO n=1, partit%myDim_nod2D+partit%eDim_nod2D
        a_ice(n)=0.0_WP
        m_ice(n)   =0.0_WP
        m_snow(n)  =0.0_WP
-#if defined (__oifs) || defined (__ifsinterface)
+        if (l_ist) then
         
-        ice_temp(n)=273.15_WP
-#endif /* (__oifs) */
+           ice_temp(n)=273.15_WP
+        end if
    end if
     !___________________________________________________________________________
     ! lower cutoff: m_ice
@@ -82,31 +85,31 @@ DO n=1, partit%myDim_nod2D+partit%eDim_nod2D
         m_ice(n)=0.0_WP 
         m_snow(n)  =0.0_WP
         a_ice(n)   =0.0_WP
-#if defined (__oifs) || defined (__ifsinterface)
-        ice_temp(n)=273.15_WP
-#endif /* (__oifs) */
+        if (l_ist) then
+           ice_temp(n)=273.15_WP
+        end if
    end if
      
     !___________________________________________________________________________
-#if defined (__oifs) || defined (__ifsinterface)
-    if (ice_temp(n) > 273.15_WP) ice_temp(n)=273.15_WP
-#endif /* (__oifs) */
+    if (l_ist) then
+       if (ice_temp(n) > 273.15_WP) ice_temp(n)=273.15_WP
+    end if
 
-#if defined (__oifs)
+#if defined (__cpl_oasis50)
     ! No lower clamp. A surface temperature this far below anything physical
     ! means the skin solve has diverged, and silently resetting it to the
     ! seawater freezing point hides the divergence instead of reporting it.
     ! Count and report below.
     if (ice_temp(n) < 173.15_WP .and. a_ice(n) >= 0.1e-8_WP) n_coldice = n_coldice + 1
-#elif defined (__ifsinterface)
+#elif defined (__cpl_direct)
     ! Preserve the 2.6.7.1 IFS-FESOM safeguard while its legacy surface
     ! temperature scheme is in use.
     if (ice_temp(n) < 173.15_WP .and. a_ice(n) >= 0.1e-8_WP) ice_temp(n)=271.35_WP
-#endif /* (__oifs) */
+#endif /* (__cpl_oasis50) */
 END DO
 !$OMP END PARALLEL DO
 
-#if defined (__oifs)
+#if defined (__cpl_oasis50)
     ! Rate limited: a diverging skin solve usually diverges every step.
     if (n_coldice > 0) then
         n_coldwarn = n_coldwarn + 1
@@ -115,10 +118,10 @@ END DO
                        ' node(s), rank ', partit%mype, ', occurrence ', n_coldwarn
         end if
     end if
-#endif /* (__oifs) */
+#endif /* (__cpl_oasis50) */
 end subroutine cut_off
 
-#if !defined (__oasis) && !defined (__ifsinterface) && !defined (__yac)
+#if !defined (__cpl_enabled)
 !_______________________________________________________________________________
 ! Sea-ice thermodynamics routines
 !
@@ -1324,6 +1327,6 @@ subroutine thermodynamics_acc(ice, partit, mesh)
     end if
 end subroutine thermodynamics_acc
 #endif
-#endif /* #if !defined (__coupled) && !defined (__ifsinterface) */
+#endif /* !defined (__cpl_enabled) */
 
 end module ice_thermo_oce_module
