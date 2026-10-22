@@ -432,7 +432,7 @@ include "node_contour_boundary.h"
 #endif
     use mod_mesh
     USE MOD_PARTIT
-    use g_rotate_grid
+    use g_rotate_grid, only: r2g
     use mod_oasis, only: oasis_write_area, oasis_write_mask
 #if defined (__XIOS)
     use xios, only: xios_oasis_enddef
