@@ -5,22 +5,21 @@ module cpl_yac_driver
   USE o_PARAM
   USE g_clock
   USE cpl_config, only : cpl_comp_name, cpl_grid_name, cpl_config_file
+  USE cpl_fields, only : nsend, nrecv, cpl_send, cpl_recv, &
+                         cpl_send_collection_size, cpl_recv_collection_size
 
   implicit none
   save
 
   integer :: comp_id, grid_id, points_id
-  integer :: send_field_id(4), recv_field_id(12)
+  integer, allocatable, dimension(:) :: send_field_id, recv_field_id
   real(kind=WP), dimension(:,:),   allocatable   :: a2o_fcorr_stat  !flux correction statistics for the output
-  integer, parameter         :: nsend = 2
-  integer, parameter         :: nrecv = 6 !SL 5 +1 add river_runoff
-  character(len=32)          :: cpl_send(nsend), cpl_recv(nrecv)
-  integer                    :: cpl_send_collection_size(nsend), cpl_recv_collection_size(nrecv)
   integer                    :: source_root, target_root   !this root/source in MPI_COMM_WORLD
   logical                    :: commRank       ! true for ranks doing YAC communication
 
   public nsend, nrecv
   public cpl_send, cpl_recv
+  public cpl_send_collection_size, cpl_recv_collection_size
   public source_root, target_root, commRank
   public a2o_fcorr_stat
 
@@ -238,31 +237,15 @@ contains
          mesh%geo_coord_nod2D(2,1:partit%myDim_nod2D), &
          points_id)
 
-    cpl_send( 1)='sst_feom' ! 1. sea surface temperature [°C]      ->
-    cpl_send_collection_size(1) = 1
-    cpl_send( 2)='ocean_sea_ice_bundle'
-    cpl_send_collection_size(2) = 3
+    ! The field names and collection sizes were registered by
+    ! define_cpl_fields (cpl_fields). They must match coupling.yaml.
+    ALLOCATE(send_field_id(nsend), recv_field_id(nrecv))
 
     DO i=1,nsend
        CALL yac_fdef_field(cpl_send(i), comp_id, [points_id], 1, &
             cpl_send_collection_size(i), &
             dt_str, YAC_TIME_UNIT_MILLISECOND, send_field_id(i))
     END DO
-
-    cpl_recv(1)  = 'taux'
-    cpl_recv_collection_size(1) = 2
-    cpl_recv(2)  = 'tauy'
-    cpl_recv_collection_size(2) = 2
-    cpl_recv(3)  = 'surface_fresh_water_flux'
-    cpl_recv_collection_size(3) = 3
-    cpl_recv(4) = 'total_heat_flux'
-    cpl_recv_collection_size(4) = 4
-    cpl_recv(5) = 'atmosphere_sea_ice_bundle'
-    cpl_recv_collection_size(5) = 2
-!SL add river_runoff ----------------
-    cpl_recv(6) = 'river_runoff'
-    cpl_recv_collection_size(6) = 1
-!SL----------------------------------
 
     DO i=1,nrecv
        CALL yac_fdef_field(cpl_recv(i), comp_id, [points_id], 1, cpl_recv_collection_size(i), &

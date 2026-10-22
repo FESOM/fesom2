@@ -18,6 +18,7 @@ module gen_forcing_couple_module
     USE cpl_yac_driver
     USE gen_bulk
     USE g_support, only: integrate_nod
+    USE par_support_module, only: par_abort
     USE cpl_config, only: is_coupled_to_echam, is_coupled_to_oifs
 #if defined (__recom)
   use g_sbf, only: sbc_do_recom
@@ -124,13 +125,17 @@ subroutine update_atm_forcing_yac(istep, ice, tracers, dynamics, partit, mesh)
 !  end if
   do i=1,nsend
      exchange  =0.
-     if (i.eq.1) then
+     select case (trim(cpl_send(i)))
+     case ('sst_feom')
         exchange(:,1)=tracers%data(1)%values(1, 1:partit%myDim_nod2d)+273.15 ! sea surface temperature [°K]
-     elseif (i.eq.2) then
+     case ('ocean_sea_ice_bundle')
         exchange(:,1) = m_ice(1:partit%myDim_nod2d)              ! ice thickness [m]
         exchange(:,2) = m_snow(1:partit%myDim_nod2d)             ! snow thickness
         exchange(:,3) = a_ice(1:partit%myDim_nod2d)              ! ice concentation [%]
-     endif
+     case default
+        write(*,*) 'update_atm_forcing_yac: no handler for the sent field ', trim(cpl_send(i))
+        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
+     end select
      call cpl_yac_send(i, exchange(:,1:cpl_send_collection_size(i)), action)
   enddo
 #ifdef VERBOSE
@@ -148,43 +153,47 @@ subroutine update_atm_forcing_yac(istep, ice, tracers, dynamics, partit, mesh)
 #endif
      if (.not. action) cycle
      !Do not apply a correction at first time step!
-     if (i.eq.1) then
+     select case (trim(cpl_recv(i)))
+     case ('taux')
         stress_atmoce_x(1:partit%myDim_nod2d) =  exchange(:,1)                    ! taux_oce
         call exchange_nod(stress_atmoce_x, partit)
         stress_atmice_x(1:partit%myDim_nod2d) =  exchange(:,2)                    ! taux_ice
         call exchange_nod(stress_atmice_x, partit)
         do_rotate_oce_wind=.true.
         do_rotate_ice_wind=.true.
-     elseif (i.eq.2) then
+     case ('tauy')
         stress_atmoce_y(1:partit%myDim_nod2d) =  exchange(:,1)                    ! tauy_oce
         call exchange_nod(stress_atmoce_y, partit)
         stress_atmice_y(1:partit%myDim_nod2d) =  exchange(:,2)                    ! tauy_ice
         call exchange_nod(stress_atmice_y, partit)
         do_rotate_oce_wind=.true.
         do_rotate_ice_wind=.true.
-     elseif (i.eq.3) then
+     case ('surface_fresh_water_flux')
         prec_rain(1:partit%myDim_nod2d)    =  exchange(:,1)/1000                   ! tot_prec ! kg m^(-2) s^(-1) -> m/s
         call exchange_nod(prec_rain, partit)
         prec_snow(1:partit%myDim_nod2d)    =  exchange(:,2)/1000                    ! snowfall ! kg m^(-2) s^(-1) -> m/s
         call exchange_nod(prec_snow, partit)
         evap_no_ifrac(1:partit%myDim_nod2d)     =  exchange(:,3)/1000               ! tot_evap ! kg m^(-2) s^(-1) -> m/s; change sign
         call exchange_nod(evap_no_ifrac, partit)
-     elseif (i.eq.4) then
+     case ('total_heat_flux')
         oce_heat_flux(1:partit%myDim_nod2d)     = exchange(:,2) + exchange(:,3) + exchange(:,4) ! heat_oce
         call exchange_nod(oce_heat_flux, partit)
         shortwave(1:partit%myDim_nod2d)         =  exchange(:,1)                ! heat_swr
         call exchange_nod(shortwave, partit)
-     elseif (i.eq.5) then
+     case ('atmosphere_sea_ice_bundle')
         ice_heat_flux(1:partit%myDim_nod2d)     = (exchange(:,2) + exchange(:,1)) ! heat_ice
         call exchange_nod(ice_heat_flux, partit)
 !SL-- add river runoff ------------------------------
-     elseif (i.eq.6) then
+     case ('river_runoff')
         runoff(1:partit%myDim_nod2D) = exchange(:,1) * mesh%area_inv(1,1:partit%myDim_nod2D)
         call exchange_nod(runoff, partit)
         call integrate_nod(runoff, net, partit, mesh)
         if(partit%mype==0) write(*,*) 'RUNOFF CHECK:', net
 !SL--------------------------------------------------
-     endif
+     case default
+        write(*,*) 'update_atm_forcing_yac: no handler for the received field ', trim(cpl_recv(i))
+        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
+     end select
   end do
 
   if ((do_rotate_oce_wind .AND. do_rotate_ice_wind) .AND. rotated_grid) then
@@ -302,116 +311,91 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
      end if
      do i=1,nsend
          exchange  =0.
-         ! The sent field set depends on the partner.
-         if (is_coupled_to_oifs) then
-          if (i.eq.1) then
-            ! AWI-CM3 outgoing state vectors
-              do n=1,partit%myDim_nod2D+partit%eDim_nod2D
-              exchange(n)=tracers%data(1)%values(1, n)+tmelt	           ! sea surface temperature [K]
-              end do
-            elseif (i.eq.2) then
-              exchange(:) = a_ice(:)                                  ! ice concentation [%]
-            elseif (i.eq.3) then
-              exchange(:) = m_snow(:)                                 ! snow thickness
-            elseif (i.eq.4) then
-              ! Concentration-weighted ice surface temperature (ist*a_ice).
-              ! The o2a remap blend must be concentration-weighted so the
-              ! atmosphere's prescribed ice-tile skin is representative of the
-              ! ice actually present in the cell; PAIRED with
-              ! ECE_CPL_NEMO_WEIGHTED_ICE=.true. (OIFS divides by the received
-              ! ice fraction on ingest) and a weighted-convention rstos.nc.
-              exchange(:) = ice_temp(:)*a_ice(:)                      ! ice surface temperature * concentration
-            elseif (i.eq.5) then
-              exchange(:) = ice_alb(:)                                ! ice albedo
-            elseif (i.eq.6 .or. i.eq.7) then
-              ! surface velocity, sent as eastward (6) and northward (7)
-              ! component: rotate from the model grid to geographical coordinates
-              do n=1,partit%myDim_nod2D+partit%eDim_nod2D
-                tx = UVnode(1,1,n)
-                ty = UVnode(2,1,n)
-                if (rotated_grid) call vector_r2g(tx, ty, mesh%coord_nod2D(1, n), mesh%coord_nod2D(2, n), 0)
-                if (i.eq.6) then
-                  exchange(n) = tx
-                else
-                  exchange(n) = ty
-                end if
-              end do
-            elseif (i.eq.8) then
-              ! Effective (grid-mean = per-ice * concentration) sea-ice
-              ! thickness for the atmosphere's ice-tile slab conduction
-              ! (OIFS ECE_FESIM_GET_ICE_STATE divides by the received ice
-              ! fraction under LNEMOLIMTHK). Weighted convention as ist/alb.
-              exchange(:) = m_ice(:)                                  ! effective sea ice thickness
-#if defined (__recom)
-            elseif (i.eq.9) then
-              ! GloCO2flux_seaicemask is in [mmolCO2 m-2 s-1], need [kgCO2 m-2 s-1]
-              ! Conversion: 1.0e-3_WP -> mol/s -> kg/s
-              ! 1 mol CO2 = 44.0095 g/mol = 0.0440095 kg/mol (NIST 2018)
-              ! *-1 for correct flux direction convention: oifs expects >0: downward; fesom: >0: upward
-              exchange(:) = GloCO2flux_seaicemask(:) * 1.0e-3_WP * 0.0440095_WP * -1 ! [kgCO2 m-2 s-1]
-#endif
+         ! The sent field set is the one define_cpl_fields registered for
+         ! the partner; each field is filled by its name.
+         select case (trim(cpl_send(i)))
+         case ('sst_feom')
+            ! sea surface temperature: OpenIFS takes [K], ECHAM6 [°C]
+            if (is_coupled_to_oifs) then
+               do n=1,partit%myDim_nod2D+partit%eDim_nod2D
+                  exchange(n)=tracers%data(1)%values(1, n)+tmelt
+               end do
             else
-            print *, 'not installed yet or error in cpl_oasis3mct_send', partit%mype
-          endif
-         else
-          if (i.eq.1) then
-            ! AWI-CM2 outgoing state vectors
-            do n=1,partit%myDim_nod2D+partit%eDim_nod2D
-               exchange(n)=tracers%data(1)%values(1, n)                     ! sea surface temperature [°C]
-            end do
-            elseif (i.eq.2) then
-            exchange(:) = m_ice(:)                                  ! ice thickness [m]
-            elseif (i.eq.3) then
+               do n=1,partit%myDim_nod2D+partit%eDim_nod2D
+                  exchange(n)=tracers%data(1)%values(1, n)
+               end do
+            end if
+         case ('sie_feom')
             exchange(:) = a_ice(:)                                  ! ice concentation [%]
-            elseif (i.eq.4) then
+         case ('snt_feom')
             exchange(:) = m_snow(:)                                 ! snow thickness
+         case ('sit_feom')
+            ! Effective (grid-mean = per-ice * concentration) sea-ice
+            ! thickness. OpenIFS uses it for its ice-tile slab conduction
+            ! (ECE_FESIM_GET_ICE_STATE divides by the received ice fraction
+            ! under LNEMOLIMTHK). Weighted convention as ist/alb.
+            exchange(:) = m_ice(:)                                  ! effective sea ice thickness
+         case ('ist_feom')
+            ! Concentration-weighted ice surface temperature (ist*a_ice).
+            ! The o2a remap blend must be concentration-weighted so the
+            ! atmosphere's prescribed ice-tile skin is representative of the
+            ! ice actually present in the cell; PAIRED with
+            ! ECE_CPL_NEMO_WEIGHTED_ICE=.true. (OIFS divides by the received
+            ! ice fraction on ingest) and a weighted-convention rstos.nc.
+            exchange(:) = ice_temp(:)*a_ice(:)                      ! ice surface temperature * concentration
+         case ('sia_feom')
+            exchange(:) = ice_alb(:)                                ! ice albedo
+         case ('u_feom', 'v_feom')
+            ! surface velocity, sent as eastward and northward component:
+            ! rotate from the model grid to geographical coordinates
+            do n=1,partit%myDim_nod2D+partit%eDim_nod2D
+              tx = UVnode(1,1,n)
+              ty = UVnode(2,1,n)
+              if (rotated_grid) call vector_r2g(tx, ty, mesh%coord_nod2D(1, n), mesh%coord_nod2D(2, n), 0)
+              if (trim(cpl_send(i)) == 'u_feom') then
+                exchange(n) = tx
+              else
+                exchange(n) = ty
+              end if
+            end do
+#if defined (__recom)
+         case ('FCO2_feom')
+            ! GloCO2flux_seaicemask is in [mmolCO2 m-2 s-1], need [kgCO2 m-2 s-1]
+            ! Conversion: 1.0e-3_WP -> mol/s -> kg/s
+            ! 1 mol CO2 = 44.0095 g/mol = 0.0440095 kg/mol (NIST 2018)
+            ! *-1 for correct flux direction convention: oifs expects >0: downward; fesom: >0: upward
+            exchange(:) = GloCO2flux_seaicemask(:) * 1.0e-3_WP * 0.0440095_WP * -1 ! [kgCO2 m-2 s-1]
+#endif
 !---wiso-code
-            elseif (i.eq.5) then
-             exchange(:) = 0.0_WP
-             if (lwiso) then
-              nt1 = index_wiso_tracers(1)
-              nt2 = index_wiso_tracers(3)
-              where (tracers%data(nt2)%values(1,:) > zwisomin)
-                exchange(:) = (tracers%data(nt1)%values(1,:)/tracers%data(nt2)%values(1,:)/wiso_smow(1) - 1._WP)*1000._WP ! delta 18O of surface water
-              end where
-             end if
-
-            elseif (i.eq.6) then
-             exchange(:) = 0.0_WP
-             if (lwiso) then
-              nt1 = index_wiso_tracers(2)
-              nt2 = index_wiso_tracers(3)
-              where (tracers%data(nt2)%values(1,:) > zwisomin)
-                exchange(:) = (tracers%data(nt1)%values(1,:)/tracers%data(nt2)%values(1,:)/wiso_smow(2) - 1._WP)*1000._WP ! delta D of surface water
-              end where
-             end if
-
-            elseif (i.eq.7) then
+         case ('o18w_oce')
+            nt1 = index_wiso_tracers(1)
+            nt2 = index_wiso_tracers(3)
+            where (tracers%data(nt2)%values(1,:) > zwisomin)
+              exchange(:) = (tracers%data(nt1)%values(1,:)/tracers%data(nt2)%values(1,:)/wiso_smow(1) - 1._WP)*1000._WP ! delta 18O of surface water
+            end where
+         case ('hdow_oce')
+            nt1 = index_wiso_tracers(2)
+            nt2 = index_wiso_tracers(3)
+            where (tracers%data(nt2)%values(1,:) > zwisomin)
+              exchange(:) = (tracers%data(nt1)%values(1,:)/tracers%data(nt2)%values(1,:)/wiso_smow(2) - 1._WP)*1000._WP ! delta D of surface water
+            end where
+         case ('o16w_oce')
             exchange(:) = 0.0_WP                          ! delta H216O of surface water is set to zero permill
-
-            elseif (i.eq.8) then
-             exchange(:) = 0.0_WP
-             if (lwiso) then
-              where (tr_arr_ice(:, 3) > zwisomin)
-                exchange(:) = (tr_arr_ice(:, 1)/tr_arr_ice(:, 3)/wiso_smow(1) - 1._WP)*1000._WP ! delta 18O of sea ice
-              end where
-             end if
-
-            elseif (i.eq.9) then
-             exchange(:) = 0.0_WP
-             if (lwiso) then
-              where (tr_arr_ice(:, 3) > zwisomin)
-                exchange(:) = (tr_arr_ice(:, 2)/tr_arr_ice(:, 3)/wiso_smow(2) - 1._WP)*1000._WP ! delta 18O of sea ice
-              end where
-             end if
-
-            elseif (i.eq.10) then
+         case ('o18i_oce')
+            where (tr_arr_ice(:, 3) > zwisomin)
+              exchange(:) = (tr_arr_ice(:, 1)/tr_arr_ice(:, 3)/wiso_smow(1) - 1._WP)*1000._WP ! delta 18O of sea ice
+            end where
+         case ('hdoi_oce')
+            where (tr_arr_ice(:, 3) > zwisomin)
+              exchange(:) = (tr_arr_ice(:, 2)/tr_arr_ice(:, 3)/wiso_smow(2) - 1._WP)*1000._WP ! delta 18O of sea ice
+            end where
+         case ('o16i_oce')
             exchange(:) = 0.0_WP                          ! delta H216O of sea ice is set to zero permill
 !---wiso-code-end
-            else	    
-            print *, 'not installed yet or error in cpl_oasis3mct_send', partit%mype
-          endif
-         endif
+         case default
+            write(*,*) 'update_atm_forcing: no handler for the sent field ', trim(cpl_send(i))
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
+         end select
 
 #if defined(__recom) && defined(__usetp)
          if(partit%my_fesom_group == 0) then
@@ -422,9 +406,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
          ! transmitted -- the temperature OIFS evaluates its ice-tile fluxes
          ! at for the coming coupling interval. `action` is only true on real
          ! OASIS transmissions, so this stays frozen between coupling events.
-         ! The compile-time guard is on ist_ref's existence, hence the ice
-         ! temperature tracer; the runtime one is on the partner.
-         if (is_coupled_to_oifs .and. i==4 .and. action) &
+         if (trim(cpl_send(i)) == 'ist_feom' .and. action) &
             ice%atmcoupl%ist_ref(:) = exchange(:)
 #if defined(__recom) && defined(__usetp)
          endif
@@ -441,95 +423,94 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
          call cpl_oasis3mct_recv (i, exchange, action, partit)
 	 !if (.not. action) cycle
 	 !Do not apply a correction at first time step!
-    if (i==1 .and. action .and. istep/=1) call net_rec_from_atm(action, partit)
-        if (i.eq.1) then
+         if (i==1 .and. action .and. istep/=1) call net_rec_from_atm(action, partit)
+         ! The received field set is the one define_cpl_fields registered
+         ! for the partner; each field is taken by its name.
+         select case (trim(cpl_recv(i)))
+         case ('taux_oce')
             if (.not. action) cycle
             stress_atmoce_x(:) =  exchange(:)                    ! taux_oce
             do_rotate_oce_wind=.true.
-        elseif (i.eq.2) then
+         case ('tauy_oce')
             if (.not. action) cycle
             stress_atmoce_y(:) =  exchange(:)                    ! tauy_oce
             do_rotate_oce_wind=.true.
-        elseif (i.eq.3) then
-            if (.not. action) cycle	
+         case ('taux_ico')
+            if (.not. action) cycle
             stress_atmice_x(:) =  exchange(:)                    ! taux_ice
             do_rotate_ice_wind=.true.
-        elseif (i.eq.4) then
-            if (.not. action) cycle	
+         case ('tauy_ico')
+            if (.not. action) cycle
             stress_atmice_y(:) =  exchange(:)                    ! tauy_ice
-            do_rotate_ice_wind=.true.	     
-        elseif (i.eq.5) then
-            if (action) then 
+            do_rotate_ice_wind=.true.
+         case ('prec_oce')
+            if (action) then
                 prec_rain(:)    =  exchange(:)	                  ! tot_prec
                 mask=1.
                 call force_flux_consv(prec_rain, mask, i, 0,action, partit, mesh)
             end if
-        elseif (i.eq.6) then 
+         case ('snow_oce')
             if (action) then
                 prec_snow(:)    =  exchange(:)                    ! snowfall
                 mask=1.
                 call force_flux_consv(prec_snow, mask,i,1,action, partit, mesh) ! Northern hemisphere
                 call force_flux_consv(prec_snow, mask,i,2,action, partit, mesh) ! Southern Hemisphere
             end if
-         elseif (i.eq.7) then
+         case ('evap_oce')
             if (action) then
                 evap_no_ifrac(:)     =  exchange(:)        	  ! tot_evap
-                tmp_evap_no_ifrac(:) =  exchange(:) 		  ! to reset for flux 
+                tmp_evap_no_ifrac(:) =  exchange(:) 		  ! to reset for flux
                                                               ! correction
             end if
             mask=1.-a_ice
             evap_no_ifrac(:)     =  tmp_evap_no_ifrac(:)
             call force_flux_consv(evap_no_ifrac,mask,i,0,action, partit, mesh)
-        elseif (i.eq.8) then
+         case ('subl_oce')
             if (action) then
                 sublimation(:)       =  exchange(:)        	  ! tot_subl
-                tmp_sublimation(:)   =  exchange(:) 		  ! to reset for flux 
+                tmp_sublimation(:)   =  exchange(:) 		  ! to reset for flux
                                                               ! correction
             end if
-            mask=a_ice 
+            mask=a_ice
             sublimation(:)       =  tmp_sublimation(:)
             call force_flux_consv(sublimation,mask,i,1,action, partit, mesh) ! Northern hemisphere
             call force_flux_consv(sublimation,mask,i,2,action, partit, mesh) ! Southern Hemisphere
-        elseif (i.eq.9) then
+         case ('heat_oce')
             if (action) then
                 oce_heat_flux(:)     =  exchange(:)        	  ! heat_oce
-                tmp_oce_heat_flux(:) =  exchange(:) 		  ! to reset for flux 
+                tmp_oce_heat_flux(:) =  exchange(:) 		  ! to reset for flux
                                                               ! correction
             end if
             mask=1.-a_ice
             oce_heat_flux(:)     =  tmp_oce_heat_flux(:)
             call force_flux_consv(oce_heat_flux, mask, i, 0,action, partit, mesh)
-        elseif (i.eq.10) then
+         case ('heat_ico')
             if (action) then
                 ice_heat_flux(:)     =  exchange(:)        	  ! heat_ice
-                tmp_ice_heat_flux(:) =  exchange(:) 		  ! to reset for flux 
+                tmp_ice_heat_flux(:) =  exchange(:) 		  ! to reset for flux
                                                               ! correction
             end if
             mask=a_ice
             ice_heat_flux(:)     =  tmp_ice_heat_flux(:)
             call force_flux_consv(ice_heat_flux, mask, i, 1,action, partit, mesh) ! Northern hemisphere
-            call force_flux_consv(ice_heat_flux, mask, i, 2,action, partit, mesh) ! Southern Hemisphere	     
-        elseif (i.eq.11) then
+            call force_flux_consv(ice_heat_flux, mask, i, 2,action, partit, mesh) ! Southern Hemisphere
+         case ('heat_swo')
             if (action) then
                 shortwave(:)         =  exchange(:)		        ! heat_swr
-                tmp_shortwave(:)     =  exchange(:) 		    ! to reset for flux 
+                tmp_shortwave(:)     =  exchange(:) 		    ! to reset for flux
                                                                 ! correction
             end if
             mask=1.-a_ice
             shortwave(:)   =  tmp_shortwave(:)
             call force_flux_consv(shortwave, mask, i, 0,action, partit, mesh)
-        elseif (i.eq.12) then
+         case ('hydr_oce')
             if (action) then
                 runoff(:)            =  exchange(:)        ! AWI-CM2: runoff, AWI-CM3: runoff + excess snow on glaciers
                 mask=1.
                 call force_flux_consv(runoff, mask, i, 0,action, partit, mesh)
             end if
-         elseif (i.ge.13) then
-          ! From here the received field set depends on the partner.
-          if (is_coupled_to_oifs) then
-
-           if (i.eq.13) then
-             if (action) then
+         case ('calv_oce')
+            if (action) then
                 runoff_solid(:)      =  exchange(:)        ! solid water discharge (excess snow --> calving)
                 enthalpyoffuse(:)            =  runoff_solid(:)*333.55*1000000.0        ! enthalpy of fusion of the solid water discharge from glaciers
                 enthalpyoffuse = -min(enthalpyoffuse, 1000.0)
@@ -540,128 +521,98 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
                 call force_flux_consv(runoff_liquid, mask, i, 0, action, partit, mesh)
                 call force_flux_consv(runoff_solid, mask, i, 0, action, partit, mesh)
                 call force_flux_consv(enthalpyoffuse, mask, i, 0, action, partit, mesh)
-             end if
-         elseif (i.eq.14) then
-             if (action) then
+            end if
+         case ('u10w_oce')
+            if (action) then
                 u_wind(:)                     = exchange(:)        ! zonal wind
-             end if
-         elseif (i.eq.15) then
-             if (action) then
+            end if
+            ! ECHAM6 sends the winds for the icebergs and corrects them like a flux
+            if (is_coupled_to_echam) then
+                mask=1.
+                call force_flux_consv(u_wind, mask, i, 0, action, partit, mesh)
+            end if
+         case ('v10w_oce')
+            if (action) then
                 v_wind(:)                     = exchange(:)        ! meridional wind
-             end if
-         elseif (i.eq.recv_tsk_ico) then
-             if (action) then
+            end if
+            if (is_coupled_to_echam) then
+                mask=1.
+                call force_flux_consv(v_wind, mask, i, 0, action, partit, mesh)
+            end if
+         case ('tsk_ico')
+            if (action) then
                 ice%atmcoupl%ist_ref(:)       = exchange(:)        ! ice-tile skin temperature
-             end if
-         elseif (i.eq.recv_mslp_oce) then
-             if (action) then
+            end if
+         case ('mslp_oce')
+            if (action) then
                 ! Mean sea-level pressure [Pa]. Only the gas exchange reads it here:
                 ! the pressure term of the momentum equation stays under l_mslp.
                 press_air(:)                  = exchange(:)
-             end if
+            end if
 #if defined (__recom)
-         elseif (i.eq.16) then
-             if (action) then
+         case ('XCO2_oce')
+            if (action) then
                 ! Convert mass mixing ratio (kg/kg) to ppm
                 ! MW_CO2 = 44.0095 g/mol (NIST 2018)
                 ! MW_dry_air = 28.9647 g/mol (standard atmosphere composition)
                 x_co2atm(:) = exchange(:) * ((28.9647_WP/44.0095_WP)*1e6_WP)  ! [ppm]
-             end if
+            end if
 #endif
-           end if
-          else
-           if (i.eq.13) then
+!---wiso-code
+         case ('w1_oce')
             if (action) then
-                 if (lwiso) then         
-                     www3(:)         =  exchange(:)
-                 else if (use_icebergs) then    
-                     u_wind(:)                     = exchange(:)        ! zonal wind
-                 end if
-             end if
-             mask=1.
-             if (lwiso) then         
-                 call force_flux_consv(www3, mask, i, 0,action, partit, mesh)
-             else if (use_icebergs) then    
-                 call force_flux_consv(u_wind, mask, i, 0, action, partit, mesh)
-             end if
-         elseif (i.eq.14) then
-             if (action) then
-                 if (lwiso) then         
-                     www1(:)         =  exchange(:)
-                 else if (use_icebergs) then    
-                     v_wind(:)                     = exchange(:)        ! meridional wind
-                 end if
-             end if
-             mask=1.
-             if (lwiso) then         
-                 call force_flux_consv(www1, mask, i, 0,action, partit, mesh)
-             else if (use_icebergs) then    
-                 call force_flux_consv(v_wind, mask, i, 0, action, partit, mesh)
-             end if
-         elseif (i.eq.15) then
-             if (action) then
-             ! tot_prec_hdo over water: this variable includes (i) rain over open water and sea ice, (ii) snow and evap over open water,  (iii) river runoff
-             www2(:)         =  exchange(:)
-             end if
-             mask=1.
-             if (lwiso) then
-             call force_flux_consv(www2, mask, i, 0,action, partit, mesh)
-             end if
-         elseif (i.eq.17) then
-             if (action) then
-             ! snowfall_o18 over seaice: this variable includes snow and sublimation over sea ice areas
-             iii1(:)         =  exchange(:)
-             tmp_iii1(:)     =  exchange(:)                   ! to reset for flux correction
-             end if
-             mask=a_ice
-             iii1(:)         =  tmp_iii1(:)
-             if (lwiso) then
-                 call force_flux_consv(iii1,mask,i,1,action, partit, mesh) ! Northern hemisphere
-                 call force_flux_consv(iii1,mask,i,2,action, partit, mesh) ! Southern Hemisphere
-             end if
-         elseif (i.eq.18) then
-             if (action) then
-             ! snowfall_hdo over seaice: this variable includes snow and sublimation over sea ice areas
-             iii2(:)         =  exchange(:)
-             tmp_iii2(:)     =  exchange(:)                   ! to reset for flux correction
-             end if
-             mask=a_ice
-             iii2(:)         =  tmp_iii2(:)
-             if (lwiso) then
-                 call force_flux_consv(iii2,mask,i,1,action, partit, mesh) ! Northern hemisphere
-                 call force_flux_consv(iii2,mask,i,2,action, partit, mesh) ! Southern Hemisphere
-             end if
-         elseif (i.eq.16) then
-             if (action) then
-             ! snowfall_o16 over seaice: this variable includes snow and sublimation over sea ice areas
-             iii3(:)         =  exchange(:)
-             tmp_iii3(:)     =  exchange(:)                   ! to reset for flux correction
-             end if
-             mask=a_ice
-             iii3(:)         =  tmp_iii3(:)
-             if (lwiso) then
-                 call force_flux_consv(iii3,mask,i,1,action, partit, mesh) ! Northern hemisphere
-                 call force_flux_consv(iii3,mask,i,2,action, partit, mesh) ! Southern Hemisphere
-             end if
-         elseif (i.eq.19) then
-             if (action) then
-                u_wind(:)                     = exchange(:)        ! meridional wind
-             end if
-             mask=1
-             if (use_icebergs.and.lwiso) then    
-                 call force_flux_consv(u_wind, mask, i, 0, action, partit, mesh)
-             end if
-         elseif (i.eq.20) then
-             if (action) then
-                v_wind(:)                     = exchange(:)        ! meridional wind
-             end if
-             mask=1
-             if (use_icebergs.and.lwiso) then    
-                 call force_flux_consv(v_wind, mask, i, 0, action, partit, mesh)
-             end if
-           end if
-          end if
-         end if
+                www3(:)         =  exchange(:)
+            end if
+            mask=1.
+            call force_flux_consv(www3, mask, i, 0,action, partit, mesh)
+         case ('w2_oce')
+            if (action) then
+                www1(:)         =  exchange(:)
+            end if
+            mask=1.
+            call force_flux_consv(www1, mask, i, 0,action, partit, mesh)
+         case ('w3_oce')
+            if (action) then
+            ! tot_prec_hdo over water: this variable includes (i) rain over open water and sea ice, (ii) snow and evap over open water,  (iii) river runoff
+            www2(:)         =  exchange(:)
+            end if
+            mask=1.
+            call force_flux_consv(www2, mask, i, 0,action, partit, mesh)
+         case ('i1_oce')
+            if (action) then
+            ! snowfall_o16 over seaice: this variable includes snow and sublimation over sea ice areas
+            iii3(:)         =  exchange(:)
+            tmp_iii3(:)     =  exchange(:)                   ! to reset for flux correction
+            end if
+            mask=a_ice
+            iii3(:)         =  tmp_iii3(:)
+            call force_flux_consv(iii3,mask,i,1,action, partit, mesh) ! Northern hemisphere
+            call force_flux_consv(iii3,mask,i,2,action, partit, mesh) ! Southern Hemisphere
+         case ('i2_oce')
+            if (action) then
+            ! snowfall_o18 over seaice: this variable includes snow and sublimation over sea ice areas
+            iii1(:)         =  exchange(:)
+            tmp_iii1(:)     =  exchange(:)                   ! to reset for flux correction
+            end if
+            mask=a_ice
+            iii1(:)         =  tmp_iii1(:)
+            call force_flux_consv(iii1,mask,i,1,action, partit, mesh) ! Northern hemisphere
+            call force_flux_consv(iii1,mask,i,2,action, partit, mesh) ! Southern Hemisphere
+         case ('i3_oce')
+            if (action) then
+            ! snowfall_hdo over seaice: this variable includes snow and sublimation over sea ice areas
+            iii2(:)         =  exchange(:)
+            tmp_iii2(:)     =  exchange(:)                   ! to reset for flux correction
+            end if
+            mask=a_ice
+            iii2(:)         =  tmp_iii2(:)
+            call force_flux_consv(iii2,mask,i,1,action, partit, mesh) ! Northern hemisphere
+            call force_flux_consv(iii2,mask,i,2,action, partit, mesh) ! Southern Hemisphere
+!---wiso-code-end
+         case default
+            write(*,*) 'update_atm_forcing: no handler for the received field ', trim(cpl_recv(i))
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
+         end select
 
 #ifdef VERBOSE
 	  if (partit%mype==0) then

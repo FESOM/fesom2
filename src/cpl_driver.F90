@@ -13,10 +13,10 @@ module cpl_driver
   ! Modules used
   !
   use mod_oasis                    ! oasis module
-  use g_config,   only : dt, use_icebergs, lwiso
+  use g_config,   only : dt
   use cpl_config, only : cpl_comp_name, cpl_grid_name, &
-                         compute_oasis_corners, &
-                         is_coupled_to_echam, is_coupled_to_oifs
+                         compute_oasis_corners, is_coupled_to_echam
+  use cpl_fields, only : nsend, nrecv, cpl_send, cpl_recv
 #if defined(__recom) && defined(__usetp)
   use g_config, only : num_fesom_groups 
 #endif
@@ -32,22 +32,10 @@ module cpl_driver
   ! Exchange parameters for coupling FESOM with ECHAM6
   !
 
-  ! nsend/nrecv are variables, not parameters: the field set depends on the
-  ! partner atmosphere (set from is_coupled_to_* in cpl_oasis3mct_init) and is
-  ! then adjusted for lwiso / use_icebergs in fesom_init. The values below are
-  ! only placeholders until cpl_oasis3mct_init runs.
-  integer                    :: nsend = 0
-  integer                    :: nrecv = 0
-  
-  ! define send_id and recv_id with variable dimension as nsend and nrecv are now variables)
+  ! The field names and counts (nsend, nrecv, cpl_send, cpl_recv) live in
+  ! cpl_fields and are re-exported from here; the OASIS ids follow them.
   integer, allocatable, dimension(:) :: send_id
   integer, allocatable, dimension(:) :: recv_id
-
-  ! define cpl_send and cpl_recv with variable dimension as nsend and nrecv are now variables)
-  character(len=32), allocatable, dimension(:) :: cpl_send
-  character(len=32), allocatable, dimension(:) :: cpl_recv
-
-  !---wiso-code-end
 
   character(len=16)          :: comp_name      ! name of this component
   character(len=11)          :: grid_name      ! name of the grid
@@ -105,11 +93,6 @@ module cpl_driver
   public seconds_til_now 
   public send_id, recv_id
   public nsend, nrecv, cpl_send, cpl_recv
-
-  ! position of tsk_ico in cpl_recv; 0 when use_atm_ice_tskin is off
-  integer, public            :: recv_tsk_ico = 0
-  ! position of mslp_oce in cpl_recv; 0 when use_atm_mslp is off
-  integer, public            :: recv_mslp_oce = 0
   public source_root, target_root, commRank
   public a2o_fcorr_stat
 
@@ -363,23 +346,6 @@ include "node_contour_boundary.h"
     grid_name = cpl_grid_name
 
     !------------------------------------------------------------------
-    ! Field set of the partner atmosphere. fesom_init adjusts these
-    ! afterwards for lwiso and use_icebergs.
-    !------------------------------------------------------------------
-    if (is_coupled_to_oifs) then
-#if defined (__recom)
-       nsend = 9      ! + FCO2_feom
-       nrecv = 16     ! + XCO2_oce
-#else
-       nsend = 8
-       nrecv = 15
-#endif
-    else
-       nsend = 4
-       nrecv = 12
-    end if
-
-    !------------------------------------------------------------------
     ! 1st Initialize the OASIS3-MCT coupling system for the application
     !------------------------------------------------------------------
 #if defined(__recom) && defined(__usetp)
@@ -513,14 +479,9 @@ include "node_contour_boundary.h"
     ! ... Some initialisation
     ! -----------------------------------------------------------------
 
-!---wiso-code
-    ALLOCATE(cpl_send(nsend))
-    ALLOCATE(cpl_recv(nrecv))
-
     ALLOCATE(send_id(nsend))
     ALLOCATE(recv_id(nrecv))
-!---wiso-code-end
-    
+
     ALLOCATE(displs_from_all_pes(partit%npes))
     ALLOCATE(counts_from_all_pes(partit%npes))
 
@@ -694,93 +655,8 @@ include "node_contour_boundary.h"
 !------------------------------------------------------------------
 ! 3rd Declare the transient variables
 !------------------------------------------------------------------
-!
-!
-! ... Define symbolic names for the transient fields send by the ocean
-!     These must be identical to the names specified in the SMIOC file.
-!
-    IF (is_coupled_to_oifs) THEN
-      cpl_send( 1)='sst_feom' ! 1. sea surface temperature [K]       ->
-      cpl_send( 2)='sie_feom' ! 2. sea ice extent [%-100]            ->
-      cpl_send( 3)='snt_feom' ! 3. snow thickness [m]                ->
-      cpl_send( 4)='ist_feom' ! 4. sea ice surface temperature [K]   ->
-      cpl_send( 5)='sia_feom' ! 5. sea ice albedo [%-100]            ->
-      cpl_send( 6)='u_feom'   ! 6. eastward  surface velocity [m/s]  ->
-      cpl_send( 7)='v_feom'   ! 7. northward surface velocity [m/s]  ->
-      cpl_send( 8)='sit_feom' ! 8. effective sea ice thickness [m]   ->
-#if defined (__recom)
-      cpl_send( 9)='FCO2_feom'! 9. CO2 flux [kgCO2 m-2 s-1]         ->
-#endif
-    ELSE
-      cpl_send( 1)='sst_feom' ! 1. sea surface temperature [°C]      ->
-      cpl_send( 2)='sit_feom' ! 2. sea ice thickness [m]             ->
-      cpl_send( 3)='sie_feom' ! 3. sea ice extent [%-100]            ->
-      cpl_send( 4)='snt_feom' ! 4. snow thickness [m]                ->
-!---wiso-code
-! add isotope coupling fields
-      IF (lwiso) THEN
-        cpl_send( 5)='o18w_oce' !               -> h2o18 of ocean water
-        cpl_send( 6)='hdow_oce' !               -> hdo16 of ocean water
-        cpl_send( 7)='o16w_oce' !               -> h2o16 of ocean water
-        cpl_send( 8)='o18i_oce' !               -> h2o18 of sea ice
-        cpl_send( 9)='hdoi_oce' !               -> hdo16 of sea ice
-        cpl_send(10)='o16i_oce' !               -> h2o16 of sea ice
-      END IF
-!---wiso-code-end
-    END IF
-
-
-    
-!
-! ...  Define symbolic names for transient fields received by the ocean.
-!      These must be identical to the names specified in the SMIOC file.
-!
-    ! The first twelve are common to both partners.
-    cpl_recv(1)  = 'taux_oce'
-    cpl_recv(2)  = 'tauy_oce'
-    cpl_recv(3)  = 'taux_ico'
-    cpl_recv(4)  = 'tauy_ico'    
-    cpl_recv(5)  = 'prec_oce'
-    cpl_recv(6)  = 'snow_oce'    
-    cpl_recv(7)  = 'evap_oce'
-    cpl_recv(8)  = 'subl_oce'
-    cpl_recv(9)  = 'heat_oce'
-    cpl_recv(10) = 'heat_ico'
-    cpl_recv(11) = 'heat_swo'    
-    cpl_recv(12) = 'hydr_oce'
-
-    IF (is_coupled_to_oifs) THEN
-      cpl_recv(13) = 'calv_oce'
-      cpl_recv(14) = 'u10w_oce'
-      cpl_recv(15) = 'v10w_oce'
-#if defined (__recom)
-      cpl_recv(16) = 'XCO2_oce'
-#endif
-      if (recv_tsk_ico > 0) cpl_recv(recv_tsk_ico) = 'tsk_ico'
-      if (recv_mslp_oce > 0) cpl_recv(recv_mslp_oce) = 'mslp_oce'
-    ELSE
-! --- icebergs ---
-      IF (lwiso) THEN
-        cpl_recv(13) = 'w1_oce'
-        cpl_recv(14) = 'w2_oce'
-        cpl_recv(15) = 'w3_oce'
-        cpl_recv(16) = 'i1_oce'
-        cpl_recv(17) = 'i2_oce'
-        cpl_recv(18) = 'i3_oce'
-        IF (use_icebergs) THEN
-          cpl_recv(19) = 'u10w_oce'
-          cpl_recv(20) = 'v10w_oce'
-        END IF
-      ELSE IF (use_icebergs) THEN
-        cpl_recv(13) = 'u10w_oce'
-        cpl_recv(14) = 'v10w_oce'
-      END IF
-! --- icebergs ---
-    END IF
-
-    if (partit%mype .eq. 0) then 
-       print *, 'FESOM after declaring the transient variables'
-    endif
+! The field names were registered by define_cpl_fields (cpl_fields).
+! They must match the namcouple.
 
     data_type = oasis_DOUBLE
 !     nodim(1): the overall number of dimensions of array that is going
