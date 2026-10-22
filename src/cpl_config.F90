@@ -144,11 +144,11 @@ contains
        write(*,*) '     could not find ', nmlfile, &
                   ', will use default values !'
     end if
-    call report_cpl_config(mype)
 
     !__________________________________________________________________________
     ! compute_oasis_corners used to live in &run_config of namelist.config.
-    ! Either location still switches it on.
+    ! Either location still switches it on. Folded in before the report, so
+    ! that the report shows the value the run uses.
     if (deprecated_oasis_corners) then
        if (mype == 0 .and. .not. compute_oasis_corners) then
           write(*,*) 'WARNING: compute_oasis_corners in &run_config of ', &
@@ -157,6 +157,7 @@ contains
        end if
        compute_oasis_corners = .true.
     end if
+    call report_cpl_config(mype)
 
     !__________________________________________________________________________
     ! Exactly one atmosphere.
