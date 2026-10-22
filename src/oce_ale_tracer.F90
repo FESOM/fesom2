@@ -2042,6 +2042,7 @@ end subroutine diff_part_bh
 ! ID = 0 and 1 are reserved for temperature and salinity
 ! MB: mesh, sst, sss, and aice are only needed for transient tracers
 FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
+  use cpl_config, only: is_coupled_to_echam, is_coupled_to_oifs
   implicit none
 
   integer,       intent(in)            :: n, id, nzmin
@@ -2054,15 +2055,15 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
   real(kind=WP), dimension(:), pointer :: a_ice  !! MB: where is this needed?
 
   if (use_transit) then
-#if defined (__cpl_oasis)
-    ! SLP and wind speed in coupled setups. This is a makeshift solution
-    ! as long as the true values are not provided by the AGCM / OASIS.
-    press_a = mean_slp
-    wind_2  = speed_2(stress_atmoce_x(n), stress_atmoce_y(n))
-#else
-    press_a = press_air(n)
-    wind_2  = u_wind(n)**2 + v_wind(n)**2
-#endif
+    if (is_coupled_to_echam .or. is_coupled_to_oifs) then
+      ! SLP and wind speed in coupled setups. This is a makeshift solution
+      ! as long as the true values are not provided by the AGCM / OASIS.
+      press_a = mean_slp
+      wind_2  = speed_2(stress_atmoce_x(n), stress_atmoce_y(n))
+    else
+      press_a = press_air(n)
+      wind_2  = u_wind(n)**2 + v_wind(n)**2
+    end if
     ! Atmospheric input of bomb-14C, CFC-11, CFC-12, and SF6 varies with latitude. To that effect specify
     y_abc = mesh%geo_coord_nod2D(2,n) / rad  ! latitude of atmospheric tracer input
     yy_nh = (10. - y_abc) * 0.05             ! interpolation weight for tropical CFC-12 and SF6 values
@@ -2324,6 +2325,7 @@ END FUNCTION
 ! Different to function bc_surface, SST, SSS, and sea ice concentrations are always needed as
 ! auxiliary variable
 FUNCTION transit_bc_surface(n, id, sst, sss, aice, sval, nzmin, partit, mesh)
+  use cpl_config, only: is_coupled_to_echam, is_coupled_to_oifs
   implicit none
 
   integer,       intent(in)            :: n, id, nzmin
@@ -2337,15 +2339,15 @@ FUNCTION transit_bc_surface(n, id, sst, sss, aice, sval, nzmin, partit, mesh)
   !  --> is_nonlinfs=1.0 for zelvel,zstar ....
   !  --> is_nonlinfs=0.0 for linfs
 
-#if defined (__cpl_oasis)
-! SLP and wind speed in coupled setups. This is a makeshift solution
-! as long as the true values are not provided by the AGCM / OASIS.
-  press_a = mean_slp
-  wind_2  = speed_2(stress_atmoce_x(n), stress_atmoce_y(n))
-#else
-  press_a = press_air(n)
-  wind_2  = u_wind(n)**2 + v_wind(n)**2
-#endif
+  if (is_coupled_to_echam .or. is_coupled_to_oifs) then
+    ! SLP and wind speed in coupled setups. This is a makeshift solution
+    ! as long as the true values are not provided by the AGCM / OASIS.
+    press_a = mean_slp
+    wind_2  = speed_2(stress_atmoce_x(n), stress_atmoce_y(n))
+  else
+    press_a = press_air(n)
+    wind_2  = u_wind(n)**2 + v_wind(n)**2
+  end if
 
 ! The atmospheric input of bomb 14C, CFC-12, and SF6 depends on latitude. To that effect specify
   y_abc = mesh%geo_coord_nod2D(2,n) / rad  ! latitude of atmospheric tracer input

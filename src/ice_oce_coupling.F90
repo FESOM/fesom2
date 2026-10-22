@@ -211,6 +211,9 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
                             virtual_oxy
 #endif
 
+#if defined (__cpl_enabled)
+    use cpl_config, only: is_coupled_to_icon_a
+#endif
     implicit none
     type(t_ice)   , intent(inout), target :: ice
     type(t_dyn)   , intent(in)   , target :: dynamics
@@ -517,17 +520,14 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
                   +prec_snow(n)*(1.0_WP-a_ice_old(n)) &
 #endif
 
-! TODO: __cpl_yac is absent here, as in the pre-rework guard. Declaration
-! and use agree, so this is self-consistent, but YAC does not get
-! residualifwflx or the rhofwt/rhowat freshwater conversion. Widening the
-! guard changes YAC results, so it is left to a separate change.
-#if defined (__cpl_oasis) || defined (__cpl_direct)
-                  +residualifwflx(n)                  & ! balance residual ice flux only in coupled case
+#if defined (__cpl_enabled)
+                  +residualifwflx(n)                  & ! balance residual ice flux only in coupled case (zero for ICON-A)
 #endif
                   +runoff(n)
-#if defined (__cpl_oasis) || defined (__cpl_direct)
-! in the coupled mode the computation of freshwater flux takes into account the ratio between freshwater & salt water
-        flux(n) = flux(n)*ice%thermo%rhofwt/ice%thermo%rhowat
+#if defined (__cpl_enabled)
+! in the coupled mode the computation of freshwater flux takes into account the ratio between freshwater & salt water;
+! the ICON-A coupling does not use it
+        if (.not. is_coupled_to_icon_a) flux(n) = flux(n)*ice%thermo%rhofwt/ice%thermo%rhowat
 #endif
     end do
 !$OMP END PARALLEL DO

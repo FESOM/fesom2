@@ -66,9 +66,23 @@ The selection drives the exchanged field set, which ``define_cpl_fields`` in
 ``src/cpl_fields.F90`` registers by name; the names must match the
 ``namcouple`` or ``coupling.yaml``. It also decides whether the ECHAM-only flux-correction
 machinery runs (``force_flux_consv`` and the out-of-band net-flux exchange in
-``net_rec_from_atm``), and whether the ice model carries a prognostic ice
-surface temperature as a fourth advected ice tracer, which the IFS-family
-atmospheres expect and the others do not.
+``net_rec_from_atm``).
+
+What FESOM provides to and receives from the atmosphere, as far as the
+sea-ice model is concerned, is derived from the selection, not from the
+compiled interface, and printed at startup:
+
+- **fesom_provides_ice_surface** FESOM computes the ice surface temperature,
+  carried as an extra advected ice tracer, and the ice albedo, and sends both
+  to the atmosphere. OpenIFS and IFS.
+- **fesom_receives_ice_flux_at_sent_surface** the ice heat flux was evaluated
+  at the surface temperature FESOM last sent. FESOM linearises its own surface
+  temperature solve around it, and ice growth follows the flux. OpenIFS.
+- **fesom_receives_ice_flux_for_skin_balance** the ice heat flux forces
+  FESOM's own surface temperature solve, and ice growth follows that surface
+  energy balance. IFS.
+- **fesom_receives_area_weighted_evaporation** evaporation and sublimation
+  arrive already weighted by the open-water and ice fractions. IFS.
 
 Section &coupling_oasis
 """""""""""""""""""""""
