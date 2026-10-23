@@ -14,7 +14,7 @@ module io_MEANDATA
   use io_redistribute
   use netcdf
   use, intrinsic :: ieee_arithmetic, only: ieee_is_nan
-  use io_xios_module, only: io_xios_is_on, io_xios_field_is_active, &
+  use io_xios_module, only: io_xios_is_on, io_xios_field_is_active, io_xios_field_is_used, &
                             io_xios_send_2d_r8, io_xios_send_2d_r4, &
                             io_xios_send_3d_r8, io_xios_send_3d_r4, &
                             io_xios_set_ice_conc, io_xios_is_ice_field, &
@@ -86,6 +86,12 @@ module io_MEANDATA
     real(kind=WP)                                      :: offset = 0.0_WP ! added ONCE to the mean after the division, not per sample (use_salt_anomaly: salt/sss carry +S_ref_anomaly so output stays absolute)
     character(500)                                     :: filename
     character(100)                                     :: name
+    ! Field whose masking rules apply (ice mask, wet mask, cavity mask). Equal to
+    ! name, except for XIOS alias streams, which carry their base field's name here.
+    character(100)                                     :: basename = ''
+    ! Instantaneous stream (XIOS aliases with mode 'inst'): the "mean" handed to
+    ! XIOS is the value of the last time step, not an average since the last send.
+    logical                                            :: instant = .false.
     character(500)                                     :: description
     character(100)                                     :: units
     character(100)                                     :: dimname(2)
@@ -2790,6 +2796,13 @@ END DO ! --> DO i=1, io_listsize
         end if
     end if
 
+#if defined(__XIOS)
+    !___________________________________________________________________________
+    ! Second streams on fields that the XML writes at more than one cadence, as
+    ! a surface level, or as a snapshot. Needs every base stream defined above.
+    if (io_xios_is_on()) call def_xios_aliases(partit, mesh)
+#endif
+
     !___________________________________________________________________________
     ! Output-precision summary, printed once per run so the precision of what
     ! lands on disk is visible in the log rather than implied by the file.
@@ -2827,6 +2840,156 @@ END DO ! --> DO i=1, io_listsize
     end if
 
 end subroutine
+!
+!
+!_______________________________________________________________________________
+! XIOS alias streams.
+!
+! Under XIOS a stream is sent whenever xios_field_is_active says any file wants
+! it, and every send hands over the mean since the previous send. If one field
+! id feeds files of different cadence (a daily and a monthly file of m_ice),
+! FESOM sends at the finer cadence and the coarser file samples only the last
+! short mean: monthly m_ice was the mean of the last day of the month. Sending
+! the base field at the finest cadence fixes the averaging but multiplies MPI
+! traffic, badly so when the fine file only needs the surface of a 3D field.
+!
+! An alias is a second stream on the same model array, with its own accumulator
+! and its own XIOS field id, so every id has exactly one cadence in the XML:
+!   mean  same field, different cadence (m_ice_day, fh_3h, DOC_day)
+!   sfc   uppermost level of a 3D node field as a 2D stream (O2_sfc): the daily
+!         send is 2D, the base 3D field stays monthly
+!   inst  snapshot: the value of the last step before the send (sst_inst for
+!         3hr tos, sgm11_inst for sistressave), sent once per output interval
+! Aliases keep the base field's masking rules (basename, cavity mask, offset).
+! An alias is created only if the XML uses its id in an enabled file, so the
+! table costs nothing for runs that do not write it. Each alias id needs its
+! own <field> in field_def_fesom.xml, not a field_ref to the base: a field_ref
+! field takes its data from the referenced field inside XIOS.
+subroutine def_xios_aliases(partit, mesh)
+    use mod_mesh
+    USE MOD_PARTIT
+    use par_support_module, only: par_abort
+    implicit none
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh),   intent(in),    target :: mesh
+    character(len=20), parameter :: alias_id(*) = (/ character(len=20) :: &
+        'm_ice_day',      'sst_inst',       'sgm11_inst',     'sgm12_inst',     'sgm22_inst',     &
+        'fh_3h',          'fw_3h',          'tx_sur_3h',      'ty_sur_3h',      'qsr_3h',         &
+        'runoff_3h',      'virtsalt_3h',                                                          &
+        'utemp_day',      'vtemp_day',      'salt_day',       'w_day',          'rsdoabsorb_day', &
+        'DOC_day',        'DetC_day',       'HetC_day',       'idetz2c_day',    'Zoo2C_day',      &
+        'Zoo3C_day',      'NPPn_day',       'NPPd_day',       'intPOC_day',     'bflxC_day',      &
+        'O2min_day',                                                                              &
+        'O2_sfc',         'pH_sfc',         'CO3_sfc',        'CO3satA_sfc',    'PhyC_sfc',       &
+        'DiaC_sfc',       'PhyChl_sfc',     'DiaChl_sfc' /)
+    character(len=20), parameter :: alias_of(*) = (/ character(len=20) :: &
+        'm_ice',          'sst',            'sgm11',          'sgm12',          'sgm22',          &
+        'fh',             'fw',             'tx_sur',         'ty_sur',         'qsr',            &
+        'runoff',         'virtsalt',                                                             &
+        'utemp',          'vtemp',          'salt',           'w',              'rsdoabsorb',     &
+        'DOC',            'DetC',           'HetC',           'idetz2c',        'Zoo2C',          &
+        'Zoo3C',          'NPPn',           'NPPd',           'intPOC',         'bflxC',          &
+        'O2min',                                                                                  &
+        'O2',             'pH',             'CO3',            'CO3satA',        'PhyC',           &
+        'DiaC',           'PhyChl',         'DiaChl' /)
+    character(len=4), parameter :: alias_mode(*) = (/ character(len=4) :: &
+        'mean',           'inst',           'inst',           'inst',           'inst',           &
+        'mean',           'mean',           'mean',           'mean',           'mean',           &
+        'mean',           'mean',                                                                 &
+        'mean',           'mean',           'mean',           'mean',           'mean',           &
+        'mean',           'mean',           'mean',           'mean',           'mean',           &
+        'mean',           'mean',           'mean',           'mean',           'mean',           &
+        'mean',                                                                                   &
+        'sfc',            'sfc',            'sfc',            'sfc',            'sfc',            &
+        'sfc',            'sfc',            'sfc' /)
+    type(Meandata), pointer :: base, alias
+    integer :: a, n, ibase, nbefore
+
+    if (size(alias_id) /= size(alias_of) .or. size(alias_id) /= size(alias_mode)) then
+        if (partit%mype==0) write(*,*) 'def_xios_aliases: alias tables differ in length'
+        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
+    end if
+
+    do a = 1, size(alias_id)
+        if (.not. io_xios_field_is_used(trim(alias_id(a)))) cycle
+        if (stream_already_defined(trim(alias_id(a)))) cycle
+
+        ibase = 0
+        do n = 1, io_NSTREAMS
+            if (trim(io_stream(n)%p%name) == trim(alias_of(a))) then
+                ibase = n
+                exit
+            end if
+        end do
+        if (ibase == 0) then
+            ! the XML wants the alias but the model has no such base stream (e.g.
+            ! a REcoM field in a physics-only build): same as an unknown field id
+            if (partit%mype==0) write(*,*) 'XIOS alias ', trim(alias_id(a)), ': base stream ', &
+                                           trim(alias_of(a)), ' is not defined, alias skipped'
+            cycle
+        end if
+        base => io_stream(ibase)%p
+
+#ifdef ENABLE_OPENACC
+        if (trim(alias_mode(a)) == 'inst') then
+            if (partit%mype==0) write(*,*) 'XIOS alias ', trim(alias_id(a)), &
+                                           ': instantaneous streams are not implemented for OpenACC builds'
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
+        end if
+#endif
+
+        nbefore = io_NSTREAMS
+        select case (trim(alias_mode(a)))
+        case ('mean', 'inst')
+            if (base%ndim == 1) then
+                call def_stream2D(base%glsize(2), size(base%local_values_r8, dim=2), trim(alias_id(a)), &
+                                  trim(base%description), trim(base%units), base%ptr1,                  &
+                                  base%freq, base%freq_unit, base%accuracy, partit, mesh,               &
+                                  trim(base%long_description))
+                if (io_NSTREAMS > nbefore) io_stream(io_NSTREAMS)%p%ptr1 => base%ptr1
+            else
+                call def_stream3D(base%glsize, shape(base%local_values_r8), trim(alias_id(a)),          &
+                                  trim(base%description), trim(base%units), base%ptr3,                  &
+                                  base%freq, base%freq_unit, base%accuracy, partit, mesh,               &
+                                  base%flip, trim(base%long_description))
+                if (io_NSTREAMS > nbefore) io_stream(io_NSTREAMS)%p%ptr3 => base%ptr3
+            end if
+        case ('sfc')
+            if (base%ndim /= 2 .or. base%is_elem_based) then
+                if (partit%mype==0) write(*,*) 'XIOS alias ', trim(alias_id(a)), ': mode sfc needs a 3D node stream, ', &
+                                               trim(alias_of(a)), ' is not one'
+                call par_abort(partit%MPI_COMM_FESOM, partit%mype)
+            end if
+            ! level 1 is the top of the base array; under ice-shelf cavities it is
+            ! inside the shelf, so these streams take the 2D cavity mask
+            if (base%flip) then
+                call def_stream2D(base%glsize(2), size(base%local_values_r8, dim=2), trim(alias_id(a)), &
+                                  trim(base%description)//' at the surface', trim(base%units),          &
+                                  base%ptr3(:,1), base%freq, base%freq_unit, base%accuracy, partit,     &
+                                  mesh, trim(base%long_description))
+                if (io_NSTREAMS > nbefore) io_stream(io_NSTREAMS)%p%ptr1 => base%ptr3(:,1)
+            else
+                call def_stream2D(base%glsize(2), size(base%local_values_r8, dim=2), trim(alias_id(a)), &
+                                  trim(base%description)//' at the surface', trim(base%units),          &
+                                  base%ptr3(1,:), base%freq, base%freq_unit, base%accuracy, partit,     &
+                                  mesh, trim(base%long_description))
+                if (io_NSTREAMS > nbefore) io_stream(io_NSTREAMS)%p%ptr1 => base%ptr3(1,:)
+            end if
+        case default
+            if (partit%mype==0) write(*,*) 'XIOS alias ', trim(alias_id(a)), ': unknown mode ', trim(alias_mode(a))
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
+        end select
+        if (io_NSTREAMS == nbefore) cycle
+
+        alias => io_stream(io_NSTREAMS)%p
+        alias%basename       = base%basename
+        alias%offset         = base%offset
+        alias%mask_cavity_2d = base%mask_cavity_2d .or. trim(alias_mode(a)) == 'sfc'
+        alias%instant        = trim(alias_mode(a)) == 'inst'
+        if (partit%mype==0) write(*,*) 'XIOS alias ', trim(alias_id(a)), ' (', trim(alias_mode(a)), ') on ', &
+                                       trim(alias_of(a))
+    end do
+end subroutine def_xios_aliases
 
 
 !_______________________________________________________________________________
@@ -3297,9 +3460,9 @@ subroutine write_mean(entry, entry_index)
                 do k=1, n_own; tmp2_r8(k) = entry%local_values_r8_copy(1, own(k)); end do
                 tp1 = MPI_Wtime(); rtime_om_pack = rtime_om_pack + (tp1 - tp0)
                 tm0 = MPI_Wtime()
-                if (io_xios_is_ice_field(entry%name)) then
+                if (io_xios_is_ice_field(entry%basename)) then
                    call io_xios_apply_ice_mask_2d_elem_r8(tmp2_r8)
-                else if (trim(entry%name) /= 'fw' .and. trim(entry%name) /= 'fh') then
+                else if (trim(entry%basename) /= 'fw' .and. trim(entry%basename) /= 'fh') then
                    call io_xios_apply_wet_2d_elem_r8(tmp2_r8)
                 end if
                 tm1 = MPI_Wtime(); rtime_om_mask = rtime_om_mask + (tm1 - tm0)
@@ -3330,9 +3493,9 @@ subroutine write_mean(entry, entry_index)
                 do k=1, n_own; tmp2_r4(k) = entry%local_values_r4_copy(1, own(k)); end do
                 tp1 = MPI_Wtime(); rtime_om_pack = rtime_om_pack + (tp1 - tp0)
                 tm0 = MPI_Wtime()
-                if (io_xios_is_ice_field(entry%name)) then
+                if (io_xios_is_ice_field(entry%basename)) then
                    call io_xios_apply_ice_mask_2d_elem_r4(tmp2_r4)
-                else if (trim(entry%name) /= 'fw' .and. trim(entry%name) /= 'fh') then
+                else if (trim(entry%basename) /= 'fw' .and. trim(entry%basename) /= 'fh') then
                    call io_xios_apply_wet_2d_elem_r4(tmp2_r4)
                 end if
                 tm1 = MPI_Wtime(); rtime_om_mask = rtime_om_mask + (tm1 - tm0)
@@ -3367,9 +3530,9 @@ subroutine write_mean(entry, entry_index)
                 end do
                 tp1 = MPI_Wtime(); rtime_om_pack = rtime_om_pack + (tp1 - tp0)
                 tm0 = MPI_Wtime()
-                if (io_xios_is_ice_field(entry%name)) then
+                if (io_xios_is_ice_field(entry%basename)) then
                    call io_xios_apply_ice_mask_2d_r8(tmp2_r8)
-                else if (trim(entry%name) /= 'fw' .and. trim(entry%name) /= 'fh') then
+                else if (trim(entry%basename) /= 'fw' .and. trim(entry%basename) /= 'fh') then
                    call io_xios_apply_wet_2d_r8(tmp2_r8)
                 end if
                 tm1 = MPI_Wtime(); rtime_om_mask = rtime_om_mask + (tm1 - tm0)
@@ -3402,9 +3565,9 @@ subroutine write_mean(entry, entry_index)
                 end do
                 tp1 = MPI_Wtime(); rtime_om_pack = rtime_om_pack + (tp1 - tp0)
                 tm0 = MPI_Wtime()
-                if (io_xios_is_ice_field(entry%name)) then
+                if (io_xios_is_ice_field(entry%basename)) then
                    call io_xios_apply_ice_mask_2d_r4(tmp2_r4)
-                else if (trim(entry%name) /= 'fw' .and. trim(entry%name) /= 'fh') then
+                else if (trim(entry%basename) /= 'fw' .and. trim(entry%basename) /= 'fh') then
                    call io_xios_apply_wet_2d_r4(tmp2_r4)
                 end if
                 tm1 = MPI_Wtime(); rtime_om_mask = rtime_om_mask + (tm1 - tm0)
@@ -3574,6 +3737,12 @@ subroutine update_means
 
     DO n=1, io_NSTREAMS
         entry=>io_stream(n)%p
+        ! instantaneous stream: keep only the current step, so the value handed
+        ! over at the next send is a snapshot (see def_xios_aliases)
+        if (entry%instant) then
+            entry%local_values_r8 = 0._real64
+            entry%addcounter      = 0
+        end if
 #ifdef ENABLE_OPENACC
         if (update_means_acc(entry)) cycle
 #endif
@@ -4776,6 +4945,7 @@ subroutine def_stream_after_dimension_specific(entry, name, description, units, 
 
     !___________________________________________________________________________
     entry%name = name
+    entry%basename = name
     entry%mask_cavity_2d = any(cavity_masked_2d == name)
     entry%description = description
     entry%long_description = long_description
