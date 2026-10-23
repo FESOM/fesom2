@@ -60,6 +60,12 @@ module io_MEANDATA
       'thdgrarea', 'thdgrice', 'thdgrsnw', 'dyngrarea', 'dyngrice', 'dyngrsnw', &
       'atmice_x', 'atmice_y', 'iceoce_x', 'iceoce_y']
 
+  ! 2D fields the XIOS path sends unmasked at cavity columns (ulevels > 1): every other
+  ! 2D field gets _FillValue there. fw and fh are fluxes into the cavity water, the
+  ! column integrals cover the water under the shelf.
+  character(len=16), parameter :: xios_no_cavity_mask_2d(*) = [character(len=16) :: &
+      'fw', 'fh', 'utemp_int', 'vtemp_int']
+
   type Meandata
     private
     type(t_partit), pointer                            :: p_partit
@@ -708,7 +714,9 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
           "bflxN", "bflxC", "bflxSi", "bflxCalc", "expN", "expC", "expSi", "expCalc", &
           "graz", "intpbsi", "scavFe", &
           "dpO2s", "O2min", "intDIC", "intDOC", "intPOC", "limNn", "limFen", "limNd", "limFed", &
-          "O2sat", "OmegaA", "CO3satA" /)
+          "O2sat", "OmegaA", "CO3satA", &
+          ! CMOR column integrals of u*T, v*T (ldiag_cmor; CMIP7 hfx/hfy depth-integrated)
+          "utemp_int", "vtemp_int" /)
         integer :: k
         if (partit%mype==0) WRITE(*,*) 'XIOS mode: skipping namelist.io; registering all ', &
                                  size(xios_ids), ' known streams. XML decides output.'
@@ -827,6 +835,19 @@ CASE ('osaltdiff ')
 CASE ('rsdoabsorb')
     if (ldiag_cmor) then
     call def_stream((/mesh%nl-1, mesh%nod2D/), (/mesh%nl-1, partit%myDim_nod2D/), 'rsdoabsorb', 'shortwave flux absorbed in ocean layer', 'W/m2', rsdoabsorb(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+
+! Column integrals of u*T and v*T on elements, geographic east/north (ldiag_cmor; does not
+! need ldiag_trflx). Defined, and computed, only if the XML or namelist.io uses them.
+CASE ('utemp_int ')
+    if (ldiag_cmor .and. (.not. io_xios_is_on() .or. io_xios_field_is_used('utemp_int'))) then
+    call def_stream(mesh%elem2D, partit%myDim_elem2D, 'utemp_int', 'vertically integrated u*T', 'm2 s-1 degC', utemp_int(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh, "Column integral of eastward velocity times temperature at elements (times rho_0*cp: heat transport per unit width)")
+    ldiag_cmor_trflx_int = .true.
+    end if
+CASE ('vtemp_int ')
+    if (ldiag_cmor .and. (.not. io_xios_is_on() .or. io_xios_field_is_used('vtemp_int'))) then
+    call def_stream(mesh%elem2D, partit%myDim_elem2D, 'vtemp_int', 'vertically integrated v*T', 'm2 s-1 degC', vtemp_int(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh, "Column integral of northward velocity times temperature at elements (times rho_0*cp: heat transport per unit width)")
+    ldiag_cmor_trflx_int = .true.
     end if
 
 ! CMOR 0D (scalar) diagnostics for CMIP6/CMIP7 (require ldiag_cmor=.true.)
@@ -2796,6 +2817,11 @@ END DO ! --> DO i=1, io_listsize
         end if
     end if
 
+    ! The streams are created on the first output() call, after this step's
+    ! compute_diagnostics, which could not know yet that they are wanted. Fill them
+    ! now so the first sample folded into the mean is this step's value, not zero.
+    if (ldiag_cmor_trflx_int) call compute_cmor_trflx_int(tracers, dynamics, partit, mesh)
+
 #if defined(__XIOS)
     !___________________________________________________________________________
     ! Second streams on fields that the XML writes at more than one cadence, as
@@ -3462,7 +3488,7 @@ subroutine write_mean(entry, entry_index)
                 tm0 = MPI_Wtime()
                 if (io_xios_is_ice_field(entry%basename)) then
                    call io_xios_apply_ice_mask_2d_elem_r8(tmp2_r8)
-                else if (trim(entry%basename) /= 'fw' .and. trim(entry%basename) /= 'fh') then
+                else if (.not. any(xios_no_cavity_mask_2d == entry%basename)) then
                    call io_xios_apply_wet_2d_elem_r8(tmp2_r8)
                 end if
                 tm1 = MPI_Wtime(); rtime_om_mask = rtime_om_mask + (tm1 - tm0)
@@ -3495,7 +3521,7 @@ subroutine write_mean(entry, entry_index)
                 tm0 = MPI_Wtime()
                 if (io_xios_is_ice_field(entry%basename)) then
                    call io_xios_apply_ice_mask_2d_elem_r4(tmp2_r4)
-                else if (trim(entry%basename) /= 'fw' .and. trim(entry%basename) /= 'fh') then
+                else if (.not. any(xios_no_cavity_mask_2d == entry%basename)) then
                    call io_xios_apply_wet_2d_elem_r4(tmp2_r4)
                 end if
                 tm1 = MPI_Wtime(); rtime_om_mask = rtime_om_mask + (tm1 - tm0)
@@ -3532,7 +3558,7 @@ subroutine write_mean(entry, entry_index)
                 tm0 = MPI_Wtime()
                 if (io_xios_is_ice_field(entry%basename)) then
                    call io_xios_apply_ice_mask_2d_r8(tmp2_r8)
-                else if (trim(entry%basename) /= 'fw' .and. trim(entry%basename) /= 'fh') then
+                else if (.not. any(xios_no_cavity_mask_2d == entry%basename)) then
                    call io_xios_apply_wet_2d_r8(tmp2_r8)
                 end if
                 tm1 = MPI_Wtime(); rtime_om_mask = rtime_om_mask + (tm1 - tm0)
@@ -3567,7 +3593,7 @@ subroutine write_mean(entry, entry_index)
                 tm0 = MPI_Wtime()
                 if (io_xios_is_ice_field(entry%basename)) then
                    call io_xios_apply_ice_mask_2d_r4(tmp2_r4)
-                else if (trim(entry%basename) /= 'fw' .and. trim(entry%basename) /= 'fh') then
+                else if (.not. any(xios_no_cavity_mask_2d == entry%basename)) then
                    call io_xios_apply_wet_2d_r4(tmp2_r4)
                 end if
                 tm1 = MPI_Wtime(); rtime_om_mask = rtime_om_mask + (tm1 - tm0)
