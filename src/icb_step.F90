@@ -372,6 +372,7 @@ use iceberg_params, only: length_ib, width_ib, scaling, elem_block, elem_area_gl
  logical   			:: i_have_element					!=
  real	   			:: left_mype						!=
  integer   			:: old_element						!=
+ integer   			:: flux_elem
  real(kind=WP) 			:: t0, t1, t2, t3, t4, t5, t6, t7, t8                   !=
  											!=
  !for restart										!=
@@ -668,7 +669,11 @@ if((local_idx_of(iceberg_elem)>0) .and. (local_idx_of(iceberg_elem)<=partit%myDi
   pe_block(ib)=partit%mype
 
   volume_ib=height_ib_single*length_ib_single*width_ib_single
-  call prepare_icb2fesom(mesh,partit,ib,i_have_element,local_idx_of(iceberg_elem),depth_ib_premelt,height_ib_premelt)
+  ! an iceberg that moved into a halo element melts into the element it left;
+  ! the new element's owner takes it over at the next step
+  flux_elem = local_idx_of(iceberg_elem)
+  if (flux_elem == 0) flux_elem = local_idx_of(old_element)
+  call prepare_icb2fesom(mesh,partit,ib,i_have_element,flux_elem,depth_ib_premelt,height_ib_premelt)
  end if !processor has element?
 end if !... and first node belongs to processor?
 
