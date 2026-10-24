@@ -124,8 +124,8 @@ save
   integer,dimension(:), allocatable:: pe_block
   real(kind=WP), dimension(:), allocatable:: elem_area_glob
   ! corners (rotated lon/lat [rad]) and cavity rejection of the halo elements
-  ! (myDim_elem2D+1 onwards), so the element search can follow a berg into
-  ! a neighbour's element without a global search
+  ! (myDim_elem2D+1 onwards), so the element search can follow an iceberg
+  ! into a neighbour's element
   real(kind=WP), dimension(:,:,:), allocatable:: halo_elem_xy
   logical,       dimension(:),     allocatable:: halo_elem_reject
   real,dimension(:), allocatable:: vl_block
