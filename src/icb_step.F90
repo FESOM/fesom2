@@ -278,7 +278,7 @@ end do
 
  if (mod(istep_end_synced,icb_outfreq)==0 .AND. .not.ascii_out) then
 
-   if (partit%mype==0 .AND. ib_num > 0) call write_buoy_props_netcdf(partit)
+   if (partit%mype==0 .AND. ib_num > 0) call write_buoy_props_netcdf(partit, istep)
        
    ! all PEs: set back to zero for next round
    bvl_mean=0.0
@@ -2019,7 +2019,7 @@ end subroutine init_buoy_output
 
 !=============================================================================================
 
-subroutine write_buoy_props_netcdf(partit)
+subroutine write_buoy_props_netcdf(partit, istep)
   ! write output file for buoys/icebergs for current time step
   ! written by Madlen Kimmritz, 25.07.2015
   ! reviewed by T. Rackow, 17.08.2015
@@ -2034,7 +2034,8 @@ subroutine write_buoy_props_netcdf(partit)
 
 #include "netcdf.inc" 
 
-  integer                   :: status,ncid, istep
+  integer, intent(in)       :: istep
+  integer                   :: status,ncid
   integer                   :: dimid_ib, dimid_rec, dimids(2)
   integer                   :: time_varid, iter_varid
   integer                   :: lonrad_id, latrad_id, londeg_id, latdeg_id
@@ -2051,8 +2052,6 @@ type(t_partit), intent(inout), target :: partit
   
   if (partit%mype==0) then 
 
-! kh 16.03.21 ?! istep is not initialized, intitialize to 0 here
-     istep = 0
      sec_in_year=dt*istep
 
     ! open files
@@ -2127,7 +2126,7 @@ type(t_partit), intent(inout), target :: partit
      if (status .ne. nf_noerr) call handle_err(status, partit) 
 
      ! time and iteration
-     status=nf_put_vara_double(ncid, time_varid, save_count_buoys, 1, prev_sec_in_year+sec_in_year) 
+     status=nf_put_vara_double(ncid, time_varid, save_count_buoys, 1, real(prev_sec_in_year+sec_in_year, 8)) 
      if (status .ne. nf_noerr) call handle_err(status, partit)
      status=nf_put_vara_int(ncid, iter_varid, save_count_buoys, 1, istep)
      if (status .ne. nf_noerr) call handle_err(status, partit)
@@ -2135,63 +2134,63 @@ type(t_partit), intent(inout), target :: partit
      !variables
      start=(/1,save_count_buoys/)
      count=(/ib_num, 1/)
-     status=nf_put_vara_double(ncid, lonrad_id, start, count, buoy_props(:, 1)) 
+     status=nf_put_vara_double(ncid, lonrad_id, start, count, real(buoy_props(:, 1), 8)) 
      if (status .ne. nf_noerr) call handle_err(status, partit)
 
-     status=nf_put_vara_double(ncid, latrad_id, start, count, buoy_props(:, 2)) 
+     status=nf_put_vara_double(ncid, latrad_id, start, count, real(buoy_props(:, 2), 8)) 
      if (status .ne. nf_noerr) call handle_err(status, partit)
 
-     status=nf_put_vara_double(ncid, londeg_id, start, count, buoy_props(:, 3)) 
+     status=nf_put_vara_double(ncid, londeg_id, start, count, real(buoy_props(:, 3), 8)) 
      if (status .ne. nf_noerr) call handle_err(status, partit)
 
-     status=nf_put_vara_double(ncid, latdeg_id, start, count, buoy_props(:, 4)) 
+     status=nf_put_vara_double(ncid, latdeg_id, start, count, real(buoy_props(:, 4), 8)) 
      if (status .ne. nf_noerr) call handle_err(status, partit)
 
-     status=nf_put_vara_double(ncid, frozen_id, start, count, buoy_props(:, 5)) 
+     status=nf_put_vara_double(ncid, frozen_id, start, count, real(buoy_props(:, 5), 8)) 
      if (status .ne. nf_noerr) call handle_err(status, partit)
 
-     status=nf_put_vara_double(ncid, dudt_id, start, count, buoy_props(:, 6)) 
+     status=nf_put_vara_double(ncid, dudt_id, start, count, real(buoy_props(:, 6), 8)) 
      if (status .ne. nf_noerr) call handle_err(status, partit)
 
-     status=nf_put_vara_double(ncid, dvdt_id, start, count, buoy_props(:, 7)) 
+     status=nf_put_vara_double(ncid, dvdt_id, start, count, real(buoy_props(:, 7), 8)) 
      if (status .ne. nf_noerr) call handle_err(status, partit)
 
-     status=nf_put_vara_double(ncid, uib_id, start, count, buoy_props(:, 8)) 
+     status=nf_put_vara_double(ncid, uib_id, start, count, real(buoy_props(:, 8), 8)) 
      if (status .ne. nf_noerr) call handle_err(status, partit)
 
-     status=nf_put_vara_double(ncid, vib_id, start, count, buoy_props(:, 9)) 
+     status=nf_put_vara_double(ncid, vib_id, start, count, real(buoy_props(:, 9), 8)) 
      if (status .ne. nf_noerr) call handle_err(status, partit)
 
      ! write 3 additional variables for iceberg case, comment for buoy case
 
-     status=nf_put_vara_double(ncid, height_id, start, count, buoy_props(:,10)) 
+     status=nf_put_vara_double(ncid, height_id, start, count, real(buoy_props(:,10), 8)) 
      if (status .ne. nf_noerr) call handle_err(status, partit)
 
-     status=nf_put_vara_double(ncid, length_id, start, count, buoy_props(:,11)) 
+     status=nf_put_vara_double(ncid, length_id, start, count, real(buoy_props(:,11), 8)) 
      if (status .ne. nf_noerr) call handle_err(status, partit)
 
-     status=nf_put_vara_double(ncid, width_id, start, count, buoy_props(:,12)) 
+     status=nf_put_vara_double(ncid, width_id, start, count, real(buoy_props(:,12), 8)) 
      if (status .ne. nf_noerr) call handle_err(status, partit)
 
      ! write 4 additional variables for iceberg case, comment for buoy case
 
-     status=nf_put_vara_double(ncid, bvl_id, start, count, bvl_mean(:)*step_per_day) 
+     status=nf_put_vara_double(ncid, bvl_id, start, count, real(bvl_mean(:)*step_per_day, 8)) 
      if (status .ne. nf_noerr) call handle_err(status, partit)
 
-     status=nf_put_vara_double(ncid, lvlv_id, start, count, lvlv_mean(:)*step_per_day) 
+     status=nf_put_vara_double(ncid, lvlv_id, start, count, real(lvlv_mean(:)*step_per_day, 8)) 
      if (status .ne. nf_noerr) call handle_err(status, partit)
 
-     status=nf_put_vara_double(ncid, lvle_id, start, count, lvle_mean(:)*step_per_day) 
+     status=nf_put_vara_double(ncid, lvle_id, start, count, real(lvle_mean(:)*step_per_day, 8)) 
      if (status .ne. nf_noerr) call handle_err(status, partit)
 
-     status=nf_put_vara_double(ncid, lvlb_id, start, count, lvlb_mean(:)*step_per_day) 
+     status=nf_put_vara_double(ncid, lvlb_id, start, count, real(lvlb_mean(:)*step_per_day, 8)) 
      if (status .ne. nf_noerr) call handle_err(status, partit)
 
      ! LA: add felem
-     status=nf_put_vara_double(ncid, felem_id, start, count, buoy_props(:,13)) 
+     status=nf_put_vara_double(ncid, felem_id, start, count, real(buoy_props(:,13), 8)) 
      if (status .ne. nf_noerr) call handle_err(status, partit)
 
-     status=nf_put_vara_double(ncid, grounded_id, start, count, buoy_props(:,14)) 
+     status=nf_put_vara_double(ncid, grounded_id, start, count, real(buoy_props(:,14), 8)) 
      if (status .ne. nf_noerr) call handle_err(status, partit)
      
      !close file
