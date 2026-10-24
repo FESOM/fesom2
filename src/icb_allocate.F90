@@ -130,6 +130,7 @@ type(t_mesh), intent(in), target :: mesh
   elem_area_glob=0.0
   call gather_elem(mesh%elem_area(1:partit%myDim_elem2D), elem_area_glob, partit)
   call MPI_Bcast(elem_area_glob, mesh%elem2D, MPI_WP, 0, partit%MPI_COMM_FESOM, partit%MPIERR)
+  call init_halo_elems(partit, mesh)
 
   allocate(vl_block(4*ib_num))
   allocate(buoy_props(ib_num,14))
@@ -141,5 +142,43 @@ type(t_mesh), intent(in), target :: mesh
   allocate(scaling(ib_num))
   scaling = 1
 end subroutine allocate_icb
+
+! Corners and cavity rejection of every halo element (eDim and eXDim), filled
+! once through the full element halo exchange: the owners compute them for
+! their own elements, whose nodes they hold.
+subroutine init_halo_elems(partit, mesh)
+
+type(t_partit), intent(inout), target :: partit
+type(t_mesh), intent(in), target :: mesh
+  real(kind=WP), allocatable :: aux(:,:)
+  integer       :: n_my, n_all, n, i, k
+  integer       :: elnodes(3)
+
+  n_my  = partit%myDim_elem2D
+  n_all = n_my + partit%eDim_elem2D + partit%eXDim_elem2D
+  allocate(aux(n_all, 7))
+  aux = 0.0_WP
+  do n = 1, n_my
+     elnodes = mesh%elem2D_nodes(:,n)
+     do i = 1, 3
+        aux(n, 2*i-1) = mesh%coord_nod2D(1, elnodes(i))
+        aux(n, 2*i)   = mesh%coord_nod2D(2, elnodes(i))
+     end do
+     if (use_cavity) then
+        if (all((mesh%cavity_depth(elnodes)/=0.0) .or. (mesh%bc_index_nod2D(elnodes)==0.0))) aux(n, 7) = 1.0_WP
+     end if
+  end do
+  do k = 1, 7
+     call exchange_elem(aux(:,k), partit)
+  end do
+
+  allocate(halo_elem_xy(2, 3, n_my+1:n_all), halo_elem_reject(n_my+1:n_all))
+  do n = n_my+1, n_all
+     halo_elem_xy(1,:,n) = aux(n, 1:5:2)
+     halo_elem_xy(2,:,n) = aux(n, 2:6:2)
+     halo_elem_reject(n) = aux(n, 7) > 0.5_WP
+  end do
+  deallocate(aux)
+end subroutine init_halo_elems
 
 end module icb_allocate_module
