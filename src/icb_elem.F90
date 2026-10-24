@@ -418,8 +418,7 @@ do m=1, 3
 
  !...and for each element containing this node (so we get all neighbour elements)...
  ! nod_in_elem2D is complete for halo nodes too (it holds the eDim and eXDim
- ! elements), so a berg crossing into a neighbour's element is found here
- ! rather than by the global search
+ ! elements), so an iceberg crossing into a neighbour's element is found here
  !do idx_elem_containing_n2 = 1,  nod_in_elem2D(n2)%nmb
  do idx_elem_containing_n2 = 1,  mesh%nod_in_elem2D_num(n2)
 

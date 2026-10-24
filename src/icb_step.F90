@@ -669,7 +669,7 @@ if((local_idx_of(iceberg_elem)>0) .and. (local_idx_of(iceberg_elem)<=partit%myDi
   pe_block(ib)=partit%mype
 
   volume_ib=height_ib_single*length_ib_single*width_ib_single
-  ! a berg that moved into a halo element melts into the element it left;
+  ! an iceberg that moved into a halo element melts into the element it left;
   ! the new element's owner takes it over at the next step
   flux_elem = local_idx_of(iceberg_elem)
   if (flux_elem == 0) flux_elem = local_idx_of(old_element)
