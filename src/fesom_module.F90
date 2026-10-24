@@ -1006,7 +1006,8 @@ contains
         ! kh 08.03.21 support of different ocean ice and iceberg steps:
         ! if steps_per_ib_step is configured greater 1 then UV is modified via call oce_timestep_ale(n) -> call update_vel while
         ! the same asynchronous iceberg computation is still active
-                f%dynamics%uv_ib     = f%dynamics%uv
+        ! nodal velocity: the iceberg routines read uv_ib at the nodes of the iceberg element
+                f%dynamics%uv_ib     = f%dynamics%uvnode
         
         ! kh 15.03.21 support of different ocean ice and iceberg steps:
         ! if steps_per_ib_step is configured greater 1 then tr_arr is modified via call oce_timestep_ale(n) -> call solve_tracers_ale() while
