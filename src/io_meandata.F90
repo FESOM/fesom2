@@ -14,7 +14,7 @@ module io_MEANDATA
   use io_redistribute
   use netcdf
   use, intrinsic :: ieee_arithmetic, only: ieee_is_nan
-  use io_xios_module, only: io_xios_is_on, io_xios_field_is_active, &
+  use io_xios_module, only: io_xios_is_on, io_xios_field_is_active, io_xios_field_is_used, &
                             io_xios_send_2d_r8, io_xios_send_2d_r4, &
                             io_xios_send_3d_r8, io_xios_send_3d_r4, &
                             io_xios_set_ice_conc, io_xios_is_ice_field, &
@@ -60,6 +60,30 @@ module io_MEANDATA
       'thdgrarea', 'thdgrice', 'thdgrsnw', 'dyngrarea', 'dyngrice', 'dyngrsnw', &
       'atmice_x', 'atmice_y', 'iceoce_x', 'iceoce_y']
 
+  ! 2D fields the XIOS path sends unmasked at cavity columns (ulevels > 1): every other
+  ! 2D field gets _FillValue there. fw and fh are fluxes into the cavity water, the
+  ! column integrals cover the water under the shelf.
+  character(len=16), parameter :: xios_no_cavity_mask_2d(*) = [character(len=16) :: &
+      'fw', 'fh', 'utemp_int', 'vtemp_int']
+
+  ! Vector fields: (x, y) components in the model's rotated frame. The XIOS path
+  ! rotates each pair to geographic east/north before sending (see pair_xios_vectors);
+  ! the native path keeps its own list in io_r2g, used with vec_autorotate. Aliases of
+  ! these streams (tx_sur_3h, utemp_day, ...) pair through their basename.
+  ! NOT listed, on purpose:
+  !   utemp_int, vtemp_int  already geographic, rotated in compute_cmor_trflx_int
+  !   sgm11, sgm12, sgm22   components of the ice stress tensor, not a vector; the
+  !                         CMIP7 rules use only rotation invariants of it
+  character(len=16), parameter :: xios_vec_x(*) = [character(len=16) :: &
+      'u', 'uice', 'unod', 'unod_sfc', 'bolus_u', 'tx_sur', 'tau_x', &
+      'atmice_x', 'atmoce_x', 'iceoce_x', 'utemp', 'usalt', 'U_rho_x_DZ']
+  character(len=16), parameter :: xios_vec_y(*) = [character(len=16) :: &
+      'v', 'vice', 'vnod', 'vnod_sfc', 'bolus_v', 'ty_sur', 'tau_y', &
+      'atmice_y', 'atmoce_y', 'iceoce_y', 'vtemp', 'vsalt', 'V_rho_x_DZ']
+  ! rotated-to-geographic matrix (a11, a12, a21, a22) per owned node / element,
+  ! (u_geo, v_geo) = (a11*u + a12*v, a21*u + a22*v), as vector_r2g
+  real(real64), allocatable, save :: xios_r2g_nod(:,:), xios_r2g_elem(:,:)
+
   type Meandata
     private
     type(t_partit), pointer                            :: p_partit
@@ -86,6 +110,22 @@ module io_MEANDATA
     real(kind=WP)                                      :: offset = 0.0_WP ! added ONCE to the mean after the division, not per sample (use_salt_anomaly: salt/sss carry +S_ref_anomaly so output stays absolute)
     character(500)                                     :: filename
     character(100)                                     :: name
+    ! Field whose masking rules apply (ice mask, wet mask, cavity mask). Equal to
+    ! name, except for XIOS alias streams, which carry their base field's name here.
+    character(100)                                     :: basename = ''
+    ! Instantaneous stream (XIOS aliases with mode 'inst'): the "mean" handed to
+    ! XIOS is the value of the last time step, not an average since the last send.
+    logical                                            :: instant = .false.
+    ! XIOS vector pairs (pair_xios_vectors): index of the other component's stream,
+    ! .true. on the x component, .true. once the current sum has been rotated,
+    ! whether the pair is output this step, and whether the XML writes this stream
+    ! at all (for the cadence check)
+    integer                                            :: vec_partner = 0
+    logical                                            :: vec_is_x    = .false.
+    logical                                            :: vec_rotated = .false.
+    logical                                            :: vec_fire    = .false.
+    logical                                            :: vec_used    = .false.
+    logical                                            :: vec_warned  = .false.
     character(500)                                     :: description
     character(100)                                     :: units
     character(100)                                     :: dimname(2)
@@ -696,7 +736,15 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
           "TCphotLL_phyto", "TCphotLL_dia", "TCphotLL_cocco", "TCphotLL_phaeo", &
           "TqLF_phyto", "TqLF_diatoms", "TqLF_cocco", "TqLF_phaeo", &
           "TTemp_phyto", "TTemp_diatoms", "TTemp_cocco", "TTemp_phaeo", &
-          "TSi_assimDia" /)
+          "TSi_assimDia", &
+          ! CMIP7 REcoM diagnostics: flux into the benthos, sinking fluxes, grazing on
+          ! phytoplankton, Si uptake and Fe scavenging
+          "bflxN", "bflxC", "bflxSi", "bflxCalc", "expN", "expC", "expSi", "expCalc", &
+          "graz", "intpbsi", "scavFe", &
+          "dpO2s", "O2min", "intDIC", "intDOC", "intPOC", "limNn", "limFen", "limNd", "limFed", &
+          "O2sat", "OmegaA", "CO3satA", &
+          ! CMOR column integrals of u*T, v*T (ldiag_cmor; CMIP7 hfx/hfy depth-integrated)
+          "utemp_int", "vtemp_int" /)
         integer :: k
         if (partit%mype==0) WRITE(*,*) 'XIOS mode: skipping namelist.io; registering all ', &
                                  size(xios_ids), ' known streams. XML decides output.'
@@ -815,6 +863,19 @@ CASE ('osaltdiff ')
 CASE ('rsdoabsorb')
     if (ldiag_cmor) then
     call def_stream((/mesh%nl-1, mesh%nod2D/), (/mesh%nl-1, partit%myDim_nod2D/), 'rsdoabsorb', 'shortwave flux absorbed in ocean layer', 'W/m2', rsdoabsorb(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+
+! Column integrals of u*T and v*T on elements, geographic east/north (ldiag_cmor; does not
+! need ldiag_trflx). Defined, and computed, only if the XML or namelist.io uses them.
+CASE ('utemp_int ')
+    if (ldiag_cmor .and. (.not. io_xios_is_on() .or. io_xios_field_is_used('utemp_int'))) then
+    call def_stream(mesh%elem2D, partit%myDim_elem2D, 'utemp_int', 'vertically integrated u*T', 'm2 s-1 degC', utemp_int(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh, "Column integral of eastward velocity times temperature at elements (times rho_0*cp: heat transport per unit width)")
+    ldiag_cmor_trflx_int = .true.
+    end if
+CASE ('vtemp_int ')
+    if (ldiag_cmor .and. (.not. io_xios_is_on() .or. io_xios_field_is_used('vtemp_int'))) then
+    call def_stream(mesh%elem2D, partit%myDim_elem2D, 'vtemp_int', 'vertically integrated v*T', 'm2 s-1 degC', vtemp_int(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh, "Column integral of northward velocity times temperature at elements (times rho_0*cp: heat transport per unit width)")
+    ldiag_cmor_trflx_int = .true.
     end if
 
 ! CMOR 0D (scalar) diagnostics for CMIP6/CMIP7 (require ldiag_cmor=.true.)
@@ -1263,6 +1324,52 @@ CASE ('benCalc   ')
     if (use_REcoM) then
     call def_stream(mesh%nod2D,  partit%myDim_nod2D,   'benCalc','Benthos calcite','mmol', Benthos(:,4), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
+! CMIP7 REcoM diagnostics (need Diags): flux into the benthos (froc, fric, exp*ob), Si uptake (intpbsi), Fe scavenging (frfe)
+! CMIP7 REcoM state diagnostics (need Diags): dpo2, o2min, intdic, intdoc, intpoc
+CASE ('dpO2s     ')
+    if (use_REcoM .and. Diags) then
+    call def_stream(mesh%nod2D,  partit%myDim_nod2D,   'dpO2s','Surface O2 partial pressure difference ocean minus atmosphere','Pa', dpO2s(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+CASE ('O2min     ')
+    if (use_REcoM .and. Diags) then
+    call def_stream(mesh%nod2D,  partit%myDim_nod2D,   'O2min','O2 at the shallowest local minimum of the profile','mmolO/m3', O2min(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+CASE ('intDIC    ')
+    if (use_REcoM .and. Diags) then
+    call def_stream(mesh%nod2D,  partit%myDim_nod2D,   'intDIC','Column inventory of dissolved inorganic carbon','mmolC/m2', intDIC(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+CASE ('intDOC    ')
+    if (use_REcoM .and. Diags) then
+    call def_stream(mesh%nod2D,  partit%myDim_nod2D,   'intDOC','Column inventory of dissolved organic carbon','mmolC/m2', intDOC(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+CASE ('intPOC    ')
+    if (use_REcoM .and. Diags) then
+    call def_stream(mesh%nod2D,  partit%myDim_nod2D,   'intPOC','Column inventory of particulate organic carbon (phytoplankton, zooplankton, detritus)','mmolC/m2', intPOC(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+CASE ('bflxN     ')
+    if (use_REcoM .and. Diags) then
+    call def_stream(mesh%nod2D,  partit%myDim_nod2D,   'bflxN','Particulate organic nitrogen flux into the benthos','mmolN/m2/s', BotFlux(:,1), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+CASE ('bflxC     ')
+    if (use_REcoM .and. Diags) then
+    call def_stream(mesh%nod2D,  partit%myDim_nod2D,   'bflxC','Particulate organic carbon flux into the benthos','mmolC/m2/s', BotFlux(:,2), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+CASE ('bflxSi    ')
+    if (use_REcoM .and. Diags) then
+    call def_stream(mesh%nod2D,  partit%myDim_nod2D,   'bflxSi','Biogenic silica flux into the benthos','mmolSi/m2/s', BotFlux(:,3), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+CASE ('bflxCalc  ')
+    if (use_REcoM .and. Diags) then
+    call def_stream(mesh%nod2D,  partit%myDim_nod2D,   'bflxCalc','Calcite flux into the benthos','mmolC/m2/s', BotFlux(:,4), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+CASE ('intpbsi   ')
+    if (use_REcoM .and. Diags) then
+    call def_stream(mesh%nod2D,  partit%myDim_nod2D,   'intpbsi','Depth-integrated silicate uptake by diatoms','mmolSi/m2/d', SiProd(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+CASE ('scavFe    ')
+    if (use_REcoM .and. Diags) then
+    call def_stream(mesh%nod2D,  partit%myDim_nod2D,   'scavFe','Depth-integrated iron scavenging onto particles','umolFe/m2/d', ScavFe(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
 ! ciso 
 CASE ('benC_13   ')
     if (use_REcoM) then
@@ -1496,6 +1603,57 @@ CASE ('NPPn3D         ')
 CASE ('NPPd3D         ')
    if (use_REcoM) then
    call def_stream((/mesh%nl-1, mesh%nod2D/),  (/mesh%nl-1, partit%myDim_nod2D/),   'NPPd3D','Net primary production of diatoms', 'mmolC/(m3*d)', NPPd3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+! CMIP7 REcoM diagnostics (need Diags): sinking fluxes at the layer interfaces (expc, expcalc, epn, epsi), grazing on phytoplankton (graz)
+CASE ('expN      ')
+   if (use_REcoM .and. Diags) then
+   call def_stream((/mesh%nl, mesh%nod2D/),  (/mesh%nl, partit%myDim_nod2D/),   'expN','Downward flux of particulate organic nitrogen (sinking)', 'mmolN/m2/s', ExpFlux(:,:,1), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+CASE ('expC      ')
+   if (use_REcoM .and. Diags) then
+   call def_stream((/mesh%nl, mesh%nod2D/),  (/mesh%nl, partit%myDim_nod2D/),   'expC','Downward flux of particulate organic carbon (sinking)', 'mmolC/m2/s', ExpFlux(:,:,2), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+CASE ('expSi     ')
+   if (use_REcoM .and. Diags) then
+   call def_stream((/mesh%nl, mesh%nod2D/),  (/mesh%nl, partit%myDim_nod2D/),   'expSi','Downward flux of biogenic silica (sinking)', 'mmolSi/m2/s', ExpFlux(:,:,3), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+CASE ('expCalc   ')
+   if (use_REcoM .and. Diags) then
+   call def_stream((/mesh%nl, mesh%nod2D/),  (/mesh%nl, partit%myDim_nod2D/),   'expCalc','Downward flux of calcite (sinking)', 'mmolC/m2/s', ExpFlux(:,:,4), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+! CMIP7 REcoM diagnostics: N and Fe limitation (limn*, limfe*; light: TCphotLL_*), o2sat, aragonite saturation (co3satarag)
+CASE ('limNn     ')
+   if (use_REcoM .and. Diags) then
+   call def_stream((/mesh%nl-1, mesh%nod2D/),  (/mesh%nl-1, partit%myDim_nod2D/),   'limNn','Nitrogen limitation of photosynthesis of small phytoplankton', '1', limN_phy3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+CASE ('limFen    ')
+   if (use_REcoM .and. Diags) then
+   call def_stream((/mesh%nl-1, mesh%nod2D/),  (/mesh%nl-1, partit%myDim_nod2D/),   'limFen','Iron limitation of photosynthesis of small phytoplankton', '1', limFe_phy3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+CASE ('limNd     ')
+   if (use_REcoM .and. Diags) then
+   call def_stream((/mesh%nl-1, mesh%nod2D/),  (/mesh%nl-1, partit%myDim_nod2D/),   'limNd','Nitrogen limitation of photosynthesis of diatoms', '1', limN_dia3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+CASE ('limFed    ')
+   if (use_REcoM .and. Diags) then
+   call def_stream((/mesh%nl-1, mesh%nod2D/),  (/mesh%nl-1, partit%myDim_nod2D/),   'limFed','Iron limitation of photosynthesis of diatoms', '1', limFe_dia3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+CASE ('O2sat     ')
+   if (use_REcoM .and. Diags) then
+   call def_stream((/mesh%nl-1, mesh%nod2D/),  (/mesh%nl-1, partit%myDim_nod2D/),   'O2sat','O2 at saturation (1 atm moist air)', 'mmolO/m3', O2sat3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+CASE ('OmegaA    ')
+   if (use_REcoM) then
+   call def_stream((/mesh%nl-1, mesh%nod2D/),  (/mesh%nl-1, partit%myDim_nod2D/),   'OmegaA','Aragonite saturation state (MOCSY)', 'none', OmegaA3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+CASE ('CO3satA   ')
+   if (use_REcoM) then
+   call def_stream((/mesh%nl-1, mesh%nod2D/),  (/mesh%nl-1, partit%myDim_nod2D/),   'CO3satA','Carbonate ion concentration at aragonite saturation (MOCSY)', '[mol/m3]', CO3satA3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+CASE ('graz      ')
+   if (use_REcoM .and. Diags) then
+   call def_stream((/mesh%nl-1, mesh%nod2D/),  (/mesh%nl-1, partit%myDim_nod2D/),   'graz','Grazing on phytoplankton by all zooplankton', 'mmolC/(m3*d)', Graz3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
    endif
 
 CASE ('NPPc3D         ')
@@ -2687,6 +2845,20 @@ END DO ! --> DO i=1, io_listsize
         end if
     end if
 
+    ! The streams are created on the first output() call, after this step's
+    ! compute_diagnostics, which could not know yet that they are wanted. Fill them
+    ! now so the first sample folded into the mean is this step's value, not zero.
+    if (ldiag_cmor_trflx_int) call compute_cmor_trflx_int(tracers, dynamics, partit, mesh)
+
+#if defined(__XIOS)
+    !___________________________________________________________________________
+    ! Second streams on fields that the XML writes at more than one cadence, as
+    ! a surface level, or as a snapshot. Needs every base stream defined above.
+    if (io_xios_is_on()) call def_xios_aliases(partit, mesh)
+    ! XIOS writes what it is sent: rotate vector pairs to geographic first
+    if (io_xios_is_on()) call pair_xios_vectors(partit, mesh)
+#endif
+
     !___________________________________________________________________________
     ! Output-precision summary, printed once per run so the precision of what
     ! lands on disk is visible in the log rather than implied by the file.
@@ -2724,6 +2896,378 @@ END DO ! --> DO i=1, io_listsize
     end if
 
 end subroutine
+!
+!
+!_______________________________________________________________________________
+! XIOS alias streams.
+!
+! Under XIOS a stream is sent whenever xios_field_is_active says any file wants
+! it, and every send hands over the mean since the previous send. If one field
+! id feeds files of different cadence (a daily and a monthly file of m_ice),
+! FESOM sends at the finer cadence and the coarser file samples only the last
+! short mean: monthly m_ice was the mean of the last day of the month. Sending
+! the base field at the finest cadence fixes the averaging but multiplies MPI
+! traffic, badly so when the fine file only needs the surface of a 3D field.
+!
+! An alias is a second stream on the same model array, with its own accumulator
+! and its own XIOS field id, so every id has exactly one cadence in the XML:
+!   mean  same field, different cadence (m_ice_day, fh_3h, DOC_day)
+!   sfc   uppermost level of a 3D node field as a 2D stream (O2_sfc): the daily
+!         send is 2D, the base 3D field stays monthly
+!   inst  snapshot: the value of the last step before the send (sst_inst for
+!         3hr tos, sgm11_inst for sistressave), sent once per output interval
+! Aliases keep the base field's masking rules (basename, cavity mask, offset).
+! An alias is created only if the XML uses its id in an enabled file, so the
+! table costs nothing for runs that do not write it. Each alias id needs its
+! own <field> in field_def_fesom.xml, not a field_ref to the base: a field_ref
+! field takes its data from the referenced field inside XIOS.
+subroutine def_xios_aliases(partit, mesh)
+    use mod_mesh
+    USE MOD_PARTIT
+    use par_support_module, only: par_abort
+    implicit none
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh),   intent(in),    target :: mesh
+    character(len=20), parameter :: alias_id(*) = (/ character(len=20) :: &
+        'm_ice_day',      'sst_inst',       'sgm11_inst',     'sgm12_inst',     'sgm22_inst',     &
+        'fh_3h',          'fw_3h',          'tx_sur_3h',      'ty_sur_3h',      'qsr_3h',         &
+        'runoff_3h',      'virtsalt_3h',                                                          &
+        'utemp_day',      'vtemp_day',      'salt_day',       'w_day',          'rsdoabsorb_day', &
+        'DOC_day',        'DetC_day',       'HetC_day',       'idetz2c_day',    'Zoo2C_day',      &
+        'Zoo3C_day',      'NPPn_day',       'NPPd_day',       'intPOC_day',     'bflxC_day',      &
+        'O2min_day',                                                                              &
+        'O2_sfc',         'pH_sfc',         'CO3_sfc',        'CO3satA_sfc',    'PhyC_sfc',       &
+        'DiaC_sfc',       'PhyChl_sfc',     'DiaChl_sfc' /)
+    character(len=20), parameter :: alias_of(*) = (/ character(len=20) :: &
+        'm_ice',          'sst',            'sgm11',          'sgm12',          'sgm22',          &
+        'fh',             'fw',             'tx_sur',         'ty_sur',         'qsr',            &
+        'runoff',         'virtsalt',                                                             &
+        'utemp',          'vtemp',          'salt',           'w',              'rsdoabsorb',     &
+        'DOC',            'DetC',           'HetC',           'idetz2c',        'Zoo2C',          &
+        'Zoo3C',          'NPPn',           'NPPd',           'intPOC',         'bflxC',          &
+        'O2min',                                                                                  &
+        'O2',             'pH',             'CO3',            'CO3satA',        'PhyC',           &
+        'DiaC',           'PhyChl',         'DiaChl' /)
+    character(len=4), parameter :: alias_mode(*) = (/ character(len=4) :: &
+        'mean',           'inst',           'inst',           'inst',           'inst',           &
+        'mean',           'mean',           'mean',           'mean',           'mean',           &
+        'mean',           'mean',                                                                 &
+        'mean',           'mean',           'mean',           'mean',           'mean',           &
+        'mean',           'mean',           'mean',           'mean',           'mean',           &
+        'mean',           'mean',           'mean',           'mean',           'mean',           &
+        'mean',                                                                                   &
+        'sfc',            'sfc',            'sfc',            'sfc',            'sfc',            &
+        'sfc',            'sfc',            'sfc' /)
+    type(Meandata), pointer :: base, alias
+    integer :: a, n, ibase, nbefore
+    character(len=100) :: partner
+
+    if (size(alias_id) /= size(alias_of) .or. size(alias_id) /= size(alias_mode)) then
+        if (partit%mype==0) write(*,*) 'def_xios_aliases: alias tables differ in length'
+        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
+    end if
+
+    do a = 1, size(alias_id)
+        ! An alias of a vector component is also created when only its partner is
+        ! used (vtemp_day for a file with utemp_day alone): the rotation needs both
+        ! sums over the same interval. The extra stream is accumulated but never sent.
+        if (.not. io_xios_field_is_used(trim(alias_id(a)))) then
+            partner = vec_partner_name(alias_id(a), alias_of(a))
+            if (len_trim(partner) == 0) cycle
+            if (.not. io_xios_field_is_used(trim(partner))) cycle
+        end if
+        if (stream_already_defined(trim(alias_id(a)))) cycle
+
+        ibase = 0
+        do n = 1, io_NSTREAMS
+            if (trim(io_stream(n)%p%name) == trim(alias_of(a))) then
+                ibase = n
+                exit
+            end if
+        end do
+        if (ibase == 0) then
+            ! the XML wants the alias but the model has no such base stream (e.g.
+            ! a REcoM field in a physics-only build): same as an unknown field id
+            if (partit%mype==0) write(*,*) 'XIOS alias ', trim(alias_id(a)), ': base stream ', &
+                                           trim(alias_of(a)), ' is not defined, alias skipped'
+            cycle
+        end if
+        base => io_stream(ibase)%p
+
+#ifdef ENABLE_OPENACC
+        if (trim(alias_mode(a)) == 'inst') then
+            if (partit%mype==0) write(*,*) 'XIOS alias ', trim(alias_id(a)), &
+                                           ': instantaneous streams are not implemented for OpenACC builds'
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
+        end if
+#endif
+
+        nbefore = io_NSTREAMS
+        select case (trim(alias_mode(a)))
+        case ('mean', 'inst')
+            if (base%ndim == 1) then
+                call def_stream2D(base%glsize(2), size(base%local_values_r8, dim=2), trim(alias_id(a)), &
+                                  trim(base%description), trim(base%units), base%ptr1,                  &
+                                  base%freq, base%freq_unit, base%accuracy, partit, mesh,               &
+                                  trim(base%long_description))
+                if (io_NSTREAMS > nbefore) io_stream(io_NSTREAMS)%p%ptr1 => base%ptr1
+            else
+                call def_stream3D(base%glsize, shape(base%local_values_r8), trim(alias_id(a)),          &
+                                  trim(base%description), trim(base%units), base%ptr3,                  &
+                                  base%freq, base%freq_unit, base%accuracy, partit, mesh,               &
+                                  base%flip, trim(base%long_description))
+                if (io_NSTREAMS > nbefore) io_stream(io_NSTREAMS)%p%ptr3 => base%ptr3
+            end if
+        case ('sfc')
+            if (base%ndim /= 2 .or. base%is_elem_based) then
+                if (partit%mype==0) write(*,*) 'XIOS alias ', trim(alias_id(a)), ': mode sfc needs a 3D node stream, ', &
+                                               trim(alias_of(a)), ' is not one'
+                call par_abort(partit%MPI_COMM_FESOM, partit%mype)
+            end if
+            ! level 1 is the top of the base array; under ice-shelf cavities it is
+            ! inside the shelf, so these streams take the 2D cavity mask
+            if (base%flip) then
+                call def_stream2D(base%glsize(2), size(base%local_values_r8, dim=2), trim(alias_id(a)), &
+                                  trim(base%description)//' at the surface', trim(base%units),          &
+                                  base%ptr3(:,1), base%freq, base%freq_unit, base%accuracy, partit,     &
+                                  mesh, trim(base%long_description))
+                if (io_NSTREAMS > nbefore) io_stream(io_NSTREAMS)%p%ptr1 => base%ptr3(:,1)
+            else
+                call def_stream2D(base%glsize(2), size(base%local_values_r8, dim=2), trim(alias_id(a)), &
+                                  trim(base%description)//' at the surface', trim(base%units),          &
+                                  base%ptr3(1,:), base%freq, base%freq_unit, base%accuracy, partit,     &
+                                  mesh, trim(base%long_description))
+                if (io_NSTREAMS > nbefore) io_stream(io_NSTREAMS)%p%ptr1 => base%ptr3(1,:)
+            end if
+        case default
+            if (partit%mype==0) write(*,*) 'XIOS alias ', trim(alias_id(a)), ': unknown mode ', trim(alias_mode(a))
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
+        end select
+        if (io_NSTREAMS == nbefore) cycle
+
+        alias => io_stream(io_NSTREAMS)%p
+        alias%basename       = base%basename
+        alias%offset         = base%offset
+        alias%mask_cavity_2d = base%mask_cavity_2d .or. trim(alias_mode(a)) == 'sfc'
+        alias%instant        = trim(alias_mode(a)) == 'inst'
+        if (partit%mype==0) write(*,*) 'XIOS alias ', trim(alias_id(a)), ' (', trim(alias_mode(a)), ') on ', &
+                                       trim(alias_of(a))
+    end do
+end subroutine def_xios_aliases
+!
+!
+!_______________________________________________________________________________
+! Name of the other component of a vector stream: the partner of `basename` in
+! xios_vec_x / xios_vec_y, followed by whatever `name` carries after its basename
+! (u -> v, utemp_day -> vtemp_day, tx_sur_3h -> ty_sur_3h). Blank when basename
+! is not a vector component.
+function vec_partner_name(name, basename) result(partner)
+    implicit none
+    character(len=*), intent(in) :: name, basename
+    character(len=100)           :: partner
+    integer :: k, lb, ln
+
+    partner = ''
+    lb = len_trim(basename)
+    ln = len_trim(name)
+    if (lb == 0 .or. ln < lb) return
+    if (name(1:lb) /= basename(1:lb)) return
+    do k = 1, size(xios_vec_x)
+        if (basename(1:lb) == trim(xios_vec_x(k))) then
+            partner = trim(xios_vec_y(k))//name(lb+1:ln)
+            return
+        else if (basename(1:lb) == trim(xios_vec_y(k))) then
+            partner = trim(xios_vec_x(k))//name(lb+1:ln)
+            return
+        end if
+    end do
+end function vec_partner_name
+!
+!
+!_______________________________________________________________________________
+! XIOS vector pairs. The model's vector fields are in its rotated frame, and XIOS
+! writes what it is sent, so every pair is rotated to geographic east/north before
+! the send, as io_r2g does for the native output with vec_autorotate (which XIOS
+! mode switches off). The rotation is linear, so it is applied to the two running
+! sums before the division, at the node or the element centroid.
+!
+! Partners are found by name, not by stream position: under XIOS the streams are
+! registered in the order of xios_ids, plus the aliases at the end.
+!
+! The two components of a pair are averaged, rotated and reset together: the pair
+! fires when XIOS wants either of them, and each is then sent only if XIOS wants
+! it (io_xios_send_* is a no-op otherwise). A component the XML does not write is
+! still accumulated so the other can be rotated; for aliases def_xios_aliases
+! creates it for that reason. Both components must therefore share one freq_op in
+! the XML; if they do not, the coarser one would get the mean since the last send
+! of the finer one, and a warning is printed.
+subroutine pair_xios_vectors(partit, mesh)
+    use mod_mesh
+    USE MOD_PARTIT
+    use par_support_module, only: par_abort
+    use g_config, only: rotated_grid, force_rotation, cyclic_length
+    use g_rotate_grid, only: vector_r2g
+    implicit none
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh),   intent(in),    target :: mesh
+    type(Meandata), pointer :: ex, ey
+    character(len=100)      :: partner
+    integer                 :: n, m, k, j, elnodes(3), npairs
+    logical                 :: any_nod, any_elem
+    real(kind=WP)           :: a, b, x(3), xmin, xc, yc
+
+    if (.not. (rotated_grid .or. force_rotation)) return ! model frame is geographic
+
+    npairs   = 0
+    any_nod  = .false.
+    any_elem = .false.
+    do n = 1, io_NSTREAMS
+        ex => io_stream(n)%p
+        if (ex%vec_partner > 0) cycle
+        partner = vec_partner_name(ex%name, ex%basename)
+        if (len_trim(partner) == 0) cycle
+        m = 0
+        do k = 1, io_NSTREAMS
+            if (trim(io_stream(k)%p%name) == trim(partner)) then
+                m = k
+                exit
+            end if
+        end do
+        if (m == 0) then
+            if (partit%mype==0) write(*,*) 'XIOS vector ', trim(ex%name), ': there is no stream ', trim(partner), &
+                ' to rotate it with. Define both components (an alias needs both ids in def_xios_aliases).'
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
+        end if
+        ey => io_stream(m)%p
+        if (any(shape(ex%local_values_r8) /= shape(ey%local_values_r8)) .or. &
+            (ex%is_elem_based .neqv. ey%is_elem_based) .or. (ex%instant .neqv. ey%instant) .or. &
+            ex%offset /= 0.0_WP .or. ey%offset /= 0.0_WP) then
+            if (partit%mype==0) write(*,*) 'XIOS vector ', trim(ex%name), ' and ', trim(ey%name), &
+                ' differ in shape, location or mode, or carry an offset: cannot rotate them'
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
+        end if
+        ex%vec_partner = m
+        ey%vec_partner = n
+        ex%vec_is_x    = any(xios_vec_x == ex%basename)
+        ey%vec_is_x    = .not. ex%vec_is_x
+        ex%vec_used    = io_xios_field_is_used(trim(ex%name))
+        ey%vec_used    = io_xios_field_is_used(trim(ey%name))
+        npairs   = npairs + 1
+        any_elem = any_elem .or. ex%is_elem_based
+        any_nod  = any_nod  .or. .not. ex%is_elem_based
+        if (partit%mype==0) then
+            if (ex%vec_is_x) then
+                write(*,*) 'XIOS vector ', trim(ex%name), ', ', trim(ey%name), ': rotated to geographic before sending'
+            else
+                write(*,*) 'XIOS vector ', trim(ey%name), ', ', trim(ex%name), ': rotated to geographic before sending'
+            end if
+        end if
+    end do
+    if (npairs == 0) return
+
+    if (any_nod .and. .not. allocated(xios_r2g_nod)) then
+        allocate(xios_r2g_nod(4, partit%myDim_nod2D))
+        do j = 1, partit%myDim_nod2D
+            xc = mesh%coord_nod2D(1, j)
+            yc = mesh%coord_nod2D(2, j)
+            a = 1.0_WP; b = 0.0_WP
+            call vector_r2g(a, b, xc, yc, 0)
+            xios_r2g_nod(1, j) = real(a, real64)
+            xios_r2g_nod(3, j) = real(b, real64)
+            a = 0.0_WP; b = 1.0_WP
+            call vector_r2g(a, b, xc, yc, 0)
+            xios_r2g_nod(2, j) = real(a, real64)
+            xios_r2g_nod(4, j) = real(b, real64)
+        end do
+    end if
+    if (any_elem .and. .not. allocated(xios_r2g_elem)) then
+        allocate(xios_r2g_elem(4, partit%myDim_elem2D))
+        do j = 1, partit%myDim_elem2D
+            ! centroid in rotated coordinates, across the cyclic seam as elem_center
+            ! and compute_cmor_trflx_int (io_r2g takes the plain mean of the three
+            ! longitudes, which is wrong for the elements on the seam)
+            elnodes = mesh%elem2D_nodes(:, j)
+            x    = mesh%coord_nod2D(1, elnodes)
+            xmin = minval(x)
+            do k = 1, 3
+                if (x(k)-xmin >= cyclic_length/2.0_WP) x(k) = x(k) - cyclic_length
+                if (x(k)-xmin < -cyclic_length/2.0_WP) x(k) = x(k) + cyclic_length
+            end do
+            xc = sum(x)/3.0_WP
+            yc = sum(mesh%coord_nod2D(2, elnodes))/3.0_WP
+            a = 1.0_WP; b = 0.0_WP
+            call vector_r2g(a, b, xc, yc, 0)
+            xios_r2g_elem(1, j) = real(a, real64)
+            xios_r2g_elem(3, j) = real(b, real64)
+            a = 0.0_WP; b = 1.0_WP
+            call vector_r2g(a, b, xc, yc, 0)
+            xios_r2g_elem(2, j) = real(a, real64)
+            xios_r2g_elem(4, j) = real(b, real64)
+        end do
+    end if
+end subroutine pair_xios_vectors
+!
+!
+!_______________________________________________________________________________
+! Rotate the running sums of the vector pair stream n belongs to, once per send
+! (whichever component output() reaches first; vec_rotated is cleared when the
+! sum is reset).
+subroutine xios_vec_r2g(n)
+    use par_support_module, only: par_abort
+    implicit none
+    integer, intent(in)     :: n
+    type(Meandata), pointer :: e, ex, ey, ep
+    integer                 :: I, J
+    real(real64)            :: ux, uy
+
+    e => io_stream(n)%p
+    if (e%vec_rotated) return
+    if (e%vec_is_x) then
+        ex => e
+        ey => io_stream(e%vec_partner)%p
+    else
+        ex => io_stream(e%vec_partner)%p
+        ey => e
+    end if
+#ifdef ENABLE_OPENACC
+    ! output() has brought this stream's sum to the host, not yet the partner's
+    ep => io_stream(e%vec_partner)%p
+    if (ep%acc_on_dev) then
+        !$ACC UPDATE HOST(ep%local_values_r8)
+    end if
+#endif
+    if (ex%addcounter /= ey%addcounter) then
+        if (e%p_partit%mype==0) write(*,*) 'XIOS vector ', trim(ex%name), ' and ', trim(ey%name), &
+            ': sums over different numbers of steps (', ex%addcounter, ey%addcounter, '), cannot rotate'
+        call par_abort(e%p_partit%MPI_COMM_FESOM, e%p_partit%mype)
+    end if
+
+    if (ex%is_elem_based) then
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I, J, ux, uy)
+        DO J=1, size(ex%local_values_r8, dim=2)
+            DO I=1, size(ex%local_values_r8, dim=1)
+                ux = ex%local_values_r8(I,J)
+                uy = ey%local_values_r8(I,J)
+                ex%local_values_r8(I,J) = xios_r2g_elem(1,J)*ux + xios_r2g_elem(2,J)*uy
+                ey%local_values_r8(I,J) = xios_r2g_elem(3,J)*ux + xios_r2g_elem(4,J)*uy
+            END DO
+        END DO
+!$OMP END PARALLEL DO
+    else
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I, J, ux, uy)
+        DO J=1, size(ex%local_values_r8, dim=2)
+            DO I=1, size(ex%local_values_r8, dim=1)
+                ux = ex%local_values_r8(I,J)
+                uy = ey%local_values_r8(I,J)
+                ex%local_values_r8(I,J) = xios_r2g_nod(1,J)*ux + xios_r2g_nod(2,J)*uy
+                ey%local_values_r8(I,J) = xios_r2g_nod(3,J)*ux + xios_r2g_nod(4,J)*uy
+            END DO
+        END DO
+!$OMP END PARALLEL DO
+    end if
+    ex%vec_rotated = .true.
+    ey%vec_rotated = .true.
+end subroutine xios_vec_r2g
 
 
 !_______________________________________________________________________________
@@ -3194,9 +3738,9 @@ subroutine write_mean(entry, entry_index)
                 do k=1, n_own; tmp2_r8(k) = entry%local_values_r8_copy(1, own(k)); end do
                 tp1 = MPI_Wtime(); rtime_om_pack = rtime_om_pack + (tp1 - tp0)
                 tm0 = MPI_Wtime()
-                if (io_xios_is_ice_field(entry%name)) then
+                if (io_xios_is_ice_field(entry%basename)) then
                    call io_xios_apply_ice_mask_2d_elem_r8(tmp2_r8)
-                else if (trim(entry%name) /= 'fw' .and. trim(entry%name) /= 'fh') then
+                else if (.not. any(xios_no_cavity_mask_2d == entry%basename)) then
                    call io_xios_apply_wet_2d_elem_r8(tmp2_r8)
                 end if
                 tm1 = MPI_Wtime(); rtime_om_mask = rtime_om_mask + (tm1 - tm0)
@@ -3227,9 +3771,9 @@ subroutine write_mean(entry, entry_index)
                 do k=1, n_own; tmp2_r4(k) = entry%local_values_r4_copy(1, own(k)); end do
                 tp1 = MPI_Wtime(); rtime_om_pack = rtime_om_pack + (tp1 - tp0)
                 tm0 = MPI_Wtime()
-                if (io_xios_is_ice_field(entry%name)) then
+                if (io_xios_is_ice_field(entry%basename)) then
                    call io_xios_apply_ice_mask_2d_elem_r4(tmp2_r4)
-                else if (trim(entry%name) /= 'fw' .and. trim(entry%name) /= 'fh') then
+                else if (.not. any(xios_no_cavity_mask_2d == entry%basename)) then
                    call io_xios_apply_wet_2d_elem_r4(tmp2_r4)
                 end if
                 tm1 = MPI_Wtime(); rtime_om_mask = rtime_om_mask + (tm1 - tm0)
@@ -3264,9 +3808,9 @@ subroutine write_mean(entry, entry_index)
                 end do
                 tp1 = MPI_Wtime(); rtime_om_pack = rtime_om_pack + (tp1 - tp0)
                 tm0 = MPI_Wtime()
-                if (io_xios_is_ice_field(entry%name)) then
+                if (io_xios_is_ice_field(entry%basename)) then
                    call io_xios_apply_ice_mask_2d_r8(tmp2_r8)
-                else if (trim(entry%name) /= 'fw' .and. trim(entry%name) /= 'fh') then
+                else if (.not. any(xios_no_cavity_mask_2d == entry%basename)) then
                    call io_xios_apply_wet_2d_r8(tmp2_r8)
                 end if
                 tm1 = MPI_Wtime(); rtime_om_mask = rtime_om_mask + (tm1 - tm0)
@@ -3299,9 +3843,9 @@ subroutine write_mean(entry, entry_index)
                 end do
                 tp1 = MPI_Wtime(); rtime_om_pack = rtime_om_pack + (tp1 - tp0)
                 tm0 = MPI_Wtime()
-                if (io_xios_is_ice_field(entry%name)) then
+                if (io_xios_is_ice_field(entry%basename)) then
                    call io_xios_apply_ice_mask_2d_r4(tmp2_r4)
-                else if (trim(entry%name) /= 'fw' .and. trim(entry%name) /= 'fh') then
+                else if (.not. any(xios_no_cavity_mask_2d == entry%basename)) then
                    call io_xios_apply_wet_2d_r4(tmp2_r4)
                 end if
                 tm1 = MPI_Wtime(); rtime_om_mask = rtime_om_mask + (tm1 - tm0)
@@ -3471,6 +4015,12 @@ subroutine update_means
 
     DO n=1, io_NSTREAMS
         entry=>io_stream(n)%p
+        ! instantaneous stream: keep only the current step, so the value handed
+        ! over at the next send is a snapshot (see def_xios_aliases)
+        if (entry%instant) then
+            entry%local_values_r8 = 0._real64
+            entry%addcounter      = 0
+        end if
 #ifdef ENABLE_OPENACC
         if (update_means_acc(entry)) cycle
 #endif
@@ -3686,6 +4236,7 @@ subroutine output(istep, ice, dynamics, tracers, partit, mesh)
     integer       :: i, j !for OMP loops
     integer       :: nlev_loc, ul_loc, kmax_loc !for wet-cell masking of output
     logical       :: do_output
+    logical       :: partner_active
     type(Meandata), pointer :: entry
     type(t_mesh), intent(in) , target :: mesh
     type(t_partit), intent(inout), target :: partit
@@ -3763,6 +4314,24 @@ ctime=timenew+(daynew-1.)*86400
 #if defined(__XIOS)
         if (io_xios_is_on()) then
             do_output = io_xios_field_is_active(trim(entry%name))
+            if (entry%vec_partner > 0) then
+                ! A vector pair is averaged, rotated and reset as one (pair_xios_vectors).
+                ! Decide at the component reached first: once a field has been sent,
+                ! XIOS no longer reports it active for this step.
+                if (n < entry%vec_partner) then
+                    partner_active = io_xios_field_is_active(trim(io_stream(entry%vec_partner)%p%name))
+                    if ((do_output .neqv. partner_active) .and. entry%vec_used .and. &
+                        io_stream(entry%vec_partner)%p%vec_used .and. .not. entry%vec_warned) then
+                        if (partit%mype==0) write(*,*) 'WARNING: XIOS vector ', trim(entry%name), ' and ', &
+                            trim(io_stream(entry%vec_partner)%p%name), ' are written at different cadences.', &
+                            ' Both are sent at the finer one; give them the same freq_op.'
+                        entry%vec_warned = .true.
+                    end if
+                    entry%vec_fire = do_output .or. partner_active
+                    io_stream(entry%vec_partner)%p%vec_fire = entry%vec_fire
+                end if
+                do_output = entry%vec_fire
+            end if
         else
 #endif
         if (entry%freq_unit.eq.'y') then
@@ -3796,12 +4365,16 @@ ctime=timenew+(daynew-1.)*86400
             ! units; must be taken BEFORE the tracker is reset further down
             t_start = accum_start_this_year(entry%t_accum_start, entry%t_accum_year)
 #ifdef ENABLE_OPENACC
-            ! the sum is written (and reset) on the host
-            if (entry%acc_on_dev) then
+            ! the sum is written (and reset) on the host; a rotated sum is there already
+            if (entry%acc_on_dev .and. .not. entry%vec_rotated) then
                 !$ACC UPDATE HOST(entry%local_values_r8)
             end if
 #endif
             if (vec_autorotate) call io_r2g(n, partit, mesh) ! automatically detect if a vector field and rotate if makes sense!
+#if defined(__XIOS)
+            ! XIOS mode: rotate the pair's sums to geographic (vec_autorotate is off there)
+            if (entry%vec_partner > 0) call xios_vec_r2g(n)
+#endif
 #if !defined(__MULTIO)
             if(entry%thread_running) call entry%thread%join()
             entry%thread_running = .false.
@@ -3965,6 +4538,7 @@ ctime=timenew+(daynew-1.)*86400
             !___________________________________________________________________
             entry%lastcounter=entry%addcounter
             entry%addcounter   = 0  ! clean_meanarrays
+            entry%vec_rotated  = .false.
             ! stamp = interval midpoint, interval itself goes to time_bounds;
             ! then start the next accumulation interval at the current time
             entry%ctime_copy = 0.5_WP*(t_start + ctime)
@@ -4673,6 +5247,7 @@ subroutine def_stream_after_dimension_specific(entry, name, description, units, 
 
     !___________________________________________________________________________
     entry%name = name
+    entry%basename = name
     entry%mask_cavity_2d = any(cavity_masked_2d == name)
     entry%description = description
     entry%long_description = long_description
