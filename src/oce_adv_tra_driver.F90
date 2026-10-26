@@ -2,7 +2,7 @@ module oce_adv_tra_driver_module
     USE MOD_MESH
     USE MOD_TRACER
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     USE MOD_DYN
     USE g_comm_auto
     USE diagnostics, only: ldiag_DVD
@@ -35,8 +35,9 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
     real(kind=WP),  intent(in), target    :: WE(mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
 
     real(kind=WP),  pointer, dimension (:,:)   :: pwvel
-    real(kind=WP),  pointer, dimension (:,:)   :: ttf, ttfAB, fct_LO, fct_LO_tend
-    real(kind=WP),  pointer, dimension (:,:)   :: adv_flux_hor, adv_flux_ver, dttf_h, dttf_v
+    real(kind=WP),  pointer, dimension (:,:)   :: ttf, ttfAB, fct_LO
+    real(kind=WP),  pointer, dimension (:,:)   :: adv_flux_hor, adv_flux_ver
+    real(kind=WP_full), pointer, dimension (:,:) :: fct_LO_tend, dttf_h, dttf_v
     real(kind=WP),  pointer, dimension (:,:)   :: fct_ttf_min, fct_ttf_max
     real(kind=WP),  pointer, dimension (:,:)   :: fct_plus, fct_minus
 
@@ -85,7 +86,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
 #endif
         do n=1, partit%myDim_nod2D+partit%eDim_nod2D
            do nz=1, mesh%nl - 1
-              fct_LO(nz,n) = 0.0_WP
+              fct_LO_tend(nz,n) = 0.0_WP_full
            end do
         end do
 #ifndef ENABLE_OPENACC
@@ -97,8 +98,13 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
         ! Low-order tendency: each node gathers the horizontal fluxes of its incident edges
         ! (mesh%nod_in_edge2D, sign +1 for the edge's first node, -1 for its second) in
         ! ascending edge order, so the result does not depend on the number of threads.
+        ! (also the OpenACC version without atomics: reproducible gather, no host round trip)
+#if !defined(ENABLE_OPENACC) || defined(DISABLE_OPENACC_ATOMICS)
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, k, edge, el, nl1, nu1, nl2, nu2, nu12, nl12, nz)
+#else
+        !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(k, edge, el, nl1, nu1, nl2, nu2, nu12, nl12, nz) VECTOR_LENGTH(acc_vl)
+#endif
         do n=1, partit%myDim_nod2D+partit%eDim_nod2D
             do k=1, mesh%nod_in_edge2D_num(n)
                 edge=mesh%nod_in_edge2D(k,n)
@@ -115,16 +121,20 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
                 nu12 = nu1
                 if (nu2>0) nu12 = min(nu1,nu2)
                 do nz=nu12, nl12
-                    fct_LO(nz, n)=fct_LO(nz, n)+mesh%nod_in_edge2D_sgn(k,n)*adv_flux_hor(nz, edge)
+                    fct_LO_tend(nz, n)=fct_LO_tend(nz, n)+mesh%nod_in_edge2D_sgn(k,n)*real(adv_flux_hor(nz, edge), WP_full)
                 end do
             end do
         end do
+#ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
+#else
+        !$ACC END PARALLEL LOOP
+#endif
 #else
 #if !defined(DISABLE_OPENACC_ATOMICS)
         !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 #else
-        !$ACC UPDATE SELF(fct_lo, adv_flux_hor)
+        !$ACC UPDATE SELF(fct_LO_tend, adv_flux_hor)
 #endif
         do e=1, partit%myDim_edge2D
             enodes=mesh%edges(:,e)
@@ -151,11 +161,11 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
                !$ACC ATOMIC UPDATE
 #endif
 
-               fct_LO(nz, enodes(1))=fct_LO(nz, enodes(1))+adv_flux_hor(nz, e)
+               fct_LO_tend(nz, enodes(1))=fct_LO_tend(nz, enodes(1))+adv_flux_hor(nz, e)
 #if !defined(DISABLE_OPENACC_ATOMICS)
                !$ACC ATOMIC UPDATE
 #endif
-               fct_LO(nz, enodes(2))=fct_LO(nz, enodes(2))-adv_flux_hor(nz, e)
+               fct_LO_tend(nz, enodes(2))=fct_LO_tend(nz, enodes(2))-adv_flux_hor(nz, e)
             end do
 #if !defined(DISABLE_OPENACC_ATOMICS)
             !$ACC END LOOP
@@ -164,7 +174,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
 #if !defined(DISABLE_OPENACC_ATOMICS)
         !$ACC END PARALLEL LOOP
 #else
-        !$ACC UPDATE DEVICE(fct_lo)
+        !$ACC UPDATE DEVICE(fct_LO_tend)
 #endif
 #endif
 
@@ -184,7 +194,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
               do nz = nu1, nl1-1
                  ! Horizontal advection part for LO (FCT is .TRUE.) [mmol/m2/s];
                  ! the anti-diffusive part is added at the end of do_oce_adv_tra
-                 tracers%work%tra_advhoriz(nz,n,tr_num) = fct_LO(nz,n)/mesh%areasvol(nz,n)
+                 tracers%work%tra_advhoriz(nz,n,tr_num) = fct_LO_tend(nz,n)/mesh%areasvol(nz,n)
               end do
            end do
         end if
@@ -207,7 +217,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
             !$ACC LOOP VECTOR
             do  nz= nu1, nl1-1
                 ! kept in flux form: LO*hnode_new-ttf*hnode is not precise enough in single precision
-                fct_LO_tend(nz,n)=(fct_LO(nz,n)+(adv_flux_ver(nz, n)-adv_flux_ver(nz+1, n)))*dt/mesh%areasvol(nz,n)
+                fct_LO_tend(nz,n)=(fct_LO_tend(nz,n)+(real(adv_flux_ver(nz, n), WP_full)-adv_flux_ver(nz+1, n)))*dt/mesh%areasvol(nz,n)
                 fct_LO(nz,n)=(ttf(nz,n)*mesh%hnode(nz,n)+fct_LO_tend(nz,n))/mesh%hnode_new(nz,n)
             end do
             !$ACC END LOOP
@@ -302,7 +312,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
              call adv_tra_hor_upw1(vel, ttfAB, partit, mesh,        adv_flux_hor,                                 o_init_zero=do_zero_flux)
         CASE DEFAULT !unknown
             if (partit%mype==0) write(*,*) 'Unknown horizontal advection type ',  trim(tracers%data(tr_num)%tra_adv_hor), '! Check your namelists!'
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     END SELECT
     if (trim(tracers%data(tr_num)%tra_adv_lim)=='FCT') then
        pwvel=>w
@@ -324,7 +334,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
             call adv_tra_ver_upw1 (   pwvel, ttfAB, partit, mesh,       adv_flux_ver, o_init_zero=do_zero_flux)
         CASE DEFAULT !unknown
             if (partit%mype==0) write(*,*) 'Unknown vertical advection type ',  trim(tracers%data(tr_num)%tra_adv_ver), '! Check your namelists!'
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
         ! --> be aware the vertical implicite part in case without FCT is done in
         !     oce_ale_tracer.F90 --> subroutine diff_ver_part_impl_ale(tr_num, partit, mesh)
         !     for do_wimpl=.true.
@@ -454,11 +464,11 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
     real(kind=WP), intent(in),    target :: dt
     type(t_partit),intent(inout), target :: partit
     type(t_mesh),  intent(in),    target :: mesh
-    real(kind=WP), intent(inout)      :: dttf_h(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-    real(kind=WP), intent(inout)      :: dttf_v(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP_full), intent(inout)  :: dttf_h(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP_full), intent(inout)  :: dttf_v(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
     real(kind=WP), intent(inout)      :: flux_h(mesh%nl-1, partit%myDim_edge2D)
     real(kind=WP), intent(inout)      :: flux_v(mesh%nl,   partit%myDim_nod2D)
-    real(kind=WP), intent(in), optional :: lo_tend(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP_full), intent(in), optional :: lo_tend(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
     integer                           :: n, nz, k, elem, enodes(3), num, el(2), nu12, nl12, nu1, nu2, nl1, nl2, edge
     !___________________________________________________________________________
     ! c. Update the solution
@@ -498,7 +508,7 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
         nl1 = mesh%nlevels_nod2D(n)
         !$ACC LOOP VECTOR
         do nz=nu1,nl1-1
-            dttf_v(nz,n)=dttf_v(nz,n) + (flux_v(nz,n)-flux_v(nz+1,n))*dt/mesh%areasvol(nz,n)
+            dttf_v(nz,n)=dttf_v(nz,n) + (real(flux_v(nz,n), WP_full)-flux_v(nz+1,n))*dt/mesh%areasvol(nz,n)
         end do
         !$ACC END LOOP
     end do
@@ -510,8 +520,13 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
     ! Horizontal: each node gathers the fluxes of its incident edges (mesh%nod_in_edge2D,
     ! sign +1 for the edge's first node, -1 for its second). No two threads write the same
     ! node, and the summation order per node is the ascending edge order at any thread count.
+    ! (also the OpenACC version without atomics: reproducible gather, no host round trip)
+#if !defined(ENABLE_OPENACC) || defined(DISABLE_OPENACC_ATOMICS)
 #ifndef ENABLE_OPENACC
 !$OMP DO
+#else
+    !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(k, edge, el, nl1, nu1, nl2, nu2, nu12, nl12, nz) VECTOR_LENGTH(acc_vl)
+#endif
     do n=1, partit%myDim_nod2D+partit%eDim_nod2D
         do k=1, mesh%nod_in_edge2D_num(n)
             edge=mesh%nod_in_edge2D(k,n)
@@ -528,12 +543,16 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
             nu12 = nu1
             if (nu2>0) nu12 = min(nu1,nu2)
             do nz=nu12, nl12
-                dttf_h(nz,n)=dttf_h(nz,n)+mesh%nod_in_edge2D_sgn(k,n)*flux_h(nz,edge)*dt/mesh%areasvol(nz,n)
+                dttf_h(nz,n)=dttf_h(nz,n)+mesh%nod_in_edge2D_sgn(k,n)*real(flux_h(nz,edge), WP_full)*dt/mesh%areasvol(nz,n)
             end do
         end do
     end do
+#ifndef ENABLE_OPENACC
 !$OMP END DO
 !$OMP END PARALLEL
+#else
+    !$ACC END PARALLEL LOOP
+#endif
 #else
 #if !defined(DISABLE_OPENACC_ATOMICS)
     !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
@@ -564,11 +583,11 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
 #if !defined(DISABLE_OPENACC_ATOMICS)
             !$ACC ATOMIC UPDATE
 #endif
-            dttf_h(nz,enodes(1))=dttf_h(nz,enodes(1))+flux_h(nz,edge)*dt/mesh%areasvol(nz,enodes(1))
+            dttf_h(nz,enodes(1))=dttf_h(nz,enodes(1))+real(flux_h(nz,edge), WP_full)*dt/mesh%areasvol(nz,enodes(1))
 #if !defined(DISABLE_OPENACC_ATOMICS)
             !$ACC ATOMIC UPDATE
 #endif
-            dttf_h(nz,enodes(2))=dttf_h(nz,enodes(2))-flux_h(nz,edge)*dt/mesh%areasvol(nz,enodes(2))
+            dttf_h(nz,enodes(2))=dttf_h(nz,enodes(2))-real(flux_h(nz,edge), WP_full)*dt/mesh%areasvol(nz,enodes(2))
         end do
 #if !defined(DISABLE_OPENACC_ATOMICS)
         !$ACC END LOOP

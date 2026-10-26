@@ -9,7 +9,7 @@
 module ice_init_module
     USE MOD_ICE
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     USE MOD_MESH
     USE o_param, only: WP
     USE ice_meltponds, only: init_meltponds
@@ -113,7 +113,7 @@ subroutine ice_init(ice, partit, mesh)
         if (partit%mype==0) write(*,*) '     file   : ', 'namelist.ice',' open ok'
     else
         if (partit%mype==0) write(*,*) 'ERROR: --> bad opening file   : ', 'namelist.ice',' ; iostat=',iost
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
         stop
     end if
     read(nm_unit, nml=ice_dyn  , iostat=iost)
@@ -166,7 +166,7 @@ subroutine ice_init(ice, partit, mesh)
         if (partit%mype==0) write(*,*) 'ERROR: new_iclasses=.true. requires iclasses=', size(ice%thermo%hpdf), ' in namelist.ice, but iclasses=', iclasses
         flush(6)
         call MPI_Barrier(partit%MPI_COMM_FESOM, partit%MPIerr)
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     end if
     ice%thermo%open_water_albedo=open_water_albedo
     ice%thermo%use_meltponds = use_meltponds

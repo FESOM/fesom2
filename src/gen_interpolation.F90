@@ -1,7 +1,7 @@
 module g_interp
     use MOD_MESH
     use MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     use o_PARAM, only: WP
     implicit none
     
@@ -73,7 +73,7 @@ subroutine interp_2d_field_v2(num_lon_reg, num_lat_reg, lon_reg, lat_reg, data_r
         print *, achar(27)//'[0m'
         write(*,*)
     end if 
-    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+    call par_abort(partit%MPI_COMM_FESOM, partit%mype)
   end if
 
   do n=1,num_mod
@@ -205,7 +205,7 @@ subroutine interp_2d_field(num_lon_reg, num_lat_reg, lon_reg, lat_reg, data_reg,
   if(lon_reg(1)<0.0_WP .or. lon_reg(num_lon_reg)>360._WP) then
      write(*,*) 'Error in 2D interpolation!'
      write(*,*) 'The regular grid is not in the proper longitude range.'
-     call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+     call par_abort(partit%MPI_COMM_FESOM, partit%mype)
      stop
   end if
 
@@ -336,7 +336,7 @@ subroutine interp_3d_field(num_lon_reg, num_lat_reg, num_lay_reg, &
   !-------------------------------------------------------------------------------------
   use MOD_MESH
   USE MOD_PARTIT
-  use par_support_module, only: par_ex
+  use par_support_module, only: par_abort
   use o_param, only: WP
   implicit none
   integer             		:: n, i, flag,nz
@@ -530,7 +530,7 @@ end subroutine interp_e2n_3d
 subroutine interp_e2n_2d(data_e, data_n, mesh, partit, do_overz_in)
     use MOD_MESH
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     use o_param, only: WP
     implicit none
     !___INPUT/OUTPUT VARIABLES______________________________________________
@@ -608,7 +608,7 @@ end subroutine interp_e2n_2d
 subroutine interp_e2n_1d(data_e, data_n, mesh, partit)
     use MOD_MESH
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     use o_param, only: WP
     implicit none
     !___INPUT/OUTPUT VARIABLES______________________________________________

@@ -73,6 +73,10 @@ gamma2_tra    = 0.            ! additional biharmonic diffusion coefficient [dim
 ! --- Vertical Diffusion and Time Stepping ---
 i_vert_diff   = .true.        ! use implicit vertical diffusion (recommended for stability)
 AB_order      = 2             ! Adams-Bashforth time stepping order (2 or 3)
+ltra_diag     = .false.       ! tracer budget diagnostics (all terms in mmol/m2/s, see io_meandata 'otracers'; extra cost)
+! ltra_diag_ids = <tracer IDs>
+!   tracer IDs that get the budget diagnostics when ltra_diag=.true. (max. 20); not set = all
+!   tracers. The terms are written with 'otracers'.
 /
 
 ! ============================================================================

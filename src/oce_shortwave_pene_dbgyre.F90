@@ -114,6 +114,6 @@ subroutine cal_shortwave_rad_dbgyre(ice, tracers, partit, mesh)
 !end if
 
   end do
-!call par_ex
+!call par_abort
 !stop
 end subroutine cal_shortwave_rad_dbgyre

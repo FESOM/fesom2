@@ -4,7 +4,7 @@
 module g_support
   USE MOD_MESH
   USE MOD_PARTIT
-  use par_support_module, only: par_ex
+  use par_support_module, only: par_abort
   use g_comm_auto
   use o_ARRAYS
   use g_config, only: dummy
@@ -13,6 +13,11 @@ module g_support
   private
   public :: smooth_nod, smooth_elem, integrate_nod, integrate_elem, extrap_nod, omp_min_max_sum1, omp_min_max_sum2, point_in_polygon
   public :: ic_extrap_det, ic_extrap_tol
+#ifdef ENABLE_OPENACC
+  public :: smooth_nod3D_acc
+  ! work arrays of smooth_nod3D_acc (device)
+  real(kind=WP), allocatable, save :: smth_vol(:,:), smth_work(:,:)
+#endif
   ! Deterministic, decomposition-independent hole filling for initial
   ! conditions (see extrap_nod3D). Off by default: the historical fill is kept
   ! bit-for-bit. Set ic_extrap_det=.true. in &tracer_init3d to make the filled
@@ -308,7 +313,7 @@ end subroutine smooth_elem3D
 !
 subroutine integrate_nod_2D(data, int2D, partit, mesh)
   USE MOD_PARTIT
-  use par_support_module, only: par_ex
+  use par_support_module, only: par_abort
   use g_comm_auto
 
   IMPLICIT NONE
@@ -341,7 +346,7 @@ end subroutine integrate_nod_2D
 !
 subroutine integrate_nod_3D(data, int3D, partit, mesh)
   USE MOD_PARTIT
-  use par_support_module, only: par_ex
+  use par_support_module, only: par_abort
   use g_comm_auto
 
   IMPLICIT NONE
@@ -714,7 +719,7 @@ FUNCTION omp_min_max_sum1(arr, pos1, pos2, what, partit, nan)
 
     CASE DEFAULT
        if (partit%mype==0) write(*,*) trim(what), ' is not implemented in omp_min_max_sum case!'
-       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+       call par_abort(partit%MPI_COMM_FESOM, partit%mype)
        STOP
   END SELECT
 
@@ -790,7 +795,7 @@ FUNCTION omp_min_max_sum2(arr, pos11, pos12, pos21, pos22, what, partit, nan)
 
    CASE DEFAULT
       if (partit%mype==0) write(*,*) trim(what), ' is not implemented in omp_min_max_sum case!'
-      call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+      call par_abort(partit%MPI_COMM_FESOM, partit%mype)
       STOP
    END SELECT
 
@@ -801,7 +806,7 @@ end function omp_min_max_sum2
 !
 subroutine integrate_elem_3D(data, int3D, partit, mesh)
   USE MOD_PARTIT
-  use par_support_module, only: par_ex
+  use par_support_module, only: par_abort
   use g_comm_auto
 
   IMPLICIT NONE
@@ -841,7 +846,7 @@ end subroutine integrate_elem_3D
 !
 subroutine integrate_elem_2D(data, int2D, partit, mesh)
   USE MOD_PARTIT
-  use par_support_module, only: par_ex
+  use par_support_module, only: par_abort
   use g_comm_auto
 
   IMPLICIT NONE
@@ -937,6 +942,66 @@ real(kind=WP) function point_in_polygon(lon, lat, poly_lon, poly_lat)
 end function point_in_polygon
 
 
+#ifdef ENABLE_OPENACC
+!===============================================================================
+! smooth_nod3D on the device for a nodal field that is current there: the same patch sums per level
+! in the same element order; the inverse patch volume and the sums are device work arrays of this module.
+subroutine smooth_nod3D_acc(arr, N_smooth, partit, mesh)
+    IMPLICIT NONE
+    type(t_mesh),   intent(in),    target :: mesh
+    type(t_partit), intent(inout), target :: partit
+    integer,        intent(in)            :: N_smooth
+    real(kind=WP),  intent(inout)         :: arr(:,:)
+    integer                               :: n, q, el, nz, j, nlev, uln, nln, ule, nle
+    real(kind=WP)                         :: v, w
+
+    nlev=ubound(arr,1)
+    if (.not. allocated(smth_vol)) then
+        allocate(smth_vol(nlev, partit%myDim_nod2D), smth_work(nlev, partit%myDim_nod2D))
+        !$ACC ENTER DATA CREATE(smth_vol, smth_work)
+    end if
+    do q=1, N_smooth
+        ! one gang per node, the levels over the vector lanes (coalesced column access)
+!$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) PRIVATE(uln, nln) VECTOR_LENGTH(32)
+        DO n=1, partit%myDim_nod2D
+            uln = mesh%ulevels_nod2d(n)
+            nln = min(nlev,mesh%nlevels_nod2d(n))
+!$ACC LOOP VECTOR PRIVATE(j, el, ule, nle, v, w)
+            DO nz=uln, nln
+                v = 0._WP
+                w = 0._WP
+!$ACC LOOP SEQ
+                DO j=1, mesh%nod_in_elem2D_num(n)
+                    el = mesh%nod_in_elem2D(j,n)
+                    ule = max( uln, mesh%ulevels(el) )
+                    nle = min( nln, min(nlev,mesh%nlevels(el)) )
+                    if (nz>=ule .and. nz<=nle) then
+                        v = v + mesh%elem_area(el)
+                        w = w + mesh%elem_area(el) * (arr(nz, mesh%elem2D_nodes(1,el)) &
+                                                    + arr(nz, mesh%elem2D_nodes(2,el)) &
+                                                    + arr(nz, mesh%elem2D_nodes(3,el)))
+                    end if
+                END DO
+                ! the patch volume (inverse, scaled by 1/3) is computed in the first sweep
+                if (q==1) smth_vol(nz,n) = 1._WP / (3._WP * v)
+                smth_work(nz,n) = w
+            END DO
+        END DO
+!$ACC END PARALLEL LOOP
+!$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) PRIVATE(uln, nln) VECTOR_LENGTH(32)
+        DO n=1, partit%myDim_nod2D
+            uln = mesh%ulevels_nod2d(n)
+            nln = min(nlev,mesh%nlevels_nod2d(n))
+!$ACC LOOP VECTOR
+            DO nz=uln,nln
+                arr(nz, n) = smth_work(nz, n) * smth_vol(nz,n)
+            END DO
+        END DO
+!$ACC END PARALLEL LOOP
+        call exchange_nod(arr, partit, luse_g2g=.true.)
+    end do
+end subroutine smooth_nod3D_acc
+#endif
 end module g_support
 
 

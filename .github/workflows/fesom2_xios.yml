@@ -109,14 +109,15 @@ jobs:
           # test_pi settings (96 steps/day, 1 day, force_rotation=True). Lock
           # to bit-identical tolerance — any future PR that perturbs these
           # values will fail this check and either adjust the references or
-          # explain the divergence.
+          # explain the divergence. u and v are geographic east/north
+          # components (rotated from the model frame before the send).
           ref = {
-              "sst":   8.677109718322754,
-              "a_ice": 0.8831050175660934,
-              "temp":  2.473566693530158,
-              "salt":  34.73030748287183,
-              "u":    -0.002011676819622966,
-              "v":     0.0002909514366927934,
+              "sst":   8.677048683166504,
+              "a_ice": 0.883104954901662,
+              "temp":  2.473566386401832,
+              "salt":  34.73030747853326,
+              "u":    -0.002215041994947135,
+              "v":     7.060244922700211e-05,
           }
           tol = 1e-12
           fail = False
