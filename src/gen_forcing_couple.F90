@@ -1,103 +1,66 @@
-module force_flux_consv_interface
-  interface
-    subroutine force_flux_consv(field2d, mask, n, h, do_stats, partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(in),    target :: mesh
-      type(t_partit), intent(inout), target :: partit
-      real(kind=WP), intent (inout) :: field2d(partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP), intent (in)    :: mask(partit%myDim_nod2D+partit%eDim_nod2D)
-      integer, intent (in)          :: n, h
-      logical, intent (in)          :: do_stats
-    end subroutine force_flux_consv
-  end interface
-end module force_flux_consv_interface
-module compute_residual_interface
-  interface
-    subroutine compute_residual(field2d, mask, n, partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(in),    target :: mesh
-      type(t_partit), intent(inout), target :: partit
-      real(kind=WP),  intent (in) :: field2d(partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP),  intent (in) :: mask(partit%myDim_nod2D+partit%eDim_nod2D)
-      integer, intent (in)       :: n
-    end subroutine compute_residual
-  end interface
-end module compute_residual_interface
-module integrate_2D_interface
-  interface
-    subroutine integrate_2D(flux_global, flux_local, eff_vol, field2d, mask, partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(in),    target :: mesh
-      type(t_partit), intent(in), target :: partit
-      real(kind=WP), intent (out) :: flux_global(2), flux_local(2)
-      real(kind=WP), intent (out) :: eff_vol(2)
-      real(kind=WP), intent (in)  :: field2d(partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP), intent (in)  :: mask(partit%myDim_nod2D   +partit%eDim_nod2D)
-    end subroutine integrate_2D
-  end interface
-end module integrate_2D_interface
+module gen_forcing_couple_module
+    USE o_PARAM
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_TRACER
+    USE MOD_ICE
+    USE MOD_DYN
+    USE o_arrays
+    USE g_forcing_param
+    USE g_forcing_arrays
+    USE g_clock
+    USE g_config
+    USE g_comm_auto
+    USE g_rotate_grid
+    USE g_sbf, only: sbc_do, atmdata, i_totfl, i_xwind, i_ywind, i_xstre, i_ystre, i_humi, &
+            i_qsr, i_qlw, i_tair, i_prec, i_mslp, i_cloud, i_snow, l_xwind, l_ywind, l_xstre, &
+            l_ystre, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow, &
+            i_xmodini, i_ymodini
+    USE cpl_yac_driver
+    USE gen_bulk
+    USE g_support, only: integrate_nod
+#if defined (__recom)
+  use g_sbf, only: sbc_do_recom
+#endif
+#if defined (__oasis)
+  use cpl_driver
+#endif
+#if defined (__recom)
+  use REcoM_GloVar, only: x_co2atm, GloCO2flux_seaicemask
+#endif
+#if defined(__oasis)
+  use cpl_driver,	 only : nrecv, cpl_recv, a2o_fcorr_stat
+#elif defined(__yac)
+  use cpl_yac_driver,	 only : nrecv, cpl_recv, a2o_fcorr_stat
+#endif
+#if defined(__oasis)
+  use cpl_driver
+#elif defined(__yac)
+  use cpl_yac_driver
+#endif
+#if defined(__recom) && defined(__usetp)
+  use g_config, only: num_fesom_groups
+#endif
 
-module update_atm_forcing_interface
-    interface
-        subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
-        USE MOD_TRACER
-        USE MOD_ICE
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        USE MOD_DYN
-        integer,        intent(in)            :: istep
-        type(t_ice),    intent(inout), target :: ice
-        type(t_tracer), intent(in),    target :: tracers
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh),   intent(in),    target :: mesh
-        type(t_dyn)   , intent(in),    target :: dynamics
-        end subroutine update_atm_forcing
-    end interface
-end module update_atm_forcing_interface
+    implicit none
 
-module net_rec_from_atm_interface
-  interface
-    subroutine net_rec_from_atm(action, partit)
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      logical,        intent(in)             :: action
-      type(t_partit), intent(inout), target  :: partit
-    end subroutine net_rec_from_atm
-  end interface
-end module net_rec_from_atm_interface
+    private
+#if defined (__yac)
+    public :: update_atm_forcing_yac
+#else /* if not defined  __yac */
+    public :: update_atm_forcing
+#endif
+#if defined (__oasis) || defined (__yac)
+    public :: force_flux_consv, compute_residual, integrate_2D, &
+              net_rec_from_atm
+#endif
+
+contains
+
 ! Routines for updating ocean surface forcing fields
 !-------------------------------------------------------------------------
 #if defined (__yac)
 subroutine update_atm_forcing_yac(istep, ice, tracers, dynamics, partit, mesh)
-  use o_PARAM
-  use MOD_MESH
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  use MOD_TRACER
-  use MOD_ICE
-  use MOD_DYN
-  use o_arrays
-  use g_forcing_param
-  use g_forcing_arrays
-  use g_clock
-  use g_config
-  use g_comm_auto
-  use g_rotate_grid
-  use net_rec_from_atm_interface
-  use g_sbf, only: sbc_do
-  use g_sbf, only: atmdata, i_totfl, i_xwind, i_ywind, i_xstre, i_ystre, i_humi, i_qsr, i_qlw, i_tair, i_prec, i_mslp, i_cloud, i_snow, &
-                                     l_xwind, l_ywind, l_xstre, l_ystre, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow
-  use cpl_yac_driver
-  use gen_bulk
-  use force_flux_consv_interface
-  USE g_support, only: integrate_nod
 
   implicit none
   integer,        intent(in)            :: istep
@@ -131,10 +94,6 @@ subroutine update_atm_forcing_yac(istep, ice, tracers, dynamics, partit, mesh)
   real(kind=WP), dimension(:), pointer  ::  oce_heat_flux, ice_heat_flux
   real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
     real(kind=WP)              , pointer  :: rhoair
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
   u_ice            => ice%uice(:)
   v_ice            => ice%vice(:)
   u_w              => ice%srfoce_u(:)
@@ -155,7 +114,7 @@ subroutine update_atm_forcing_yac(istep, ice, tracers, dynamics, partit, mesh)
   !_____________________________________________________________________________
   t1=MPI_Wtime()
   if (.NOT. ALLOCATED(exchange)) then
-     ALLOCATE(exchange(myDim_nod2D, &
+     ALLOCATE(exchange(partit%myDim_nod2D, &
           MAX(MAXVAL(cpl_send_collection_size), MAXVAL(cpl_recv_collection_size))))
      exchange = 0
   end if
@@ -166,72 +125,72 @@ subroutine update_atm_forcing_yac(istep, ice, tracers, dynamics, partit, mesh)
   do i=1,nsend
      exchange  =0.
      if (i.eq.1) then
-        exchange(:,1)=tracers%data(1)%values(1, 1:myDim_nod2d)+273.15 ! sea surface temperature [°K]
+        exchange(:,1)=tracers%data(1)%values(1, 1:partit%myDim_nod2d)+273.15 ! sea surface temperature [°K]
      elseif (i.eq.2) then
-        exchange(:,1) = m_ice(1:myDim_nod2d)              ! ice thickness [m]
-        exchange(:,2) = m_snow(1:myDim_nod2d)             ! snow thickness
-        exchange(:,3) = a_ice(1:myDim_nod2d)              ! ice concentation [%]
+        exchange(:,1) = m_ice(1:partit%myDim_nod2d)              ! ice thickness [m]
+        exchange(:,2) = m_snow(1:partit%myDim_nod2d)             ! snow thickness
+        exchange(:,3) = a_ice(1:partit%myDim_nod2d)              ! ice concentation [%]
      endif
      call cpl_yac_send(i, exchange(:,1:cpl_send_collection_size(i)), action)
   enddo
 #ifdef VERBOSE
   do i=1, nsend
-     if (mype==0) write(*,*) 'SEND: field ', i, ' max val:', maxval(exchange), ' . ACTION? ', action
+     if (partit%mype==0) write(*,*) 'SEND: field ', i, ' max val:', maxval(exchange), ' . ACTION? ', action
   enddo
 #endif
   do i=1,nrecv
      exchange =0.0
      CALL cpl_yac_recv (i, exchange(:,1:cpl_recv_collection_size(i)), action)
 #ifdef VERBOSE
-     if (mype==0) then
+     if (partit%mype==0) then
         write(*,*) 'FESOM RECV: flux ', i, ', max val: ', maxval(exchange), ' . ACTION? ', action
      end if
 #endif
      if (.not. action) cycle
      !Do not apply a correction at first time step!
      if (i.eq.1) then
-        stress_atmoce_x(1:myDim_nod2d) =  exchange(:,1)                    ! taux_oce
+        stress_atmoce_x(1:partit%myDim_nod2d) =  exchange(:,1)                    ! taux_oce
         call exchange_nod(stress_atmoce_x, partit)
-        stress_atmice_x(1:myDim_nod2d) =  exchange(:,2)                    ! taux_ice
+        stress_atmice_x(1:partit%myDim_nod2d) =  exchange(:,2)                    ! taux_ice
         call exchange_nod(stress_atmice_x, partit)
         do_rotate_oce_wind=.true.
         do_rotate_ice_wind=.true.
      elseif (i.eq.2) then
-        stress_atmoce_y(1:myDim_nod2d) =  exchange(:,1)                    ! tauy_oce
+        stress_atmoce_y(1:partit%myDim_nod2d) =  exchange(:,1)                    ! tauy_oce
         call exchange_nod(stress_atmoce_y, partit)
-        stress_atmice_y(1:myDim_nod2d) =  exchange(:,2)                    ! tauy_ice
+        stress_atmice_y(1:partit%myDim_nod2d) =  exchange(:,2)                    ! tauy_ice
         call exchange_nod(stress_atmice_y, partit)
         do_rotate_oce_wind=.true.
         do_rotate_ice_wind=.true.
      elseif (i.eq.3) then
-        prec_rain(1:myDim_nod2d)    =  exchange(:,1)/1000                   ! tot_prec ! kg m^(-2) s^(-1) -> m/s
+        prec_rain(1:partit%myDim_nod2d)    =  exchange(:,1)/1000                   ! tot_prec ! kg m^(-2) s^(-1) -> m/s
         call exchange_nod(prec_rain, partit)
-        prec_snow(1:myDim_nod2d)    =  exchange(:,2)/1000                    ! snowfall ! kg m^(-2) s^(-1) -> m/s
+        prec_snow(1:partit%myDim_nod2d)    =  exchange(:,2)/1000                    ! snowfall ! kg m^(-2) s^(-1) -> m/s
         call exchange_nod(prec_snow, partit)
-        evap_no_ifrac(1:myDim_nod2d)     =  exchange(:,3)/1000               ! tot_evap ! kg m^(-2) s^(-1) -> m/s; change sign
+        evap_no_ifrac(1:partit%myDim_nod2d)     =  exchange(:,3)/1000               ! tot_evap ! kg m^(-2) s^(-1) -> m/s; change sign
         call exchange_nod(evap_no_ifrac, partit)
      elseif (i.eq.4) then
-        oce_heat_flux(1:myDim_nod2d)     = exchange(:,2) + exchange(:,3) + exchange(:,4) ! heat_oce
+        oce_heat_flux(1:partit%myDim_nod2d)     = exchange(:,2) + exchange(:,3) + exchange(:,4) ! heat_oce
         call exchange_nod(oce_heat_flux, partit)
-        shortwave(1:myDim_nod2d)         =  exchange(:,1)                ! heat_swr
+        shortwave(1:partit%myDim_nod2d)         =  exchange(:,1)                ! heat_swr
         call exchange_nod(shortwave, partit)
      elseif (i.eq.5) then
-        ice_heat_flux(1:myDim_nod2d)     = (exchange(:,2) + exchange(:,1)) ! heat_ice
+        ice_heat_flux(1:partit%myDim_nod2d)     = (exchange(:,2) + exchange(:,1)) ! heat_ice
         call exchange_nod(ice_heat_flux, partit)
 !SL-- add river runoff ------------------------------
      elseif (i.eq.6) then
-        runoff(1:myDim_nod2D) = exchange(:,1) * mesh%area_inv(1,1:myDim_nod2D)
+        runoff(1:partit%myDim_nod2D) = exchange(:,1) * mesh%area_inv(1,1:partit%myDim_nod2D)
         call exchange_nod(runoff, partit)
         call integrate_nod(runoff, net, partit, mesh)
-        if(mype==0) write(*,*) 'RUNOFF CHECK:', net
+        if(partit%mype==0) write(*,*) 'RUNOFF CHECK:', net
 !SL--------------------------------------------------
      endif
   end do
 
   if ((do_rotate_oce_wind .AND. do_rotate_ice_wind) .AND. rotated_grid) then
-     do n=1, myDim_nod2D+eDim_nod2D
-        call vector_g2r(stress_atmoce_x(n), stress_atmoce_y(n), coord_nod2D(1, n), coord_nod2D(2, n), 0)
-        call vector_g2r(stress_atmice_x(n), stress_atmice_y(n), coord_nod2D(1, n), coord_nod2D(2, n), 0)
+     do n=1, partit%myDim_nod2D+partit%eDim_nod2D
+        call vector_g2r(stress_atmoce_x(n), stress_atmoce_y(n), mesh%coord_nod2D(1, n), mesh%coord_nod2D(2, n), 0)
+        call vector_g2r(stress_atmice_x(n), stress_atmice_y(n), mesh%coord_nod2D(1, n), mesh%coord_nod2D(2, n), 0)
      end do
      do_rotate_oce_wind=.false.
      do_rotate_ice_wind=.false.
@@ -240,7 +199,7 @@ subroutine update_atm_forcing_yac(istep, ice, tracers, dynamics, partit, mesh)
   t2=MPI_Wtime()
 
 #ifdef VERBOSE
-  if (mod(istep,logfile_outfreq)==0 .and. mype==0) then
+  if (mod(istep,logfile_outfreq)==0 .and. partit%mype==0) then
      write(*,*) 'update forcing data took', t2-t1
   end if
 #endif
@@ -250,33 +209,7 @@ end subroutine update_atm_forcing_yac
 #else /* if not defined  __yac */
 
 subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
-  use o_PARAM
-  use MOD_MESH
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  use MOD_TRACER
-  use MOD_ICE
-  use MOD_DYN
-  use o_arrays
-  use g_forcing_param
-  use g_forcing_arrays
-  use g_clock
-  use g_config
-  use g_comm_auto
-  use g_rotate_grid
-  use net_rec_from_atm_interface
-  use g_sbf, only: sbc_do
-#if defined (__recom) 
-  use g_sbf, only: sbc_do_recom
-#endif
-  use g_sbf, only: atmdata, i_totfl, i_xwind, i_ywind, i_xstre, i_ystre, i_humi, i_qsr, i_qlw, i_tair, i_prec, i_mslp, i_cloud, i_snow, &
-                                     i_xmodini, i_ymodini, &
-                                     l_xwind, l_ywind, l_xstre, l_ystre, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow
-#if defined (__oasis)
-  use cpl_driver
-#endif
-  use gen_bulk
-  use force_flux_consv_interface
+  use fesom_profiler, only: fesom_profiler_start, fesom_profiler_end
 
   implicit none
   integer,        intent(in)            :: istep
@@ -325,10 +258,6 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   real(kind=WP), dimension(:,:,:), pointer :: UVnode
 #endif
   real(kind=WP)              , pointer  :: rhoair
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
   u_ice            => ice%uice(:)
   v_ice            => ice%vice(:)
   u_w              => ice%srfoce_u(:)
@@ -359,7 +288,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   t1=MPI_Wtime()
 #if defined (__oasis)
      if (firstcall) then
-        allocate(exchange(myDim_nod2D+eDim_nod2D), mask(myDim_nod2D+eDim_nod2D))
+        allocate(exchange(partit%myDim_nod2D+partit%eDim_nod2D), mask(partit%myDim_nod2D+partit%eDim_nod2D))
         allocate(a2o_fcorr_stat(nrecv,6))
         a2o_fcorr_stat=0.
         exchange      =0.
@@ -371,7 +300,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
          if (i.eq.1) then
 #if defined (__oifs)
             ! AWI-CM3 outgoing state vectors
-              do n=1,myDim_nod2D+eDim_nod2D
+              do n=1,partit%myDim_nod2D+partit%eDim_nod2D
               exchange(n)=tracers%data(1)%values(1, n)+tmelt	           ! sea surface temperature [K]
               end do
             elseif (i.eq.2) then
@@ -379,22 +308,47 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
             elseif (i.eq.3) then
               exchange(:) = m_snow(:)                                 ! snow thickness
             elseif (i.eq.4) then
-              exchange(:) = ice_temp(:)                               ! ice surface temperature
+              ! Concentration-weighted ice surface temperature (ist*a_ice).
+              ! The o2a remap blend must be concentration-weighted so the
+              ! atmosphere's prescribed ice-tile skin is representative of the
+              ! ice actually present in the cell; PAIRED with
+              ! ECE_CPL_NEMO_WEIGHTED_ICE=.true. (OIFS divides by the received
+              ! ice fraction on ingest) and a weighted-convention rstos.nc.
+              exchange(:) = ice_temp(:)*a_ice(:)                      ! ice surface temperature * concentration
             elseif (i.eq.5) then
               exchange(:) = ice_alb(:)                                ! ice albedo
-            elseif (i.eq.6) then
-              do n=1,myDim_nod2D+eDim_nod2D
-                exchange(n) = UVnode(1,1,n)
+            elseif (i.eq.6 .or. i.eq.7) then
+              ! surface velocity, sent as eastward (6) and northward (7)
+              ! component: rotate from the model grid to geographical coordinates
+              do n=1,partit%myDim_nod2D+partit%eDim_nod2D
+                tx = UVnode(1,1,n)
+                ty = UVnode(2,1,n)
+                if (rotated_grid) call vector_r2g(tx, ty, mesh%coord_nod2D(1, n), mesh%coord_nod2D(2, n), 0)
+                if (i.eq.6) then
+                  exchange(n) = tx
+                else
+                  exchange(n) = ty
+                end if
               end do
-            elseif (i.eq.7) then
-              do n=1,myDim_nod2D+eDim_nod2D
-                exchange(n) = UVnode(2,1,n)
-              end do
-            else    
-            print *, 'not installed yet or error in cpl_oasis3mct_send', mype
+            elseif (i.eq.8) then
+              ! Effective (grid-mean = per-ice * concentration) sea-ice
+              ! thickness for the atmosphere's ice-tile slab conduction
+              ! (OIFS ECE_FESIM_GET_ICE_STATE divides by the received ice
+              ! fraction under LNEMOLIMTHK). Weighted convention as ist/alb.
+              exchange(:) = m_ice(:)                                  ! effective sea ice thickness
+#if defined (__recom)
+            elseif (i.eq.9) then
+              ! GloCO2flux_seaicemask is in [mmolCO2 m-2 s-1], need [kgCO2 m-2 s-1]
+              ! Conversion: 1.0e-3_WP -> mol/s -> kg/s
+              ! 1 mol CO2 = 44.0095 g/mol = 0.0440095 kg/mol (NIST 2018)
+              ! *-1 for correct flux direction convention: oifs expects >0: downward; fesom: >0: upward
+              exchange(:) = GloCO2flux_seaicemask(:) * 1.0e-3_WP * 0.0440095_WP * -1 ! [kgCO2 m-2 s-1]
+#endif
+            else
+            print *, 'not installed yet or error in cpl_oasis3mct_send', partit%mype
 #else
             ! AWI-CM2 outgoing state vectors
-            do n=1,myDim_nod2D+eDim_nod2D
+            do n=1,partit%myDim_nod2D+partit%eDim_nod2D
                exchange(n)=tracers%data(1)%values(1, n)                     ! sea surface temperature [°C]
             end do
             elseif (i.eq.2) then
@@ -447,7 +401,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
             exchange(:) = 0.0_WP                          ! delta H216O of sea ice is set to zero permill
 !---wiso-code-end
             else	    
-            print *, 'not installed yet or error in cpl_oasis3mct_send', mype
+            print *, 'not installed yet or error in cpl_oasis3mct_send', partit%mype
 #endif
          endif
 
@@ -461,7 +415,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
       end do
 #ifdef VERBOSE
       do i=1, nsend 
-        if (mype==0) write(*,*) 'SEND: field ', i, ' max val:', maxval(exchange), ' . ACTION? ', action 
+        if (partit%mype==0) write(*,*) 'SEND: field ', i, ' max val:', maxval(exchange), ' . ACTION? ', action 
       end do
 #endif
       mask=1.
@@ -576,6 +530,25 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
              if (action) then
                 v_wind(:)                     = exchange(:)        ! meridional wind
              end if
+         elseif (i.eq.recv_tsk_ico) then
+             if (action) then
+                ice%atmcoupl%ist_ref(:)       = exchange(:)        ! ice-tile skin temperature
+             end if
+         elseif (i.eq.recv_mslp_oce) then
+             if (action) then
+                ! Mean sea-level pressure [Pa]. Only the gas exchange reads it here:
+                ! the pressure term of the momentum equation stays under l_mslp.
+                press_air(:)                  = exchange(:)
+             end if
+#if defined (__recom)
+         elseif (i.eq.16) then
+             if (action) then
+                ! Convert mass mixing ratio (kg/kg) to ppm
+                ! MW_CO2 = 44.0095 g/mol (NIST 2018)
+                ! MW_dry_air = 28.9647 g/mol (standard atmosphere composition)
+                x_co2atm(:) = exchange(:) * ((28.9647_WP/44.0095_WP)*1e6_WP)  ! [ppm]
+             end if
+#endif
 #else
          elseif (i.eq.13) then
             if (action) then
@@ -670,16 +643,16 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
          end if
 
 #ifdef VERBOSE
-	  if (mype==0) then
+	  if (partit%mype==0) then
 		write(*,*) 'FESOM RECV: flux ', i, ', max val: ', maxval(exchange)
 	  end if
 #endif
       end do
 
     if ((do_rotate_oce_wind .AND. do_rotate_ice_wind) .AND. rotated_grid) then
-        do n=1, myDim_nod2D+eDim_nod2D
-            call vector_g2r(stress_atmoce_x(n), stress_atmoce_y(n), coord_nod2D(1, n), coord_nod2D(2, n), 0)
-            call vector_g2r(stress_atmice_x(n), stress_atmice_y(n), coord_nod2D(1, n), coord_nod2D(2, n), 0)
+        do n=1, partit%myDim_nod2D+partit%eDim_nod2D
+            call vector_g2r(stress_atmoce_x(n), stress_atmoce_y(n), mesh%coord_nod2D(1, n), mesh%coord_nod2D(2, n), 0)
+            call vector_g2r(stress_atmice_x(n), stress_atmice_y(n), mesh%coord_nod2D(1, n), mesh%coord_nod2D(2, n), 0)
         end do
         do_rotate_oce_wind=.false.
         do_rotate_ice_wind=.false.
@@ -695,7 +668,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
     if (use_modini) then
        call sbc_do(partit, mesh)
 !$OMP PARALLEL DO
-       do n=1, myDim_nod2D+eDim_nod2D
+       do n=1, partit%myDim_nod2D+partit%eDim_nod2D
           u_wind(n) = atmdata(i_xmodini,n)
           v_wind(n) = atmdata(i_ymodini,n)
        end do
@@ -713,9 +686,9 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
 
        ! wind stress from the modini winds
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i, dux, dvy, aux)
-       do i=1,myDim_nod2d+eDim_nod2d
+       do i=1,partit%myDim_nod2d+partit%eDim_nod2d
           !_____________________________________________________________________
-          if (ulevels_nod2d(i)>1) then
+          if (mesh%ulevels_nod2d(i)>1) then
              stress_atmoce_x(i)=0.0_WP
              stress_atmoce_y(i)=0.0_WP
              stress_atmice_x(i)=0.0_WP
@@ -741,9 +714,11 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
     end if
 #else
 #ifndef __ifsinterface
+  call fesom_profiler_start("forc_sbc_do")
   call sbc_do(partit, mesh)
+  call fesom_profiler_end("forc_sbc_do")
 !$OMP PARALLEL DO
-  DO n=1, myDim_nod2D+eDim_nod2D
+  DO n=1, partit%myDim_nod2D+partit%eDim_nod2D
      u_wind(n)    = atmdata(i_xwind,n)
      v_wind(n)    = atmdata(i_ywind,n)
      if (l_xstre) then
@@ -766,8 +741,8 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
 
   if (use_cavity) then 
 !$OMP PARALLEL DO
-    do i=1,myDim_nod2d+eDim_nod2d
-        if (ulevels_nod2d(i)>1) then
+    do i=1,partit%myDim_nod2d+partit%eDim_nod2d
+        if (mesh%ulevels_nod2d(i)>1) then
             u_wind(i)   = 0.0_WP
             v_wind(i)   = 0.0_WP
             shum(i)     = 0.0_WP
@@ -776,9 +751,8 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
             Tair(i)     = 0.0_WP
             prec_rain(i)= 0.0_WP
             prec_snow(i)= 0.0_WP
-            if (l_mslp) then
-               press_air(i)= 0.0_WP 
-            end if
+            ! press_air is kept: a floating ice shelf passes the atmospheric pressure on to
+            ! the water below, and zeroing it here made a pressure step at the ice-shelf front
             runoff(i)   = 0.0_WP
         end if
     end do
@@ -787,23 +761,27 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   ! second, compute exchange coefficients
   ! 1) drag coefficient 
   if(AOMIP_drag_coeff) then
+     call fesom_profiler_start("forc_wind_drag")
      call cal_wind_drag_coeff(partit)
+     call fesom_profiler_end("forc_wind_drag")
   end if
   ! 2) drag coeff. and heat exchange coeff. over ocean in case using ncar formulae
   if(ncar_bulk_formulae) then
 !     cd_atm_oce_arr=0.0_WP
 !     ch_atm_oce_arr=0.0_WP
 !     ce_atm_oce_arr=0.0_WP
+     call fesom_profiler_start("forc_ncar_fluxes")
      call ncar_ocean_fluxes_mode(ice, partit, mesh)
+     call fesom_profiler_end("forc_ncar_fluxes")
   elseif(AOMIP_drag_coeff) then
      cd_atm_oce_arr=cd_atm_ice_arr
   end if
   ! third, compute wind stress
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i, dux, dvy, aux)
 
-  do i=1,myDim_nod2d+eDim_nod2d   
+  do i=1,partit%myDim_nod2d+partit%eDim_nod2d   
      !__________________________________________________________________________
-     if (ulevels_nod2d(i)>1) then
+     if (mesh%ulevels_nod2d(i)>1) then
         stress_atmoce_x(i)=0.0_WP
         stress_atmoce_y(i)=0.0_WP
         stress_atmice_x(i)=0.0_WP
@@ -825,8 +803,10 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
      dux=u_wind(i)-u_ice(i) 
      dvy=v_wind(i)-v_ice(i)
      aux=sqrt(dux**2+dvy**2)*rhoair
-     stress_atmice_x(i) = Cd_atm_ice_arr(i)*aux*dux
-     stress_atmice_y(i) = Cd_atm_ice_arr(i)*aux*dvy
+     if (use_ice) then
+        stress_atmice_x(i) = Cd_atm_ice_arr(i)*aux*dux
+        stress_atmice_y(i) = Cd_atm_ice_arr(i)*aux*dvy
+     end if
   end do
 !$OMP END PARALLEL DO
   ! heat and fresh water fluxes are treated in i_therm and ice2ocean
@@ -840,7 +820,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   t2=MPI_Wtime()
 
 #ifdef VERBOSE
-  if (mod(istep,logfile_outfreq)==0 .and. mype==0) then
+  if (mod(istep,logfile_outfreq)==0 .and. partit%mype==0) then
      write(*,*) 'update forcing data took', t2-t1
   end if
 #endif
@@ -869,21 +849,6 @@ end subroutine update_atm_forcing
 !
 SUBROUTINE force_flux_consv(field2d, mask, n, h, do_stats, partit, mesh)
 
-  use g_forcing_arrays,	only : 	atm_net_fluxes_north, atm_net_fluxes_south, 	&
-  				oce_net_fluxes_north, oce_net_fluxes_south, 	&
-				flux_correction_north, flux_correction_south,	&
-				flux_correction_total
-  use mod_mesh
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-#if defined(__oasis)
-  use cpl_driver,	 only : nrecv, cpl_recv, a2o_fcorr_stat
-#elif defined(__yac)
-  use cpl_yac_driver,	 only : nrecv, cpl_recv, a2o_fcorr_stat
-#endif
-  use o_PARAM,           only : mstep, WP
-  use compute_residual_interface
-  use integrate_2D_interface
   IMPLICIT NONE
   type(t_mesh),   intent(in),    target :: mesh
   type(t_partit), intent(inout), target :: partit  
@@ -897,17 +862,13 @@ SUBROUTINE force_flux_consv(field2d, mask, n, h, do_stats, partit, mesh)
   real(kind=WP)                         :: flux_global(2), flux_local(2)
   real(kind=WP)                         :: eff_vol(2)
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
 #if defined (__oifs)
   return !OIFS-FESOM2 coupling uses OASIS3MCT conservative remapping instead
 #endif
 
   if (mstep==1) then
-	if (mype == 0) write(*,*) 'Do not apply a correction at first time step for ', trim(cpl_recv(n))
+	if (partit%mype == 0) write(*,*) 'Do not apply a correction at first time step for ', trim(cpl_recv(n))
 	return
   end if
 
@@ -915,10 +876,10 @@ SUBROUTINE force_flux_consv(field2d, mask, n, h, do_stats, partit, mesh)
   !just keep NH or SH part in mask
   rmask=mask
   SELECT CASE(h)
-	   CASE( 1 ) ; where (geo_coord_nod2D(2, :)< 0) !just NH 
+	   CASE( 1 ) ; where (mesh%geo_coord_nod2D(2, :)< 0) !just NH 
 	                     rmask=0. 
 		       end where
-	   CASE( 2 ) ; where (geo_coord_nod2D(2, :)>=0) !just SH 
+	   CASE( 2 ) ; where (mesh%geo_coord_nod2D(2, :)>=0) !just SH 
 	                     rmask=0. 
 		       end where
 	   CASE DEFAULT 
@@ -929,7 +890,7 @@ SUBROUTINE force_flux_consv(field2d, mask, n, h, do_stats, partit, mesh)
   call compute_residual(field2d, rmask, n, partit, mesh)
   
 #ifdef VERBOSE
-  if (mype == 0) then
+  if (partit%mype == 0) then
   !atm net fluxes, oce net fluxes before modification
   write(*,'(3A,3e15.7)') 'atm NH SH GL / ', trim(cpl_recv(n)), ': ', 		&
   			    atm_net_fluxes_north(n), atm_net_fluxes_south(n), 	&
@@ -978,14 +939,14 @@ SUBROUTINE force_flux_consv(field2d, mask, n, h, do_stats, partit, mesh)
   !check conservation
   call integrate_2D(flux_global, flux_local, eff_vol, field2d, rmask, partit, mesh)
 #ifdef VERBOSE
-  if (mype == 0) then
+  if (partit%mype == 0) then
   write(*,'(3A,3e15.7)') 'oce NH SH GL / ', trim(cpl_recv(n)), ': ', 		&
   			   flux_global(1), flux_global(2), sum(flux_global)
   end if
 #endif
   
   !last flux			   
-  if (n==nrecv .AND. mype==0) write(*,*) 'Fluxes have been modified.'  
+  if (n==nrecv .AND. partit%mype==0) write(*,*) 'Fluxes have been modified.'  
 END SUBROUTINE force_flux_consv
 
 !
@@ -994,15 +955,6 @@ END SUBROUTINE force_flux_consv
 !
 SUBROUTINE compute_residual(field2d, mask, n, partit, mesh)
 
-  use g_forcing_arrays,	only : 	atm_net_fluxes_north, atm_net_fluxes_south, 	&
-  				oce_net_fluxes_north, oce_net_fluxes_south, 	&
-				flux_correction_north, flux_correction_south,	&
-				flux_correction_total
-  use o_PARAM, only : WP 
-  use MOD_MESH
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  use integrate_2D_interface
  
   IMPLICIT NONE
   type(t_mesh),   intent(in),    target :: mesh
@@ -1014,10 +966,6 @@ SUBROUTINE compute_residual(field2d, mask, n, partit, mesh)
   real(kind=WP)               :: flux_global(2), flux_local(2)
   real(kind=WP)               :: eff_vol(2)
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
   !compute net flux (for flux n) on ocean side
   call integrate_2D(flux_global, flux_local, eff_vol, field2d, mask, partit, mesh)
   oce_net_fluxes_north(n)=flux_global(1)
@@ -1034,10 +982,6 @@ END SUBROUTINE compute_residual
 ! -flux_global (returned) is the communicated and summarized flux_local  
 !
 SUBROUTINE integrate_2D(flux_global, flux_local, eff_vol, field2d, mask, partit, mesh)
-  use MOD_MESH
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  use o_PARAM, only: WP 
   IMPLICIT NONE
   type(t_mesh),   intent(in),    target :: mesh
   type(t_partit), intent(in),    target :: partit
@@ -1047,22 +991,19 @@ SUBROUTINE integrate_2D(flux_global, flux_local, eff_vol, field2d, mask, partit,
   real(kind=WP), INTENT(IN)   :: mask(partit%myDim_nod2D   +partit%eDim_nod2D) 
    
   real(kind=WP)               :: eff_vol_local(2)
+  integer                     :: MPIerr
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
-  flux_local(1)=sum(lump2d_north*field2d(1:myDim_nod2D)*mask(1:myDim_nod2D))
-  flux_local(2)=sum(lump2d_south*field2d(1:myDim_nod2D)*mask(1:myDim_nod2D))
+  flux_local(1)=sum(mesh%lump2d_north*field2d(1:partit%myDim_nod2D)*mask(1:partit%myDim_nod2D))
+  flux_local(2)=sum(mesh%lump2d_south*field2d(1:partit%myDim_nod2D)*mask(1:partit%myDim_nod2D))
   call MPI_AllREDUCE(flux_local, flux_global, 2, &
-  		     MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+  		     MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
 		     
 		     
-  eff_vol_local(1)=sum(lump2d_north*mask(1:myDim_nod2D))
-  eff_vol_local(2)=sum(lump2d_south*mask(1:myDim_nod2D))
+  eff_vol_local(1)=sum(mesh%lump2d_north*mask(1:partit%myDim_nod2D))
+  eff_vol_local(2)=sum(mesh%lump2d_south*mask(1:partit%myDim_nod2D))
   call MPI_AllREDUCE(eff_vol_local, eff_vol,  2, & 
-  		     MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+  		     MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
 		     
 END SUBROUTINE integrate_2D
 !
@@ -1097,19 +1038,7 @@ END SUBROUTINE integrate_2D
 !
 SUBROUTINE net_rec_from_atm(action, partit)
 !
-  use g_forcing_arrays
-#if defined(__oasis)
-  use cpl_driver
-#elif defined(__yac)
-  use cpl_yac_driver
-#endif
-  use o_PARAM, only: WP
-  USE MOD_PARTIT
-  USE MOD_PARSUP
 
-#if defined(__recom) && defined(__usetp)
-  use g_config, only: num_fesom_groups
-#endif
 
   IMPLICIT NONE
 
@@ -1127,6 +1056,15 @@ SUBROUTINE net_rec_from_atm(action, partit)
 #if defined (__oifs)
   return  !OIFS-FESOM2 coupling uses OASIS3MCT conservative remapping and recieves no net fluxes here.
 #endif
+  ! NOTE (single precision): the MPI_DOUBLE_PRECISION calls below are a RAW
+  ! FESOM<->atmosphere root exchange over MPI_COMM_WORLD (source_root/target_root),
+  ! NOT routed through OASIS, so they are only used by the ECHAM/AWICM flux-correction
+  ! path -- the __oifs build returns above and never reaches them. They are left
+  ! hardcoded double on purpose: atm_net_fluxes_* are real(kind=WP), but the buffer
+  ! kind must match the ATMOSPHERE partner (double), not the local WP, so this is the
+  ! one coupling spot that MUST NOT be switched to MPI_WP. Making FESOM single
+  ! precision coupled to ECHAM would additionally require this exchange (and the
+  ! atmosphere side) to agree on a precision -- out of scope for the OIFS SP work.
 
   if (action) then
      CALL MPI_COMM_RANK(MPI_COMM_WORLD, my_global_rank, ierror)
@@ -1143,23 +1081,24 @@ SUBROUTINE net_rec_from_atm(action, partit)
 #else
      if (my_global_rank==target_root) then
 #endif
-        CALL MPI_IRecv(atm_net_fluxes_north(1), nrecv, MPI_DOUBLE_PRECISION, source_root, 111, MPI_COMM_WORLD, request(1), partit%MPIerr)
-        CALL MPI_IRecv(atm_net_fluxes_south(1), nrecv, MPI_DOUBLE_PRECISION, source_root, 112, MPI_COMM_WORLD, request(2), partit%MPIerr)
+        CALL MPI_IRecv(atm_net_fluxes_north(1), nrecv, MPI_WP, source_root, 111, MPI_COMM_WORLD, request(1), partit%MPIerr)
+        CALL MPI_IRecv(atm_net_fluxes_south(1), nrecv, MPI_WP, source_root, 112, MPI_COMM_WORLD, request(2), partit%MPIerr)
         CALL MPI_Waitall(2, request, status, partit%MPIerr)
      end if
 
 #if defined(__recom) && defined(__usetp)
         if(num_fesom_groups > 1) then
-           call MPI_Bcast(atm_net_fluxes_north(1), nrecv, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%MPIerr)
-           call MPI_Bcast(atm_net_fluxes_south(1), nrecv, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%MPIerr)
+           call MPI_Bcast(atm_net_fluxes_north(1), nrecv, MPI_WP, 0, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%MPIerr)
+           call MPI_Bcast(atm_net_fluxes_south(1), nrecv, MPI_WP, 0, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%MPIerr)
         end if
      end if ! (my_global_rank_test==target_root) then
 #endif
-  call MPI_Barrier(partit%MPI_COMM_FESOM, partit%MPIerr)     
-  call MPI_AllREDUCE(atm_net_fluxes_north(1), aux, nrecv, MPI_DOUBLE_PRECISION, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+  call MPI_AllREDUCE(atm_net_fluxes_north(1), aux, nrecv, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
   atm_net_fluxes_north=aux
-  call MPI_AllREDUCE(atm_net_fluxes_south(1), aux, nrecv, MPI_DOUBLE_PRECISION, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+  call MPI_AllREDUCE(atm_net_fluxes_south(1), aux, nrecv, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
   atm_net_fluxes_south=aux
   end if
 END SUBROUTINE net_rec_from_atm
 #endif
+
+end module gen_forcing_couple_module

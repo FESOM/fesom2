@@ -1,32 +1,19 @@
-module ssh_solve_preconditioner_interface
-    interface
-        subroutine ssh_solve_preconditioner(solverinfo, partit, mesh)
-        use MOD_MESH
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_DYN
-        type(t_solverinfo),  intent(inout), target :: solverinfo
-        type(t_partit),      intent(inout), target :: partit
-        type(t_mesh),        intent(inout), target :: mesh
-        end subroutine ssh_solve_preconditioner
-    end interface
-end module ssh_solve_preconditioner_interface
+module solver_module
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_DYN
+    USE g_comm_auto
+#if defined(FESOM_PROFILING)
+  USE fesom_rtdiagnostics, only: diag_count
+#endif
 
-module ssh_solve_cg_interface
-    interface
-        subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
-        use MOD_MESH
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_DYN
-        type(t_solverinfo),  intent(inout), target :: solverinfo
-        type(t_partit),      intent(inout), target :: partit
-        type(t_mesh),        intent(inout), target :: mesh
-        real(kind=WP),       intent(inout) :: x(partit%myDim_nod2D+partit%eDim_nod2D)
-        real(kind=WP),       intent(in)    :: rhs(partit%myDim_nod2D+partit%eDim_nod2D)
-        end subroutine ssh_solve_cg
-    end interface
-end module ssh_solve_cg_interface
+    implicit none
+
+    private
+    public :: ssh_solve_preconditioner, ssh_solve_cg
+
+contains
+
 !=========================================================================
 subroutine ssh_solve_preconditioner(solverinfo, partit, mesh)
   ! Preconditioner follows MITgcm (JGR, 102,5753-5766, 1997)
@@ -40,11 +27,6 @@ subroutine ssh_solve_preconditioner(solverinfo, partit, mesh)
   ! paper cited) is, in reality, one iteration of the
   ! Jacobi method, with symmetrization. We need symmetrization to be able to use
   ! the conjugate gradient method.    
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_DYN
-    USE g_comm_auto
     IMPLICIT NONE
     type(t_solverinfo),  intent(inout), target :: solverinfo
     type(t_partit),      intent(inout), target :: partit
@@ -54,12 +36,8 @@ subroutine ssh_solve_preconditioner(solverinfo, partit, mesh)
     real(kind=WP), pointer       :: pr_values(:)
     integer,       pointer       :: rptr(:), cind(:)
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
-    nend=ssh_stiff%rowptr(myDim_nod2D+1)-ssh_stiff%rowptr(1)
+    nend=mesh%ssh_stiff%rowptr(partit%myDim_nod2D+1)-mesh%ssh_stiff%rowptr(1)
     ! Guarded: building the preconditioner twice (a restart path can do this)
     ! otherwise aborts with "allocatable array is already allocated".
     if (.not. allocated(mesh%ssh_stiff%pr_values)) then
@@ -68,29 +46,45 @@ subroutine ssh_solve_preconditioner(solverinfo, partit, mesh)
     pr_values=>mesh%ssh_stiff%pr_values
     cind     =>mesh%ssh_stiff%colind_loc
     rptr     =>mesh%ssh_stiff%rowptr_loc
-    allocate(diag_values(myDim_nod2D+eDim_nod2D)) ! Temporary, will be thrown away
+    allocate(diag_values(partit%myDim_nod2D+partit%eDim_nod2D)) ! Temporary, will be thrown away
 
-    DO row=1, myDim_nod2D
-       offset=ssh_stiff%rowptr(row)- ssh_stiff%rowptr(1)+1
-       diag_values(row)=ssh_stiff%values(offset)
+    DO row=1, partit%myDim_nod2D
+       offset=mesh%ssh_stiff%rowptr(row)- mesh%ssh_stiff%rowptr(1)+1
+       diag_values(row)=mesh%ssh_stiff%values(offset)
     END DO
     call exchange_nod(diag_values, partit)              ! We have diagonal values
     ! ==========
     ! Fill in the preconditioner
     ! ==========
-    DO row=1, myDim_nod2D
-       offset=ssh_stiff%rowptr(row)-ssh_stiff%rowptr(1)
-       nend=ssh_stiff%rowptr(row+1)-ssh_stiff%rowptr(row)
-       pr_values(offset+1)=1.0_WP/ssh_stiff%values(offset+1)
+    DO row=1, partit%myDim_nod2D
+       offset=mesh%ssh_stiff%rowptr(row)-mesh%ssh_stiff%rowptr(1)
+       nend=mesh%ssh_stiff%rowptr(row+1)-mesh%ssh_stiff%rowptr(row)
+       pr_values(offset+1)=1.0_WP/mesh%ssh_stiff%values(offset+1)
        DO n=2, nend   
           node=cind(offset+n)    ! Will be ssh_stiff$colind(offset+n) 
-          pr_values(n+offset)=-0.5_WP*(ssh_stiff%values(n+offset)/ssh_stiff%values(1+offset))/  &
-                               (ssh_stiff%values(1+offset)+ diag_values(node)) 
+          if (solverinfo%precond_variant == 0) then
+             ! As coded since 60b46bdc. Note two things about it. The comment at
+             ! the top of this routine specifies -2*a_i/a_r/(a_r+(a_diag)_i),
+             ! which is this expression times 4. And entry (r,i) here is
+             ! -c*a_ri/(a_rr*(a_rr+a_ii)) while its transpose (i,r) is
+             ! -c*a_ir/(a_ii*(a_ii+a_rr)); with A symmetric those agree only
+             ! where a_rr == a_ii, i.e. on a uniform mesh. CG needs an SPD M^-1,
+             ! so this is worth measuring rather than assuming -- see the r.z<0
+             ! sensor in ssh_solve_cg.
+             pr_values(n+offset)=-0.5_WP*(mesh%ssh_stiff%values(n+offset)/mesh%ssh_stiff%values(1+offset))/  &
+                                  (mesh%ssh_stiff%values(1+offset)+ diag_values(node)) 
+          else
+             ! Textbook symmetrised Jacobi, M^-1 = 2D^-1 - D^-1 A D^-1. The
+             ! off-diagonal -a_ri/(a_rr*a_ii) is symmetric by construction, and
+             ! its diagonal reduces to 1/a_rr, which is what is coded above.
+             pr_values(n+offset)=-mesh%ssh_stiff%values(n+offset)/                                     &
+                                  (mesh%ssh_stiff%values(1+offset)*diag_values(node))
+          end if
        END DO
     END DO
    deallocate(diag_values)
 
-   n=myDim_nod2D+eDim_nod2D
+   n=partit%myDim_nod2D+partit%eDim_nod2D
    if (.not. allocated(solverinfo%rr)) then
       allocate(solverinfo%rr(n), solverinfo%zz(n), solverinfo%pp(n), solverinfo%App(n))
    end if
@@ -108,14 +102,6 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
   ! 
   ! I tried first to follow the MITgcm paper, but I have doubts about
   ! their computations of beta. The variant below -- see Wikipedia.
-  USE MOD_MESH
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  USE MOD_DYN
-  USE g_comm_auto
-#if defined(FESOM_PROFILING)
-  USE fesom_rtdiagnostics, only: diag_count
-#endif
   IMPLICIT NONE
   type(t_solverinfo),  intent(inout), target :: solverinfo
   type(t_partit),      intent(inout), target :: partit
@@ -123,17 +109,21 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
   real(kind=WP),       intent(inout)         :: x(partit%myDim_nod2D+partit%eDim_nod2D)
   real(kind=WP),       intent(in)            :: rhs(partit%myDim_nod2D+partit%eDim_nod2D)
   integer                      :: row, nini, nend, iter
-  real(kind=WP)                :: sprod(2), s_old, s_aux, al, be, rtol
+  ! CG scalars in WP_full. Every one of these is either a global reduction of a
+  ! sum over all nod2D, or derived from one, and they set the search direction and
+  ! the stopping test -- so rounding here steers the iteration itself rather than
+  ! just reporting on it. The vectors (rr/zz/pp/App) and the matrix stay WP: the
+  ! bandwidth is theirs, the accuracy is these.
+  ! The MPI_Allreduce calls below pass MPI_WP_FULL to match; declaring these
+  ! WP_full makes the buffer type and the declared type agree by construction
+  ! rather than by WP happening to be real64.
+  real(kind=WP_full)           :: sprod(2), s_old, s_aux, al, be, rtol
   integer                      :: req
   logical                      :: converged
   real(kind=WP), pointer       :: pr_values(:), rr(:), zz(:), pp(:), App(:)
   integer,       pointer       :: rptr(:), cind(:)
 
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
   
   pr_values=>mesh%ssh_stiff%pr_values
   cind     =>mesh%ssh_stiff%colind_loc
@@ -143,32 +133,28 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
   zz =>solverinfo%zz
   pp =>solverinfo%pp
   App=>solverinfo%App
+#ifdef ENABLE_OPENACC
+  ! the same iteration on the device (ssh_cg_iterate_acc); the bookkeeping below is shared
+  call ssh_cg_iterate_acc(x, rhs, solverinfo, partit, mesh, iter, converged, sprod, rtol)
+#else
  
   ! ============== 
   ! Initialization. We solve AX=b, r_0=b-AX_0
   ! ============== 
   ! Define working tolerance: 
   ! ==============
-#if !defined(__openmp_reproducible)
-  s_old=0.0_WP
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row) REDUCTION(+:s_old)
-  DO row=1, myDim_nod2D
-     s_old=s_old+rhs(row)*rhs(row)
-  END DO
-!$OMP END PARALLEL DO
-#else
- s_old = sum(rhs(1:myDim_nod2D) * rhs(1:myDim_nod2D))
-#endif
+ s_old = sum(real(rhs(1:partit%myDim_nod2D), WP_full) * real(rhs(1:partit%myDim_nod2D), WP_full))
 
-  call MPI_Allreduce(MPI_IN_PLACE, s_old, 1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
-  rtol=solverinfo%soltol*sqrt(s_old/real(nod2D,WP))
+  call MPI_Allreduce(MPI_IN_PLACE, s_old, 1, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+  rtol=solverinfo%soltol*sqrt(s_old/real(mesh%nod2D,WP_full))
   ! ==============
   ! Compute r0
   ! ==============
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row) 
-  DO row=1, myDim_nod2D
-     rr(row)=rhs(row)-sum(ssh_stiff%values(rptr(row):rptr(row+1)-1)* &
-                      X(cind(rptr(row):rptr(row+1)-1)))
+  DO row=1, partit%myDim_nod2D
+     rr(row)=real(real(rhs(row),WP_full)                                        &
+              - sum(real(mesh%ssh_stiff%values(rptr(row):rptr(row+1)-1),WP_full)*     &
+                    real(X(cind(rptr(row):rptr(row+1)-1)),WP_full)), WP)
   END DO
 !$OMP END PARALLEL DO 
   call exchange_nod(rr, partit)
@@ -178,8 +164,9 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
   ! pp is the search direction
   ! =============
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row) 
-  DO row=1, myDim_nod2D
-     zz(row)= sum(pr_values(rptr(row):rptr(row+1)-1)*rr(cind(rptr(row):rptr(row+1)-1)))
+  DO row=1, partit%myDim_nod2D
+     zz(row)= real(sum(real(pr_values(rptr(row):rptr(row+1)-1),WP_full)*       &
+                       real(rr(cind(rptr(row):rptr(row+1)-1)),WP_full)), WP)
      pp(row)=zz(row)
   END DO
 !$OMP END PARALLEL DO 
@@ -187,49 +174,33 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
   ! Scalar product of r*z
   ! ===============
 
-#if !defined(__openmp_reproducible)
-  s_old=0.0_WP
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row) REDUCTION(+:s_old)
-  DO row=1, myDim_nod2D
-     s_old=s_old+rr(row)*zz(row)
-  END DO
-!$OMP END PARALLEL DO
-#else
-  s_old = sum(rr(1:myDim_nod2D) * zz(1:myDim_nod2D))
-#endif
+  s_old = sum(real(rr(1:partit%myDim_nod2D), WP_full) * real(zz(1:partit%myDim_nod2D), WP_full))
 
-  call MPI_Allreduce(MPI_IN_PLACE, s_old, 1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+  call MPI_Allreduce(MPI_IN_PLACE, s_old, 1, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
   
   ! ===============
   ! Iterations
   ! ===============
   converged = .false.
+  sprod     = 0.0_WP_full ! defined also if the loop is left before the first residual
   Do iter=1, solverinfo%maxiter
      ! ============
      ! Compute Ap
      ! ============
   call exchange_nod(pp, partit)     !  Update before matrix-vector multiplications
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row) 
-  DO row=1, myDim_nod2D
-     App(row)=sum(ssh_stiff%values(rptr(row):rptr(row+1)-1)*pp(cind(rptr(row):rptr(row+1)-1)))
+  DO row=1, partit%myDim_nod2D
+     App(row)=real(sum(real(mesh%ssh_stiff%values(rptr(row):rptr(row+1)-1),WP_full)* &
+                        real(pp(cind(rptr(row):rptr(row+1)-1)),WP_full)), WP)
   END DO
 !$OMP END PARALLEL DO 
      ! ============
      ! Scalar products for alpha
      ! ============
  
-#if !defined(__openmp_reproducible)
-  s_aux=0.0_WP
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row) REDUCTION(+:s_aux)
-  DO row=1, myDim_nod2D
-     s_aux=s_aux+pp(row)*App(row)
-  END DO
-!$OMP END PARALLEL DO
-#else
- s_aux = sum(pp(1:myDim_nod2D) * App(1:myDim_nod2D))
-#endif
+ s_aux = sum(real(pp(1:partit%myDim_nod2D), WP_full) * real(App(1:partit%myDim_nod2D), WP_full))
 
-  call MPI_Allreduce(MPI_IN_PLACE, s_aux, 1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+  call MPI_Allreduce(MPI_IN_PLACE, s_aux, 1, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
 
      ! ===========
      ! Breakdown guard. An equivalent check existed until 4eb2f21d ("Removed
@@ -254,7 +225,7 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
      ! New X and residual r
      ! ===========
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row)
-  DO row=1, myDim_nod2D
+  DO row=1, partit%myDim_nod2D
      X(row) =X(row) +al* pp(row)
      rr(row)=rr(row)-al*App(row)
   END DO
@@ -265,33 +236,24 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
   call exchange_nod(rr, partit)     ! Update before matrix-vector multiplications
 !$OMP BARRIER
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row)
-  DO row=1, myDim_nod2D
-     zz(row)= sum(pr_values(rptr(row):rptr(row+1)-1)*rr(cind(rptr(row):rptr(row+1)-1)))
+  DO row=1, partit%myDim_nod2D
+     zz(row)= real(sum(real(pr_values(rptr(row):rptr(row+1)-1),WP_full)*       &
+                       real(rr(cind(rptr(row):rptr(row+1)-1)),WP_full)), WP)
   END DO
 !$OMP END PARALLEL DO
      ! ===========
      ! Scalar products for beta
      ! ===========
-#if !defined(__openmp_reproducible)
-sprod(1:2)=0.0_WP
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row) REDUCTION(+:sprod)
-  DO row=1, myDim_nod2D
-     sprod(1)=sprod(1)+rr(row)*zz(row)
-     sprod(2)=sprod(2)+rr(row)*rr(row)
-  END DO
-!$OMP END PARALLEL DO
-#else
-    sprod(1) = sum(rr(1:myDim_nod2D) * zz(1:myDim_nod2D))
-    sprod(2) = sum(rr(1:myDim_nod2D) * rr(1:myDim_nod2D))
-#endif
+    sprod(1) = sum(real(rr(1:partit%myDim_nod2D), WP_full) * real(zz(1:partit%myDim_nod2D), WP_full))
+    sprod(2) = sum(real(rr(1:partit%myDim_nod2D), WP_full) * real(rr(1:partit%myDim_nod2D), WP_full))
   
-  call MPI_Allreduce(MPI_IN_PLACE, sprod, 2, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+  call MPI_Allreduce(MPI_IN_PLACE, sprod, 2, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
 
 !$OMP BARRIER
      ! ===========
      ! Exit if tolerance is achieved
      ! ===========
-  if (sqrt(sprod(2)/nod2D)< rtol) then
+  if (sqrt(sprod(2)/mesh%nod2D)< rtol) then
      converged = .true.
      exit
   endif
@@ -300,7 +262,7 @@ sprod(1:2)=0.0_WP
      ! here is direct evidence that M^-1 is not SPD. Cheap, and evaluated on the
      ! already-reduced value so all ranks agree.
      ! ===========
-  if (sprod(1) < 0.0_WP) then
+  if (sprod(1) < 0.0_WP_full) then
      solverinfo%nnegrz = solverinfo%nnegrz + 1
      if (partit%mype==0 .and. solverinfo%nnegrz == 1) then
         write(*,*) 'WARNING: ssh CG r.z < 0 at iter ', iter, ': r.z= ', sprod(1), &
@@ -321,11 +283,12 @@ sprod(1:2)=0.0_WP
      ! New p
      ! ===========
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row)
-  DO row=1,myDim_nod2D
+  DO row=1,partit%myDim_nod2D
      pp(row)=zz(row)+be*pp(row)
   END DO
 !$OMP END PARALLEL DO
   END DO
+#endif
 
   ! Record SSH-CG iteration count (and non-convergence) for fesom.stats.
 #if defined(FESOM_PROFILING)
@@ -343,7 +306,7 @@ sprod(1:2)=0.0_WP
   solverinfo%iters_max  = max(solverinfo%iters_max, solverinfo%iters_last)
   solverinfo%iters_sum  = solverinfo%iters_sum + solverinfo%iters_last
   solverinfo%nsolves    = solverinfo%nsolves + 1
-  solverinfo%resid_last = sqrt(sprod(2)/nod2D)
+  solverinfo%resid_last = sqrt(sprod(2)/mesh%nod2D)
   solverinfo%rtol_last  = rtol
   if (.not. converged) solverinfo%nonconv = solverinfo%nonconv + 1
 
@@ -368,5 +331,155 @@ sprod(1:2)=0.0_WP
 !$OMP BARRIER
 end subroutine ssh_solve_cg
 
+#ifdef ENABLE_OPENACC
+!=========================================================================
+! Initialisation and iterations of ssh_solve_cg on the device: explicit row products, scalar products
+! as device reductions in WP_full (summation order differs from the host); ssh_stiff%values is copied every step.
+subroutine ssh_cg_iterate_acc(x, rhs, solverinfo, partit, mesh, iter, converged, sprod, rtol)
+  IMPLICIT NONE
+  type(t_solverinfo),  intent(inout), target :: solverinfo
+  type(t_partit),      intent(inout), target :: partit
+  type(t_mesh),        intent(inout), target :: mesh
+  real(kind=WP),       intent(inout)         :: x(partit%myDim_nod2D+partit%eDim_nod2D)
+  real(kind=WP),       intent(in)            :: rhs(partit%myDim_nod2D+partit%eDim_nod2D)
+  integer,             intent(out)           :: iter
+  logical,             intent(out)           :: converged
+  real(kind=WP_full),  intent(out)           :: sprod(2), rtol
+  real(kind=WP_full)           :: s_old, s_aux, al, be, acc, sp1, sp2
+  integer                      :: row, j, nrow
+  logical, save                :: on_device = .false.
+  real(kind=WP), pointer       :: pr_values(:), values(:), rr(:), zz(:), pp(:), App(:)
+  integer,       pointer       :: rptr(:), cind(:)
+  pr_values=>mesh%ssh_stiff%pr_values
+  values   =>mesh%ssh_stiff%values
+  cind     =>mesh%ssh_stiff%colind_loc
+  rptr     =>mesh%ssh_stiff%rowptr_loc
+  rr =>solverinfo%rr
+  zz =>solverinfo%zz
+  pp =>solverinfo%pp
+  App=>solverinfo%App
+  nrow=partit%myDim_nod2D
+  if (.not. on_device) then
+     !$ACC ENTER DATA COPYIN(cind, rptr, pr_values) CREATE(values, rr, zz, pp, App, x, rhs)
+     on_device = .true.
+  end if
+  !$ACC UPDATE DEVICE(values, x, rhs)
+
+  ! working tolerance
+  s_old = 0.0_WP_full
+  !$ACC PARALLEL LOOP DEFAULT(PRESENT) REDUCTION(+:s_old)
+  do row=1, nrow
+     s_old = s_old + real(rhs(row),WP_full)*real(rhs(row),WP_full)
+  end do
+  call MPI_Allreduce(MPI_IN_PLACE, s_old, 1, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+  rtol=solverinfo%soltol*sqrt(s_old/real(mesh%nod2D,WP_full))
+
+  ! r0 = b - A x0 (one thread per row: the rows have a few entries only)
+  !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(acc, j)
+  do row=1, nrow
+     acc = 0.0_WP_full
+     !$ACC LOOP SEQ
+     do j=rptr(row), rptr(row+1)-1
+        acc = acc + real(values(j),WP_full)*real(x(cind(j)),WP_full)
+     end do
+     rr(row)=real(real(rhs(row),WP_full)-acc, WP)
+  end do
+  call exchange_nod(rr, partit, luse_g2g=.true.)
+
+  ! z0 = M^-1 r0, p0 = z0, r.z
+  s_old = 0.0_WP_full
+  !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(acc, j) REDUCTION(+:s_old)
+  do row=1, nrow
+     acc = 0.0_WP_full
+     !$ACC LOOP SEQ
+     do j=rptr(row), rptr(row+1)-1
+        acc = acc + real(pr_values(j),WP_full)*real(rr(cind(j)),WP_full)
+     end do
+     zz(row)=real(acc, WP)
+     pp(row)=zz(row)
+     s_old = s_old + real(rr(row),WP_full)*real(zz(row),WP_full)
+  end do
+  call MPI_Allreduce(MPI_IN_PLACE, s_old, 1, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+
+  converged = .false.
+  sprod = 0.0_WP_full
+  do iter=1, solverinfo%maxiter
+     ! A p and p.Ap
+     call exchange_nod(pp, partit, luse_g2g=.true.)
+     s_aux = 0.0_WP_full
+     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(acc, j) REDUCTION(+:s_aux)
+     do row=1, nrow
+        acc = 0.0_WP_full
+        !$ACC LOOP SEQ
+        do j=rptr(row), rptr(row+1)-1
+           acc = acc + real(values(j),WP_full)*real(pp(cind(j)),WP_full)
+        end do
+        App(row)=real(acc, WP)
+        s_aux = s_aux + real(pp(row),WP_full)*real(App(row),WP_full)
+     end do
+     call MPI_Allreduce(MPI_IN_PLACE, s_aux, 1, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+     if (s_aux <= 0.0_WP .or. s_aux /= s_aux) then
+        solverinfo%nbreakdown = solverinfo%nbreakdown + 1
+        if (partit%mype==0 .and. solverinfo%nbreakdown <= 5) then
+           write(*,*) 'WARNING: ssh CG breakdown at iter ', iter, ': p.Ap= ', s_aux, &
+                      ' is not positive; keeping current solution and leaving the loop'
+        endif
+        exit
+     endif
+     al=s_old/s_aux
+     !$ACC PARALLEL LOOP DEFAULT(PRESENT)
+     do row=1, nrow
+        x(row) =x(row) +al* pp(row)
+        rr(row)=rr(row)-al*App(row)
+     end do
+     ! z = M^-1 r, r.z and r.r
+     call exchange_nod(rr, partit, luse_g2g=.true.)
+     sp1 = 0.0_WP_full
+     sp2 = 0.0_WP_full
+     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(acc, j) REDUCTION(+:sp1, sp2)
+     do row=1, nrow
+        acc = 0.0_WP_full
+        !$ACC LOOP SEQ
+        do j=rptr(row), rptr(row+1)-1
+           acc = acc + real(pr_values(j),WP_full)*real(rr(cind(j)),WP_full)
+        end do
+        zz(row)=real(acc, WP)
+        sp1 = sp1 + real(rr(row),WP_full)*real(zz(row),WP_full)
+        sp2 = sp2 + real(rr(row),WP_full)*real(rr(row),WP_full)
+     end do
+     sprod(1)=sp1
+     sprod(2)=sp2
+     call MPI_Allreduce(MPI_IN_PLACE, sprod, 2, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+     if (sqrt(sprod(2)/mesh%nod2D)< rtol) then
+        converged = .true.
+        exit
+     endif
+     if (sprod(1) < 0.0_WP_full) then
+        solverinfo%nnegrz = solverinfo%nnegrz + 1
+        if (partit%mype==0 .and. solverinfo%nnegrz == 1) then
+           write(*,*) 'WARNING: ssh CG r.z < 0 at iter ', iter, ': r.z= ', sprod(1), &
+                      ' -- preconditioner is not symmetric positive definite'
+        endif
+     endif
+     if (s_old == 0.0_WP) then
+        solverinfo%nbreakdown = solverinfo%nbreakdown + 1
+        if (partit%mype==0 .and. solverinfo%nbreakdown <= 5) then
+           write(*,*) 'WARNING: ssh CG breakdown at iter ', iter, ': previous r.z is zero'
+        endif
+        exit
+     endif
+     be=sprod(1)/s_old
+     s_old=sprod(1)
+     !$ACC PARALLEL LOOP DEFAULT(PRESENT)
+     do row=1, nrow
+        pp(row)=zz(row)+be*pp(row)
+     end do
+  end do
+  ! the halo of x is exchanged by the caller (on the host)
+  !$ACC UPDATE HOST(x)
+end subroutine ssh_cg_iterate_acc
+#endif
+
 ! ===================================================================
 
+end module solver_module

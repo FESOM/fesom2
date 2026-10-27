@@ -1,123 +1,44 @@
-module oce_adv_tra_ver_interfaces
-  interface
-! implicit 1st order upwind vertical advection with to solve for fct_LO
-! updates the input tracer ttf
-    subroutine adv_tra_vert_impl(dt, w, ttf, partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      real(kind=WP), intent(in), target  :: dt
-      type(t_partit),intent(in), target  :: partit
-      type(t_mesh),  intent(in), target  :: mesh
-      real(kind=WP), intent(inout)       :: ttf(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP), intent(in)          :: W  (mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
-    end subroutine adv_tra_vert_impl
-!===============================================================================
-! 1st order upwind (explicit)
-! returns flux given at vertical interfaces of scalar volumes
-! IF o_init_zero=.TRUE.  : flux will be set to zero before computation
-! IF o_init_zero=.FALSE. : flux=flux-input flux
-! flux is not multiplied with dt
-    subroutine adv_tra_ver_upw1(w, ttf, partit, mesh, flux, o_init_zero)
-      use MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_partit),intent(in), target :: partit
-      type(t_mesh),  intent(in), target :: mesh
-      real(kind=WP), intent(in)         :: ttf(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP), intent(in)         :: W  (mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP), intent(inout)      :: flux(mesh%nl,  partit%myDim_nod2D)
-      logical, optional                 :: o_init_zero
-    end subroutine adv_tra_ver_upw1
-!===============================================================================
-! QR (4th order centerd)
-! returns flux given at vertical interfaces of scalar volumes
-! IF o_init_zero=.TRUE.  : flux will be set to zero before computation
-! IF o_init_zero=.FALSE. : flux=flux-input flux
-! flux is not multiplied with dt
-    subroutine adv_tra_ver_qr4c(w, ttf, partit, mesh, num_ord, flux, o_init_zero)
-      use MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_partit),intent(in), target :: partit
-      type(t_mesh),  intent(in), target :: mesh
-      real(kind=WP), intent(in)         :: num_ord    ! num_ord is the fraction of fourth-order contribution in the solution
-      real(kind=WP), intent(in)         :: ttf(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP), intent(in)         :: W  (mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP), intent(inout)      :: flux(mesh%nl,  partit%myDim_nod2D)
-      logical, optional                 :: o_init_zero
-    end subroutine adv_tra_ver_qr4c
-!===============================================================================
-! Vertical advection with PPM reconstruction (5th order)
-! returns flux given at vertical interfaces of scalar volumes
-! IF o_init_zero=.TRUE.  : flux will be set to zero before computation
-! IF o_init_zero=.FALSE. : flux=flux-input flux
-! flux is not multiplied with dt
-   subroutine adv_tra_vert_ppm(dt, w, ttf, partit, mesh, flux, o_init_zero)
-      use MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      real(kind=WP), intent(in), target :: dt
-      type(t_partit),intent(in), target :: partit
-      type(t_mesh),  intent(in), target :: mesh
-      real(kind=WP)                     :: tvert(mesh%nl), tv
-      real(kind=WP), intent(in)         :: ttf(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP), intent(in)         :: W  (mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP), intent(inout)      :: flux(mesh%nl,  partit%myDim_nod2D)
-      logical, optional                 :: o_init_zero
-    end subroutine adv_tra_vert_ppm
-! central difference reconstruction (2nd order, use only with FCT)
-! returns flux given at vertical interfaces of scalar volumes
-! IF o_init_zero=.TRUE.  : flux will be set to zero before computation
-! IF o_init_zero=.FALSE. : flux=flux-input flux
-! flux is not multiplied with dt
-    subroutine adv_tra_ver_cdiff(w, ttf, partit, mesh, flux, o_init_zero)
-      use MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_partit),intent(in), target :: partit
-      type(t_mesh),  intent(in), target :: mesh
-      integer                           :: n, nz, nl1
-      real(kind=WP)                     :: tvert(mesh%nl), tv
-      real(kind=WP), intent(in)         :: ttf(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP), intent(in)         :: W  (mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP), intent(inout)      :: flux(mesh%nl,  partit%myDim_nod2D)
-      logical, optional                 :: o_init_zero
-    end subroutine adv_tra_ver_cdiff
-  end interface
-end module oce_adv_tra_ver_interfaces
-!===============================================================================
-subroutine adv_tra_vert_impl(dt, w, ttf, partit, mesh)
-    use MOD_MESH
-    use MOD_TRACER
+module oce_adv_tra_ver_module
+    USE MOD_MESH
+    USE MOD_TRACER
     USE MOD_PARTIT
-    USE MOD_PARSUP
-    use g_comm_auto
+    USE g_comm_auto
+    USE o_ARRAYS
+    USE o_PARAM
+    USE g_config, only: dt
+
+    implicit none
+
+    private
+    public :: adv_tra_vert_impl, adv_tra_ver_upw1, adv_tra_ver_qr4c, &
+              adv_tra_ver_ppm, adv_tra_ver_cdiff, adv_tra_ver_spbee
+
+contains
+
+!===============================================================================
+subroutine adv_tra_vert_impl(dt, w, ttf, partit, mesh, tend)
 
     implicit none
     real(kind=WP), intent(in) , target :: dt
     type(t_partit),intent(in), target  :: partit
     type(t_mesh),  intent(in) , target :: mesh
-    real(kind=WP), intent(inout)       :: ttf(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-    real(kind=WP), intent(in)          :: W  (mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
-    real(kind=WP)                      :: a(mesh%nl), b(mesh%nl), c(mesh%nl), tr(mesh%nl)
-    real(kind=WP)                      :: cp(mesh%nl), tp(mesh%nl)
-    real(kind=WP)                      :: zbar_n(mesh%nl), z_n(mesh%nl-1)
+    real(kind=WP), intent(inout)       :: ttf (mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP), intent(in)          :: W   (mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP_full), intent(inout)   :: tend(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP_full)                  :: a(mesh%nl), b(mesh%nl), c(mesh%nl), tr(mesh%nl)
+    real(kind=WP_full)                  :: cp(mesh%nl), tp(mesh%nl)
+    real(kind=WP_full)                  :: zbar_n(mesh%nl), z_n(mesh%nl-1)
     integer                            :: nz, n, nzmax, nzmin
-    real(kind=WP)                      :: m, zinv, dt_inv, dz
-    real(kind=WP)                      :: c1, v_adv
+    real(kind=WP_full)                  :: m, zinv, dt_inv, dz
+    real(kind=WP_full)                  :: c1, v_adv
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
     dt_inv=1.0_WP/dt
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(a, b, c, tr, cp, tp, n, nz, nzmax, nzmin, m, zinv, dz, c1, v_adv)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(a, b, c, tr, cp, tp, n, nz, nzmax, nzmin, m, zinv, dz, c1, v_adv, zbar_n, z_n)
 !$OMP DO
     !___________________________________________________________________________
     ! loop over local nodes
-    do n=1,myDim_nod2D
+    do n=1,partit%myDim_nod2D
 
         ! initialise
         a  = 0.0_WP
@@ -128,10 +49,10 @@ subroutine adv_tra_vert_impl(dt, w, ttf, partit, mesh)
         cp = 0.0_WP
 
         ! max. number of levels at node n
-        nzmax=nlevels_nod2D(n)
+        nzmax=mesh%nlevels_nod2D(n)
 
         ! upper surface index, in case of cavity !=1
-        nzmin=ulevels_nod2D(n)
+        nzmin=mesh%ulevels_nod2D(n)
 
         !___________________________________________________________________________
         ! Here can not exchange zbar_n & Z_n with zbar_3d_n & Z_3d_n because
@@ -141,13 +62,13 @@ subroutine adv_tra_vert_impl(dt, w, ttf, partit, mesh)
         ! Be carefull here vertical operation have to be done on NEW vertical mesh !!!
         zbar_n=0.0_WP
         Z_n=0.0_WP
-        zbar_n(nzmax)=zbar_n_bot(n)
-        Z_n(nzmax-1) =zbar_n(nzmax) + hnode_new(nzmax-1,n)/2.0_WP
+        zbar_n(nzmax)=mesh%zbar_n_bot(n)
+        Z_n(nzmax-1) =zbar_n(nzmax) + mesh%hnode_new(nzmax-1,n)/2.0_WP
         do nz=nzmax-1,nzmin+1,-1
-            zbar_n(nz) = zbar_n(nz+1) + hnode_new(nz,n)
-            Z_n(nz-1)  = zbar_n(nz)   + hnode_new(nz-1,n)/2.0_WP
+            zbar_n(nz) = zbar_n(nz+1) + mesh%hnode_new(nz,n)
+            Z_n(nz-1)  = zbar_n(nz)   + mesh%hnode_new(nz-1,n)/2.0_WP
         end do
-        zbar_n(nzmin) = zbar_n(nzmin+1) + hnode_new(nzmin,n)
+        zbar_n(nzmin) = zbar_n(nzmin+1) + mesh%hnode_new(nzmin,n)
 
         !_______________________________________________________________________
         ! Regular part of coefficients: --> surface layer
@@ -162,10 +83,10 @@ subroutine adv_tra_vert_impl(dt, w, ttf, partit, mesh)
         !!PS c(nz)=-max(0._WP, W(nz+1, n))*v_adv
 
         a(nz)=0.0_WP
-        v_adv=zinv*area(nz  ,n)/areasvol(nz,n)
-        b(nz)= hnode_new(nz,n)+W(nz, n)*v_adv
+        v_adv=zinv*mesh%area(nz  ,n)/mesh%areasvol(nz,n)
+        b(nz)= mesh%hnode_new(nz,n)+W(nz, n)*v_adv
 
-        v_adv=zinv*area(nz+1,n)/areasvol(nz,n)
+        v_adv=zinv*mesh%area(nz+1,n)/mesh%areasvol(nz,n)
         b(nz)= b(nz)-min(0._WP, W(nz+1, n))*v_adv
         c(nz)=-max(0._WP, W(nz+1, n))*v_adv
 
@@ -173,11 +94,11 @@ subroutine adv_tra_vert_impl(dt, w, ttf, partit, mesh)
         ! Regular part of coefficients: --> 2nd...nl-2 layer
         do nz=nzmin+1, nzmax-2
             ! update from the vertical advection
-            v_adv=zinv*area(nz  ,n)/areasvol(nz,n)
+            v_adv=zinv*mesh%area(nz  ,n)/mesh%areasvol(nz,n)
             a(nz)=min(0._WP, W(nz, n))*v_adv
-            b(nz)=hnode_new(nz,n)+max(0._WP, W(nz, n))*v_adv
+            b(nz)=mesh%hnode_new(nz,n)+max(0._WP, W(nz, n))*v_adv
 
-            v_adv=zinv*area(nz+1,n)/areasvol(nz,n)
+            v_adv=zinv*mesh%area(nz+1,n)/mesh%areasvol(nz,n)
             b(nz)=b(nz)-min(0._WP, W(nz+1, n))*v_adv
             c(nz)=     -max(0._WP, W(nz+1, n))*v_adv
         end do ! --> do nz=2, nzmax-2
@@ -189,22 +110,22 @@ subroutine adv_tra_vert_impl(dt, w, ttf, partit, mesh)
         !!PS a(nz)=                min(0._WP, W(nz, n))*zinv
         !!PS b(nz)=hnode_new(nz,n)+max(0._WP, W(nz, n))*zinv
         !!PS c(nz)=0.0_WP
-        v_adv=zinv*area(nz  ,n)/areasvol(nz,n)
+        v_adv=zinv*mesh%area(nz  ,n)/mesh%areasvol(nz,n)
         a(nz)=                min(0._WP, W(nz, n))*v_adv
-        b(nz)=hnode_new(nz,n)+max(0._WP, W(nz, n))*v_adv
+        b(nz)=mesh%hnode_new(nz,n)+max(0._WP, W(nz, n))*v_adv
         c(nz)=0.0_WP
 
         !_______________________________________________________________________
         nz=nzmin
-        dz=hnode_new(nz,n) ! It would be (zbar(nz)-zbar(nz+1)) if not ALE
+        dz=mesh%hnode_new(nz,n) ! It would be (zbar(nz)-zbar(nz+1)) if not ALE
         tr(nz)=-(b(nz)-dz)*ttf(nz,n)-c(nz)*ttf(nz+1,n)
 
         do nz=nzmin+1,nzmax-2
-            dz=hnode_new(nz,n)
+            dz=mesh%hnode_new(nz,n)
             tr(nz)=-a(nz)*ttf(nz-1,n)-(b(nz)-dz)*ttf(nz,n)-c(nz)*ttf(nz+1,n)
         end do
         nz=nzmax-1
-        dz=hnode_new(nz,n)
+        dz=mesh%hnode_new(nz,n)
         tr(nz)=-a(nz)*ttf(nz-1,n)-(b(nz)-dz)*ttf(nz,n)
 
         !_______________________________________________________________________
@@ -232,6 +153,7 @@ subroutine adv_tra_vert_impl(dt, w, ttf, partit, mesh)
         ! update tracer
         do nz=nzmin,nzmax-1
             ttf(nz,n)=ttf(nz,n)+tr(nz)
+            tend(nz,n)=tend(nz,n)+tr(nz)*mesh%hnode_new(nz,n)
         end do
     end do ! --> do n=1,myDim_nod2D
 !$OMP END DO
@@ -242,11 +164,6 @@ end subroutine adv_tra_vert_impl
 !
 !===============================================================================
 subroutine adv_tra_ver_upw1(w, ttf, partit, mesh, flux, o_init_zero)
-    use MOD_MESH
-    use MOD_TRACER
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use g_comm_auto
 
     implicit none
     type(t_partit),intent(in), target :: partit
@@ -258,10 +175,6 @@ subroutine adv_tra_ver_upw1(w, ttf, partit, mesh, flux, o_init_zero)
     real(kind=WP), intent(inout)      :: flux(mesh%nl,  partit%myDim_nod2D)
     logical, optional                 :: o_init_zero
     logical                           :: l_init_zero
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
     l_init_zero=.true.
     if (present(o_init_zero)) then
@@ -273,7 +186,7 @@ subroutine adv_tra_ver_upw1(w, ttf, partit, mesh, flux, o_init_zero)
 #else
         !$ACC PARALLEL LOOP GANG VECTOR COLLAPSE(2) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 #endif
-        do n=1, myDim_nod2D
+        do n=1, partit%myDim_nod2D
           do nz=1,mesh%nl
             flux(nz, n)=0.0_WP
           end do
@@ -290,15 +203,15 @@ subroutine adv_tra_ver_upw1(w, ttf, partit, mesh, flux, o_init_zero)
 #else
     !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 #endif
-    do n=1, myDim_nod2D
+    do n=1, partit%myDim_nod2D
        !_______________________________________________________________________
-       nzmax=nlevels_nod2D(n)
-       nzmin=ulevels_nod2D(n)
+       nzmax=mesh%nlevels_nod2D(n)
+       nzmin=mesh%ulevels_nod2D(n)
 
        !_______________________________________________________________________
        ! vert. flux at surface layer
        nz=nzmin
-       flux(nz,n)=-W(nz,n)*ttf(nz,n)*area(nz,n)-flux(nz,n)
+       flux(nz,n)=-W(nz,n)*ttf(nz,n)*mesh%area(nz,n)-flux(nz,n)
 
        !_______________________________________________________________________
        ! vert. flux at bottom layer --> zero bottom flux
@@ -315,7 +228,7 @@ subroutine adv_tra_ver_upw1(w, ttf, partit, mesh, flux, o_init_zero)
        do nz=nzmin+1,nzmax-1
           flux(nz,n)=-0.5*(                                                        &
                       ttf(nz  ,n)*(W(nz,n)+abs(W(nz,n)))+ &
-                      ttf(nz-1,n)*(W(nz,n)-abs(W(nz,n))))*area(nz,n)-flux(nz,n)
+                      ttf(nz-1,n)*(W(nz,n)-abs(W(nz,n))))*mesh%area(nz,n)-flux(nz,n)
        end do
        !$ACC END LOOP
     end do
@@ -330,11 +243,6 @@ end subroutine adv_tra_ver_upw1
 !
 !===============================================================================
 subroutine adv_tra_ver_qr4c(w, ttf, partit, mesh, num_ord, flux, o_init_zero)
-    use MOD_MESH
-    use o_ARRAYS
-    use o_PARAM
-    USE MOD_PARTIT
-    USE MOD_PARSUP
     implicit none
     type(t_partit),intent(in), target :: partit
     type(t_mesh),  intent(in), target :: mesh
@@ -349,10 +257,6 @@ subroutine adv_tra_ver_qr4c(w, ttf, partit, mesh, num_ord, flux, o_init_zero)
     real(kind=WP)                :: Tmean, Tmean1, Tmean2
     real(kind=WP)                :: qc, qu, qd
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
     l_init_zero=.true.
     if (present(o_init_zero)) then
@@ -364,7 +268,7 @@ subroutine adv_tra_ver_qr4c(w, ttf, partit, mesh, num_ord, flux, o_init_zero)
 #else
        !$ACC PARALLEL LOOP GANG VECTOR COLLAPSE(2) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 #endif
-       do n=1, myDim_nod2D
+       do n=1, partit%myDim_nod2D
           do nz=1, mesh%nl
              flux(nz, n)=0.0_WP
           end do
@@ -381,24 +285,24 @@ subroutine adv_tra_ver_qr4c(w, ttf, partit, mesh, num_ord, flux, o_init_zero)
 #else
     !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 #endif
-    do n=1, myDim_nod2D
+    do n=1, partit%myDim_nod2D
        !_______________________________________________________________________
-       nzmax=nlevels_nod2D(n)
-       nzmin=ulevels_nod2D(n)
+       nzmax=mesh%nlevels_nod2D(n)
+       nzmin=mesh%ulevels_nod2D(n)
        !_______________________________________________________________________
        ! vert. flux at surface layer
        nz=nzmin
-       flux(nz,n)=-ttf(nz,n)*W(nz,n)*area(nz,n)-flux(nz,n)
+       flux(nz,n)=-ttf(nz,n)*W(nz,n)*mesh%area(nz,n)-flux(nz,n)
 
        !_______________________________________________________________________
        ! vert. flux 2nd layer --> centered differences
        nz=nzmin+1
-       flux(nz,n)=-0.5_WP*(ttf(nz-1,n)+ttf(nz,n))*W(nz,n)*area(nz,n)-flux(nz,n)
+       flux(nz,n)=-0.5_WP*(ttf(nz-1,n)+ttf(nz,n))*W(nz,n)*mesh%area(nz,n)-flux(nz,n)
 
        !_______________________________________________________________________
        ! vert. flux at bottom - 1 layer --> centered differences
        nz=nzmax-1
-       flux(nz,n)=-0.5_WP*(ttf(nz-1,n)+ttf(nz,n))*W(nz,n)*area(nz,n)-flux(nz,n)
+       flux(nz,n)=-0.5_WP*(ttf(nz-1,n)+ttf(nz,n))*W(nz,n)*mesh%area(nz,n)-flux(nz,n)
 
        !_______________________________________________________________________
        ! vert. flux at bottom layer --> zero bottom flux
@@ -414,14 +318,14 @@ subroutine adv_tra_ver_qr4c(w, ttf, partit, mesh, num_ord, flux, o_init_zero)
        !$ACC LOOP VECTOR
        do nz=nzmin+2,nzmax-2
             !centered (4th order)
-            qc=(ttf(nz-1,n)-ttf(nz  ,n))/(Z_3d_n(nz-1,n)-Z_3d_n(nz  ,n))
-            qu=(ttf(nz  ,n)-ttf(nz+1,n))/(Z_3d_n(nz  ,n)-Z_3d_n(nz+1,n))
-            qd=(ttf(nz-2,n)-ttf(nz-1,n))/(Z_3d_n(nz-2,n)-Z_3d_n(nz-1,n))
+            qc=(ttf(nz-1,n)-ttf(nz  ,n))/(mesh%Z_3d_n(nz-1,n)-mesh%Z_3d_n(nz  ,n))
+            qu=(ttf(nz  ,n)-ttf(nz+1,n))/(mesh%Z_3d_n(nz  ,n)-mesh%Z_3d_n(nz+1,n))
+            qd=(ttf(nz-2,n)-ttf(nz-1,n))/(mesh%Z_3d_n(nz-2,n)-mesh%Z_3d_n(nz-1,n))
 
-            Tmean1=ttf(nz  ,n)+(2*qc+qu)*(zbar_3d_n(nz,n)-Z_3d_n(nz  ,n))/3.0_WP
-            Tmean2=ttf(nz-1,n)+(2*qc+qd)*(zbar_3d_n(nz,n)-Z_3d_n(nz-1,n))/3.0_WP
+            Tmean1=ttf(nz  ,n)+(2*qc+qu)*(mesh%zbar_3d_n(nz,n)-mesh%Z_3d_n(nz  ,n))/3.0_WP
+            Tmean2=ttf(nz-1,n)+(2*qc+qd)*(mesh%zbar_3d_n(nz,n)-mesh%Z_3d_n(nz-1,n))/3.0_WP
             Tmean =(W(nz,n)+abs(W(nz,n)))*Tmean1+(W(nz,n)-abs(W(nz,n)))*Tmean2
-            flux(nz,n)=(-0.5_WP*(1.0_WP-num_ord)*Tmean - num_ord*(0.5_WP*(Tmean1+Tmean2))*W(nz,n))*area(nz,n)-flux(nz,n)
+            flux(nz,n)=(-0.5_WP*(1.0_WP-num_ord)*Tmean - num_ord*(0.5_WP*(Tmean1+Tmean2))*W(nz,n))*mesh%area(nz,n)-flux(nz,n)
        end do
        !$ACC END LOOP
     end do
@@ -435,12 +339,7 @@ end subroutine adv_tra_ver_qr4c
 !
 !
 !===============================================================================
-subroutine adv_tra_vert_ppm(dt, w, ttf, partit, mesh, flux, o_init_zero)
-    use MOD_MESH
-    use MOD_TRACER
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use g_comm_auto
+subroutine adv_tra_ver_ppm(dt, w, ttf, partit, mesh, flux, o_init_zero)
     implicit none
     real(kind=WP), intent(in),  target :: dt
     type(t_partit),intent(in), target  :: partit
@@ -455,10 +354,6 @@ subroutine adv_tra_vert_ppm(dt, w, ttf, partit, mesh, flux, o_init_zero)
     integer                            :: n, nz, nzmax, nzmin
 !   integer                            :: overshoot_counter, counter
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
     l_init_zero=.true.
     if (present(o_init_zero)) then
@@ -466,7 +361,7 @@ subroutine adv_tra_vert_ppm(dt, w, ttf, partit, mesh, flux, o_init_zero)
     end if
     if (l_init_zero) then
 !$OMP PARALLEL DO
-       do n=1, myDim_nod2D
+       do n=1, partit%myDim_nod2D
           flux(:, n)=0.0_WP
        end do
 !$OMP END PARALLEL DO
@@ -484,13 +379,13 @@ subroutine adv_tra_vert_ppm(dt, w, ttf, partit, mesh, flux, o_init_zero)
 !   counter          =0
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(tvert, tv, aL, aR, aj, x, dzjm1, dzj, dzjp1, dzjp2, deltaj, deltajp1, n, nz, nzmax, nzmin)
 !$OMP DO
-    do n=1, myDim_nod2D
+    do n=1, partit%myDim_nod2D
         !_______________________________________________________________________
         !Interpolate to zbar...depth levels --> all quantities (tracer ...) are
         ! calculated on mid depth levels
         ! nzmax ... number of depth levels at node n
-        nzmax=nlevels_nod2D(n)
-        nzmin=ulevels_nod2D(n)
+        nzmax=mesh%nlevels_nod2D(n)
+        nzmin=mesh%ulevels_nod2D(n)
 
         ! tracer at surface level
         tv(nzmin)=ttf(nzmin,n)
@@ -521,10 +416,10 @@ subroutine adv_tra_vert_ppm(dt, w, ttf, partit, mesh, flux, o_init_zero)
             ! for non-uniformity spaced vertical grids --> piecewise parabolic
             ! method (ppm) see see Colella and Woodward, JCP, 1984, 174-201
             ! --> full equation (1.6), (1.7) and (1.8)
-            dzjm1    = hnode_new(nz-1,n)
-            dzj      = hnode_new(nz  ,n)
-            dzjp1    = hnode_new(nz+1,n)
-            dzjp2    = hnode_new(nz+2,n)
+            dzjm1    = mesh%hnode_new(nz-1,n)
+            dzj      = mesh%hnode_new(nz  ,n)
+            dzjp1    = mesh%hnode_new(nz+1,n)
+            dzjp2    = mesh%hnode_new(nz+2,n)
             ! Be carefull here vertical operation have to be done on NEW vertical mesh !!!
 
             !___________________________________________________________________
@@ -600,27 +495,27 @@ subroutine adv_tra_vert_ppm(dt, w, ttf, partit, mesh, flux, o_init_zero)
                 aR =3._WP*ttf(nz, n)-2._WP*aL
             end if
 
-            dzj   = hnode(nz,n)
+            dzj   = mesh%hnode(nz,n)
             aj=6.0_WP*(ttf(nz, n)-0.5_WP*(aL+aR))
 
             if (W(nz,n)>0._WP) then
                 x=min(W(nz,n)*dt/dzj, 1._WP)
                 tvert(nz  )=(-aL-0.5_WP*x*(aR-aL+(1._WP-2._WP/3._WP*x)*aj))
                 tvert(nz  )=tvert(nz) ! compute 2nd moment for DVD
-                tvert(nz  )=tvert(nz)*area(nz,n)*W(nz,n)
+                tvert(nz  )=tvert(nz)*mesh%area(nz,n)*W(nz,n)
             end if
 
             if (W(nz+1,n)<0._WP) then
                 x=min(-W(nz+1,n)*dt/dzj, 1._WP)
                 tvert(nz+1)=(-aR+0.5_WP*x*(aR-aL-(1._WP-2._WP/3._WP*x)*aj))
                 tvert(nz+1)=tvert(nz+1) ! compute 2nd moment for DVD
-                tvert(nz+1)=tvert(nz+1)*area(nz+1,n)*W(nz+1,n)
+                tvert(nz+1)=tvert(nz+1)*mesh%area(nz+1,n)*W(nz+1,n)
             end if
         end do
 
         !_______________________________________________________________________
         ! Surface flux
-        tvert(nzmin)= -tv(nzmin)*W(nzmin,n)*area(nzmin,n)
+        tvert(nzmin)= -tv(nzmin)*W(nzmin,n)*mesh%area(nzmin,n)
         ! Zero bottom flux
         tvert(nzmax)=0.0_WP
         flux(nzmin:nzmax, n)=tvert(nzmin:nzmax)-flux(nzmin:nzmax, n)
@@ -628,16 +523,11 @@ subroutine adv_tra_vert_ppm(dt, w, ttf, partit, mesh, flux, o_init_zero)
 !       if (mype==0) write(*,*) 'PPM overshoot statistics:', real(overshoot_counter)/real(counter)
 !$OMP END DO
 !$OMP END PARALLEL
-end subroutine adv_tra_vert_ppm
+end subroutine adv_tra_ver_ppm
 !
 !
 !===============================================================================
 subroutine adv_tra_ver_cdiff(w, ttf, partit, mesh, flux, o_init_zero)
-    use MOD_MESH
-    use MOD_TRACER
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use g_comm_auto
     implicit none
     type(t_partit),intent(in), target :: partit
     type(t_mesh),  intent(in), target :: mesh
@@ -648,10 +538,6 @@ subroutine adv_tra_ver_cdiff(w, ttf, partit, mesh, flux, o_init_zero)
     logical                           :: l_init_zero
     integer                           :: n, nz, nzmax, nzmin
     real(kind=WP)                     :: tvert(mesh%nl), tv
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
     l_init_zero=.true.
     if (present(o_init_zero)) then
@@ -659,7 +545,7 @@ subroutine adv_tra_ver_cdiff(w, ttf, partit, mesh, flux, o_init_zero)
     end if
     if (l_init_zero) then
 !$OMP PARALLEL DO
-       do n=1, myDim_nod2D
+       do n=1, partit%myDim_nod2D
           flux(:, n)=0.0_WP
        end do
 !$OMP END PARALLEL DO
@@ -667,14 +553,14 @@ subroutine adv_tra_ver_cdiff(w, ttf, partit, mesh, flux, o_init_zero)
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, nzmax, nzmin, tv, tvert)
 !$OMP DO
-    do n=1, myDim_nod2D
+    do n=1, partit%myDim_nod2D
         !_______________________________________________________________________
-        nzmax=nlevels_nod2D(n)-1
-        nzmin=ulevels_nod2D(n)
+        nzmax=mesh%nlevels_nod2D(n)-1
+        nzmin=mesh%ulevels_nod2D(n)
 
         !_______________________________________________________________________
         ! Surface flux
-        tvert(nzmin)= -W(nzmin,n)*ttf(nzmin,n)*area(nzmin,n)
+        tvert(nzmin)= -W(nzmin,n)*ttf(nzmin,n)*mesh%area(nzmin,n)
 
         !_______________________________________________________________________
         ! Zero bottom flux
@@ -684,7 +570,7 @@ subroutine adv_tra_ver_cdiff(w, ttf, partit, mesh, flux, o_init_zero)
         ! Other levels
         do nz=nzmin+1, nzmax
             tv=0.5_WP*(ttf(nz-1,n)+ttf(nz,n))
-            tvert(nz)= -tv*W(nz,n)*area(nz,n)
+            tvert(nz)= -tv*W(nz,n)*mesh%area(nz,n)
         end do
 
         !_______________________________________________________________________
@@ -693,3 +579,167 @@ subroutine adv_tra_ver_cdiff(w, ttf, partit, mesh, flux, o_init_zero)
 !$OMP END DO
 !$OMP END PARALLEL
 end subroutine adv_tra_ver_cdiff
+
+
+!
+!
+!_______________________________________________________________________________
+! vertical advection 2nd order in space (and time) using  superbee slope limiter
+! !!! ATTENTION !!! 
+! This part is sofar untested it is left here for later pickup
+subroutine adv_tra_ver_spbee(                 &
+            W                               , &
+            ttf                             , &
+            partit                          , &
+            mesh                            , &
+            flux                            , &
+            flag_2ndord_time                , &
+            flag_posdef                     , &
+            o_init_zero                       &
+            )
+    implicit none
+    !___INPUT/OUTPUT VARIABLES__________________________________________________
+    type(t_partit),intent(inout), target :: partit
+    type(t_mesh),  intent(in)   , target :: mesh
+    real(kind=WP), intent(in)            :: W  ( mesh%nl  , partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP), intent(in)            :: ttf( mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP), intent(inout)         :: flux(mesh%nl  , partit%myDim_nod2D)
+    logical      , intent(in)            :: flag_2ndord_time
+    logical      , intent(in)            :: flag_posdef
+    logical      , optional              :: o_init_zero
+    !___LOCAL VARIABLES_________________________________________________________
+    logical                              :: l_init_zero
+    integer                              :: node, nz, nzmin, nzmax
+    real(kind=WP)                        :: R, ttf0, ttfp1, dttf0p1, Tmean1, Tmean2, Cr, vflux, vfabs
+    real(kind=WP)                        :: cfl
+
+    !___________________________________________________________________________
+    l_init_zero=.true.
+    if (present(o_init_zero)) then
+       l_init_zero=o_init_zero
+    end if
+    if (l_init_zero) then
+!$OMP PARALLEL DO
+       do node=1, partit%myDim_nod2D
+          flux(:, node)=0.0_WP
+       end do
+!$OMP END PARALLEL DO
+    end if
+    
+    !___________________________________________________________________________
+#ifndef ENABLE_OPENACC
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax, ttf0, ttfp1, dttf0p1, &
+!$OMP                                  R, Cr, Tmean2, Tmean1, cfl, vflux, vfabs)
+!$OMP DO
+#else
+!$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+#endif
+    !___________________________________________________________________________
+    ! this advection does !!! NOT !!! go over the vertical dimension it goes 
+    ! over the domain of the spectral bins 
+    do node = 1, partit%myDim_nod2D
+        nzmax=mesh%nlevels_nod2D(node)
+        nzmin=mesh%ulevels_nod2D(node)
+        
+        !_______________________________________________________________________
+        ! vert. flux at surface layer
+        nz=nzmin
+        flux(nz,node)=-W(nz,node)*ttf(nz,node)*mesh%area(nz,node)-flux(nz,node)
+        
+        !_______________________________________________________________________
+        ! vert. flux at bottom - 1 layer --> centered differences
+        nz=nzmax-1
+        flux(nz,node)=-0.5_WP*(ttf(nz-1,node)+ttf(nz,node))*W(nz,node)*mesh%area(nz,node)-flux(nz,node)
+
+        !_______________________________________________________________________
+        ! vert. flux at bottom layer --> zero bottom flux
+        nz=nzmax
+        flux(nz,node)= 0.0_WP-flux(nz,node)
+       
+        !_______________________________________________________________________
+        !loop over spectral bins 
+!$ACC LOOP VECTOR               
+        do nz = nzmin+1, nzmax-2
+            !___________________________________________________________________
+            cfl     = abs(W(nz, node)) * dt * 2.0_WP / (mesh%hnode(nz-1,node)+mesh%hnode(nz,node))
+            
+            !___________________________________________________________________
+            ! compute tracer difference 
+            ttf0    = ttf(nz  , node)
+            ttfp1   = ttf(nz+1, node)
+            dttf0p1 = ttfp1 - ttf0
+            
+            !___________________________________________________________________
+            ! tracer Slope Ratio Calculation for upwind point
+            ! compute tracer slope 
+            R      = (ttfp1-ttf(nz+2,node))/(-dttf0p1+small)
+                
+            ! apply superbee limiter
+            Cr     = spbee_limiter(R)     
+            
+            ! construct edge centered tracer value
+            ! T_(i+0.5) = T_i+1 - [ (T_i+1 - T_i)/dz ]_Limited * dz/2
+            !  --> this is seconds order in space, but first order in time 
+            !  
+            ! T_(i+0.5) = T_i+1 - [ (T_i+1 - T_i)/dz ]_Limited * (dz/2 -|W|*dt/2)
+            ! T_(i+0.5) = T_i+1 - [ (T_i+1 - T_i)/dz ]_Limited * dz/2 *(1 - CFL)
+            !  --> CFL = W*dt/dx
+            Tmean2 = ttfp1 + 0.5_WP*Cr*(-dttf0p1) * (1.0_WP-merge(cfl, 0.0_WP, flag_2ndord_time))
+            
+            ! make sure tracer are enforced to be positive definite e.g for 
+            ! internal wave energy 
+            Tmean2 = merge(max(0.0_WP, Tmean2), Tmean2, flag_posdef)
+            
+            !___________________________________________________________________
+            ! tracer Slope Ratio Calculation for downwind point
+            ! compute tracer slope 
+            R      = (ttf0-ttf(nz-1,node))/(dttf0p1+small)
+            
+            ! apply superbee limiter
+            Cr     = spbee_limiter(R)     
+            
+            ! construct edge centered tracer value
+            ! T_(i+0.5) = T_i + [ (T_i+1 - T_i)/dz ]_Limited * dz/2
+            !  --> this is seconds order in space, but first order in time 
+            !  
+            ! T_(i+0.5) = T_i + [ (T_i+1 - T_i)/dz ]_Limited * (dz/2 -|W|*dt/2)
+            ! T_(i+0.5) = T_i + [ (T_i+1 - T_i)/dz ]_Limited * dz/2 *(1 - CFL)
+            !  --> CFL = W*dt/dx
+            Tmean1 = ttf0 + 0.5_WP*Cr*(dttf0p1) * (1.0_WP-merge(cfl, 0.0_WP, flag_2ndord_time))
+            
+            ! make sure tracer are enforced to be positive definite e.g for 
+            ! internal wave energy 
+            Tmean1 = merge(max(0.0_WP, Tmean1), Tmean1, flag_posdef)
+            !___________________________________________________________________
+            ! cross spectral exchange rate is related to spectral width dphi 
+            vflux = W(nz, node)
+            vfabs = abs(vflux)
+            flux(nz, node)=-0.5_WP*((vflux+vfabs)*Tmean1 + (vflux-vfabs)*Tmean2  &
+                                    )*mesh%area(nz,node) - flux(nz, node)
+            
+            end do !--> do nz = nzmin+1, nzmax-2
+!$ACC END LOOP
+    end do ! --> do node = 1, myDim_nod2D
+#ifndef ENABLE_OPENACC
+!$OMP END DO
+!$OMP END PARALLEL
+#else
+    !$ACC END PARALLEL LOOP
+#endif
+
+    contains
+    
+    !
+    !
+    !___________________________________________________________________________
+    ! superbee slope limiter
+    pure elemental real(kind=WP) function spbee_limiter(R) result(Cr)
+        real(kind=WP), intent(in) :: R
+        Cr = max(0._WP, min( min(2._WP*R, 0.5_WP+R/2._WP), 2._WP ))
+    end function spbee_limiter
+    
+end subroutine adv_tra_ver_spbee
+    
+    
+
+end module oce_adv_tra_ver_module

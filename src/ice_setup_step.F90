@@ -1,67 +1,49 @@
-module ice_initial_state_interface
-    interface
-        subroutine ice_initial_state(ice, tracers, partit, mesh)
-        USE MOD_ICE
-        USE MOD_TRACER
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        type(t_ice)   , intent(inout), target :: ice
-        type(t_tracer), intent(in)   , target :: tracers
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine ice_initial_state
-    end interface
-end module ice_initial_state_interface
+module ice_setup_step_module
+    USE MOD_ICE
+    USE MOD_TRACER
+    USE MOD_PARTIT
+    use par_support_module, only: par_abort
+    USE MOD_MESH
+    USE o_param
+    USE g_CONFIG
+    use ice_fct_module, only: ice_mass_matrix_fill, ice_solve_high_order, ice_solve_low_order, &
+            ice_fem_fct, ice_TG_rhs_div, ice_TG_rhs, ice_update_for_div, ice_fct_solve
+    USE ice_EVP_module, only: EVPdynamics
+    USE ice_maEVP_module, only: EVPdynamics_a, EVPdynamics_m
+#if !defined (__oasis) && !defined (__ifsinterface) && !defined (__yac)
+    use ice_thermo_oce_module, only: thermodynamics, cut_off
+#ifdef ENABLE_OPENACC
+    use ice_thermo_oce_module, only: thermodynamics_acc, thermo_device_ok
+#endif
+#else
+    use ice_thermo_oce_module, only: cut_off
+#endif
+    use cavity_param_module, only: cavity_heat_water_fluxes_3eq, cavity_heat_water_fluxes_2eq, cavity_ice_clean_vel, cavity_ice_clean_ma, cavity_momentum_fluxes
+    USE o_arrays
+    USE g_read_other_NetCDF, only: read_other_NetCDF
+    use ice_init_module, only: ice_init
+#if defined (__icepack)
+    use icedrv_main,   only: step_icepack
+#endif
+#if defined (FESOM_PROFILING)
+    use fesom_profiler
+#endif
 
-module ice_setup_interface
-    interface
-        subroutine ice_setup(ice, tracers, partit, mesh)
-        USE MOD_ICE
-        USE MOD_TRACER
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        type(t_ice)   , intent(inout), target :: ice
-        type(t_tracer), intent(in)   , target :: tracers
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine ice_setup
-    end interface
-end module ice_setup_interface
+    implicit none
 
-module ice_timestep_interface
-    interface
-        subroutine ice_timestep(istep, ice, partit, mesh)
-        USE MOD_ICE
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        integer       , intent(in)            :: istep
-        type(t_ice)   , intent(inout), target :: ice
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine ice_timestep
-    end interface
-end module ice_timestep_interface
+    private
+    public :: ice_setup, ice_timestep, ice_initial_state
+
+contains
 
 !
 !_______________________________________________________________________________
 ! ice initialization + array allocation + time stepping
 subroutine ice_setup(ice, tracers, partit, mesh)
-    USE MOD_ICE
-    USE MOD_TRACER
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
-    use o_param
-    use g_CONFIG
-    use ice_initial_state_interface
-    use ice_fct_interfaces
     implicit none
     type(t_ice)   , intent(inout), target :: ice
     type(t_tracer), intent(in)   , target :: tracers
-    type(t_mesh)  , intent(in)   , target :: mesh
+    type(t_mesh)  , intent(inout), target :: mesh
     type(t_partit), intent(inout), target :: partit
 
     !___________________________________________________________________________
@@ -94,23 +76,6 @@ end subroutine ice_setup
 !_______________________________________________________________________________
 ! Sea ice model step
 subroutine ice_timestep(step, ice, partit, mesh)
-    USE MOD_ICE
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
-    use o_param
-    use g_CONFIG
-    use ice_EVPdynamics_interface
-    use ice_maEVPdynamics_interface
-    use ice_fct_interfaces
-    use ice_thermodynamics_interfaces
-    use cavity_interfaces
-#if defined (__icepack)
-    use icedrv_main,   only: step_icepack
-#endif
-#if defined (FESOM_PROFILING)
-    use fesom_profiler
-#endif
     implicit none
     integer       , intent(in)            :: step
     type(t_ice)   , intent(inout), target :: ice
@@ -132,10 +97,6 @@ subroutine ice_timestep(step, ice, partit, mesh)
     !LA 2023-03-08
     real(kind=WP), dimension(:), pointer  :: a_ice_ib
 #endif
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
 !---------------------------------------------
   if (ib_async_mode == 0) then
@@ -208,20 +169,20 @@ subroutine ice_timestep(step, ice, partit, mesh)
     ! ===== Dynamics
     SELECT CASE (ice%whichEVP)
     CASE (0)
-        if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics...'//achar(27)//'[0m'
+        if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics...'//achar(27)//'[0m'
 #if defined(_CRAYFTN)
 	!dir$ noinline
 #endif
         call EVPdynamics  (ice, partit, mesh)
     CASE (1)
-        if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics_m...'//achar(27)//'[0m'
+        if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics_m...'//achar(27)//'[0m'
         call EVPdynamics_m(ice, partit, mesh)
     CASE (2)
-        if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics_a...'//achar(27)//'[0m'
+        if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics_a...'//achar(27)//'[0m'
         call EVPdynamics_a(ice, partit, mesh)
     CASE DEFAULT
-        if (mype==0) write(*,*) 'a non existing EVP scheme specified!'
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+        if (partit%mype==0) write(*,*) 'a non existing EVP scheme specified!'
+        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
         stop
     END SELECT
 
@@ -245,7 +206,7 @@ subroutine ice_timestep(step, ice, partit, mesh)
 #else
 !$ACC parallel loop present(ice_temp, a_ice)
 #endif
-    do i=1,myDim_nod2D+eDim_nod2D
+    do i=1,partit%myDim_nod2D+partit%eDim_nod2D
         ice_temp(i) = ice_temp(i)*a_ice(i)
     end do
 #ifndef ENABLE_OPENACC
@@ -254,13 +215,13 @@ subroutine ice_timestep(step, ice, partit, mesh)
 !$ACC END parallel loop
 #endif
 #endif /* (__oifs) */
-    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_TG_rhs_div...'//achar(27)//'[0m'
+    if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call ice_TG_rhs_div...'//achar(27)//'[0m'
     call ice_TG_rhs    (ice, partit, mesh)
 
-    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_fct_solve...'//achar(27)//'[0m'
+    if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call ice_fct_solve...'//achar(27)//'[0m'
     call ice_fct_solve     (ice, partit, mesh)
 
-    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_update_for_div...'//achar(27)//'[0m'
+    if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call ice_update_for_div...'//achar(27)//'[0m'
 !   call ice_update_for_div(ice, partit, mesh)
 
     !$ACC UPDATE HOST (ice%work%fct_massmatrix) &
@@ -285,13 +246,20 @@ subroutine ice_timestep(step, ice, partit, mesh)
 
 #if defined (__oifs) || defined (__ifsinterface)
 !$OMP PARALLEL DO
-    do i=1,myDim_nod2D+eDim_nod2D
-        if (a_ice(i)>0.0_WP) ice_temp(i) = ice_temp(i)/max(a_ice(i), 1.e-6_WP)
+    do i=1,partit%myDim_nod2D+partit%eDim_nod2D
+        ! ice_temp was advected as ice_temp*a_ice. Where a_ice is (near) zero
+        ! there is no ice surface; use the freezing point rather than the
+        ! near-zero-Kelvin product.
+        if (a_ice(i) > 1.e-6_WP) then
+            ice_temp(i) = ice_temp(i)/a_ice(i)
+        else
+            ice_temp(i) = 271.35_WP
+        end if
     end do
 !$OMP END PARALLEL DO
 #endif /* (__oifs) */
 
-    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call cut_off...'//achar(27)//'[0m'
+    if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call cut_off...'//achar(27)//'[0m'
     call cut_off(ice, partit, mesh)
 
     if (use_cavity) call cavity_ice_clean_ma(ice, partit, mesh)
@@ -310,18 +278,26 @@ subroutine ice_timestep(step, ice, partit, mesh)
     
     !___________________________________________________________________________
     ! ===== Thermodynamic part
-    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call thermodynamics...'//achar(27)//'[0m'
+    if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call thermodynamics...'//achar(27)//'[0m'
+#if defined(ENABLE_OPENACC) && !defined(__oasis) && !defined(__ifsinterface) && !defined(__yac)
+    if (thermo_device_ok(ice)) then
+        call thermodynamics_acc(ice, partit, mesh)
+    else
+        call thermodynamics(ice, partit, mesh)
+    end if
+#else
     call thermodynamics(ice, partit, mesh)
+#endif
 #endif /* (__icepack) */
 
 
     !___________________________________________________________________________
 !$OMP PARALLEL DO
-    do i=1,myDim_nod2D+eDim_nod2D
+    do i=1,partit%myDim_nod2D+partit%eDim_nod2D
         ice%h_ice(i) =ice%data(2)%values(i)/max(ice%data(1)%values(i), 1.e-3)
         ice%h_snow(i)=ice%data(3)%values(i)/max(ice%data(1)%values(i), 1.e-3)
         if ( ( U_ice(i)/=0.0_WP .and. mesh%ulevels_nod2d(i)>1) .or. (V_ice(i)/=0.0_WP .and. mesh%ulevels_nod2d(i)>1) ) then
-            write(*,*) " --> found cavity velocity /= 0.0_WP , ", mype
+            write(*,*) " --> found cavity velocity /= 0.0_WP , ", partit%mype
             write(*,*) " ulevels_nod2d(n) = ", mesh%ulevels_nod2d(i)
             write(*,*) " U_ice(n) = ", U_ice(i)
             write(*,*) " V_ice(n) = ", V_ice(i)
@@ -333,21 +309,24 @@ subroutine ice_timestep(step, ice, partit, mesh)
 #if defined (FESOM_PROFILING)
     call fesom_profiler_end("ice_thermodynamics")
 #endif
-    rtime_ice = rtime_ice + (t3-t0)
+    rtime_ice       = rtime_ice       + (t3-t0)
+    rtime_ice_evp   = rtime_ice_evp   + t1-t0
+    rtime_ice_adv   = rtime_ice_adv   + t2-t1
+    rtime_ice_therm = rtime_ice_therm + t3-t2
     rtime_tot = rtime_tot + (t3-t0)
-    if(mod(step,logfile_outfreq)==0 .and. mype==0) then
+    if(mod(step,logfile_outfreq)==0 .and. partit%mype==0) then
         write(*,*) '___ICE STEP EXECUTION TIMES____________________________'
 #if defined (__icepack)
-        write(*,"(A, ES10.3)") '	Ice Dyn.        :', time_evp
-                write(*,"(A, ES10.3)") '        Ice Advect.     :', time_advec
-                write(*,"(A, ES10.3)") '        Ice Thermodyn.  :', time_therm
+        write(*,"(A, ES10.3, A, F6.2, A)") '	Ice Dyn.        :', time_evp,  '  (', 100.0*time_evp/(t3-t0),  '%)'
+        write(*,"(A, ES10.3, A, F6.2, A)") '        Ice Advect.     :', time_advec,'  (', 100.0*time_advec/(t3-t0),'%)'
+        write(*,"(A, ES10.3, A, F6.2, A)") '        Ice Thermodyn.  :', time_therm,'  (', 100.0*time_therm/(t3-t0),'%)'
 #else
-        write(*,"(A, ES10.3)") '	Ice Dyn.        :', t1-t0
-        write(*,"(A, ES10.3)") '	Ice Advect.     :', t2-t1
-        write(*,"(A, ES10.3)") '	Ice Thermodyn.  :', t3-t2
+        write(*,"(A, ES10.3, A, F6.2, A)") '	Ice Dyn.        :', t1-t0, '  (', 100.0*(t1-t0)/(t3-t0), '%)'
+        write(*,"(A, ES10.3, A, F6.2, A)") '	Ice Advect.     :', t2-t1, '  (', 100.0*(t2-t1)/(t3-t0), '%)'
+        write(*,"(A, ES10.3, A, F6.2, A)") '	Ice Thermodyn.  :', t3-t2, '  (', 100.0*(t3-t2)/(t3-t0), '%)'
 #endif /* (__icepack) */
         write(*,*) '   _______________________________'
-        write(*,"(A, ES10.3)") '	Ice TOTAL       :', t3-t0
+        write(*,"(A, ES10.3)")             '	Ice TOTAL       :', t3-t0
         write(*,*)
      endif
 end subroutine ice_timestep
@@ -356,15 +335,6 @@ end subroutine ice_timestep
 !_______________________________________________________________________________
 ! sets inital values or reads restart file for ice model
 subroutine ice_initial_state(ice, tracers, partit, mesh)
-    USE MOD_ICE
-    USE MOD_TRACER
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
-    use o_PARAM
-    use o_arrays
-    use g_CONFIG
-    USE g_read_other_NetCDF, only: read_other_NetCDF
     implicit none
     type(t_ice)   , intent(inout), target :: ice
     type(t_tracer), intent(in)   , target :: tracers
@@ -373,7 +343,6 @@ subroutine ice_initial_state(ice, tracers, partit, mesh)
     !___________________________________________________________________________
     integer                               :: i
     character(MAX_PATH)                   :: filename
-    real(kind=WP), external               :: TFrez  ! Sea water freeze temperature.
 !============== namelistatmdata variables ================
    integer, save                                :: nm_ic_unit     = 107 ! unit to open namelist file
    integer                                      :: iost                 !I/O status
@@ -394,10 +363,6 @@ subroutine ice_initial_state(ice, tracers, partit, mesh)
     !LA 2023-03-07
     real(kind=WP), dimension(:), pointer  :: a_ice_ib, m_ice_ib
     real(kind=WP), dimension(:), pointer  :: u_ice_ib, v_ice_ib
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
 ! LA: 2023-01-31 add asynchronous icebergs
 !---------------------------------------------
@@ -483,10 +448,10 @@ end if
     ! OPEN and read namelist for I/O
     open( unit=nm_ic_unit, file='namelist.tra', form='formatted', access='sequential', status='old', iostat=iost )
     if (iost == 0) then
-        if (mype==0) WRITE(*,*) '     file   : ', 'namelist.tra',' open ok'
+        if (partit%mype==0) WRITE(*,*) '     file   : ', 'namelist.tra',' open ok'
         else
-        if (mype==0) WRITE(*,*) 'ERROR: --> bad opening file   : ', 'namelist.tra',' ; iostat=',iost
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+        if (partit%mype==0) WRITE(*,*) 'ERROR: --> bad opening file   : ', 'namelist.tra',' ; iostat=',iost
+        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
         stop
     end if
     read(nm_ic_unit, nml=tracer_init2d,   iostat=iost)
@@ -497,17 +462,26 @@ end if
     !___________________________________________________________________________
     ! switch for making sea-ice initialisation from regular gridded files and 
     ! do interpolation to fesom grid or to initialise them with a constant value
-    if (.not. ini_ice_from_file) then
-        if(mype==0) write(*,*) 'initialize the sea ice: cold start'
+    if (r_restart) then
+        ! The ice arrays were zeroed above and read_initial_conditions overwrites
+        ! them from the restart a little later in fesom_runloop. Neither the
+        ! constant-value fill nor the interpolation from file would survive that,
+        ! so skip both and say what is actually happening. Zeroing still runs, so
+        ! any field the restart does not carry stays at zero rather than becoming
+        ! whatever the cold start would have guessed.
+        if(partit%mype==0) write(*,*) 'initialize the sea ice: from restart'
+
+    else if (.not. ini_ice_from_file) then
+        if(partit%mype==0) write(*,*) 'initialize the sea ice: cold start'
         !___________________________________________________________________________
-        do i=1,myDim_nod2D+eDim_nod2D
+        do i=1,partit%myDim_nod2D+partit%eDim_nod2D
             !_______________________________________________________________________
             ! if cavity, no sea ice, no initial state
-            if (ulevels_nod2d(i)>1) cycle 
+            if (mesh%ulevels_nod2d(i)>1) cycle 
             
             !_______________________________________________________________________
             if (tracers%data(1)%values(1,i)< 0.0_WP) then
-                if (geo_coord_nod2D(2,i)>0._WP) then
+                if (mesh%geo_coord_nod2D(2,i)>0._WP) then
                     m_ice(i) = 1.0_WP
                     m_snow(i)= 0.1_WP
                 else
@@ -521,7 +495,7 @@ end if
         enddo
         
     else ! --> if (.not. ini_ice_from_file) then
-        if (mype==0) write(*,*) 'initialize the sea ice: from file'
+        if (partit%mype==0) write(*,*) 'initialize the sea ice: from file'
         do i=1, n_ic2d
             do current_tracer=1, ice%num_itracers
                 if (ice%data(current_tracer)%ID==idlist(i)) then
@@ -532,7 +506,7 @@ end if
                     file_exist=.False.
                     inquire(file=trim(trim(ClimateDataPath)//trim(filelist(i))), exist=file_exist) 
                     if (file_exist) then   
-                        if (mype==0) then
+                        if (partit%mype==0) then
                             write(*,*) ' --> reading 2D variable: ', trim(varlist(i)), ' into 2D tracer ID=', current_tracer
                             write(*,*) '     from file ',trim(ClimateDataPath)//trim(filelist(i))
                         end if 
@@ -541,7 +515,7 @@ end if
                         call read_other_NetCDF(trim(ClimateDataPath)//trim(filelist(i)), varlist(i),  1, ice%data(current_tracer)%values(:), .false., .true., partit, mesh)
                     
                     else    
-                        if (mype==0) then
+                        if (partit%mype==0) then
                             write(*,*) '____________________________________________________________________'
                             write(*,*) ' ERROR: sea-ice initialisation file not found! '
                             write(*,*) '        ', trim(ClimateDataPath)//trim(filelist(i))
@@ -553,7 +527,7 @@ end if
                             write(*,*) '            /)'
                             write(*,*) '____________________________________________________________________'
                         end if
-                        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+                        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
                         
                     end if ! --> if (file_exist) then       
                 end if ! --> IF (ice%data(current_tracer)%ID==idlist(i)) then
@@ -561,3 +535,5 @@ end if
         end do ! --> DO i=1, n_ic2d
     end if ! --> if (.not. ini_ice_from_file) then
 end subroutine ice_initial_state
+
+end module ice_setup_step_module

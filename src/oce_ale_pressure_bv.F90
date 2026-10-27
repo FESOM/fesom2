@@ -1,193 +1,45 @@
-module densityJM_components_interface
-  interface
-    subroutine densityJM_components(t, s, bulk_0, bulk_pz, bulk_pz2, rhopot)
-      USE MOD_PARSUP
-      USE o_param
-      real(kind=WP),  intent(IN)             :: t,s
-      real(kind=WP),  intent(OUT)            :: bulk_0, bulk_pz, bulk_pz2, rhopot
-    end subroutine densityJM_components
-  end interface
-end module densityJM_components_interface
+module oce_ale_pressure_bv_module
+    USE g_config
+    USE o_PARAM
+    USE MOD_MESH
+    USE MOD_TRACER
+    USE MOD_PARTIT
+    use par_support_module, only: par_abort
+    USE o_ARRAYS
+    USE g_support
+    USE o_mixing_KPP_mod, only: dbsfc, kpp_on_device
+    USE diagnostics, only: ldiag_dMOC, dmoc_is_due, ldiag_diapmix, sw_alpha_diap, sw_beta_diap
+    USE g_comm_auto
+    USE Toy_Neverworld2, only: thermal_alpha, do_cabbeling, cabbeling_Cb, do_thermobar, &
+            thermobaric_Th, do_haline, haline_beta
 
-module density_linear_interface
-  interface
-    subroutine density_linear(t, s, bulk_0, bulk_pz, bulk_pz2, rho_out)
-      USE MOD_PARSUP
-      USE o_param
-      real(kind=WP),  intent(IN)             :: t,s
-      real(kind=WP),  intent(OUT)            :: bulk_0, bulk_pz, bulk_pz2, rho_out
-    end subroutine density_linear
-  end interface
-end module density_linear_interface
+    USE oce_density_kernels, only: densityJM_components, densityJM_components_abs
 
-module pressure_force_4_linfs_fullcell_interface
-  interface
-    subroutine pressure_force_4_linfs_fullcell(partit, mesh)
-      USE MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(in) ,    target :: mesh
-      type(t_partit), intent(inout),  target :: partit
-    end subroutine pressure_force_4_linfs_fullcell
-  end interface
-end module pressure_force_4_linfs_fullcell_interface
-module pressure_force_4_linfs_nemo_interface
-  interface
-    subroutine pressure_force_4_linfs_nemo(tracers, partit, mesh)
-      USE MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      USE MOD_TRACER
-      type(t_mesh),   intent(in) ,    target :: mesh
-      type(t_partit), intent(inout),  target :: partit
-      type(t_tracer), intent(in),     target :: tracers
-    end subroutine pressure_force_4_linfs_nemo
-  end interface
-end module pressure_force_4_linfs_nemo_interface
-module pressure_force_4_linfs_shchepetkin_interface
-  interface
-    subroutine pressure_force_4_linfs_shchepetkin(partit, mesh)
-      USE MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(in) ,    target :: mesh
-      type(t_partit), intent(inout),  target :: partit
-    end subroutine pressure_force_4_linfs_shchepetkin
-  end interface
-end module pressure_force_4_linfs_shchepetkin_interface
-module pressure_force_4_linfs_easypgf_interface
-  interface
-    subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
-      USE MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      USE MOD_TRACER
-      type(t_tracer), intent(in),     target :: tracers
-      type(t_partit), intent(inout),  target :: partit
-      type(t_mesh),   intent(in),     target :: mesh
-    end subroutine pressure_force_4_linfs_easypgf
-  end interface
-end module pressure_force_4_linfs_easypgf_interface
-module pressure_force_4_linfs_cubicspline_interface
-  interface
-    subroutine pressure_force_4_linfs_cubicspline(partit, mesh)
-      USE MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(in) ,    target :: mesh
-      type(t_partit), intent(inout),  target :: partit
-    end subroutine pressure_force_4_linfs_cubicspline
-  end interface
-end module pressure_force_4_linfs_cubicspline_interface
-module pressure_force_4_linfs_cavity_interface
-  interface
-    subroutine pressure_force_4_linfs_cavity(partit, mesh)
-      USE MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(in) ,    target :: mesh
-      type(t_partit), intent(inout),  target :: partit
-    end subroutine pressure_force_4_linfs_cavity
-  end interface
-end module pressure_force_4_linfs_cavity_interface
-module pressure_force_4_zxxxx_shchepetkin_interface
-  interface
-    subroutine pressure_force_4_zxxxx_shchepetkin(partit, mesh)
-      USE MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(in) ,    target :: mesh
-      type(t_partit), intent(inout),  target :: partit
-    end subroutine pressure_force_4_zxxxx_shchepetkin
-  end interface
-end module pressure_force_4_zxxxx_shchepetkin_interface
-module pressure_force_4_zxxxx_easypgf_interface
-  interface
-    subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
-      USE MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      USE MOD_TRACER
-      type(t_mesh),   intent(in) ,    target :: mesh
-      type(t_partit), intent(inout),  target :: partit
-      type(t_tracer), intent(in),     target :: tracers
-    end subroutine pressure_force_4_zxxxx_easypgf
-  end interface
-end module pressure_force_4_zxxxx_easypgf_interface
-module pressure_force_4_zxxxx_cubicspline_interface
-  interface
-    subroutine pressure_force_4_zxxxx_cubicspline(partit, mesh)
-      USE MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(in) ,    target :: mesh
-      type(t_partit), intent(inout),  target :: partit
-    end subroutine pressure_force_4_zxxxx_cubicspline
-  end interface
-end module pressure_force_4_zxxxx_cubicspline_interface
-module init_ref_density_interface
-  interface
-    subroutine init_ref_density(partit, mesh)
-      USE MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(in) ,    target :: mesh
-      type(t_partit), intent(inout),  target :: partit
-    end subroutine init_ref_density
-  end interface
-end module init_ref_density_interface
-module insitu2pot_interface
-  interface
-    subroutine insitu2pot(tracers, partit, mesh)
-      USE MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      USE MOD_TRACER
-      type(t_mesh),   intent(in) ,    target :: mesh
-      type(t_partit), intent(inout),  target :: partit
-      type(t_tracer), intent(in),     target :: tracers
-    end subroutine insitu2pot
-  end interface
-end module insitu2pot_interface
-module pressure_bv_interface
-  interface
-    subroutine pressure_bv(tracers, partit, mesh)
-      USE MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      USE MOD_TRACER
-      type(t_mesh),   intent(in) ,    target :: mesh
-      type(t_partit), intent(inout),  target :: partit
-      type(t_tracer), intent(in),     target :: tracers
-    end subroutine pressure_bv
-  end interface
-end module pressure_bv_interface
-module pressure_force_4_linfs_interface
-  interface
-    subroutine pressure_force_4_linfs(tracers, partit, mesh)
-      USE MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      USE MOD_TRACER
-      type(t_mesh),   intent(in) ,    target :: mesh
-      type(t_partit), intent(inout),  target :: partit
-      type(t_tracer), intent(in),     target :: tracers
-    end subroutine pressure_force_4_linfs
-  end interface
-end module pressure_force_4_linfs_interface
-module pressure_force_4_zxxxx_interface
-  interface
-    subroutine pressure_force_4_zxxxx(tracers, partit, mesh)
-      USE MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      USE MOD_TRACER
-      type(t_mesh),   intent(in) ,    target :: mesh
-      type(t_partit), intent(inout),  target :: partit
-      type(t_tracer), intent(in),     target :: tracers
-    end subroutine pressure_force_4_zxxxx
-  end interface
-end module pressure_force_4_zxxxx_interface
+    implicit none
+
+    private
+    public :: pressure_bv, pressure_force_4_linfs, &
+              pressure_force_4_linfs_fullcell, &
+              pressure_force_4_linfs_nemo, &
+              pressure_force_4_linfs_shchepetkin, &
+              pressure_force_4_linfs_easypgf, &
+              pressure_force_4_linfs_cubicspline, &
+              pressure_force_4_linfs_cavity, pressure_force_4_zxxxx, &
+              pressure_force_4_zxxxx_cubicspline, &
+              pressure_force_4_zxxxx_shchepetkin, &
+              pressure_force_4_zxxxx_easypgf, densityJM_local, &
+              ptheta, atg, sw_alpha_beta, &
+              compute_sigma_xy, compute_neutral_slope, insitu2pot, &
+              density_linear, init_ref_density, &
+              init_ref_density_advanced, sxy_on_device, pbv_on_device
+
+    ! OpenACC: pressure_bv of this step ran on the device (density and layer depths current there)
+    logical :: pbv_on_device = .false.
+    ! ... and sw_alpha_beta, compute_sigma_xy (their results current on the device)
+    logical :: ab_on_device = .false., sxy_on_device = .false.
+
+contains
+
 !
 !
 !===============================================================================
@@ -195,18 +47,6 @@ subroutine pressure_bv(tracers, partit, mesh)
 ! fill in the hydrostatic pressure and the Brunt-Vaisala frequency
 ! in a single pass the using split form of the equation of state
 ! as proposed by NR
-    use g_config
-    USE o_PARAM
-    USE MOD_MESH
-    USE MOD_TRACER
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE o_ARRAYS
-    USE g_support
-    USE o_mixing_KPP_mod, only: dbsfc
-    USE diagnostics,      only: ldiag_dMOC, dmoc_is_due
-    use densityJM_components_interface
-    use density_linear_interface
     IMPLICIT NONE
     type(t_mesh),   intent(in) ,    target  :: mesh
     type(t_partit), intent(inout),  target  :: partit
@@ -220,23 +60,31 @@ subroutine pressure_bv(tracers, partit, mesh)
     logical                                 :: flag1, flag2, flag3, mixing_kpp
 !PS     logical                                 :: smooth_bv_vertical=.false. ! smoothing Bv in vertical is sometimes necessary in order to avoid vertival noise in Kv/Av
     real(kind=WP),  dimension(:,:), pointer :: temp, salt
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     temp=>tracers%data(1)%values(:,:)
     salt=>tracers%data(2)%values(:,:)
     smallvalue=1.0e-20
     buoyancy_crit=0.0003_WP
-    mixing_kpp = (mix_scheme_nmb==1 .or. mix_scheme_nmb==17)
+    mixing_kpp = (mix_scheme_nmb==1 .or. mix_scheme_nmb==18)
+#ifdef ENABLE_OPENACC
+    ! the device version covers the configurations without cavities, linfs, the dMOC
+    ! diagnostic, vertical N2 smoothing and the linear equation of state
+    pbv_on_device = .not. (ldiag_dMOC .or. use_cavity .or. trim(which_ale)=='linfs' .or. N2smth_v .or. state_equation/=1)
+    if (pbv_on_device) then
+        call pressure_bv_acc(tracers, partit, mesh)
+        if (N2smth_h) call smooth_nod3D_acc(bvfreq, N2smth_hidx, partit, mesh)
+        ! the mixing scheme (host) needs N2
+        !$ACC UPDATE HOST(bvfreq)
+        return
+    end if
+#endif
     !___________________________________________________________________________
     ! Screen salinity
     a    =0.0_WP
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax)
 !$OMP DO REDUCTION(min: a)
-    do node=1, myDim_nod2D+eDim_nod2D
-        nzmin = ulevels_nod2D(node)
-        nzmax = nlevels_nod2D(node)
+    do node=1, partit%myDim_nod2D+partit%eDim_nod2D
+        nzmin = mesh%ulevels_nod2D(node)
+        nzmax = mesh%nlevels_nod2D(node)
         do nz=nzmin,nzmax-1
             a=min(a, salt(nz,node))
         enddo
@@ -246,14 +94,15 @@ subroutine pressure_bv(tracers, partit, mesh)
 
     !___________________________________________________________________________
     ! model explodes, no OpenMP parallelization !
-    if( a < 0.0_WP ) then
+    ! absolute S<0 <=> anomaly < -S_ref (S_ref=0 unless use_salt_anomaly)
+    if( a < -S_ref_anomaly ) then
         write (*,*)' --> pressure_bv: s<0 happens!', a
-        pe_status=1
-        do node=1, myDim_nod2D+eDim_nod2D
-            nzmin = ulevels_nod2D(node)
-            nzmax = nlevels_nod2D(node)
+        partit%pe_status=1
+        do node=1, partit%myDim_nod2D+partit%eDim_nod2D
+            nzmin = mesh%ulevels_nod2D(node)
+            nzmax = mesh%nlevels_nod2D(node)
             do nz=nzmin, nzmax-1
-                if (salt(nz, node) < 0) write (*,*) 'the model blows up at n=', mylist_nod2D(node), ' ; ', 'nz=', nz
+                if (salt(nz, node) < -S_ref_anomaly) write (*,*) 'the model blows up at n=', partit%mylist_nod2D(node), ' ; ', 'nz=', nz
             end do
         end do
     endif
@@ -262,11 +111,11 @@ subroutine pressure_bv(tracers, partit, mesh)
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(zmean, dz_inv, bv,  a, rho_up, rho_dn, t, s, node, nz, nl1, nzmax, nzmin, &
 !$OMP                                  rhopot, bulk_0, bulk_pz, bulk_pz2, rho, dbsfc1, db_max, bulk_up, bulk_dn, &
-!$OMP                                  rho_surf, aux_rho, aux_rho1, flag1, flag2, bv1)
+!$OMP                                  rho_surf, aux_rho, aux_rho1, flag1, flag2, bv1, flag3)
 !$OMP DO
-    do node=1, myDim_nod2D+eDim_nod2D
-        nzmin = ulevels_nod2D(node)
-        nzmax = nlevels_nod2D(node)
+    do node=1, partit%myDim_nod2D+partit%eDim_nod2D
+        nzmin = mesh%ulevels_nod2D(node)
+        nzmax = mesh%nlevels_nod2D(node)
 
         !!PS nl1= nlevels_nod2d(node)-1
         rho      = 0.0_WP
@@ -286,12 +135,14 @@ subroutine pressure_bv(tracers, partit, mesh)
             s=salt(nz, node)
             select case(state_equation)
                 case(0)
-                    call density_linear(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
+                    ! depth (positive-downward, [m]) is only used by the neverworld2 branch's
+                    ! optional do_thermobar term -- every other branch/config ignores it
+                    call density_linear(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz), depth=abs(mesh%Z_3d_n(nz,node)))
                 case(1)
                     call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
                 case default !unknown
-                    if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+                    if (partit%mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
+                    call par_abort(partit%MPI_COMM_FESOM, partit%mype)
             end select
         end do
 
@@ -313,9 +164,9 @@ subroutine pressure_bv(tracers, partit, mesh)
             !___________________________________________________________________
             ! compute institu-density at each depth layer (includes Temperature 
             ! effects, Salinity effects, Pressure/compression effects 
-            rho(nz) = bulk_0(nz) + Z_3d_n(nz,node)*(bulk_pz(nz)   + Z_3d_n(nz,node)*bulk_pz2(nz))
+            rho(nz) = bulk_0(nz) + mesh%Z_3d_n(nz,node)*(bulk_pz(nz)   + mesh%Z_3d_n(nz,node)*bulk_pz2(nz))
             !!PS rho(nz)=rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z_3d_n(nz,node))-density_0
-            rho(nz) = rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z_3d_n(nz,node)*real(state_equation))-density_ref(nz,node)
+            rho(nz) = rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*mesh%Z_3d_n(nz,node)*real(state_equation))-density_ref(nz,node)
             density_m_rho0(nz,node) = rho(nz)
             density_sigma0(nz,node) = rhopot(nz)-density_ref(nz,node)
             
@@ -324,15 +175,15 @@ subroutine pressure_bv(tracers, partit, mesh)
             ! --> bring density of surface point adiabatically to the same
             !     depth level as the deep point --> than calculate bouyancy
             !     difference
-            rho_surf=bulk_0(nzmin)   + Z_3d_n(nz,node)*(bulk_pz(nzmin)   + Z_3d_n(nz,node)*bulk_pz2(nzmin))
+            rho_surf=bulk_0(nzmin)   + mesh%Z_3d_n(nz,node)*(bulk_pz(nzmin)   + mesh%Z_3d_n(nz,node)*bulk_pz2(nzmin))
             !!PS rho_surf=rho_surf*rhopot(nzmin)/(rho_surf+0.1_WP*Z_3d_n(nz,node))-density_0
-            rho_surf=rho_surf*rhopot(nzmin)/(rho_surf+0.1_WP*Z_3d_n(nz,node)*real(state_equation)) !-density_ref(nzmin,node)
+            rho_surf=rho_surf*rhopot(nzmin)/(rho_surf+0.1_WP*mesh%Z_3d_n(nz,node)*real(state_equation)) !-density_ref(nzmin,node)
 
             !!PS dbsfc1(nz) = -g * ( rho_surf - rho(nz) ) / (rho(nz)+density_0)      ! this is also required when KPP is ON
             !!PS dbsfc1(nz) = -g * density_0_r * ( rho_surf - rho(nz) )
             dbsfc1(nz) = -g * ( rho_surf - (rho(nz)+density_ref(nz,node)) ) / (rho(nz)+density_ref(nz,node))      ! this is also required when KPP is ON
 
-            db_max = max(dbsfc1(nz)/abs(Z_3d_n(nzmin,node)-Z_3d_n(max(nz, nzmin+1),node)), db_max)
+            db_max = max(dbsfc1(nz)/abs(mesh%Z_3d_n(nzmin,node)-mesh%Z_3d_n(max(nz, nzmin+1),node)), db_max)
         end do
 
         dbsfc1(nzmax)=dbsfc1(nzmax-1)
@@ -355,14 +206,14 @@ subroutine pressure_bv(tracers, partit, mesh)
                     case(1)
                         call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
                     case default !unknown
-                        if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+                        if (partit%mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
+                        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
                 end select
                 !_______________________________________________________________
                 ! compute institu-density in cavity at each depth layer (includes
                 ! Temperature effects, Salinity effects, Pressure/compression effects 
-                rho(nz)= bulk_0(nz)   + Z_3d_n(nz,node)*(bulk_pz(nz)   + Z_3d_n(nz,node)*bulk_pz2(nz))
-                rho(nz)=rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z_3d_n(nz,node)*real(state_equation))-density_ref(nz,node)
+                rho(nz)= bulk_0(nz)   + mesh%Z_3d_n(nz,node)*(bulk_pz(nz)   + mesh%Z_3d_n(nz,node)*bulk_pz2(nz))
+                rho(nz)=rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*mesh%Z_3d_n(nz,node)*real(state_equation))-density_ref(nz,node)
                 density_m_rho0(nz,node) = rho(nz)
                 density_sigma0(nz,node) = rhopot(nz)-density_ref(nz,node)
             end do
@@ -381,9 +232,9 @@ subroutine pressure_bv(tracers, partit, mesh)
                 ! --> this as a upper pressure boundary condition incase of a
                 ! homogenous ocean, with no fluxes and boundary condition creates
                 ! no pressure gradient errors
-                hpressure(nzmin, node)=0.5_WP*(zbar_3d_n(1,node)-zbar_3d_n(2,node))*rho(1)*g
+                hpressure(nzmin, node)=0.5_WP*(mesh%zbar_3d_n(1,node)-mesh%zbar_3d_n(2,node))*rho(1)*g
                 do nz=2,nzmin
-                    a=0.5_WP*g*(rho(nz-1)*(zbar_3d_n(nz-1,node)-zbar_3d_n(nz,node))+rho(nz)*(zbar_3d_n(nz,node)-zbar_3d_n(nz+1,node)))
+                    a=0.5_WP*g*(rho(nz-1)*(mesh%zbar_3d_n(nz-1,node)-mesh%zbar_3d_n(nz,node))+rho(nz)*(mesh%zbar_3d_n(nz,node)-mesh%zbar_3d_n(nz+1,node)))
                     hpressure(nzmin, node)=hpressure(nzmin, node)+a
                 end do
 
@@ -392,7 +243,7 @@ subroutine pressure_bv(tracers, partit, mesh)
                 ! pgf errors
                 !!PS hpressure(nzmin, node)=-Z_3d_n(nzmin,node)*rho(nzmin)*g
             else
-                hpressure(nzmin, node)=-Z_3d_n(nzmin,node)*rho(nzmin)*g
+                hpressure(nzmin, node)=-mesh%Z_3d_n(nzmin,node)*rho(nzmin)*g
             end if
 
             !___________________________________________________________________
@@ -401,7 +252,7 @@ subroutine pressure_bv(tracers, partit, mesh)
                 ! why 0.5 ... integrate g*rho*dz vertically, integrate half layer
                 ! thickness of previouse layer and half layer thickness of actual
                 ! layer to integrate pressure on mid depth level of actual layer
-                a=0.5_WP*g*(rho(nz-1)*hnode(nz-1,node)+rho(nz)*hnode(nz,node))
+                a=0.5_WP*g*(rho(nz-1)*mesh%hnode(nz-1,node)+rho(nz)*mesh%hnode(nz,node))
                 hpressure(nz, node)=hpressure(nz-1, node)+a
             end do
         end if
@@ -418,9 +269,9 @@ subroutine pressure_bv(tracers, partit, mesh)
         ! To be CMOR compliant we add MLD3, which is identical to MLD2, except
         ! for the critical density threshold at 0.03, rather than 0.125 kg/m³
         ! BV frequency:  bvfreq(nl,:), squared value is stored
-        MLD1(node)=Z_3d_n(nzmin+1,node)
-        MLD2(node)=Z_3d_n(nzmin+1,node)
-        MLD3(node)=Z_3d_n(nzmin+1,node)
+        MLD1(node)=mesh%Z_3d_n(nzmin+1,node)
+        MLD2(node)=mesh%Z_3d_n(nzmin+1,node)
+        MLD3(node)=mesh%Z_3d_n(nzmin+1,node)
         MLD1_ind(node)=nzmin+1
         MLD2_ind(node)=nzmin+1
         MLD3_ind(node)=nzmin+1
@@ -429,12 +280,12 @@ subroutine pressure_bv(tracers, partit, mesh)
         flag2=.true.
         flag3=.true.
         do nz=nzmin+1,nzmax-1
-            zmean   = 0.5_WP*sum(Z_3d_n(nz-1:nz, node))
+            zmean   = 0.5_WP*sum(mesh%Z_3d_n(nz-1:nz, node))
             bulk_up = bulk_0(nz-1) + zmean*(bulk_pz(nz-1) + zmean*bulk_pz2(nz-1))
             bulk_dn = bulk_0(nz)   + zmean*(bulk_pz(nz)   + zmean*bulk_pz2(nz))
             rho_up  = bulk_up*rhopot(nz-1) / (bulk_up + 0.1_WP*zmean*real(state_equation))
             rho_dn  = bulk_dn*rhopot(nz)   / (bulk_dn + 0.1_WP*zmean*real(state_equation))
-            dz_inv  = 1.0_WP/(Z_3d_n(nz-1,node)-Z_3d_n(nz,node))
+            dz_inv  = 1.0_WP/(mesh%Z_3d_n(nz-1,node)-mesh%Z_3d_n(nz,node))
             !_______________________________________________________________
             ! squared brunt väisälä frequence N^2 --> N^2>0 stratification is
             ! stable, vertical elongated parcel is accelaratedtowards
@@ -449,26 +300,26 @@ subroutine pressure_bv(tracers, partit, mesh)
             ! MLD is the shallowest depth where the local buoyancy gradient matches the maximum buoyancy gradient
             ! between the surface and any discrete depth within the water column.
             if (bvfreq(nz, node) > db_max .and. flag1) then
-                MLD1(node)    =Z_3d_n(nz, node)
+                MLD1(node)    =mesh%Z_3d_n(nz, node)
                 MLD1_ind(node)=nz
                 flag1=.false.
             end if
 
             ! another definition of MLD after Levitus
             if ((rhopot(nz)-rhopot(nzmin) > sigma_theta_crit) .and. flag2) then
-                MLD2(node)=MLD2(node)+(Z_3d_n(nz,node)-MLD2(node))/(rhopot(nz)-rhopot(nz-1)+1.e-20)*(rhopot(1)+sigma_theta_crit-rhopot(nz-1))
+                MLD2(node)=MLD2(node)+(mesh%Z_3d_n(nz,node)-MLD2(node))/(rhopot(nz)-rhopot(nz-1)+1.e-20)*(rhopot(1)+sigma_theta_crit-rhopot(nz-1))
                 MLD2_ind(node)=nz
                 flag2=.false.
             elseif (flag2) then
-                MLD2(node)=Z_3d_n(nz,node)
+                MLD2(node)=mesh%Z_3d_n(nz,node)
             end if
             ! another definition of MLD after Griffies 2016 (https://doi.org/10.5194/gmd-9-3231-2016)
             if ((rhopot(nz)-rhopot(nzmin) > sigma_theta_crit_cmor) .and. flag3) then
-                MLD3(node)=MLD3(node)+(Z_3d_n(nz,node)-MLD3(node))/(rhopot(nz)-rhopot(nz-1)+1.e-20)*(rhopot(1)+sigma_theta_crit_cmor-rhopot(nz-1))
+                MLD3(node)=MLD3(node)+(mesh%Z_3d_n(nz,node)-MLD3(node))/(rhopot(nz)-rhopot(nz-1)+1.e-20)*(rhopot(1)+sigma_theta_crit_cmor-rhopot(nz-1))
                 MLD3_ind(node)=nz
                 flag3=.false.
             elseif (flag3) then
-                MLD3(node)=Z_3d_n(nz,node)
+                MLD3(node)=mesh%Z_3d_n(nz,node)
             end if
         end do
 
@@ -485,9 +336,9 @@ subroutine pressure_bv(tracers, partit, mesh)
         ! BV is defined on full levels except for the first and the last ones.
         if (N2smth_v) then
            do nz=nzmin+1,nzmax-1
-              bv1(nz)=        (zbar_3d_n(nz-1,node)-zbar_3d_n(nz,  node))*(bvfreq(nz-1,node)+bvfreq(nz,  node))
-              bv1(nz)=bv1(nz)+(zbar_3d_n(nz,  node)-zbar_3d_n(nz+1,node))*(bvfreq(nz,  node)+bvfreq(nz+1,node))
-              bv1(nz)=0.5_WP*bv1(nz)/(zbar_3d_n(nz-1,node)-zbar_3d_n(nz+1,  node))
+              bv1(nz)=        (mesh%zbar_3d_n(nz-1,node)-mesh%zbar_3d_n(nz,  node))*(bvfreq(nz-1,node)+bvfreq(nz,  node))
+              bv1(nz)=bv1(nz)+(mesh%zbar_3d_n(nz,  node)-mesh%zbar_3d_n(nz+1,node))*(bvfreq(nz,  node)+bvfreq(nz+1,node))
+              bv1(nz)=0.5_WP*bv1(nz)/(mesh%zbar_3d_n(nz-1,node)-mesh%zbar_3d_n(nz+1,  node))
            end do
            do nz=nzmin+1,nzmax-1
               bvfreq(nz,node)=bv1(nz)
@@ -503,23 +354,175 @@ subroutine pressure_bv(tracers, partit, mesh)
 if (N2smth_h) call smooth_nod (bvfreq, N2smth_hidx, partit, mesh)
 
 end subroutine pressure_bv
+#ifdef ENABLE_OPENACC
+!
+!
+!===============================================================================
+! pressure_bv on the device, one water column per thread, same arithmetic as the host version for
+! its configuration (see pressure_bv); temperature, salinity and the layer depths are uploaded.
+subroutine pressure_bv_acc(tracers, partit, mesh)
+    IMPLICIT NONE
+    type(t_mesh),   intent(in) ,    target  :: mesh
+    type(t_partit), intent(inout),  target  :: partit
+    type(t_tracer), intent(in),     target  :: tracers
+    ! column work arrays have this fixed size (private arrays of run-time size would
+    ! come from the per-thread device heap)
+    integer, parameter                      :: pbv_nl_max = 128
+    real(kind=WP), parameter                :: sigma_theta_crit=0.125_WP       ! Levitus threshold for MLD2
+    real(kind=WP), parameter                :: sigma_theta_crit_cmor=0.03_WP   ! Griffies threshold for MLD3
+    real(kind=WP)                           :: rhopot(pbv_nl_max), bulk_0(pbv_nl_max), bulk_pz(pbv_nl_max)
+    real(kind=WP)                           :: bulk_pz2(pbv_nl_max), rho(pbv_nl_max), dbsfc1(pbv_nl_max)
+    real(kind=WP)                           :: zmean, dz_inv, a, rho_up, rho_dn, t, s, db_max, bulk_up, bulk_dn
+    real(kind=WP)                           :: rho_surf, sref
+    integer                                 :: node, nz, nzmax, nzmin
+    logical                                 :: flag1, flag2, flag3, mixing_kpp
+    logical, save                           :: data_created = .false.
+    real(kind=WP),  dimension(:,:), pointer :: temp, salt
+    temp=>tracers%data(1)%values(:,:)
+    salt=>tracers%data(2)%values(:,:)
+
+    if (mesh%nl > pbv_nl_max) then
+        if (partit%mype==0) write(*,*) 'pressure_bv_acc: mesh%nl =', mesh%nl, ' > pbv_nl_max =', pbv_nl_max
+        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
+    end if
+    mixing_kpp = (mix_scheme_nmb==1 .or. mix_scheme_nmb==18)
+    sref = S_ref_anomaly
+    if (.not. data_created) then
+        !$ACC ENTER DATA CREATE(density_m_rho0, density_sigma0, bvfreq, MLD1, MLD2, MLD3, MLD1_ind, MLD2_ind, MLD3_ind) COPYIN(density_ref)
+        if (mixing_kpp) then
+            !$ACC ENTER DATA CREATE(dbsfc)
+        end if
+        data_created = .true.
+    end if
+    ! temperature and salinity are current on the host at the start of the step (the
+    ! tracer step uploads them again)
+    !$ACC UPDATE DEVICE(temp, salt)
+    if (.not. geom_on_device) then
+        !$ACC UPDATE DEVICE(mesh%Z_3d_n)
+    end if
+
+    !___________________________________________________________________________
+    ! screen salinity
+    a = 0.0_WP
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) REDUCTION(min:a) PRIVATE(nz, nzmin, nzmax)
+    do node=1, partit%myDim_nod2D+partit%eDim_nod2D
+        nzmin = mesh%ulevels_nod2D(node)
+        nzmax = mesh%nlevels_nod2D(node)
+        do nz=nzmin,nzmax-1
+            a=min(a, salt(nz,node))
+        enddo
+    enddo
+!$ACC END PARALLEL LOOP
+    if( a < -S_ref_anomaly ) then
+        write (*,*)' --> pressure_bv: s<0 happens!', a
+        partit%pe_status=1
+        do node=1, partit%myDim_nod2D+partit%eDim_nod2D
+            nzmin = mesh%ulevels_nod2D(node)
+            nzmax = mesh%nlevels_nod2D(node)
+            do nz=nzmin, nzmax-1
+                if (salt(nz, node) < -S_ref_anomaly) write (*,*) 'the model blows up at n=', partit%mylist_nod2D(node), ' ; ', 'nz=', nz
+            end do
+        end do
+    endif
+
+    !___________________________________________________________________________
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(rhopot, bulk_0, bulk_pz, bulk_pz2, rho, dbsfc1, &
+!$ACC     zmean, dz_inv, rho_up, rho_dn, t, s, db_max, bulk_up, bulk_dn, rho_surf, nz, nzmin, nzmax, flag1, flag2, flag3)
+    do node=1, partit%myDim_nod2D+partit%eDim_nod2D
+        nzmin = mesh%ulevels_nod2D(node)
+        nzmax = mesh%nlevels_nod2D(node)
+        do nz=1, mesh%nl
+            rho(nz)      = 0.0_WP
+            bulk_0(nz)   = 0.0_WP
+            bulk_pz(nz)  = 0.0_WP
+            bulk_pz2(nz) = 0.0_WP
+            rhopot(nz)   = 0.0_WP
+            dbsfc1(nz)   = 0.0_WP
+        end do
+        db_max   = 0.0_WP
+
+        ! equation of state
+        do nz=nzmin, nzmax-1
+            t=temp(nz, node)
+            s=salt(nz, node)
+            call densityJM_components_abs(t, s + sref, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
+        end do
+
+        ! density for the PGF and buoyancy difference to the surface
+        do nz=nzmin, nzmax-1
+            rho(nz) = bulk_0(nz) + mesh%Z_3d_n(nz,node)*(bulk_pz(nz)   + mesh%Z_3d_n(nz,node)*bulk_pz2(nz))
+            rho(nz) = rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*mesh%Z_3d_n(nz,node)*real(state_equation))-density_ref(nz,node)
+            density_m_rho0(nz,node) = rho(nz)
+            density_sigma0(nz,node) = rhopot(nz)-density_ref(nz,node)
+            rho_surf=bulk_0(nzmin)   + mesh%Z_3d_n(nz,node)*(bulk_pz(nzmin)   + mesh%Z_3d_n(nz,node)*bulk_pz2(nzmin))
+            rho_surf=rho_surf*rhopot(nzmin)/(rho_surf+0.1_WP*mesh%Z_3d_n(nz,node)*real(state_equation))
+            dbsfc1(nz) = -g * ( rho_surf - (rho(nz)+density_ref(nz,node)) ) / (rho(nz)+density_ref(nz,node))
+            db_max = max(dbsfc1(nz)/abs(mesh%Z_3d_n(nzmin,node)-mesh%Z_3d_n(max(nz, nzmin+1),node)), db_max)
+        end do
+        dbsfc1(nzmax)=dbsfc1(nzmax-1)
+        if (mixing_kpp) then
+            do nz=nzmin, nzmax
+                dbsfc(nz, node)=dbsfc1(nz)
+            end do
+        end if
+
+        ! N2 and the mixed layer depths (see pressure_bv)
+        MLD1(node)=mesh%Z_3d_n(nzmin+1,node)
+        MLD2(node)=mesh%Z_3d_n(nzmin+1,node)
+        MLD3(node)=mesh%Z_3d_n(nzmin+1,node)
+        MLD1_ind(node)=nzmin+1
+        MLD2_ind(node)=nzmin+1
+        MLD3_ind(node)=nzmin+1
+        flag1=.true.
+        flag2=.true.
+        flag3=.true.
+        do nz=nzmin+1,nzmax-1
+            zmean   = 0.5_WP*(mesh%Z_3d_n(nz-1, node)+mesh%Z_3d_n(nz, node))
+            bulk_up = bulk_0(nz-1) + zmean*(bulk_pz(nz-1) + zmean*bulk_pz2(nz-1))
+            bulk_dn = bulk_0(nz)   + zmean*(bulk_pz(nz)   + zmean*bulk_pz2(nz))
+            rho_up  = bulk_up*rhopot(nz-1) / (bulk_up + 0.1_WP*zmean*real(state_equation))
+            rho_dn  = bulk_dn*rhopot(nz)   / (bulk_dn + 0.1_WP*zmean*real(state_equation))
+            dz_inv  = 1.0_WP/(mesh%Z_3d_n(nz-1,node)-mesh%Z_3d_n(nz,node))
+            bvfreq(nz,node)  = -g*dz_inv*(rho_up-rho_dn)/density_0
+            if (bvfreq(nz, node) > db_max .and. flag1) then
+                MLD1(node)    =mesh%Z_3d_n(nz, node)
+                MLD1_ind(node)=nz
+                flag1=.false.
+            end if
+            if ((rhopot(nz)-rhopot(nzmin) > sigma_theta_crit) .and. flag2) then
+                MLD2(node)=MLD2(node)+(mesh%Z_3d_n(nz,node)-MLD2(node))/(rhopot(nz)-rhopot(nz-1)+1.e-20)*(rhopot(1)+sigma_theta_crit-rhopot(nz-1))
+                MLD2_ind(node)=nz
+                flag2=.false.
+            elseif (flag2) then
+                MLD2(node)=mesh%Z_3d_n(nz,node)
+            end if
+            if ((rhopot(nz)-rhopot(nzmin) > sigma_theta_crit_cmor) .and. flag3) then
+                MLD3(node)=MLD3(node)+(mesh%Z_3d_n(nz,node)-MLD3(node))/(rhopot(nz)-rhopot(nz-1)+1.e-20)*(rhopot(1)+sigma_theta_crit_cmor-rhopot(nz-1))
+                MLD3_ind(node)=nz
+                flag3=.false.
+            elseif (flag3) then
+                MLD3(node)=mesh%Z_3d_n(nz,node)
+            end if
+        end do
+        if (flag2) MLD2_ind(node)=nzmax-1
+        if (flag3) MLD3_ind(node)=nzmax-1
+        bvfreq(nzmin,node)=bvfreq(nzmin+1,node)
+        bvfreq(nzmax,node)=bvfreq(nzmax-1,node)
+    end do
+!$ACC END PARALLEL LOOP
+    ! host copies of the results
+    !$ACC UPDATE HOST(density_m_rho0, density_sigma0, MLD1, MLD2, MLD3, MLD1_ind, MLD2_ind, MLD3_ind)
+    if (mixing_kpp) then
+        !$ACC UPDATE HOST(dbsfc)
+    end if
+end subroutine pressure_bv_acc
+#endif
 !
 !
 !
 !===============================================================================
 ! Calculate pressure gradient force (PGF) for linear free surface case
 subroutine pressure_force_4_linfs(tracers, partit, mesh)
-    use g_config
-    use mod_mesh
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use mod_tracer
-    use pressure_force_4_linfs_fullcell_interface
-    use pressure_force_4_linfs_nemo_interface
-    use pressure_force_4_linfs_shchepetkin_interface
-    use pressure_force_4_linfs_cubicspline_interface
-    use pressure_force_4_linfs_cavity_interface
-    use pressure_force_4_linfs_easypgf_interface
     implicit none
     type(t_mesh),   intent(in) ,    target  :: mesh
     type(t_partit), intent(inout),  target  :: partit
@@ -546,7 +549,7 @@ subroutine pressure_force_4_linfs(tracers, partit, mesh)
             write(*,*) '            see in namelist.oce --> which_pgf = sergey,   '
             write(*,*) '            shchepetkin, easypgf '
             write(*,*) '________________________________________________________'
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
         end if
 
     !___________________________________________________________________________
@@ -567,7 +570,7 @@ subroutine pressure_force_4_linfs(tracers, partit, mesh)
             write(*,*) '            see in namelist.oce --> which_pgf = nemo,   '
             write(*,*) '            shchepetkin, cubicspline '
             write(*,*) '________________________________________________________'
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
         end if
     end if
 end subroutine pressure_force_4_linfs
@@ -577,41 +580,31 @@ end subroutine pressure_force_4_linfs
 !===============================================================================
 ! calculate pressure gradient force for linfs in case full cells
 subroutine pressure_force_4_linfs_fullcell(partit, mesh)
-    use o_PARAM
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use o_ARRAYS
-    use g_config
     implicit none
     type(t_mesh),   intent(in) ,    target :: mesh
     type(t_partit), intent(inout),  target :: partit
     integer                                :: elem, elnodes(3), nle, ule,  nlz
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     !___________________________________________________________________________
     ! loop over triangular elemments
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, elnodes, nle, ule,  nlz)
-    do elem=1, myDim_elem2D
+    do elem=1, partit%myDim_elem2D
         !_______________________________________________________________________
         ! number of levels at elem
-        nle=nlevels(elem)-1
-        ule=ulevels(elem)
+        nle=mesh%nlevels(elem)-1
+        ule=mesh%ulevels(elem)
 
         !_______________________________________________________________________
         ! node indices of elem
-        elnodes = elem2D_nodes(:,elem)
+        elnodes = mesh%elem2D_nodes(:,elem)
 
         !_______________________________________________________________________
         ! loop over mid-depth levels to calculate the pressure gradient
         ! force (pgf) --> from top to bottom
         !!PS do nlz=1,nle
         do nlz=ule,nle
-            pgf_x(nlz,elem) = sum(gradient_sca(1:3,elem)*hpressure(nlz,elnodes)/density_0)
-            pgf_y(nlz,elem) = sum(gradient_sca(4:6,elem)*hpressure(nlz,elnodes)/density_0)
+            pgf_x(nlz,elem) = sum(mesh%gradient_sca(1:3,elem)*hpressure(nlz,elnodes)/density_0)
+            pgf_y(nlz,elem) = sum(mesh%gradient_sca(4:6,elem)*hpressure(nlz,elnodes)/density_0)
         end do
     end do !-->do elem=1, myDim_elem2D
 !$OMP END PARALLEL DO
@@ -629,15 +622,6 @@ end subroutine pressure_force_4_linfs_fullcell
 ! Gurvan Madec, and the NEMO team gurvan.madec@locean-ipsl.umpc.fr, nemo st@locean-ipsl.umpc.fr
 ! November 2015, – version 3.6 stable –
 subroutine pressure_force_4_linfs_nemo(tracers, partit, mesh)
-    use o_PARAM
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use MOD_TRACER
-    use o_ARRAYS
-    use g_config
-    use densityJM_components_interface
-    use density_linear_interface
     implicit none
     type(t_mesh),   intent(in) ,    target :: mesh
     type(t_partit), intent(inout),  target :: partit
@@ -650,10 +634,6 @@ subroutine pressure_force_4_linfs_nemo(tracers, partit, mesh)
     real(kind=WP)                          :: rhopot, bulk_0, bulk_pz, bulk_pz2
     real(kind=WP)                          :: zbar_n(mesh%nl), z_n(mesh%nl-1)
     real(kind=WP), dimension(:,:), pointer :: temp, salt
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     temp=>tracers%data(1)%values(:,:)
     salt=>tracers%data(2)%values(:,:)
     !___________________________________________________________________________
@@ -663,14 +643,14 @@ subroutine pressure_force_4_linfs_nemo(tracers, partit, mesh)
 !$OMP                                  mean_e_rho, dZn_rho_grad, rhopot, bulk_0, bulk_pz, bulk_pz2,            &
 !$OMP                                  zbar_n, z_n)
 !$OMP DO
-    do elem=1, myDim_elem2D
+    do elem=1, partit%myDim_elem2D
         !_______________________________________________________________________
         ! nle...number of mid-depth levels at elem
-        nle          = nlevels(elem)-1
-        ule          = ulevels(elem)
+        nle          = mesh%nlevels(elem)-1
+        ule          = mesh%ulevels(elem)
 
         ! node indices of elem
-        elnodes = elem2D_nodes(:,elem)
+        elnodes = mesh%elem2D_nodes(:,elem)
 
         !_______________________________________________________________________
         ! 1) loop over mid-depth levels to calculate the pressure gradient
@@ -694,8 +674,8 @@ subroutine pressure_force_4_linfs_nemo(tracers, partit, mesh)
         ! //////////   //////////
         !!PS do nlz=1,nle-1
         do nlz=ule,nle-1
-            pgf_x(nlz,elem) = sum(gradient_sca(1:3,elem)*hpressure(nlz,elnodes)/density_0)
-            pgf_y(nlz,elem) = sum(gradient_sca(4:6,elem)*hpressure(nlz,elnodes)/density_0)
+            pgf_x(nlz,elem) = sum(mesh%gradient_sca(1:3,elem)*hpressure(nlz,elnodes)/density_0)
+            pgf_y(nlz,elem) = sum(mesh%gradient_sca(4:6,elem)*hpressure(nlz,elnodes)/density_0)
         end do
 
         !_______________________________________________________________________
@@ -703,23 +683,23 @@ subroutine pressure_force_4_linfs_nemo(tracers, partit, mesh)
         !    bottom depth
         !_______________________________________________________________________
         ! nln...number of mid-depth levels at node
-        nln     = nlevels_nod2d(elnodes)-1
-        uln     = ulevels_nod2d(elnodes)
+        nln     = mesh%nlevels_nod2d(elnodes)-1
+        uln     = mesh%ulevels_nod2d(elnodes)
         !!PS uln     = ulevels_nod2d(elnodes)
 
         !_______________________________________________________________________
         ! calculate mid depth element level --> Z_e
         zbar_n       = 0.0_WP
         Z_n          = 0.0_WP
-        zbar_n(nle+1)= zbar_e_bot(elem)
-        Z_n(nle)     = zbar_n(nle+1) + helem(nle,elem)/2.0_WP
+        zbar_n(nle+1)= mesh%zbar_e_bot(elem)
+        Z_n(nle)     = zbar_n(nle+1) + mesh%helem(nle,elem)/2.0_WP
         !!PS do nlz=nle,2,-1
         do nlz=nle,ule+1,-1
-            zbar_n(nlz) = zbar_n(nlz+1) + helem(nlz,elem)
-            Z_n(nlz-1)  = zbar_n(nlz)   + helem(nlz-1,elem)/2.0_WP
+            zbar_n(nlz) = zbar_n(nlz+1) + mesh%helem(nlz,elem)
+            Z_n(nlz-1)  = zbar_n(nlz)   + mesh%helem(nlz-1,elem)/2.0_WP
         end do
         !!PS zbar_n(1)    = zbar_n(2) + helem(1,elem)
-        zbar_n(ule)    = zbar_n(ule+1) + helem(ule,elem)
+        zbar_n(ule)    = zbar_n(ule+1) + mesh%helem(ule,elem)
         ! --> zbar_n    ... depth of level at elements
         ! --> Z_n       ... depth of mid-depth level at elements
         ! --> zbar_n_3d ... depth of level at nodes
@@ -735,13 +715,13 @@ subroutine pressure_force_4_linfs_nemo(tracers, partit, mesh)
             !!PS nlc   = minloc( Z_3d_n(1:nln(ni),elnodes(ni))-maxval(Z_3d_n(nle,elnodes)),1,&
             !!PS                 Z_3d_n(1:nln(ni),elnodes(ni))-maxval(Z_3d_n(nle,elnodes))>0.0_WP &  ! mask for index selection
             !!PS                 )+1
-            nlc   = minloc( Z_3d_n(uln(ni):nln(ni),elnodes(ni))-maxval(Z_3d_n(nle,elnodes)),1,&
-                            Z_3d_n(uln(ni):nln(ni),elnodes(ni))-maxval(Z_3d_n(nle,elnodes))>0.0_WP &  ! mask for index selection
+            nlc   = minloc( mesh%Z_3d_n(uln(ni):nln(ni),elnodes(ni))-maxval(mesh%Z_3d_n(nle,elnodes)),1,&
+                            mesh%Z_3d_n(uln(ni):nln(ni),elnodes(ni))-maxval(mesh%Z_3d_n(nle,elnodes))>0.0_WP &  ! mask for index selection
                             )+1
             nlc   = min(nlc,nln(ni))
-            dZn   = Z_3d_n(nlc,elnodes(ni))    -Z_3d_n(nlc-1,elnodes(ni))
-            dZn_i = maxval(Z_3d_n(nle,elnodes))-Z_3d_n(nlc-1,elnodes(ni))
-            dh    = minval(hnode(nle  ,elnodes))
+            dZn   = mesh%Z_3d_n(nlc,elnodes(ni))    -mesh%Z_3d_n(nlc-1,elnodes(ni))
+            dZn_i = maxval(mesh%Z_3d_n(nle,elnodes))-mesh%Z_3d_n(nlc-1,elnodes(ni))
+            dh    = minval(mesh%hnode(nle  ,elnodes))
 
             !___________________________________________________________________
             !! Option (A): interpolate density directly ...
@@ -770,8 +750,8 @@ subroutine pressure_force_4_linfs_nemo(tracers, partit, mesh)
                     case(1)
                         call densityJM_components(interp_n_temp, interp_n_salt, bulk_0, bulk_pz, bulk_pz2, rhopot)
                     case default !unknown
-                        if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+                        if (partit%mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
+                        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
                 end select
                 interp_n_dens(ni) = bulk_0 + Z_n(nle)*(bulk_pz + Z_n(nle)*bulk_pz2)
                 !!PS interp_n_dens(ni) = interp_n_dens(ni)*rhopot/(interp_n_dens(ni)+0.1_WP*Z_n(nle))*real(state_equation))-density_0
@@ -789,14 +769,14 @@ subroutine pressure_force_4_linfs_nemo(tracers, partit, mesh)
             hpress_n_bottom(ni) = hpressure(nlce-1, elnodes(ni))        &
                                     + 0.5_WP*g*                         &
                                     (density_m_rho0(nlce-1,elnodes(ni))*&
-                                              hnode(nlce-1,elnodes(ni)) &
+                                              mesh%hnode(nlce-1,elnodes(ni)) &
                                     +                                   &
                                     interp_n_dens(ni)*dh                &
                                     )
         end do ! --> do ni=1,3
         !_______________________________________________________________________
-        pgf_x(nle,elem) = sum(gradient_sca(1:3,elem)*hpress_n_bottom)/density_0
-        pgf_y(nle,elem) = sum(gradient_sca(4:6,elem)*hpress_n_bottom)/density_0
+        pgf_x(nle,elem) = sum(mesh%gradient_sca(1:3,elem)*hpress_n_bottom)/density_0
+        pgf_y(nle,elem) = sum(mesh%gradient_sca(4:6,elem)*hpress_n_bottom)/density_0
 
     end do ! --> do elem=1, myDim_elem2D
 !$OMP END DO
@@ -814,12 +794,6 @@ end subroutine pressure_force_4_linfs_nemo
 ! calculate PGF for linfs with partiell cell on/off
 ! First coded by P. Scholz for FESOM2.0, 08.02.2019
 subroutine pressure_force_4_linfs_shchepetkin(partit, mesh)
-    use o_PARAM
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use o_ARRAYS
-    use g_config
     implicit none
     type(t_mesh),   intent(in) ,    target :: mesh
     type(t_partit), intent(inout),  target :: partit
@@ -827,36 +801,32 @@ subroutine pressure_force_4_linfs_shchepetkin(partit, mesh)
     real(kind=WP)                          :: int_dp_dx(2), drho_dx, dz_dx, aux_sum
     real(kind=WP)                          :: dx10(3), dx20(3), dx21(3), df10(3), df21(3), drho_dz(3)
     real(kind=WP)                          :: zbar_n(mesh%nl), z_n(mesh%nl-1)
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     !___________________________________________________________________________
     ! loop over triangular elemments
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, elnodes, nle, ule, nlz, idx, ni, int_dp_dx, drho_dx, dz_dx, aux_sum, &
 !$OMP                                  dx10, dx20, dx21, df10, df21, drho_dz, zbar_n, z_n)
 !$OMP DO
-    do elem=1, myDim_elem2D
+    do elem=1, partit%myDim_elem2D
         !_______________________________________________________________________
         ! nle...number of mid-depth levels at elem
-        nle     = nlevels(elem)-1
-        ule     = ulevels(elem)
+        nle     = mesh%nlevels(elem)-1
+        ule     = mesh%ulevels(elem)
 
         ! node indices of elem
-        elnodes = elem2D_nodes(:,elem)
+        elnodes = mesh%elem2D_nodes(:,elem)
 
         !_______________________________________________________________________
         ! calculate mid depth element level --> Z_e
         ! nle...number of mid-depth levels at elem
         zbar_n       = 0.0_WP
         Z_n          = 0.0_WP
-        zbar_n(nle+1)= zbar_e_bot(elem)
-        Z_n(nle)     = zbar_n(nle+1) + helem(nle,elem)*0.5_WP
+        zbar_n(nle+1)= mesh%zbar_e_bot(elem)
+        Z_n(nle)     = zbar_n(nle+1) + mesh%helem(nle,elem)*0.5_WP
         do nlz=nle,ule+1,-1
-            zbar_n(nlz) = zbar_n(nlz+1) + helem(nlz,elem)
-            Z_n(nlz-1)  = zbar_n(nlz)   + helem(nlz-1,elem)*0.5_WP
+            zbar_n(nlz) = zbar_n(nlz+1) + mesh%helem(nlz,elem)
+            Z_n(nlz-1)  = zbar_n(nlz)   + mesh%helem(nlz-1,elem)*0.5_WP
         end do
-        zbar_n(ule) = zbar_n(ule+1) + helem(ule,elem)
+        zbar_n(ule) = zbar_n(ule+1) + mesh%helem(ule,elem)
 
         !_______________________________________________________________________
         ! Calculate pressure gradient force (PGF) based on "Shchepetkin
@@ -880,15 +850,15 @@ subroutine pressure_force_4_linfs_shchepetkin(partit, mesh)
         if (ule==1) then
             !___________________________________________________________________
             ! zonal gradients
-            drho_dx         = sum(gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
-            aux_sum         = drho_dx*helem(nlz,elem)*g/density_0
+            drho_dx         = sum(mesh%gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
+            aux_sum         = drho_dx*mesh%helem(nlz,elem)*g/density_0
             pgf_x(nlz,elem) = aux_sum*0.5_WP
             int_dp_dx(1)    = aux_sum
 
             !___________________________________________________________________
             ! meridional gradients
-            drho_dx         = sum(gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
-            aux_sum         = drho_dx*helem(nlz,elem)*g/density_0
+            drho_dx         = sum(mesh%gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
+            aux_sum         = drho_dx*mesh%helem(nlz,elem)*g/density_0
             pgf_y(nlz,elem) = aux_sum*0.5_WP
             int_dp_dx(2)    = aux_sum
         else
@@ -915,55 +885,55 @@ subroutine pressure_force_4_linfs_shchepetkin(partit, mesh)
             !           *[(x-x1)+(x-x0)]
             !
             idx = (/1, 1, 1/)*nlz
-            idx = idx - ulevels_nod2D(elnodes)
+            idx = idx - mesh%ulevels_nod2D(elnodes)
             do ni=1,3
                 if (idx(ni)==0) then
                     ! elemental surface index nlz ist also surface index of vertice ni
                     !_______________________________________________________________
                     ! interpolation coefficients
-                    dx10(ni)   = Z_3d_n(nlz+1,elnodes(ni))-Z_3d_n(nlz  ,elnodes(ni))
-                    dx21(ni)   = Z_3d_n(nlz+2,elnodes(ni))-Z_3d_n(nlz+1,elnodes(ni))
-                    dx20(ni)   = Z_3d_n(nlz+2,elnodes(ni))-Z_3d_n(nlz  ,elnodes(ni))
+                    dx10(ni)   = mesh%Z_3d_n(nlz+1,elnodes(ni))-mesh%Z_3d_n(nlz  ,elnodes(ni))
+                    dx21(ni)   = mesh%Z_3d_n(nlz+2,elnodes(ni))-mesh%Z_3d_n(nlz+1,elnodes(ni))
+                    dx20(ni)   = mesh%Z_3d_n(nlz+2,elnodes(ni))-mesh%Z_3d_n(nlz  ,elnodes(ni))
 
                     df10(ni)   = density_m_rho0(nlz+1,elnodes(ni))-density_m_rho0(nlz  ,elnodes(ni))
                     df21(ni)   = density_m_rho0(nlz+2,elnodes(ni))-density_m_rho0(nlz+1,elnodes(ni))
                     !_______________________________________________________________
                     ! compute vertical density gradient
                     drho_dz(ni)= df10(ni)/dx10(ni) + (dx10(ni)*df21(ni)-dx21(ni)*df10(ni))/(dx20(ni)*dx21(ni)*dx10(ni))&
-                                *((Z_n(nlz)-Z_3d_n(nlz+1,elnodes(ni))) + &
-                                (Z_n(nlz)-Z_3d_n(nlz  ,elnodes(ni))))
+                                *((Z_n(nlz)-mesh%Z_3d_n(nlz+1,elnodes(ni))) + &
+                                (Z_n(nlz)-mesh%Z_3d_n(nlz  ,elnodes(ni))))
                 else
                     ! elemental surface index nlz ist deeper than surface index of vertices ni
                     !_______________________________________________________________
                     ! interpolation coefficients
-                    dx10(ni)   = Z_3d_n(nlz  ,elnodes(ni))-Z_3d_n(nlz-1,elnodes(ni))
-                    dx21(ni)   = Z_3d_n(nlz+1,elnodes(ni))-Z_3d_n(nlz  ,elnodes(ni))
-                    dx20(ni)   = Z_3d_n(nlz+1,elnodes(ni))-Z_3d_n(nlz-1,elnodes(ni))
+                    dx10(ni)   = mesh%Z_3d_n(nlz  ,elnodes(ni))-mesh%Z_3d_n(nlz-1,elnodes(ni))
+                    dx21(ni)   = mesh%Z_3d_n(nlz+1,elnodes(ni))-mesh%Z_3d_n(nlz  ,elnodes(ni))
+                    dx20(ni)   = mesh%Z_3d_n(nlz+1,elnodes(ni))-mesh%Z_3d_n(nlz-1,elnodes(ni))
 
                     df10(ni)   = density_m_rho0(nlz  ,elnodes(ni))-density_m_rho0(nlz-1,elnodes(ni))
                     df21(ni)   = density_m_rho0(nlz+1,elnodes(ni))-density_m_rho0(nlz  ,elnodes(ni))
                     !_______________________________________________________________
                     ! compute vertical density gradient
                     drho_dz(ni)= df10(ni)/dx10(ni) + (dx10(ni)*df21(ni)-dx21(ni)*df10(ni))/(dx20(ni)*dx21(ni)*dx10(ni))&
-                                *((Z_n(nlz)-Z_3d_n(nlz  ,elnodes(ni))) + &
-                                (Z_n(nlz)-Z_3d_n(nlz-1,elnodes(ni))))
+                                *((Z_n(nlz)-mesh%Z_3d_n(nlz  ,elnodes(ni))) + &
+                                (Z_n(nlz)-mesh%Z_3d_n(nlz-1,elnodes(ni))))
                 end if
             end do
 
             !___________________________________________________________________
             ! -->...-g/rho*int_z^eta( drho/dx|_s - drho/dz'*dz'/dx|_s )*dz'
             ! zonal gradients
-            drho_dx         = sum(gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
-            dz_dx           = sum(gradient_sca(1:3,elem)*Z_3d_n(nlz,elnodes))
-            aux_sum         = (drho_dx-sum(drho_dz)/3.0_WP*dz_dx)*helem(nlz,elem)*g/density_0
+            drho_dx         = sum(mesh%gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
+            dz_dx           = sum(mesh%gradient_sca(1:3,elem)*mesh%Z_3d_n(nlz,elnodes))
+            aux_sum         = (drho_dx-sum(drho_dz)/3.0_WP*dz_dx)*mesh%helem(nlz,elem)*g/density_0
             pgf_x(nlz,elem) = aux_sum*0.5_WP
             int_dp_dx(1)    = aux_sum
 
             !___________________________________________________________________
             ! meridional gradients
-            drho_dx         = sum(gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
-            dz_dx           = sum(gradient_sca(4:6,elem)*Z_3d_n(nlz,elnodes))
-            aux_sum         = (drho_dx-sum(drho_dz)/3.0_WP*dz_dx)*helem(nlz,elem)*g/density_0
+            drho_dx         = sum(mesh%gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
+            dz_dx           = sum(mesh%gradient_sca(4:6,elem)*mesh%Z_3d_n(nlz,elnodes))
+            aux_sum         = (drho_dx-sum(drho_dz)/3.0_WP*dz_dx)*mesh%helem(nlz,elem)*g/density_0
             pgf_y(nlz,elem) = aux_sum*0.5_WP
             int_dp_dx(2)    = aux_sum
         end if
@@ -975,14 +945,14 @@ subroutine pressure_force_4_linfs_shchepetkin(partit, mesh)
             ! - g/rho*int_z^eta( drho/dx|_s - drho/dz'*dz'/dx|_s )*dz'
             ! --> in case linfs: dz_dx == 0.0
             ! zonal gradients
-            drho_dx         = sum(gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
-            aux_sum         = drho_dx*helem(nlz,elem)*g/density_0
+            drho_dx         = sum(mesh%gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
+            aux_sum         = drho_dx*mesh%helem(nlz,elem)*g/density_0
             pgf_x(nlz,elem) = int_dp_dx(1) + aux_sum*0.5_WP
             int_dp_dx(1)    = int_dp_dx(1) + aux_sum
 
             ! meridional gradients
-            drho_dx         = sum(gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
-            aux_sum         = drho_dx*helem(nlz,elem)*g/density_0
+            drho_dx         = sum(mesh%gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
+            aux_sum         = drho_dx*mesh%helem(nlz,elem)*g/density_0
             pgf_y(nlz,elem) = int_dp_dx(2) + aux_sum*0.5_WP
             int_dp_dx(2)    = int_dp_dx(2) + aux_sum
 
@@ -1012,56 +982,56 @@ subroutine pressure_force_4_linfs_shchepetkin(partit, mesh)
         !
         nlz = nle
         idx = (/1, 1, 1/)*nlz
-        idx = nlevels_nod2D(elnodes)-1 - idx
+        idx = mesh%nlevels_nod2D(elnodes)-1 - idx
         do ni=1,3
             if (idx(ni)==0) then
                 ! elemental bottom index nlz ist also bottom index of vertice ni
                 !_______________________________________________________________
                 ! interpolation coefficients
-                dx10(ni)   = Z_3d_n(nlz-1,elnodes(ni))-Z_3d_n(nlz-2,elnodes(ni))
-                dx21(ni)   = Z_3d_n(nlz  ,elnodes(ni))-Z_3d_n(nlz-1,elnodes(ni))
-                dx20(ni)   = Z_3d_n(nlz  ,elnodes(ni))-Z_3d_n(nlz-2,elnodes(ni))
+                dx10(ni)   = mesh%Z_3d_n(nlz-1,elnodes(ni))-mesh%Z_3d_n(nlz-2,elnodes(ni))
+                dx21(ni)   = mesh%Z_3d_n(nlz  ,elnodes(ni))-mesh%Z_3d_n(nlz-1,elnodes(ni))
+                dx20(ni)   = mesh%Z_3d_n(nlz  ,elnodes(ni))-mesh%Z_3d_n(nlz-2,elnodes(ni))
 
                 df10(ni)   = density_m_rho0(nlz-1,elnodes(ni))-density_m_rho0(nlz-2,elnodes(ni))
                 df21(ni)   = density_m_rho0(nlz  ,elnodes(ni))-density_m_rho0(nlz-1,elnodes(ni))
                 !_______________________________________________________________
                 ! compute vertical density gradient
                 drho_dz(ni)= df10(ni)/dx10(ni) + (dx10(ni)*df21(ni)-dx21(ni)*df10(ni))/(dx20(ni)*dx21(ni)*dx10(ni))&
-                             *((Z_n(nlz)-Z_3d_n(nlz-1,elnodes(ni))) + &
-                               (Z_n(nlz)-Z_3d_n(nlz-2,elnodes(ni))))
+                             *((Z_n(nlz)-mesh%Z_3d_n(nlz-1,elnodes(ni))) + &
+                               (Z_n(nlz)-mesh%Z_3d_n(nlz-2,elnodes(ni))))
             else
                 ! elemental bottom index nlz ist shallower than bottom index of vertice ni
                 !_______________________________________________________________
                 ! interpolation coefficients
-                dx10(ni)   = Z_3d_n(nlz  ,elnodes(ni))-Z_3d_n(nlz-1,elnodes(ni))
-                dx21(ni)   = Z_3d_n(nlz+1,elnodes(ni))-Z_3d_n(nlz  ,elnodes(ni))
-                dx20(ni)   = Z_3d_n(nlz+1,elnodes(ni))-Z_3d_n(nlz-1,elnodes(ni))
+                dx10(ni)   = mesh%Z_3d_n(nlz  ,elnodes(ni))-mesh%Z_3d_n(nlz-1,elnodes(ni))
+                dx21(ni)   = mesh%Z_3d_n(nlz+1,elnodes(ni))-mesh%Z_3d_n(nlz  ,elnodes(ni))
+                dx20(ni)   = mesh%Z_3d_n(nlz+1,elnodes(ni))-mesh%Z_3d_n(nlz-1,elnodes(ni))
 
                 df10(ni)   = density_m_rho0(nlz  ,elnodes(ni))-density_m_rho0(nlz-1,elnodes(ni))
                 df21(ni)   = density_m_rho0(nlz+1,elnodes(ni))-density_m_rho0(nlz  ,elnodes(ni))
                 !_______________________________________________________________
                 ! compute vertical density gradient
                 drho_dz(ni)= df10(ni)/dx10(ni) + (dx10(ni)*df21(ni)-dx21(ni)*df10(ni))/(dx20(ni)*dx21(ni)*dx10(ni))&
-                             *((Z_n(nlz)-Z_3d_n(nlz  ,elnodes(ni))) + &
-                               (Z_n(nlz)-Z_3d_n(nlz-1,elnodes(ni))))
+                             *((Z_n(nlz)-mesh%Z_3d_n(nlz  ,elnodes(ni))) + &
+                               (Z_n(nlz)-mesh%Z_3d_n(nlz-1,elnodes(ni))))
             end if
         end do
 
         !_______________________________________________________________________
         ! - g/rho*int_z^eta( drho/dx|_s - drho/dz'*dz'/dx|_s )*dz'
         ! zonal gradients
-        drho_dx         = sum(gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
-        dz_dx           = sum(gradient_sca(1:3,elem)*Z_3d_n(nlz,elnodes))
+        drho_dx         = sum(mesh%gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
+        dz_dx           = sum(mesh%gradient_sca(1:3,elem)*mesh%Z_3d_n(nlz,elnodes))
         !!PS aux_sum         = (drho_dx-drho_dz)*dz_dx)*helem(nlz,elem)*g/density_0
-        aux_sum         = (drho_dx-sum(drho_dz)/3.0_WP*dz_dx)*helem(nlz,elem)*g/density_0
+        aux_sum         = (drho_dx-sum(drho_dz)/3.0_WP*dz_dx)*mesh%helem(nlz,elem)*g/density_0
         pgf_x(nlz,elem) = int_dp_dx(1) + aux_sum*0.5_WP
 
         !_______________________________________________________________________
         ! meridional gradients
-        drho_dx         = sum(gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
-        dz_dx           = sum(gradient_sca(4:6,elem)*Z_3d_n(nlz,elnodes))
+        drho_dx         = sum(mesh%gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
+        dz_dx           = sum(mesh%gradient_sca(4:6,elem)*mesh%Z_3d_n(nlz,elnodes))
         !!PS aux_sum         = (drho_dx-drho_dz*dz_dx)*helem(nlz,elem)*g/density_0
-        aux_sum         = (drho_dx-sum(drho_dz)/3.0_WP*dz_dx)*helem(nlz,elem)*g/density_0
+        aux_sum         = (drho_dx-sum(drho_dz)/3.0_WP*dz_dx)*mesh%helem(nlz,elem)*g/density_0
         pgf_y(nlz,elem) = int_dp_dx(2) + aux_sum*0.5_WP
 
     end do ! --> do elem=1, myDim_elem2D
@@ -1075,15 +1045,6 @@ end subroutine pressure_force_4_linfs_shchepetkin
 ! Calculate pressure gradient force (PGF)
 ! First coded by P. Scholz for FESOM2.0, 08.02.2019
 subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
-    use o_PARAM
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use MOD_TRACER
-    use o_ARRAYS
-    use g_config
-    use densityJM_components_interface
-    use density_linear_interface
     implicit none
     type(t_mesh),   intent(in) ,    target :: mesh
     type(t_partit), intent(inout),  target :: partit
@@ -1098,10 +1059,6 @@ subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
     real(kind=WP)                          :: dref_rhopot, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2
     real(kind=WP)                          :: zbar_n(mesh%nl), z_n(mesh%nl-1)
     real(kind=WP), dimension(:,:), pointer :: temp, salt
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     temp=>tracers%data(1)%values(:,:)
     salt=>tracers%data(2)%values(:,:)
 
@@ -1111,27 +1068,27 @@ subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
 !$OMP                                  rho_at_Zn, temp_at_Zn, salt_at_Zn, drho_dz, aux_dref, rhopot, bulk_0, bulk_pz, bulk_pz2, dref_rhopot, dref_bulk_0,    &
 !$OMP                                  dref_bulk_pz, dref_bulk_pz2, zbar_n, z_n                                                                              )
 !$OMP DO
-    do elem=1, myDim_elem2D
+    do elem=1, partit%myDim_elem2D
         !_______________________________________________________________________
         ! nle...number of mid-depth levels at elem
-        nle     = nlevels(elem)-1
-        ule     = ulevels(elem)
+        nle     = mesh%nlevels(elem)-1
+        ule     = mesh%ulevels(elem)
 
         ! node indices of elem
-        elnodes = elem2D_nodes(:,elem)
+        elnodes = mesh%elem2D_nodes(:,elem)
 
         !_______________________________________________________________________
         ! calculate mid depth element level --> Z_e
         ! nle...number of mid-depth levels at elem
         zbar_n       = 0.0_WP
         Z_n          = 0.0_WP
-        zbar_n(nle+1)= zbar_e_bot(elem)
-        Z_n(nle)     = zbar_n(nle+1) + helem(nle,elem)*0.5_WP
+        zbar_n(nle+1)= mesh%zbar_e_bot(elem)
+        Z_n(nle)     = zbar_n(nle+1) + mesh%helem(nle,elem)*0.5_WP
         do nlz=nle,ule+1,-1
-            zbar_n(nlz) = zbar_n(nlz+1) + helem(nlz,elem)
-            Z_n(nlz-1)  = zbar_n(nlz)   + helem(nlz-1,elem)*0.5_WP
+            zbar_n(nlz) = zbar_n(nlz+1) + mesh%helem(nlz,elem)
+            Z_n(nlz-1)  = zbar_n(nlz)   + mesh%helem(nlz-1,elem)*0.5_WP
         end do
-        zbar_n(ule) = zbar_n(ule+1) + helem(ule,elem)
+        zbar_n(ule) = zbar_n(ule+1) + mesh%helem(ule,elem)
 
         !_______________________________________________________________________
         aux_dref     = density_0
@@ -1142,8 +1099,8 @@ subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
                 case(1)
                     call densityJM_components(density_ref_T, density_ref_S, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2, dref_rhopot)
                 case default !unknown
-                    if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+                    if (partit%mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
+                    call par_abort(partit%MPI_COMM_FESOM, partit%mype)
             end select
         end if
 
@@ -1153,15 +1110,15 @@ subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
         if (ule==1) then
             !___________________________________________________________________
             ! zonal gradients
-            drho_dx         = sum(gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
-            aux_sum         = drho_dx*helem(nlz,elem)*g/density_0
+            drho_dx         = sum(mesh%gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
+            aux_sum         = drho_dx*mesh%helem(nlz,elem)*g/density_0
             pgf_x(nlz,elem) = aux_sum*0.5_WP
             int_dp_dx(1)    = aux_sum
 
             !___________________________________________________________________
             ! meridional gradients
-            drho_dx         = sum(gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
-            aux_sum         = drho_dx*helem(nlz,elem)*g/density_0
+            drho_dx         = sum(mesh%gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
+            aux_sum         = drho_dx*mesh%helem(nlz,elem)*g/density_0
             pgf_y(nlz,elem) = aux_sum*0.5_WP
             int_dp_dx(2)    = aux_sum
         else
@@ -1197,15 +1154,15 @@ subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
             end if
 
             idx = (/1, 1, 1/)*nlz
-            idx = idx - ulevels_nod2D(elnodes)
+            idx = idx - mesh%ulevels_nod2D(elnodes)
             do ni=1,3
                 if (idx(ni)==0) then
                     ! elemental surface index nlz ist also surface index of vertice ni
                     !___________________________________________________________________
                     ! compute interpolation coefficients
-                    dx10(ni)   = Z_3d_n(nlz+1,elnodes(ni))-Z_3d_n(nlz  ,elnodes(ni))
-                    dx21(ni)   = Z_3d_n(nlz+2,elnodes(ni))-Z_3d_n(nlz+1,elnodes(ni))
-                    dx20(ni)   = Z_3d_n(nlz+2,elnodes(ni))-Z_3d_n(nlz  ,elnodes(ni))
+                    dx10(ni)   = mesh%Z_3d_n(nlz+1,elnodes(ni))-mesh%Z_3d_n(nlz  ,elnodes(ni))
+                    dx21(ni)   = mesh%Z_3d_n(nlz+2,elnodes(ni))-mesh%Z_3d_n(nlz+1,elnodes(ni))
+                    dx20(ni)   = mesh%Z_3d_n(nlz+2,elnodes(ni))-mesh%Z_3d_n(nlz  ,elnodes(ni))
 
                     t0(ni)     = temp(nlz  ,elnodes(ni))
                     dt10(ni)   = temp(nlz+1,elnodes(ni))-temp(nlz  ,elnodes(ni))
@@ -1217,13 +1174,13 @@ subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
                     !___________________________________________________________________
                     ! interpoalte vertice temp and salinity to elemental level Z_n
                     temp_at_Zn(ni) = t0(ni) &
-                                    + dt10(ni)/dx10(ni)*(Z_n(nlz)-Z_3d_n(nlz,elnodes(ni))) &
+                                    + dt10(ni)/dx10(ni)*(Z_n(nlz)-mesh%Z_3d_n(nlz,elnodes(ni))) &
                                     + (dx10(ni)*dt21(ni)-dx21(ni)*dt10(ni))/(dx20(ni)*dx21(ni)*dx10(ni))* &
-                                    (Z_n(nlz)-Z_3d_n(nlz+1,elnodes(ni)))*(Z_n(nlz)-Z_3d_n(nlz,elnodes(ni)))
+                                    (Z_n(nlz)-mesh%Z_3d_n(nlz+1,elnodes(ni)))*(Z_n(nlz)-mesh%Z_3d_n(nlz,elnodes(ni)))
                     salt_at_Zn(ni) = s0(ni) &
-                                    + ds10(ni)/dx10(ni)*(Z_n(nlz)-Z_3d_n(nlz,elnodes(ni))) &
+                                    + ds10(ni)/dx10(ni)*(Z_n(nlz)-mesh%Z_3d_n(nlz,elnodes(ni))) &
                                     + (dx10(ni)*ds21(ni)-dx21(ni)*ds10(ni))/(dx20(ni)*dx21(ni)*dx10(ni))* &
-                                    (Z_n(nlz)-Z_3d_n(nlz+1,elnodes(ni)))*(Z_n(nlz)-Z_3d_n(nlz,elnodes(ni)))
+                                    (Z_n(nlz)-mesh%Z_3d_n(nlz+1,elnodes(ni)))*(Z_n(nlz)-mesh%Z_3d_n(nlz,elnodes(ni)))
                     !___________________________________________________________________
                     ! compute density from state equation
                     select case(state_equation)
@@ -1232,8 +1189,8 @@ subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
                         case(1)
                             call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni))
                         case default !unknown
-                            if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+                            if (partit%mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
+                            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
                     end select
                     rho_at_Zn(ni) = bulk_0(ni) + Z_n(nlz)*(bulk_pz(ni) + Z_n(nlz)*bulk_pz2(ni))
                     rho_at_Zn(ni) = rho_at_Zn(ni)*rhopot(ni)/(rho_at_Zn(ni)+0.1_WP*Z_n(nlz)*real(state_equation))-aux_dref
@@ -1242,9 +1199,9 @@ subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
                     ! elemental surface index nlz ist deeper than surface index of vertices ni
                     !___________________________________________________________________
                     ! compute interpolation coefficients
-                    dx10(ni)   = Z_3d_n(nlz  ,elnodes(ni))-Z_3d_n(nlz-1,elnodes(ni))
-                    dx21(ni)   = Z_3d_n(nlz+1,elnodes(ni))-Z_3d_n(nlz  ,elnodes(ni))
-                    dx20(ni)   = Z_3d_n(nlz+1,elnodes(ni))-Z_3d_n(nlz-1,elnodes(ni))
+                    dx10(ni)   = mesh%Z_3d_n(nlz  ,elnodes(ni))-mesh%Z_3d_n(nlz-1,elnodes(ni))
+                    dx21(ni)   = mesh%Z_3d_n(nlz+1,elnodes(ni))-mesh%Z_3d_n(nlz  ,elnodes(ni))
+                    dx20(ni)   = mesh%Z_3d_n(nlz+1,elnodes(ni))-mesh%Z_3d_n(nlz-1,elnodes(ni))
 
                     t0(ni)     = temp(nlz-1,elnodes(ni))
                     dt10(ni)   = temp(nlz  ,elnodes(ni))-temp(nlz-1,elnodes(ni))
@@ -1256,13 +1213,13 @@ subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
                     !___________________________________________________________________
                     ! interpoalte vertice temp and salinity to elemental level Z_n
                     temp_at_Zn(ni) = t0(ni) &
-                                    + dt10(ni)/dx10(ni)*(Z_n(nlz)-Z_3d_n(nlz-1,elnodes(ni))) &
+                                    + dt10(ni)/dx10(ni)*(Z_n(nlz)-mesh%Z_3d_n(nlz-1,elnodes(ni))) &
                                     + (dx10(ni)*dt21(ni)-dx21(ni)*dt10(ni))/(dx20(ni)*dx21(ni)*dx10(ni))* &
-                                    (Z_n(nlz)-Z_3d_n(nlz,elnodes(ni)))*(Z_n(nlz)-Z_3d_n(nlz-1,elnodes(ni)))
+                                    (Z_n(nlz)-mesh%Z_3d_n(nlz,elnodes(ni)))*(Z_n(nlz)-mesh%Z_3d_n(nlz-1,elnodes(ni)))
                     salt_at_Zn(ni) = s0(ni) &
-                                    + ds10(ni)/dx10(ni)*(Z_n(nlz)-Z_3d_n(nlz-1,elnodes(ni))) &
+                                    + ds10(ni)/dx10(ni)*(Z_n(nlz)-mesh%Z_3d_n(nlz-1,elnodes(ni))) &
                                     + (dx10(ni)*ds21(ni)-dx21(ni)*ds10(ni))/(dx20(ni)*dx21(ni)*dx10(ni))* &
-                                    (Z_n(nlz)-Z_3d_n(nlz,elnodes(ni)))*(Z_n(nlz)-Z_3d_n(nlz-1,elnodes(ni)))
+                                    (Z_n(nlz)-mesh%Z_3d_n(nlz,elnodes(ni)))*(Z_n(nlz)-mesh%Z_3d_n(nlz-1,elnodes(ni)))
                     !___________________________________________________________________
                     ! compute density from state equation
                     select case(state_equation)
@@ -1271,8 +1228,8 @@ subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
                         case(1)
                             call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni))
                         case default !unknown
-                            if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+                            if (partit%mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
+                            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
                     end select
                     rho_at_Zn(ni) = bulk_0(ni) + Z_n(nlz)*(bulk_pz(ni) + Z_n(nlz)*bulk_pz2(ni))
                     rho_at_Zn(ni) = rho_at_Zn(ni)*rhopot(ni)/(rho_at_Zn(ni)+0.1_WP*Z_n(nlz)*real(state_equation))-aux_dref
@@ -1282,15 +1239,15 @@ subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
             !___________________________________________________________________
             ! -->...-g/rho*int_z^eta( drho/dx|_s - drho/dz'*dz'/dx|_s )*dz'
             ! zonal gradients
-            drho_dx         = sum(gradient_sca(1:3,elem)*rho_at_Zn)
-            aux_sum         = drho_dx*helem(nlz,elem)*g/density_0
+            drho_dx         = sum(mesh%gradient_sca(1:3,elem)*rho_at_Zn)
+            aux_sum         = drho_dx*mesh%helem(nlz,elem)*g/density_0
             pgf_x(nlz,elem) = aux_sum*0.5_WP
             int_dp_dx(1)    = aux_sum
 
             !___________________________________________________________________
             ! meridional gradients
-            drho_dx         = sum(gradient_sca(4:6,elem)*rho_at_Zn)
-            aux_sum         = drho_dx*helem(nlz,elem)*g/density_0
+            drho_dx         = sum(mesh%gradient_sca(4:6,elem)*rho_at_Zn)
+            aux_sum         = drho_dx*mesh%helem(nlz,elem)*g/density_0
             pgf_y(nlz,elem) = aux_sum*0.5_WP
             int_dp_dx(2)    = aux_sum
         end if
@@ -1302,14 +1259,14 @@ subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
             ! - g/rho*int_z^eta( drho/dx|_s - drho/dz'*dz'/dx|_s )*dz'
             ! --> in case linfs: dz_dx == 0.0
             ! zonal gradients
-            drho_dx         = sum(gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
-            aux_sum         = drho_dx*helem(nlz,elem)*g/density_0
+            drho_dx         = sum(mesh%gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
+            aux_sum         = drho_dx*mesh%helem(nlz,elem)*g/density_0
             pgf_x(nlz,elem) = int_dp_dx(1) + aux_sum*0.5_WP
             int_dp_dx(1)    = int_dp_dx(1) + aux_sum
 
             ! meridional gradients
-            drho_dx         = sum(gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
-            aux_sum         = drho_dx*helem(nlz,elem)*g/density_0
+            drho_dx         = sum(mesh%gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
+            aux_sum         = drho_dx*mesh%helem(nlz,elem)*g/density_0
             pgf_y(nlz,elem) = int_dp_dx(2) + aux_sum*0.5_WP
             int_dp_dx(2)    = int_dp_dx(2) + aux_sum
 
@@ -1339,15 +1296,15 @@ subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
         !
         nlz = nle
         idx = (/1, 1, 1/)*nlz
-        idx = nlevels_nod2D(elnodes)-1 - idx
+        idx = mesh%nlevels_nod2D(elnodes)-1 - idx
         do ni=1,3
             if (idx(ni)==0) then
                 ! elemental bottom index nlz ist also bottom index of vertice ni
                 !___________________________________________________________________
                 ! compute interpolation coefficients
-                dx10(ni)   = Z_3d_n(nlz-1,elnodes(ni))-Z_3d_n(nlz-2,elnodes(ni))
-                dx21(ni)   = Z_3d_n(nlz  ,elnodes(ni))-Z_3d_n(nlz-1,elnodes(ni))
-                dx20(ni)   = Z_3d_n(nlz  ,elnodes(ni))-Z_3d_n(nlz-2,elnodes(ni))
+                dx10(ni)   = mesh%Z_3d_n(nlz-1,elnodes(ni))-mesh%Z_3d_n(nlz-2,elnodes(ni))
+                dx21(ni)   = mesh%Z_3d_n(nlz  ,elnodes(ni))-mesh%Z_3d_n(nlz-1,elnodes(ni))
+                dx20(ni)   = mesh%Z_3d_n(nlz  ,elnodes(ni))-mesh%Z_3d_n(nlz-2,elnodes(ni))
 
                 t0(ni)     = temp(nlz-2,elnodes(ni))
                 dt10(ni)   = temp(nlz-1,elnodes(ni))-temp(nlz-2,elnodes(ni))
@@ -1359,13 +1316,13 @@ subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
                 !_________________________________________________________________
                 ! interpoalte vertice temp and salinity to elemental level Z_n
                 temp_at_Zn(ni) = t0(ni) &
-                                + dt10(ni)/dx10(ni)*(Z_n(nlz)-Z_3d_n(nlz-2,elnodes(ni))) &
+                                + dt10(ni)/dx10(ni)*(Z_n(nlz)-mesh%Z_3d_n(nlz-2,elnodes(ni))) &
                                 + (dx10(ni)*dt21(ni)-dx21(ni)*dt10(ni))/(dx20(ni)*dx21(ni)*dx10(ni))* &
-                                  (Z_n(nlz)-Z_3d_n(nlz-1,elnodes(ni)))*(Z_n(nlz)-Z_3d_n(nlz-2,elnodes(ni)))
+                                  (Z_n(nlz)-mesh%Z_3d_n(nlz-1,elnodes(ni)))*(Z_n(nlz)-mesh%Z_3d_n(nlz-2,elnodes(ni)))
                 salt_at_Zn(ni) = s0(ni) &
-                                + ds10(ni)/dx10(ni)*(Z_n(nlz)-Z_3d_n(nlz-2,elnodes(ni))) &
+                                + ds10(ni)/dx10(ni)*(Z_n(nlz)-mesh%Z_3d_n(nlz-2,elnodes(ni))) &
                                 + (dx10(ni)*ds21(ni)-dx21(ni)*ds10(ni))/(dx20(ni)*dx21(ni)*dx10(ni))* &
-                                  (Z_n(nlz)-Z_3d_n(nlz-1,elnodes(ni)))*(Z_n(nlz)-Z_3d_n(nlz-2,elnodes(ni)))
+                                  (Z_n(nlz)-mesh%Z_3d_n(nlz-1,elnodes(ni)))*(Z_n(nlz)-mesh%Z_3d_n(nlz-2,elnodes(ni)))
                 !___________________________________________________________________
                 ! compute density from state equation
                 select case(state_equation)
@@ -1374,8 +1331,8 @@ subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
                     case(1)
                         call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni))
                     case default !unknown
-                        if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+                        if (partit%mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
+                        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
                 end select
                 rho_at_Zn(ni) = bulk_0(ni) + Z_n(nlz)*(bulk_pz(ni) + Z_n(nlz)*bulk_pz2(ni))
                 rho_at_Zn(ni) = rho_at_Zn(ni)*rhopot(ni)/(rho_at_Zn(ni)+0.1_WP*Z_n(nlz)*real(state_equation))-aux_dref
@@ -1384,9 +1341,9 @@ subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
                 ! elemental bottom index nlz ist shallower than bottom index of vertice ni
                 !___________________________________________________________________
                 ! compute interpolation coefficients
-                dx10(ni)   = Z_3d_n(nlz  ,elnodes(ni))-Z_3d_n(nlz-1,elnodes(ni))
-                dx21(ni)   = Z_3d_n(nlz+1,elnodes(ni))-Z_3d_n(nlz  ,elnodes(ni))
-                dx20(ni)   = Z_3d_n(nlz+1,elnodes(ni))-Z_3d_n(nlz-1,elnodes(ni))
+                dx10(ni)   = mesh%Z_3d_n(nlz  ,elnodes(ni))-mesh%Z_3d_n(nlz-1,elnodes(ni))
+                dx21(ni)   = mesh%Z_3d_n(nlz+1,elnodes(ni))-mesh%Z_3d_n(nlz  ,elnodes(ni))
+                dx20(ni)   = mesh%Z_3d_n(nlz+1,elnodes(ni))-mesh%Z_3d_n(nlz-1,elnodes(ni))
 
                 t0(ni)     = temp(nlz-1,elnodes(ni))
                 dt10(ni)   = temp(nlz  ,elnodes(ni))-temp(nlz-1,elnodes(ni))
@@ -1398,13 +1355,13 @@ subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
                 !___________________________________________________________________
                 ! interpoalte vertice temp and salinity to elemental level Z_n
                 temp_at_Zn(ni) = t0(ni) &
-                                + dt10(ni)/dx10(ni)*(Z_n(nlz)-Z_3d_n(nlz-1,elnodes(ni))) &
+                                + dt10(ni)/dx10(ni)*(Z_n(nlz)-mesh%Z_3d_n(nlz-1,elnodes(ni))) &
                                 + (dx10(ni)*dt21(ni)-dx21(ni)*dt10(ni))/(dx20(ni)*dx21(ni)*dx10(ni))* &
-                                  (Z_n(nlz)-Z_3d_n(nlz,elnodes(ni)))*(Z_n(nlz)-Z_3d_n(nlz-1,elnodes(ni)))
+                                  (Z_n(nlz)-mesh%Z_3d_n(nlz,elnodes(ni)))*(Z_n(nlz)-mesh%Z_3d_n(nlz-1,elnodes(ni)))
                 salt_at_Zn(ni) = s0(ni) &
-                                + ds10(ni)/dx10(ni)*(Z_n(nlz)-Z_3d_n(nlz-1,elnodes(ni))) &
+                                + ds10(ni)/dx10(ni)*(Z_n(nlz)-mesh%Z_3d_n(nlz-1,elnodes(ni))) &
                                 + (dx10(ni)*ds21(ni)-dx21(ni)*ds10(ni))/(dx20(ni)*dx21(ni)*dx10(ni))* &
-                                  (Z_n(nlz)-Z_3d_n(nlz,elnodes(ni)))*(Z_n(nlz)-Z_3d_n(nlz-1,elnodes(ni)))
+                                  (Z_n(nlz)-mesh%Z_3d_n(nlz,elnodes(ni)))*(Z_n(nlz)-mesh%Z_3d_n(nlz-1,elnodes(ni)))
                 !___________________________________________________________________
                 ! compute density from state equation
                 select case(state_equation)
@@ -1413,8 +1370,8 @@ subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
                     case(1)
                         call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni))
                     case default !unknown
-                        if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+                        if (partit%mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
+                        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
                 end select
                 rho_at_Zn(ni) = bulk_0(ni) + Z_n(nlz)*(bulk_pz(ni) + Z_n(nlz)*bulk_pz2(ni))
                 rho_at_Zn(ni) = rho_at_Zn(ni)*rhopot(ni)/(rho_at_Zn(ni)+0.1_WP*Z_n(nlz)*real(state_equation))-aux_dref
@@ -1424,14 +1381,14 @@ subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
         !_______________________________________________________________________
         ! - g/rho*int_z^eta( drho/dx|_s - drho/dz'*dz'/dx|_s )*dz'
         ! zonal gradients
-        drho_dx         = sum(gradient_sca(1:3,elem)*rho_at_Zn)
-        aux_sum         = drho_dx*helem(nlz,elem)*g/density_0
+        drho_dx         = sum(mesh%gradient_sca(1:3,elem)*rho_at_Zn)
+        aux_sum         = drho_dx*mesh%helem(nlz,elem)*g/density_0
         pgf_x(nlz,elem) = int_dp_dx(1) + aux_sum*0.5_WP
 
         !_______________________________________________________________________
         ! meridional gradients
-        drho_dx         = sum(gradient_sca(4:6,elem)*rho_at_Zn)
-        aux_sum         = drho_dx*helem(nlz,elem)*g/density_0
+        drho_dx         = sum(mesh%gradient_sca(4:6,elem)*rho_at_Zn)
+        aux_sum         = drho_dx*mesh%helem(nlz,elem)*g/density_0
         pgf_y(nlz,elem) = int_dp_dx(2) + aux_sum*0.5_WP
 
     end do ! --> do elem=1, myDim_elem2D
@@ -1445,12 +1402,6 @@ end subroutine pressure_force_4_linfs_easypgf
 ! Calculate pressure gradient force (PGF) via cubicspline used in FEOSM1.4
 ! First coded by Q. Wang for FESOM1.4, adapted by P. Scholz for FESOM2.0, 08.02.2019
 subroutine pressure_force_4_linfs_cubicspline(partit, mesh)
-    use o_PARAM
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use o_ARRAYS
-    use g_config
     implicit none
     type(t_mesh),   intent(in) ,    target :: mesh
     type(t_partit), intent(inout),  target :: partit
@@ -1462,41 +1413,37 @@ subroutine pressure_force_4_linfs_cubicspline(partit, mesh)
     real(kind=WP)                          :: s_z(4), s_dens(4), s_H, aux1, aux2, s_dup, s_dlo
     real(kind=WP)                          :: a, b, c, d, dz
     real(kind=WP)                          :: zbar_n(mesh%nl), z_n(mesh%nl-1)
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     !___________________________________________________________________________
     ! loop over triangular elemments
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, elnodes, nle, ule, nlz, nlc, ni, node, nln, uln, dd, int_dp_dx, drho_dx, dz_dx, drho_dz, auxp, &
 !$OMP                                  dx10, dx20, dx21, df10, df21, interp_n_dens, s_ind, s_z, s_dens, s_H, aux1, aux2, s_dup, s_dlo,      &
 !$OMP                                  a, b, c, d, dz, zbar_n, z_n                                                                          )
 !$OMP DO
-    do elem=1, myDim_elem2D
+    do elem=1, partit%myDim_elem2D
         !_______________________________________________________________________
         ! nle...number of mid-depth levels at elem
-        nle     = nlevels(elem)-1
-        ule     = ulevels(elem)
+        nle     = mesh%nlevels(elem)-1
+        ule     = mesh%ulevels(elem)
 
         ! node indices of elem
-        elnodes = elem2D_nodes(:,elem)
+        elnodes = mesh%elem2D_nodes(:,elem)
 
         ! calculate mid depth element level --> Z_e
         ! nle...number of mid-depth levels at elem
         zbar_n       = 0.0_WP
         Z_n          = 0.0_WP
-        zbar_n(nle+1)= zbar_e_bot(elem)
-        Z_n(nle)     = zbar_n(nle+1) + helem(nle,elem)/2.0_WP
+        zbar_n(nle+1)= mesh%zbar_e_bot(elem)
+        Z_n(nle)     = zbar_n(nle+1) + mesh%helem(nle,elem)/2.0_WP
         do nlz=nle,2,-1
-            zbar_n(nlz) = zbar_n(nlz+1) + helem(nlz,elem)
-            Z_n(nlz-1)  = zbar_n(nlz)   + helem(nlz-1,elem)/2.0_WP
+            zbar_n(nlz) = zbar_n(nlz+1) + mesh%helem(nlz,elem)
+            Z_n(nlz-1)  = zbar_n(nlz)   + mesh%helem(nlz-1,elem)/2.0_WP
         end do
-        zbar_n(1) = zbar_n(2) + helem(1,elem)
+        zbar_n(1) = zbar_n(2) + mesh%helem(1,elem)
 
         ! nln...number of mid depth levels at each node that corresponds to
         ! element elem
-        nln=nlevels_nod2D(elnodes)-1
-        uln=ulevels_nod2D(elnodes)
+        nln=mesh%nlevels_nod2D(elnodes)-1
+        uln=mesh%ulevels_nod2D(elnodes)
 
         !_______________________________________________________________________
         ! calculate pressure gradient for surface layer
@@ -1506,40 +1453,40 @@ subroutine pressure_force_4_linfs_cubicspline(partit, mesh)
         if (ule==1) then ! in case no cavity
             !___________________________________________________________________
             ! zonal gradients
-            drho_dx         = sum(gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
-            auxp            = drho_dx*helem(nlz,elem)*g/density_0
+            drho_dx         = sum(mesh%gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
+            auxp            = drho_dx*mesh%helem(nlz,elem)*g/density_0
             pgf_x(nlz,elem) = int_dp_dx(1) + auxp*0.5_WP
             int_dp_dx(1)    = int_dp_dx(1) + auxp
 
             !___________________________________________________________________
             ! meridional gradients
-            drho_dx         = sum(gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
-            auxp            = drho_dx*helem(nlz,elem)*g/density_0
+            drho_dx         = sum(mesh%gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
+            auxp            = drho_dx*mesh%helem(nlz,elem)*g/density_0
             pgf_y(nlz,elem) = int_dp_dx(2) + auxp*0.5_WP
             int_dp_dx(2)    = int_dp_dx(2) + auxp
 
         else! in case of cavity (includes pressure bnd condition under cavity)
             !___________________________________________________________________
             ! zonal gradients
-            drho_dx         = sum(gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
+            drho_dx         = sum(mesh%gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
 
             ! cavity-ocean interface pressure boundary condition
-            auxp            = drho_dx*(-zbar_e_srf(elem))*g/density_0
+            auxp            = drho_dx*(-mesh%zbar_e_srf(elem))*g/density_0
             int_dp_dx(1)    = int_dp_dx(1) + auxp
 
-            auxp            = drho_dx*helem(nlz,elem)*g/density_0
+            auxp            = drho_dx*mesh%helem(nlz,elem)*g/density_0
             pgf_x(nlz,elem) = int_dp_dx(1) + auxp*0.5_WP
             int_dp_dx(1)    = int_dp_dx(1) + auxp
 
             !___________________________________________________________________
             ! meridional gradients
-            drho_dx         = sum(gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
+            drho_dx         = sum(mesh%gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
 
             ! cavity-ocean interface pressure boundary condition
-            auxp            = drho_dx*(-zbar_e_srf(elem))*g/density_0
+            auxp            = drho_dx*(-mesh%zbar_e_srf(elem))*g/density_0
             int_dp_dx(2)    = int_dp_dx(2) + auxp
 
-            auxp            = drho_dx*helem(nlz,elem)*g/density_0
+            auxp            = drho_dx*mesh%helem(nlz,elem)*g/density_0
             pgf_y(nlz,elem) = int_dp_dx(2) + auxp*0.5_WP
             int_dp_dx(2)    = int_dp_dx(2) + auxp
         endif
@@ -1552,14 +1499,14 @@ subroutine pressure_force_4_linfs_cubicspline(partit, mesh)
             ! - g/rho*int_z^eta( drho/dx|_s - drho/dz'*dz'/dx|_s )*dz'
             ! --> in case linfs: dz_dx == 0.0
             ! zonal gradients
-            drho_dx         = sum(gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
-            auxp            = drho_dx*helem(nlz,elem)*g/density_0
+            drho_dx         = sum(mesh%gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
+            auxp            = drho_dx*mesh%helem(nlz,elem)*g/density_0
             pgf_x(nlz,elem) = int_dp_dx(1) + auxp*0.5_WP
             int_dp_dx(1)    = int_dp_dx(1) + auxp
 
             ! meridional gradients
-            drho_dx         = sum(gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
-            auxp            = drho_dx*helem(nlz,elem)*g/density_0
+            drho_dx         = sum(mesh%gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
+            auxp            = drho_dx*mesh%helem(nlz,elem)*g/density_0
             pgf_y(nlz,elem) = int_dp_dx(2) + auxp*0.5_WP
             int_dp_dx(2)    = int_dp_dx(2) + auxp
 
@@ -1579,7 +1526,7 @@ subroutine pressure_force_4_linfs_cubicspline(partit, mesh)
             nlc=nln(ni)-1
             !!PS do dd=1,nln(ni)
             do dd=uln(ni),nln(ni)
-                if (Z_3d_n(dd,elnodes(ni))<=Z_n(nlz)) then
+                if (mesh%Z_3d_n(dd,elnodes(ni))<=Z_n(nlz)) then
                     nlc = dd-1
                     if (dd==1) nlc=1
                     exit
@@ -1605,7 +1552,7 @@ subroutine pressure_force_4_linfs_cubicspline(partit, mesh)
             ! we are at the bottom
             s_ind(4)=nlc+1
 
-            s_z    = Z_3d_n(s_ind,node)
+            s_z    = mesh%Z_3d_n(s_ind,node)
             s_dens = density_m_rho0(s_ind,node)
             s_H    = s_z(3)-s_z(2)
             aux1   = (s_dens(3)-s_dens(2))/s_H
@@ -1633,14 +1580,14 @@ subroutine pressure_force_4_linfs_cubicspline(partit, mesh)
         end do ! --> do ni=1,3
 
         ! zonal gradients
-        drho_dx         = sum(gradient_sca(1:3,elem)*interp_n_dens)
-        auxp            = drho_dx*helem(nlz,elem)*g/density_0
+        drho_dx         = sum(mesh%gradient_sca(1:3,elem)*interp_n_dens)
+        auxp            = drho_dx*mesh%helem(nlz,elem)*g/density_0
         pgf_x(nlz,elem) = int_dp_dx(1) + auxp*0.5_WP
         int_dp_dx(1)    = int_dp_dx(1) + auxp
 
         ! meridional gradients
-        drho_dx         = sum(gradient_sca(4:6,elem)*interp_n_dens)
-        auxp            = drho_dx*helem(nlz,elem)*g/density_0
+        drho_dx         = sum(mesh%gradient_sca(4:6,elem)*interp_n_dens)
+        auxp            = drho_dx*mesh%helem(nlz,elem)*g/density_0
         pgf_y(nlz,elem) = int_dp_dx(2) + auxp*0.5_WP
         int_dp_dx(2)    = int_dp_dx(2) + auxp
 
@@ -1655,12 +1602,6 @@ end subroutine pressure_force_4_linfs_cubicspline
 ! calculate pressure gradient force for linfs in case cavities are used with
 ! surface partial cells or bottom partial cells
 subroutine pressure_force_4_linfs_cavity(partit, mesh)
-    use o_PARAM
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use o_ARRAYS
-    use g_config
     implicit none
     type(t_mesh),   intent(in) ,    target :: mesh
     type(t_partit), intent(inout),  target :: partit
@@ -1669,45 +1610,41 @@ subroutine pressure_force_4_linfs_cavity(partit, mesh)
     real(kind=WP)                          :: dx10(3), dx20(3), dx21(3), df10(3), df21(3), drho_dz(3)
     real(kind=WP)                          :: zbar_n(mesh%nl), z_n(mesh%nl-1)
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
     !___________________________________________________________________________
     ! loop over triangular elemments
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, elnodes, nle, ule, nlz, idx, ni, int_dp_dx, drho_dx, dz_dx, aux_sum, &
 !$OMP                                  dx10, dx20, dx21, df10, df21, drho_dz,  zbar_n, z_n                        )
 !$OMP DO
-    do elem=1, myDim_elem2D
+    do elem=1, partit%myDim_elem2D
         !_______________________________________________________________________
         ! number of levels at elem
-        nle=nlevels(elem)-1
-        ule=ulevels(elem)
+        nle=mesh%nlevels(elem)-1
+        ule=mesh%ulevels(elem)
 
         !_______________________________________________________________________
         ! node indices of elem
-        elnodes = elem2D_nodes(:,elem)
+        elnodes = mesh%elem2D_nodes(:,elem)
 
         !_______________________________________________________________________
         ! calculate mid depth element level --> Z_e
         ! nle...number of mid-depth levels at elem
         zbar_n       = 0.0_WP
         Z_n          = 0.0_WP
-        zbar_n(nle+1)= zbar_e_bot(elem)
-        Z_n(nle)     = zbar_n(nle+1) + helem(nle,elem)*0.5_WP
+        zbar_n(nle+1)= mesh%zbar_e_bot(elem)
+        Z_n(nle)     = zbar_n(nle+1) + mesh%helem(nle,elem)*0.5_WP
         do nlz=nle,ule+1,-1
-            zbar_n(nlz) = zbar_n(nlz+1) + helem(nlz,elem)
-            Z_n(nlz-1)  = zbar_n(nlz)   + helem(nlz-1,elem)*0.5_WP
+            zbar_n(nlz) = zbar_n(nlz+1) + mesh%helem(nlz,elem)
+            Z_n(nlz-1)  = zbar_n(nlz)   + mesh%helem(nlz-1,elem)*0.5_WP
         end do
-        zbar_n(ule) = zbar_n(ule+1) + helem(ule,elem)
+        zbar_n(ule) = zbar_n(ule+1) + mesh%helem(ule,elem)
 
         !_______________________________________________________________________
         ! calculate pressure gradient for surface layer
         nlz=ule
         if (ule==1) then
-            pgf_x(nlz,elem) = sum(gradient_sca(1:3,elem)*hpressure(nlz,elnodes)/density_0)
-            pgf_y(nlz,elem) = sum(gradient_sca(4:6,elem)*hpressure(nlz,elnodes)/density_0)
+            pgf_x(nlz,elem) = sum(mesh%gradient_sca(1:3,elem)*hpressure(nlz,elnodes)/density_0)
+            pgf_y(nlz,elem) = sum(mesh%gradient_sca(4:6,elem)*hpressure(nlz,elnodes)/density_0)
         else
             !___________________________________________________________________
             ! compute vertical density gradient
@@ -1732,55 +1669,55 @@ subroutine pressure_force_4_linfs_cavity(partit, mesh)
             !
             nlz = ule
             idx = (/1, 1, 1/)*nlz
-            idx = idx - ulevels_nod2D(elnodes)
+            idx = idx - mesh%ulevels_nod2D(elnodes)
             do ni=1,3
                 if (idx(ni)==0) then
                     ! elemental surface index nlz ist also surface index of vertice ni
                     !_______________________________________________________________
                     ! interpolation coefficients
-                    dx10(ni)   = Z_3d_n(nlz+1,elnodes(ni))-Z_3d_n(nlz  ,elnodes(ni))
-                    dx21(ni)   = Z_3d_n(nlz+2,elnodes(ni))-Z_3d_n(nlz+1,elnodes(ni))
-                    dx20(ni)   = Z_3d_n(nlz+2,elnodes(ni))-Z_3d_n(nlz  ,elnodes(ni))
+                    dx10(ni)   = mesh%Z_3d_n(nlz+1,elnodes(ni))-mesh%Z_3d_n(nlz  ,elnodes(ni))
+                    dx21(ni)   = mesh%Z_3d_n(nlz+2,elnodes(ni))-mesh%Z_3d_n(nlz+1,elnodes(ni))
+                    dx20(ni)   = mesh%Z_3d_n(nlz+2,elnodes(ni))-mesh%Z_3d_n(nlz  ,elnodes(ni))
 
                     df10(ni)   = density_m_rho0(nlz+1,elnodes(ni))-density_m_rho0(nlz  ,elnodes(ni))
                     df21(ni)   = density_m_rho0(nlz+2,elnodes(ni))-density_m_rho0(nlz+1,elnodes(ni))
                     !_______________________________________________________________
                     ! compute vertical density gradient
                     drho_dz(ni)= df10(ni)/dx10(ni) + (dx10(ni)*df21(ni)-dx21(ni)*df10(ni))/(dx20(ni)*dx21(ni)*dx10(ni))&
-                                *((Z_n(nlz)-Z_3d_n(nlz+1,elnodes(ni))) + &
-                                (Z_n(nlz)-Z_3d_n(nlz  ,elnodes(ni))))
+                                *((Z_n(nlz)-mesh%Z_3d_n(nlz+1,elnodes(ni))) + &
+                                (Z_n(nlz)-mesh%Z_3d_n(nlz  ,elnodes(ni))))
                 else
                     ! elemental surface index nlz ist deeper than surface index of vertices ni
                     !_______________________________________________________________
                     ! interpolation coefficients
-                    dx10(ni)   = Z_3d_n(nlz  ,elnodes(ni))-Z_3d_n(nlz-1,elnodes(ni))
-                    dx21(ni)   = Z_3d_n(nlz+1,elnodes(ni))-Z_3d_n(nlz  ,elnodes(ni))
-                    dx20(ni)   = Z_3d_n(nlz+1,elnodes(ni))-Z_3d_n(nlz-1,elnodes(ni))
+                    dx10(ni)   = mesh%Z_3d_n(nlz  ,elnodes(ni))-mesh%Z_3d_n(nlz-1,elnodes(ni))
+                    dx21(ni)   = mesh%Z_3d_n(nlz+1,elnodes(ni))-mesh%Z_3d_n(nlz  ,elnodes(ni))
+                    dx20(ni)   = mesh%Z_3d_n(nlz+1,elnodes(ni))-mesh%Z_3d_n(nlz-1,elnodes(ni))
 
                     df10(ni)   = density_m_rho0(nlz  ,elnodes(ni))-density_m_rho0(nlz-1,elnodes(ni))
                     df21(ni)   = density_m_rho0(nlz+1,elnodes(ni))-density_m_rho0(nlz  ,elnodes(ni))
                     !_______________________________________________________________
                     ! compute vertical density gradient
                     drho_dz(ni)= df10(ni)/dx10(ni) + (dx10(ni)*df21(ni)-dx21(ni)*df10(ni))/(dx20(ni)*dx21(ni)*dx10(ni))&
-                                *((Z_n(nlz)-Z_3d_n(nlz  ,elnodes(ni))) + &
-                                (Z_n(nlz)-Z_3d_n(nlz-1,elnodes(ni))))
+                                *((Z_n(nlz)-mesh%Z_3d_n(nlz  ,elnodes(ni))) + &
+                                (Z_n(nlz)-mesh%Z_3d_n(nlz-1,elnodes(ni))))
                 end if
             end do
 
             !_______________________________________________________________________
             ! -->...-g/rho*int_z^eta( drho/dx|_s - drho/dz'*dz'/dx|_s )*dz'
             ! zonal gradients
-            drho_dx         = sum(gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
-            dz_dx           = sum(gradient_sca(1:3,elem)*Z_3d_n(nlz,elnodes))
-            aux_sum         = (drho_dx-sum(drho_dz)/3.0_WP*dz_dx)*helem(nlz,elem)*g/density_0
+            drho_dx         = sum(mesh%gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
+            dz_dx           = sum(mesh%gradient_sca(1:3,elem)*mesh%Z_3d_n(nlz,elnodes))
+            aux_sum         = (drho_dx-sum(drho_dz)/3.0_WP*dz_dx)*mesh%helem(nlz,elem)*g/density_0
             pgf_x(nlz,elem) = aux_sum*0.5_WP
             int_dp_dx(1)    = aux_sum
 
             !_______________________________________________________________________
             ! meridional gradients
-            drho_dx         = sum(gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
-            dz_dx           = sum(gradient_sca(4:6,elem)*Z_3d_n(nlz,elnodes))
-            aux_sum         = (drho_dx-sum(drho_dz)/3.0_WP*dz_dx)*helem(nlz,elem)*g/density_0
+            drho_dx         = sum(mesh%gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
+            dz_dx           = sum(mesh%gradient_sca(4:6,elem)*mesh%Z_3d_n(nlz,elnodes))
+            aux_sum         = (drho_dx-sum(drho_dz)/3.0_WP*dz_dx)*mesh%helem(nlz,elem)*g/density_0
             pgf_y(nlz,elem) = aux_sum*0.5_WP
             int_dp_dx(2)    = aux_sum
         end if
@@ -1788,24 +1725,24 @@ subroutine pressure_force_4_linfs_cavity(partit, mesh)
         !_______________________________________________________________________
         ! calculate pressure gradient for the ocean bulk based on pressure
         do nlz=ule+1,nle-1
-            pgf_x(nlz,elem) = sum(gradient_sca(1:3,elem)*hpressure(nlz,elnodes)/density_0)
-            pgf_y(nlz,elem) = sum(gradient_sca(4:6,elem)*hpressure(nlz,elnodes)/density_0)
+            pgf_x(nlz,elem) = sum(mesh%gradient_sca(1:3,elem)*hpressure(nlz,elnodes)/density_0)
+            pgf_y(nlz,elem) = sum(mesh%gradient_sca(4:6,elem)*hpressure(nlz,elnodes)/density_0)
         end do
 
         !_______________________________________________________________________
         ! calculate pressure gradient for the ocean bottom
         nlz=nle
         if (.not. use_partial_cell) then
-            pgf_x(nlz,elem) = sum(gradient_sca(1:3,elem)*hpressure(nlz,elnodes)/density_0)
-            pgf_y(nlz,elem) = sum(gradient_sca(4:6,elem)*hpressure(nlz,elnodes)/density_0)
+            pgf_x(nlz,elem) = sum(mesh%gradient_sca(1:3,elem)*hpressure(nlz,elnodes)/density_0)
+            pgf_y(nlz,elem) = sum(mesh%gradient_sca(4:6,elem)*hpressure(nlz,elnodes)/density_0)
         else
             !___________________________________________________________________
             ! (1) compute pgf_xy onto zbar_n(nle-1) --> needed for vertical
             ! integration of bottom density gradient from zbar_n(nle-1) until Z_n(nle)
-            int_dp_dx(1) = sum(gradient_sca(1:3,elem)*(hpressure(nlz-1,elnodes) &
-                           + 0.5_WP*g*(density_m_rho0(nlz-1,elnodes)*hnode(nlz-1,elnodes)))/density_0)
-            int_dp_dx(2) = sum(gradient_sca(4:6,elem)*(hpressure(nlz-1,elnodes) &
-                           + 0.5_WP*g*(density_m_rho0(nlz-1,elnodes)*hnode(nlz-1,elnodes)))/density_0)
+            int_dp_dx(1) = sum(mesh%gradient_sca(1:3,elem)*(hpressure(nlz-1,elnodes) &
+                           + 0.5_WP*g*(density_m_rho0(nlz-1,elnodes)*mesh%hnode(nlz-1,elnodes)))/density_0)
+            int_dp_dx(2) = sum(mesh%gradient_sca(4:6,elem)*(hpressure(nlz-1,elnodes) &
+                           + 0.5_WP*g*(density_m_rho0(nlz-1,elnodes)*mesh%hnode(nlz-1,elnodes)))/density_0)
 
             !___________________________________________________________________
             ! vertical gradient --> with average density and average mid-depth level
@@ -1814,54 +1751,54 @@ subroutine pressure_force_4_linfs_cavity(partit, mesh)
             !         - [(x1-x0)*(f2-f1)-(x2-x1)*(f1-f0)]/[(x2-x1)*(x1-x0)*(x2-x0)]
             !           *[(x-x1)+(x-x0)]
             idx = (/1, 1, 1/)*nlz
-            idx = nlevels_nod2D(elnodes)-1 - idx
+            idx = mesh%nlevels_nod2D(elnodes)-1 - idx
             do ni=1,3
                 if (idx(ni)==0) then
                     ! elemental bottom index nlz ist also bottom index of vertice ni
                     !_______________________________________________________________
                     ! interpolation coefficients
-                    dx10(ni)   = Z_3d_n(nlz-1,elnodes(ni))-Z_3d_n(nlz-2,elnodes(ni))
-                    dx21(ni)   = Z_3d_n(nlz  ,elnodes(ni))-Z_3d_n(nlz-1,elnodes(ni))
-                    dx20(ni)   = Z_3d_n(nlz  ,elnodes(ni))-Z_3d_n(nlz-2,elnodes(ni))
+                    dx10(ni)   = mesh%Z_3d_n(nlz-1,elnodes(ni))-mesh%Z_3d_n(nlz-2,elnodes(ni))
+                    dx21(ni)   = mesh%Z_3d_n(nlz  ,elnodes(ni))-mesh%Z_3d_n(nlz-1,elnodes(ni))
+                    dx20(ni)   = mesh%Z_3d_n(nlz  ,elnodes(ni))-mesh%Z_3d_n(nlz-2,elnodes(ni))
 
                     df10(ni)   = density_m_rho0(nlz-1,elnodes(ni))-density_m_rho0(nlz-2,elnodes(ni))
                     df21(ni)   = density_m_rho0(nlz  ,elnodes(ni))-density_m_rho0(nlz-1,elnodes(ni))
                     !_______________________________________________________________
                     ! compute vertical density gradient
                     drho_dz(ni)= df10(ni)/dx10(ni) + (dx10(ni)*df21(ni)-dx21(ni)*df10(ni))/(dx20(ni)*dx21(ni)*dx10(ni))&
-                                *((Z_n(nlz)-Z_3d_n(nlz-1,elnodes(ni))) + &
-                                (Z_n(nlz)-Z_3d_n(nlz-2,elnodes(ni))))
+                                *((Z_n(nlz)-mesh%Z_3d_n(nlz-1,elnodes(ni))) + &
+                                (Z_n(nlz)-mesh%Z_3d_n(nlz-2,elnodes(ni))))
                 else
                     ! elemental bottom index nlz ist shallower than bottom index of vertice ni
                     !_______________________________________________________________
                     ! interpolation coefficients
-                    dx10(ni)   = Z_3d_n(nlz  ,elnodes(ni))-Z_3d_n(nlz-1,elnodes(ni))
-                    dx21(ni)   = Z_3d_n(nlz+1,elnodes(ni))-Z_3d_n(nlz  ,elnodes(ni))
-                    dx20(ni)   = Z_3d_n(nlz+1,elnodes(ni))-Z_3d_n(nlz-1,elnodes(ni))
+                    dx10(ni)   = mesh%Z_3d_n(nlz  ,elnodes(ni))-mesh%Z_3d_n(nlz-1,elnodes(ni))
+                    dx21(ni)   = mesh%Z_3d_n(nlz+1,elnodes(ni))-mesh%Z_3d_n(nlz  ,elnodes(ni))
+                    dx20(ni)   = mesh%Z_3d_n(nlz+1,elnodes(ni))-mesh%Z_3d_n(nlz-1,elnodes(ni))
 
                     df10(ni)   = density_m_rho0(nlz  ,elnodes(ni))-density_m_rho0(nlz-1,elnodes(ni))
                     df21(ni)   = density_m_rho0(nlz+1,elnodes(ni))-density_m_rho0(nlz  ,elnodes(ni))
                     !_______________________________________________________________
                     ! compute vertical density gradient
                     drho_dz(ni)= df10(ni)/dx10(ni) + (dx10(ni)*df21(ni)-dx21(ni)*df10(ni))/(dx20(ni)*dx21(ni)*dx10(ni))&
-                                *((Z_n(nlz)-Z_3d_n(nlz  ,elnodes(ni))) + &
-                                (Z_n(nlz)-Z_3d_n(nlz-1,elnodes(ni))))
+                                *((Z_n(nlz)-mesh%Z_3d_n(nlz  ,elnodes(ni))) + &
+                                (Z_n(nlz)-mesh%Z_3d_n(nlz-1,elnodes(ni))))
                 end if
             end do
 
             !___________________________________________________________________
             ! -->...-g/rho*int_z^eta( drho/dx|_s - drho/dz'*dz'/dx|_s )*dz'
             ! zonal gradients
-            drho_dx         = sum(gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
-            dz_dx           = sum(gradient_sca(1:3,elem)*Z_3d_n(nlz,elnodes))
-            aux_sum         = (drho_dx-sum(drho_dz)/3.0_WP*dz_dx)*helem(nlz,elem)*g/density_0
+            drho_dx         = sum(mesh%gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
+            dz_dx           = sum(mesh%gradient_sca(1:3,elem)*mesh%Z_3d_n(nlz,elnodes))
+            aux_sum         = (drho_dx-sum(drho_dz)/3.0_WP*dz_dx)*mesh%helem(nlz,elem)*g/density_0
             pgf_x(nlz,elem) = int_dp_dx(1) + aux_sum*0.5_WP
 
             !_______________________________________________________________________
             ! meridional gradients
-            drho_dx         = sum(gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
-            dz_dx           = sum(gradient_sca(4:6,elem)*Z_3d_n(nlz,elnodes))
-            aux_sum         = (drho_dx-sum(drho_dz)/3.0_WP*dz_dx)*helem(nlz,elem)*g/density_0
+            drho_dx         = sum(mesh%gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
+            dz_dx           = sum(mesh%gradient_sca(4:6,elem)*mesh%Z_3d_n(nlz,elnodes))
+            aux_sum         = (drho_dx-sum(drho_dz)/3.0_WP*dz_dx)*mesh%helem(nlz,elem)*g/density_0
             pgf_y(nlz,elem) = int_dp_dx(2) + aux_sum*0.5_WP
         end if
 
@@ -1875,18 +1812,29 @@ end subroutine pressure_force_4_linfs_cavity
 !===============================================================================
 ! Calculate pressure gradient force (PGF) for full free surface case zlevel and zstar
 subroutine pressure_force_4_zxxxx(tracers, partit, mesh)
-    use mod_mesh
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use mod_tracer
-    use g_config
-    use pressure_force_4_zxxxx_shchepetkin_interface
-    use pressure_force_4_zxxxx_cubicspline_interface
-    use pressure_force_4_zxxxx_easypgf_interface
     implicit none
     type(t_mesh),   intent(in) ,    target :: mesh
     type(t_partit), intent(inout),  target :: partit
     type(t_tracer), intent(in),     target :: tracers
+#ifdef ENABLE_OPENACC
+    logical, save :: thin_elements_checked = .false., no_thin_elements = .false.
+    integer       :: elem
+    ! the device version merges the surface and bottom treatment of the host version,
+    ! which differ for elements with a single layer: those stay on the host
+    if (.not. thin_elements_checked) then
+        no_thin_elements = .true.
+        do elem=1, partit%myDim_elem2D
+            if (mesh%nlevels(elem)-1 <= mesh%ulevels(elem)) no_thin_elements = .false.
+        end do
+        thin_elements_checked = .true.
+    end if
+    ! on the device when the density of this step is there
+    pgf_on_device = (trim(which_pgf)=='shchepetkin') .and. pbv_on_device .and. no_thin_elements
+    if (pgf_on_device) then
+        call pressure_force_4_zxxxx_shchepetkin_acc(partit, mesh)
+        return
+    end if
+#endif
     !___________________________________________________________________________
     if     (trim(which_pgf)=='shchepetkin') then
         call pressure_force_4_zxxxx_shchepetkin(partit, mesh)
@@ -1902,7 +1850,7 @@ subroutine pressure_force_4_zxxxx(tracers, partit, mesh)
         write(*,*) '            see in namelist.oce --> which_pgf =         '
         write(*,*) '            shchepetkin, cubicspline, easypgf                   '
         write(*,*) '________________________________________________________'
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     end if
 end subroutine pressure_force_4_zxxxx
 !
@@ -1915,12 +1863,6 @@ end subroutine pressure_force_4_zxxxx
 ! First coded by Q. Wang for FESOM1.4, adapted by P. Scholz for FESOM2.0
 ! 26.04.2018
 subroutine pressure_force_4_zxxxx_cubicspline(partit, mesh)
-    use o_PARAM
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use o_ARRAYS
-    use g_config
     implicit none
     type(t_mesh),   intent(in) ,    target :: mesh
     type(t_partit), intent(inout),  target :: partit
@@ -1931,42 +1873,38 @@ subroutine pressure_force_4_zxxxx_cubicspline(partit, mesh)
     real(kind=WP)                          :: s_z(4), s_dens(4), s_H, aux1, aux2, aux(2), s_dup, s_dlo
     real(kind=WP)                          :: a, b, c, d, dz, rho_n(3), rhograd_e(2), p_grad(2)
     real(kind=WP)                          :: zbar_n(mesh%nl), z_n(mesh%nl-1)
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     !___________________________________________________________________________
     ! loop over triangular elemments
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, elnodes, nle, ule, nln, uln, nlz, nlc, dd, ni, node, dens_ind, kk, ze, s_ind, s_z, s_dens, s_H, &
 !$OMP                                  aux1, aux2, aux, s_dup, s_dlo, a, b, c, d, dz, rho_n, rhograd_e, p_grad, zbar_n, z_n                  )
 !$OMP DO
-    do elem=1, myDim_elem2D
-        ule          = ulevels(elem)
-        nle          = nlevels(elem)-1
+    do elem=1, partit%myDim_elem2D
+        ule          = mesh%ulevels(elem)
+        nle          = mesh%nlevels(elem)-1
         !_______________________________________________________________________
         ! calculate mid depth element level --> Z_e
         ! nle...number of mid-depth levels at elem
         zbar_n       = 0.0_WP
         Z_n          = 0.0_WP
-        zbar_n(nle+1)= zbar_e_bot(elem)
-        Z_n(nle)     = zbar_n(nle+1) + helem(nle,elem)/2.0_WP
+        zbar_n(nle+1)= mesh%zbar_e_bot(elem)
+        Z_n(nle)     = zbar_n(nle+1) + mesh%helem(nle,elem)/2.0_WP
         !!PS do nlz=nle,2,-1
         do nlz=nle,ule+1,-1
-            zbar_n(nlz) = zbar_n(nlz+1) + helem(nlz,elem)
-            Z_n(nlz-1)  = zbar_n(nlz)   + helem(nlz-1,elem)/2.0_WP
+            zbar_n(nlz) = zbar_n(nlz+1) + mesh%helem(nlz,elem)
+            Z_n(nlz-1)  = zbar_n(nlz)   + mesh%helem(nlz-1,elem)/2.0_WP
         end do
         !!PS zbar_n(1) = zbar_n(2) + helem(1,elem)
-        zbar_n(ule) = zbar_n(ule+1) + helem(ule,elem)
+        zbar_n(ule) = zbar_n(ule+1) + mesh%helem(ule,elem)
 
         !_______________________________________________________________________
         ! node indices of elem
-        elnodes = elem2D_nodes(:,elem)
+        elnodes = mesh%elem2D_nodes(:,elem)
 
         !_______________________________________________________________________
         ! nln...number of mid depth levels at each node that corresponds to
         ! element elem
-        nln=nlevels_nod2D(elnodes)-1
-        uln=ulevels_nod2D(elnodes)
+        nln=mesh%nlevels_nod2D(elnodes)-1
+        uln=mesh%ulevels_nod2D(elnodes)
 
         !_______________________________________________________________________
         ! loop over mid-depth levels at element elem
@@ -1986,7 +1924,7 @@ subroutine pressure_force_4_zxxxx_cubicspline(partit, mesh)
                 nlc=nln(ni)-1
                 !!PS do dd=1,nln(ni)
                 do dd=uln(ni),nln(ni)
-                    if (Z_3d_n(dd,elnodes(ni))<=Z_n(nlz)) then
+                    if (mesh%Z_3d_n(dd,elnodes(ni))<=Z_n(nlz)) then
                         nlc = dd-1
                         if (dd==1) nlc=1
                         exit
@@ -2012,7 +1950,7 @@ subroutine pressure_force_4_zxxxx_cubicspline(partit, mesh)
                     s_ind(1)=uln(ni)
 
                     !___________________________________________________________
-                    s_z    = Z_3d_n(s_ind,node)
+                    s_z    = mesh%Z_3d_n(s_ind,node)
                     s_dens = density_m_rho0(s_ind,node)
                     s_H    = s_z(3)-s_z(2)
                     aux1   = (s_dens(3)-s_dens(2))/s_H
@@ -2028,7 +1966,7 @@ subroutine pressure_force_4_zxxxx_cubicspline(partit, mesh)
                     s_ind(4)=nlc+1
 
                     !___________________________________________________________
-                    s_z    = Z_3d_n(s_ind,node)
+                    s_z    = mesh%Z_3d_n(s_ind,node)
                     s_dens = density_m_rho0(s_ind,node)
                     s_H    = s_z(3)-s_z(2)
                     aux1   = (s_dens(3)-s_dens(2))/s_H
@@ -2041,7 +1979,7 @@ subroutine pressure_force_4_zxxxx_cubicspline(partit, mesh)
 
                 else ! bulk, subsurface/above bottom case
                     !___________________________________________________________
-                    s_z    = Z_3d_n(s_ind,node)
+                    s_z    = mesh%Z_3d_n(s_ind,node)
                     s_dens = density_m_rho0(s_ind,node)
                     s_H    = s_z(3)-s_z(2)
                     aux1   = (s_dens(3)-s_dens(2))/s_H
@@ -2072,13 +2010,13 @@ subroutine pressure_force_4_zxxxx_cubicspline(partit, mesh)
 
             !___________________________________________________________________
             ! calculate element wise density gradient
-            rhograd_e(1) = sum(gradient_sca(1:3,elem)*rho_n)
-            rhograd_e(2) = sum(gradient_sca(4:6,elem)*rho_n)
+            rhograd_e(1) = sum(mesh%gradient_sca(1:3,elem)*rho_n)
+            rhograd_e(2) = sum(mesh%gradient_sca(4:6,elem)*rho_n)
 
             !___________________________________________________________________
             ! calculate element wise pressure gradient force
             ! helem ... here because of vertical integral
-            aux             = g*helem(nlz,elem)*rhograd_e/density_0
+            aux             = g*mesh%helem(nlz,elem)*rhograd_e/density_0
 
             ! *0.5 because pgf_xy is calculated at mid depth levels but at
             ! this point p_grad is integrated pressure gradient force until
@@ -2106,14 +2044,6 @@ end subroutine pressure_force_4_zxxxx_cubicspline
 ! calculate PGF for linfs with partiell cell on/off
 ! First coded by P. Scholz for FESOM2.0, 08.02.2019
 subroutine pressure_force_4_zxxxx_shchepetkin(partit, mesh)
-    use o_PARAM
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use o_ARRAYS
-    use g_config
-    use densityJM_components_interface
-    use density_linear_interface
     implicit none
     type(t_mesh),   intent(in) ,    target :: mesh
     type(t_partit), intent(inout),  target :: partit
@@ -2122,37 +2052,33 @@ subroutine pressure_force_4_zxxxx_shchepetkin(partit, mesh)
     real(kind=WP)                          :: dx10(3), dx20(3), dx21(3), df10(3), df21(3)
     real(kind=WP)                          :: rhopot(3), bulk_0(3), bulk_pz(3), bulk_pz2(3)
     real(kind=WP)                          :: zbar_n(mesh%nl), z_n(mesh%nl-1)
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
     !___________________________________________________________________________
     ! loop over triangular elemments
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, elnodes, nle, ule, nlz, nln, ni, nlc, nlce, idx, int_dp_dx, drho_dx, drho_dy, drho_dz, dz_dx, dz_dy, aux_sum, &
 !$OMP                                  dx10, dx20, dx21, df10, df21, rhopot, bulk_0, bulk_pz, bulk_pz2, zbar_n, z_n)
 !$OMP DO
-    do elem=1, myDim_elem2D
+    do elem=1, partit%myDim_elem2D
         !_______________________________________________________________________
         ! nle...number of mid-depth levels at elem
-        nle          = nlevels(elem)-1
-        ule          = ulevels(elem)
+        nle          = mesh%nlevels(elem)-1
+        ule          = mesh%ulevels(elem)
 
         ! node indices of elem
-        elnodes      = elem2D_nodes(:,elem)
+        elnodes      = mesh%elem2D_nodes(:,elem)
 
         !_______________________________________________________________________
         ! calculate mid depth element level --> Z_e
         ! nle...number of mid-depth levels at elem
         zbar_n       = 0.0_WP
         Z_n          = 0.0_WP
-        zbar_n(nle+1)= zbar_e_bot(elem)
-        Z_n(nle)     = zbar_n(nle+1) + helem(nle,elem)*0.5_WP
+        zbar_n(nle+1)= mesh%zbar_e_bot(elem)
+        Z_n(nle)     = zbar_n(nle+1) + mesh%helem(nle,elem)*0.5_WP
         do nlz=nle,ule+1,-1
-            zbar_n(nlz) = zbar_n(nlz+1) + helem(nlz,elem)
-            Z_n(nlz-1)  = zbar_n(nlz)   + helem(nlz-1,elem)*0.5_WP
+            zbar_n(nlz) = zbar_n(nlz+1) + mesh%helem(nlz,elem)
+            Z_n(nlz-1)  = zbar_n(nlz)   + mesh%helem(nlz-1,elem)*0.5_WP
         end do
-        zbar_n(ule) = zbar_n(ule+1) + helem(ule,elem)
+        zbar_n(ule) = zbar_n(ule+1) + mesh%helem(ule,elem)
 
         !_______________________________________________________________________
         ! Calculate pressure gradient force (PGF) based on "Shchepetkin
@@ -2194,55 +2120,55 @@ subroutine pressure_force_4_zxxxx_shchepetkin(partit, mesh)
         ! calculate pressure gradient for surface layer
         nlz = ule
         idx = (/1, 1, 1/)*nlz
-        idx = idx - ulevels_nod2D(elnodes)
+        idx = idx - mesh%ulevels_nod2D(elnodes)
         do ni=1,3
             if (idx(ni)==0) then
                 ! elemental surface index nlz ist also surface index of vertice ni
                 !_______________________________________________________________
                 ! interpolation coefficients
-                dx10(ni)   = Z_3d_n(nlz+1,elnodes(ni))-Z_3d_n(nlz  ,elnodes(ni))
-                dx21(ni)   = Z_3d_n(nlz+2,elnodes(ni))-Z_3d_n(nlz+1,elnodes(ni))
-                dx20(ni)   = Z_3d_n(nlz+2,elnodes(ni))-Z_3d_n(nlz  ,elnodes(ni))
+                dx10(ni)   = mesh%Z_3d_n(nlz+1,elnodes(ni))-mesh%Z_3d_n(nlz  ,elnodes(ni))
+                dx21(ni)   = mesh%Z_3d_n(nlz+2,elnodes(ni))-mesh%Z_3d_n(nlz+1,elnodes(ni))
+                dx20(ni)   = mesh%Z_3d_n(nlz+2,elnodes(ni))-mesh%Z_3d_n(nlz  ,elnodes(ni))
 
                 df10(ni)   = density_m_rho0(nlz+1,elnodes(ni))-density_m_rho0(nlz  ,elnodes(ni))
                 df21(ni)   = density_m_rho0(nlz+2,elnodes(ni))-density_m_rho0(nlz+1,elnodes(ni))
                 !_______________________________________________________________
                 ! compute vertical density gradient
                 drho_dz(ni)= df10(ni)/dx10(ni) + (dx10(ni)*df21(ni)-dx21(ni)*df10(ni))/(dx20(ni)*dx21(ni)*dx10(ni))&
-                             *((Z_n(nlz)-Z_3d_n(nlz+1,elnodes(ni))) + &
-                               (Z_n(nlz)-Z_3d_n(nlz  ,elnodes(ni))))
+                             *((Z_n(nlz)-mesh%Z_3d_n(nlz+1,elnodes(ni))) + &
+                               (Z_n(nlz)-mesh%Z_3d_n(nlz  ,elnodes(ni))))
             else
                 ! elemental surface index nlz ist deeper than surface index of vertices ni
                 !_______________________________________________________________
                 ! interpolation coefficients
-                dx10(ni)   = Z_3d_n(nlz  ,elnodes(ni))-Z_3d_n(nlz-1,elnodes(ni))
-                dx21(ni)   = Z_3d_n(nlz+1,elnodes(ni))-Z_3d_n(nlz  ,elnodes(ni))
-                dx20(ni)   = Z_3d_n(nlz+1,elnodes(ni))-Z_3d_n(nlz-1,elnodes(ni))
+                dx10(ni)   = mesh%Z_3d_n(nlz  ,elnodes(ni))-mesh%Z_3d_n(nlz-1,elnodes(ni))
+                dx21(ni)   = mesh%Z_3d_n(nlz+1,elnodes(ni))-mesh%Z_3d_n(nlz  ,elnodes(ni))
+                dx20(ni)   = mesh%Z_3d_n(nlz+1,elnodes(ni))-mesh%Z_3d_n(nlz-1,elnodes(ni))
 
                 df10(ni)   = density_m_rho0(nlz  ,elnodes(ni))-density_m_rho0(nlz-1,elnodes(ni))
                 df21(ni)   = density_m_rho0(nlz+1,elnodes(ni))-density_m_rho0(nlz  ,elnodes(ni))
                 !_______________________________________________________________
                 ! compute vertical density gradient
                 drho_dz(ni)= df10(ni)/dx10(ni) + (dx10(ni)*df21(ni)-dx21(ni)*df10(ni))/(dx20(ni)*dx21(ni)*dx10(ni))&
-                             *((Z_n(nlz)-Z_3d_n(nlz  ,elnodes(ni))) + &
-                               (Z_n(nlz)-Z_3d_n(nlz-1,elnodes(ni))))
+                             *((Z_n(nlz)-mesh%Z_3d_n(nlz  ,elnodes(ni))) + &
+                               (Z_n(nlz)-mesh%Z_3d_n(nlz-1,elnodes(ni))))
             end if
         end do
 
         !_______________________________________________________________________
         ! -->...-g/rho*int_z^eta( drho/dx|_s - drho/dz'*dz'/dx|_s )*dz'
         ! zonal surface pressure gradients
-        drho_dx         = sum(gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
-        dz_dx           = sum(gradient_sca(1:3,elem)*Z_3d_n(nlz,elnodes))
-        aux_sum         = (drho_dx-sum(drho_dz)/3.0_WP*dz_dx)*helem(nlz,elem)*g/density_0
+        drho_dx         = sum(mesh%gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
+        dz_dx           = sum(mesh%gradient_sca(1:3,elem)*mesh%Z_3d_n(nlz,elnodes))
+        aux_sum         = (drho_dx-sum(drho_dz)/3.0_WP*dz_dx)*mesh%helem(nlz,elem)*g/density_0
         pgf_x(nlz,elem) = aux_sum*0.5_WP
         int_dp_dx(1)    = aux_sum
 
         !_______________________________________________________________________
         ! meridional surface pressure gradients
-        drho_dy         = sum(gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
-        dz_dy           = sum(gradient_sca(4:6,elem)*Z_3d_n(nlz,elnodes))
-        aux_sum         = (drho_dy-sum(drho_dz)/3.0_WP*dz_dy)*helem(nlz,elem)*g/density_0
+        drho_dy         = sum(mesh%gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
+        dz_dy           = sum(mesh%gradient_sca(4:6,elem)*mesh%Z_3d_n(nlz,elnodes))
+        aux_sum         = (drho_dy-sum(drho_dz)/3.0_WP*dz_dy)*mesh%helem(nlz,elem)*g/density_0
         pgf_y(nlz,elem) = aux_sum*0.5_WP
         int_dp_dx(2)    = aux_sum
 
@@ -2252,32 +2178,32 @@ subroutine pressure_force_4_zxxxx_shchepetkin(partit, mesh)
         do nlz=ule+1,nle-1
             !___________________________________________________________________
             ! compute coefficients
-            dx10            = Z_3d_n(nlz  ,elnodes)-Z_3d_n(nlz-1,elnodes)
-            dx21            = Z_3d_n(nlz+1,elnodes)-Z_3d_n(nlz  ,elnodes)
-            dx20            = Z_3d_n(nlz+1,elnodes)-Z_3d_n(nlz-1,elnodes)
+            dx10            = mesh%Z_3d_n(nlz  ,elnodes)-mesh%Z_3d_n(nlz-1,elnodes)
+            dx21            = mesh%Z_3d_n(nlz+1,elnodes)-mesh%Z_3d_n(nlz  ,elnodes)
+            dx20            = mesh%Z_3d_n(nlz+1,elnodes)-mesh%Z_3d_n(nlz-1,elnodes)
 
             df10            = density_m_rho0(nlz  ,elnodes)-density_m_rho0(nlz-1,elnodes)
             df21            = density_m_rho0(nlz+1,elnodes)-density_m_rho0(nlz  ,elnodes)
             !_______________________________________________________________
             ! compute vertical density gradient
             drho_dz         = df10/dx10 + (dx10*df21-dx21*df10)/(dx20*dx21*dx10)&
-                              *(((/1.0,1.0,1.0/)*Z_n(nlz)-Z_3d_n(nlz,elnodes)) + &
-                                ((/1.0,1.0,1.0/)*Z_n(nlz)-Z_3d_n(nlz-1,elnodes)))
+                              *(((/1.0,1.0,1.0/)*Z_n(nlz)-mesh%Z_3d_n(nlz,elnodes)) + &
+                                ((/1.0,1.0,1.0/)*Z_n(nlz)-mesh%Z_3d_n(nlz-1,elnodes)))
 
             !___________________________________________________________________
             ! -->...-g/rho*int_z^eta( drho/dx|_s - drho/dz'*dz'/dx|_s )*dz'
             ! zonal bulk pressure gradients
-            drho_dx         = sum(gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
-            dz_dx           = sum(gradient_sca(1:3,elem)*Z_3d_n(nlz,elnodes))
-            aux_sum         = (drho_dx-sum(drho_dz)/3.0_WP*dz_dx)*helem(nlz,elem)*g/density_0
+            drho_dx         = sum(mesh%gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
+            dz_dx           = sum(mesh%gradient_sca(1:3,elem)*mesh%Z_3d_n(nlz,elnodes))
+            aux_sum         = (drho_dx-sum(drho_dz)/3.0_WP*dz_dx)*mesh%helem(nlz,elem)*g/density_0
             pgf_x(nlz,elem) = int_dp_dx(1) + aux_sum*0.5_WP
             int_dp_dx(1)    = int_dp_dx(1) + aux_sum
 
             !___________________________________________________________________
             ! meridional bulk pressure gradients
-            drho_dy         = sum(gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
-            dz_dy           = sum(gradient_sca(4:6,elem)*Z_3d_n(nlz,elnodes))
-            aux_sum         = (drho_dy-sum(drho_dz)/3.0_WP*dz_dy)*helem(nlz,elem)*g/density_0
+            drho_dy         = sum(mesh%gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
+            dz_dy           = sum(mesh%gradient_sca(4:6,elem)*mesh%Z_3d_n(nlz,elnodes))
+            aux_sum         = (drho_dy-sum(drho_dz)/3.0_WP*dz_dy)*mesh%helem(nlz,elem)*g/density_0
             pgf_y(nlz,elem) = int_dp_dx(2) + aux_sum*0.5_WP
             int_dp_dx(2)    = int_dp_dx(2) + aux_sum
 
@@ -2287,60 +2213,150 @@ subroutine pressure_force_4_zxxxx_shchepetkin(partit, mesh)
         ! calculate pressure gradient for bottom layer
         nlz = nle
         idx = (/1, 1, 1/)*nlz
-        idx = nlevels_nod2D(elnodes)-1 - idx
+        idx = mesh%nlevels_nod2D(elnodes)-1 - idx
         do ni=1,3
             if (idx(ni)==0) then
                 ! elemental bottom index nlz ist also bottom index of vertice ni
                 !_______________________________________________________________
                 ! interpolation coefficients
-                dx10(ni)   = Z_3d_n(nlz-1,elnodes(ni))-Z_3d_n(nlz-2,elnodes(ni))
-                dx21(ni)   = Z_3d_n(nlz  ,elnodes(ni))-Z_3d_n(nlz-1,elnodes(ni))
-                dx20(ni)   = Z_3d_n(nlz  ,elnodes(ni))-Z_3d_n(nlz-2,elnodes(ni))
+                dx10(ni)   = mesh%Z_3d_n(nlz-1,elnodes(ni))-mesh%Z_3d_n(nlz-2,elnodes(ni))
+                dx21(ni)   = mesh%Z_3d_n(nlz  ,elnodes(ni))-mesh%Z_3d_n(nlz-1,elnodes(ni))
+                dx20(ni)   = mesh%Z_3d_n(nlz  ,elnodes(ni))-mesh%Z_3d_n(nlz-2,elnodes(ni))
 
                 df10(ni)   = density_m_rho0(nlz-1,elnodes(ni))-density_m_rho0(nlz-2,elnodes(ni))
                 df21(ni)   = density_m_rho0(nlz  ,elnodes(ni))-density_m_rho0(nlz-1,elnodes(ni))
                 !_______________________________________________________________
                 ! compute vertical density gradient
                 drho_dz(ni)= df10(ni)/dx10(ni) + (dx10(ni)*df21(ni)-dx21(ni)*df10(ni))/(dx20(ni)*dx21(ni)*dx10(ni))&
-                             *((Z_n(nlz)-Z_3d_n(nlz-1,elnodes(ni))) + &
-                               (Z_n(nlz)-Z_3d_n(nlz-2,elnodes(ni))))
+                             *((Z_n(nlz)-mesh%Z_3d_n(nlz-1,elnodes(ni))) + &
+                               (Z_n(nlz)-mesh%Z_3d_n(nlz-2,elnodes(ni))))
             else
                 ! elemental bottom index nlz ist shallower than bottom index of vertice ni
                 !_______________________________________________________________
                 ! interpolation coefficients
-                dx10(ni)   = Z_3d_n(nlz  ,elnodes(ni))-Z_3d_n(nlz-1,elnodes(ni))
-                dx21(ni)   = Z_3d_n(nlz+1,elnodes(ni))-Z_3d_n(nlz  ,elnodes(ni))
-                dx20(ni)   = Z_3d_n(nlz+1,elnodes(ni))-Z_3d_n(nlz-1,elnodes(ni))
+                dx10(ni)   = mesh%Z_3d_n(nlz  ,elnodes(ni))-mesh%Z_3d_n(nlz-1,elnodes(ni))
+                dx21(ni)   = mesh%Z_3d_n(nlz+1,elnodes(ni))-mesh%Z_3d_n(nlz  ,elnodes(ni))
+                dx20(ni)   = mesh%Z_3d_n(nlz+1,elnodes(ni))-mesh%Z_3d_n(nlz-1,elnodes(ni))
 
                 df10(ni)   = density_m_rho0(nlz  ,elnodes(ni))-density_m_rho0(nlz-1,elnodes(ni))
                 df21(ni)   = density_m_rho0(nlz+1,elnodes(ni))-density_m_rho0(nlz  ,elnodes(ni))
                 !_______________________________________________________________
                 ! compute vertical density gradient
                 drho_dz(ni)= df10(ni)/dx10(ni) + (dx10(ni)*df21(ni)-dx21(ni)*df10(ni))/(dx20(ni)*dx21(ni)*dx10(ni))&
-                             *((Z_n(nlz)-Z_3d_n(nlz  ,elnodes(ni))) + &
-                               (Z_n(nlz)-Z_3d_n(nlz-1,elnodes(ni))))
+                             *((Z_n(nlz)-mesh%Z_3d_n(nlz  ,elnodes(ni))) + &
+                               (Z_n(nlz)-mesh%Z_3d_n(nlz-1,elnodes(ni))))
             end if
         end do
 
         !_______________________________________________________________________
         ! -->...-g/rho*int_z^eta( drho/dx|_s - drho/dz'*dz'/dx|_s )*dz'
         ! zonal bottom pressure gradients
-        drho_dx         = sum(gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
-        dz_dx           = sum(gradient_sca(1:3,elem)*(Z_3d_n(nlz,elnodes)))
-        aux_sum         = (drho_dx-sum(drho_dz)/3.0_WP*dz_dx)*helem(nlz,elem)*g/density_0
+        drho_dx         = sum(mesh%gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
+        dz_dx           = sum(mesh%gradient_sca(1:3,elem)*(mesh%Z_3d_n(nlz,elnodes)))
+        aux_sum         = (drho_dx-sum(drho_dz)/3.0_WP*dz_dx)*mesh%helem(nlz,elem)*g/density_0
         pgf_x(nlz,elem) = int_dp_dx(1) + aux_sum*0.5_WP
 
         !_______________________________________________________________________
         ! meridional bottom pressure gradients
-        drho_dy         = sum(gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
-        dz_dy           = sum(gradient_sca(4:6,elem)*(Z_3d_n(nlz,elnodes)))
-        aux_sum         = (drho_dy-sum(drho_dz)/3.0_WP*dz_dy)*helem(nlz,elem)*g/density_0
+        drho_dy         = sum(mesh%gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
+        dz_dy           = sum(mesh%gradient_sca(4:6,elem)*(mesh%Z_3d_n(nlz,elnodes)))
+        aux_sum         = (drho_dy-sum(drho_dz)/3.0_WP*dz_dy)*mesh%helem(nlz,elem)*g/density_0
         pgf_y(nlz,elem) = int_dp_dx(2) + aux_sum*0.5_WP
 
     end do ! --> do elem=1, myDim_elem2D
 !$OMP END DO
 !$OMP END PARALLEL
 end subroutine pressure_force_4_zxxxx_shchepetkin
+#ifdef ENABLE_OPENACC
+!
+!
+!===============================================================================
+! pressure_force_4_zxxxx_shchepetkin on the device, one element per thread, same arithmetic; the surface,
+! interior and bottom stencils (kb, kb+1, kb+2) are written out per vertex. pgf_x/pgf_y stay on the device.
+subroutine pressure_force_4_zxxxx_shchepetkin_acc(partit, mesh)
+    implicit none
+    type(t_mesh),   intent(in) ,    target :: mesh
+    type(t_partit), intent(inout),  target :: partit
+    ! element mid-depths in a fixed-size work array (no per-thread device heap)
+    integer, parameter                     :: pgf_nl_max = 128
+    integer                                :: elem, n1, n2, n3, nle, ule, nlz, ni, nd, kb
+    real(kind=WP)                          :: int_dp_x, int_dp_y, drho_dx, drho_dy, dz_dx, dz_dy, aux_sum
+    real(kind=WP)                          :: dsum, zb, dx10, dx20, dx21, df10, df21, drz
+    real(kind=WP)                          :: Z_n(pgf_nl_max)
+
+    if (mesh%nl > pgf_nl_max) then
+        if (partit%mype==0) write(*,*) 'pressure_force_4_zxxxx_shchepetkin_acc: mesh%nl =', mesh%nl, ' > pgf_nl_max'
+        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
+    end if
+    ! layer thicknesses from the thickness update at the end of the previous step
+    if (.not. geom_on_device) then
+        !$ACC UPDATE DEVICE(mesh%helem)
+    end if
+
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(Z_n, n1, n2, n3, nle, ule, nlz, ni, nd, kb, int_dp_x, int_dp_y, &
+!$ACC     drho_dx, drho_dy, dz_dx, dz_dy, aux_sum, dsum, zb, dx10, dx20, dx21, df10, df21, drz)
+    do elem=1, partit%myDim_elem2D
+        nle = mesh%nlevels(elem)-1
+        ule = mesh%ulevels(elem)
+        n1  = mesh%elem2D_nodes(1,elem)
+        n2  = mesh%elem2D_nodes(2,elem)
+        n3  = mesh%elem2D_nodes(3,elem)
+        do nlz=1, mesh%nl-1
+            Z_n(nlz) = 0.0_WP
+        end do
+        zb       = mesh%zbar_e_bot(elem)
+        Z_n(nle) = zb + mesh%helem(nle,elem)*0.5_WP
+        do nlz=nle,ule+1,-1
+            zb         = zb + mesh%helem(nlz,elem)
+            Z_n(nlz-1) = zb + mesh%helem(nlz-1,elem)*0.5_WP
+        end do
+
+        int_dp_x = 0.0_WP
+        int_dp_y = 0.0_WP
+        do nlz=ule, nle
+            ! sum of the vertical density gradients at the three vertices
+            dsum = 0.0_WP
+            do ni=1,3
+                if (ni==1) nd=n1
+                if (ni==2) nd=n2
+                if (ni==3) nd=n3
+                if (nlz==ule .and. nlz==mesh%ulevels_nod2D(nd)) then
+                    kb = nlz          ! surface layer of the vertex
+                elseif (nlz==nle .and. nlz==mesh%nlevels_nod2D(nd)-1) then
+                    kb = nlz-2        ! bottom layer of the vertex
+                else
+                    kb = nlz-1
+                end if
+                dx10 = mesh%Z_3d_n(kb+1,nd)-mesh%Z_3d_n(kb  ,nd)
+                dx21 = mesh%Z_3d_n(kb+2,nd)-mesh%Z_3d_n(kb+1,nd)
+                dx20 = mesh%Z_3d_n(kb+2,nd)-mesh%Z_3d_n(kb  ,nd)
+                df10 = density_m_rho0(kb+1,nd)-density_m_rho0(kb  ,nd)
+                df21 = density_m_rho0(kb+2,nd)-density_m_rho0(kb+1,nd)
+                drz  = df10/dx10 + (dx10*df21-dx21*df10)/(dx20*dx21*dx10) &
+                       *((Z_n(nlz)-mesh%Z_3d_n(kb+1,nd)) + (Z_n(nlz)-mesh%Z_3d_n(kb,nd)))
+                dsum = dsum + drz
+            end do
+            ! zonal
+            drho_dx = mesh%gradient_sca(1,elem)*density_m_rho0(nlz,n1) + mesh%gradient_sca(2,elem)*density_m_rho0(nlz,n2) &
+                    + mesh%gradient_sca(3,elem)*density_m_rho0(nlz,n3)
+            dz_dx   = mesh%gradient_sca(1,elem)*mesh%Z_3d_n(nlz,n1) + mesh%gradient_sca(2,elem)*mesh%Z_3d_n(nlz,n2) &
+                    + mesh%gradient_sca(3,elem)*mesh%Z_3d_n(nlz,n3)
+            aux_sum = (drho_dx-dsum/3.0_WP*dz_dx)*mesh%helem(nlz,elem)*g/density_0
+            pgf_x(nlz,elem) = int_dp_x + aux_sum*0.5_WP
+            int_dp_x = int_dp_x + aux_sum
+            ! meridional
+            drho_dy = mesh%gradient_sca(4,elem)*density_m_rho0(nlz,n1) + mesh%gradient_sca(5,elem)*density_m_rho0(nlz,n2) &
+                    + mesh%gradient_sca(6,elem)*density_m_rho0(nlz,n3)
+            dz_dy   = mesh%gradient_sca(4,elem)*mesh%Z_3d_n(nlz,n1) + mesh%gradient_sca(5,elem)*mesh%Z_3d_n(nlz,n2) &
+                    + mesh%gradient_sca(6,elem)*mesh%Z_3d_n(nlz,n3)
+            aux_sum = (drho_dy-dsum/3.0_WP*dz_dy)*mesh%helem(nlz,elem)*g/density_0
+            pgf_y(nlz,elem) = int_dp_y + aux_sum*0.5_WP
+            int_dp_y = int_dp_y + aux_sum
+        end do
+    end do
+!$ACC END PARALLEL LOOP
+end subroutine pressure_force_4_zxxxx_shchepetkin_acc
+#endif
 !
 !
 !
@@ -2353,15 +2369,6 @@ end subroutine pressure_force_4_zxxxx_shchepetkin
 ! calculate PGF for linfs with partiell cell on/off
 ! First coded by P. Scholz for FESOM2.0, 08.02.2019
 subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
-    use o_PARAM
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use MOD_TRACER
-    use o_ARRAYS
-    use g_config
-    use densityJM_components_interface
-    use density_linear_interface
     implicit none
     type(t_mesh),   intent(in) ,    target  :: mesh
     type(t_partit), intent(inout),  target  :: partit
@@ -2377,40 +2384,36 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
     real(kind=WP)                           :: dref_rhopot, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2
     real(kind=WP)                           :: zbar_n(mesh%nl), z_n(mesh%nl-1)
     real(kind=WP),  dimension(:,:), pointer :: temp, salt
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     temp=>tracers%data(1)%values(:,:)
     salt=>tracers%data(2)%values(:,:)
     !___________________________________________________________________________
     ! loop over triangular elemments
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, elnodes, nle, ule, nlz, nln, ni, nlc, nlce, idx, int_dp_dx, drho_dx, drho_dy, dz_dx, dz_dy, aux_sum, dx10, dx20, dx21, &
 !$OMP                                  f0, df10, df21, t0, dt10, dt21, s0, ds10, ds21, rho_at_Zn, temp_at_Zn, salt_at_Zn, drho_dz, aux_dref, rhopot,                &
-!$OMP                                  bulk_0, bulk_pz, bulk_pz2, dref_rhopot, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2, zbar_n, z_n                                )
+!$OMP                                  bulk_0, bulk_pz, bulk_pz2, dref_rhopot, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2, zbar_n, z_n, layer_offset)
 !$OMP DO
-    do elem = 1, myDim_elem2D
+    do elem = 1, partit%myDim_elem2D
         !_______________________________________________________________________
         ! nle...number of mid-depth levels at elem
-        nle = nlevels(elem) - 1
-        ule = ulevels(elem)
+        nle = mesh%nlevels(elem) - 1
+        ule = mesh%ulevels(elem)
 
         ! node indices of elem
-        elnodes = elem2D_nodes(:, elem)
+        elnodes = mesh%elem2D_nodes(:, elem)
 
         !_______________________________________________________________________
         ! calculate mid depth element level --> Z_e
         ! nle...number of mid-depth levels at elem
         zbar_n          = 0.0_WP
         Z_n             = 0.0_WP
-        zbar_n(nle + 1) = zbar_e_bot(elem)
-        Z_n(nle)        = zbar_n(nle + 1) + helem(nle, elem) * 0.5_WP
+        zbar_n(nle + 1) = mesh%zbar_e_bot(elem)
+        Z_n(nle)        = zbar_n(nle + 1) + mesh%helem(nle, elem) * 0.5_WP
 
         do nlz = nle, ule + 1, -1
-            zbar_n(nlz)  = zbar_n(nlz + 1) + helem(nlz    , elem)
-            Z_n(nlz - 1) = zbar_n(nlz    ) + helem(nlz - 1, elem) * 0.5_WP
+            zbar_n(nlz)  = zbar_n(nlz + 1) + mesh%helem(nlz    , elem)
+            Z_n(nlz - 1) = zbar_n(nlz    ) + mesh%helem(nlz - 1, elem) * 0.5_WP
         end do
-        zbar_n(ule) = zbar_n(ule + 1) + helem(ule, elem)
+        zbar_n(ule) = zbar_n(ule + 1) + mesh%helem(ule, elem)
 
         !_______________________________________________________________________
         aux_dref = density_0
@@ -2421,8 +2424,8 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
                 case(1)
                     call densityJM_components(density_ref_T, density_ref_S, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2, dref_rhopot)
                 case default !unknown
-                    if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+                    if (partit%mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
+                    call par_abort(partit%MPI_COMM_FESOM, partit%mype)
             end select
         end if
 
@@ -2462,9 +2465,9 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
 
             idx = (/1, 1, 1/) * nlz
             if ( nlz == ule ) then
-                idx = idx - ulevels_nod2D(elnodes)
+                idx = idx - mesh%ulevels_nod2D(elnodes)
             else
-                idx = nlevels_nod2D(elnodes) - 1 - idx
+                idx = mesh%nlevels_nod2D(elnodes) - 1 - idx
             end if
 
             do ni = 1, 3
@@ -2477,8 +2480,8 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
                     write(*,*) ' nlz = ', nlz
                     write(*,*) ' nle = ', nle
                     write(*,*) ' ule = ', ule
-                    write(*,*) ' nln = ', nlevels_nod2D(elnodes)-1
-                    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+                    write(*,*) ' nln = ', mesh%nlevels_nod2D(elnodes)-1
+                    call par_abort(partit%MPI_COMM_FESOM, partit%mype)
                 end if
 
                 layer_offset = 0
@@ -2493,9 +2496,9 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
                 end if
                 !___________________________________________________________________
                 ! compute interpolation coefficients
-                dx10(ni)   = Z_3d_n(nlz     + layer_offset, elnodes(ni))-Z_3d_n(nlz - 1 + layer_offset,elnodes(ni))
-                dx21(ni)   = Z_3d_n(nlz + 1 + layer_offset, elnodes(ni))-Z_3d_n(nlz     + layer_offset,elnodes(ni))
-                dx20(ni)   = Z_3d_n(nlz + 1 + layer_offset, elnodes(ni))-Z_3d_n(nlz - 1 + layer_offset,elnodes(ni))
+                dx10(ni)   = mesh%Z_3d_n(nlz     + layer_offset, elnodes(ni))-mesh%Z_3d_n(nlz - 1 + layer_offset,elnodes(ni))
+                dx21(ni)   = mesh%Z_3d_n(nlz + 1 + layer_offset, elnodes(ni))-mesh%Z_3d_n(nlz     + layer_offset,elnodes(ni))
+                dx20(ni)   = mesh%Z_3d_n(nlz + 1 + layer_offset, elnodes(ni))-mesh%Z_3d_n(nlz - 1 + layer_offset,elnodes(ni))
 
                 !!PS f0     = density_m_rho0(nlz-1,elnodes)
                 !!PS df10   = density_m_rho0(nlz  ,elnodes)-density_m_rho0(nlz-1,elnodes)
@@ -2512,18 +2515,18 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
                 !___________________________________________________________________
                 ! interpoalte vertice temp and salinity to elemental level Z_n
                 temp_at_Zn(ni) = t0(ni) + dt10(ni) / dx10(ni)                               &
-                                 * (Z_n(nlz) - Z_3d_n(nlz - 1 + layer_offset, elnodes(ni))) &
+                                 * (Z_n(nlz) - mesh%Z_3d_n(nlz - 1 + layer_offset, elnodes(ni))) &
                                  + (dx10(ni) * dt21(ni) - dx21(ni) * dt10(ni))              &
                                  / (dx20(ni) * dx21(ni) * dx10(ni))                         &
-                                 * (Z_n(nlz) - Z_3d_n(nlz     + layer_offset, elnodes(ni))) &
-                                 * (Z_n(nlz) - Z_3d_n(nlz - 1 + layer_offset, elnodes(ni)))
+                                 * (Z_n(nlz) - mesh%Z_3d_n(nlz     + layer_offset, elnodes(ni))) &
+                                 * (Z_n(nlz) - mesh%Z_3d_n(nlz - 1 + layer_offset, elnodes(ni)))
 
                 salt_at_Zn(ni) = s0(ni) + ds10(ni) / dx10(ni)                               &
-                                 * (Z_n(nlz) - Z_3d_n(nlz - 1 + layer_offset, elnodes(ni))) &
+                                 * (Z_n(nlz) - mesh%Z_3d_n(nlz - 1 + layer_offset, elnodes(ni))) &
                                  + (dx10(ni) * ds21(ni) - dx21(ni) * ds10(ni))              &
                                  / (dx20(ni) * dx21(ni) * dx10(ni))                         &
-                                 * (Z_n(nlz) - Z_3d_n(nlz     + layer_offset, elnodes(ni))) &
-                                 * (Z_n(nlz) - Z_3d_n(nlz - 1 + layer_offset, elnodes(ni)))
+                                 * (Z_n(nlz) - mesh%Z_3d_n(nlz     + layer_offset, elnodes(ni))) &
+                                 * (Z_n(nlz) - mesh%Z_3d_n(nlz - 1 + layer_offset, elnodes(ni)))
 
                 !___________________________________________________________________
                 ! compute density from state equation
@@ -2533,8 +2536,8 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
                     case(1)
                         call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni))
                     case default !unknown
-                        if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+                        if (partit%mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
+                        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
                 end select
                 rho_at_Zn(ni, nlz) = bulk_0(ni) + Z_n(nlz) * (bulk_pz(ni) + Z_n(nlz) * bulk_pz2(ni))
                 rho_at_Zn(ni, nlz) = rho_at_Zn(ni, nlz) * rhopot(ni)                                   &
@@ -2547,15 +2550,15 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
         do nlz = ule, nle
             !_______________________________________________________________________
             ! zonal gradients
-            drho_dx         = sum(gradient_sca(1:3,elem) * rho_at_Zn(:, nlz))
-            aux_sum         = drho_dx * helem(nlz,elem) * g/density_0
+            drho_dx         = sum(mesh%gradient_sca(1:3,elem) * rho_at_Zn(:, nlz))
+            aux_sum         = drho_dx * mesh%helem(nlz,elem) * g/density_0
             pgf_x(nlz,elem) = int_dp_dx(1) + aux_sum * 0.5_WP
             int_dp_dx(1)    = int_dp_dx(1) + aux_sum
 
             !_______________________________________________________________________
             ! meridional gradients
-            drho_dy         = sum(gradient_sca(4:6,elem) * rho_at_Zn(:, nlz))
-            aux_sum         = drho_dy * helem(nlz,elem) * g / density_0
+            drho_dy         = sum(mesh%gradient_sca(4:6,elem) * rho_at_Zn(:, nlz))
+            aux_sum         = drho_dy * mesh%helem(nlz,elem) * g / density_0
             pgf_y(nlz,elem) = int_dp_dx(2) + aux_sum * 0.5_WP
             int_dp_dx(2)    = int_dp_dx(2) + aux_sum
         end do
@@ -2608,12 +2611,6 @@ end subroutine pressure_force_4_zxxxx_easypgf
 !   - Includes full pressure/compressibility effects → in-situ density
 !   - Different from potential density (which has no pressure effects)
 SUBROUTINE densityJM_local(t, s, pz, rho_out, partit, mesh)
-USE MOD_MESH
-USE MOD_PARTIT
-USE MOD_PARSUP !, only: par_ex,pe_status
-USE o_ARRAYS
-USE o_PARAM
-use densityJM_components_interface
 IMPLICIT NONE
 
   !
@@ -2630,10 +2627,6 @@ IMPLICIT NONE
   real(kind=WP),  intent(OUT)           :: rho_out
   real(kind=WP)                         :: rhopot, bulk
   real(kind=WP)                         :: bulk_0, bulk_pz, bulk_pz2
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
   !compute secant bulk modulus
 
   call densityJM_components(t, s, bulk_0, bulk_pz, bulk_pz2, rhopot)
@@ -2645,118 +2638,6 @@ end subroutine densityJM_local
 !
 !
 !
-!===============================================================================
-! Computes components of the Jackett-McDougall equation of state for seawater.
-! This split-form approach separates density into surface density and pressure
-! derivatives, enabling efficient computation of both potential and in-situ 
-! density from a single EOS call.
-!
-! INPUT:
-!   t          - in-situ temperature (°C)
-!   s          - salinity (psu)
-!
-! OUTPUT:
-!   bulk_0     - density at surface pressure (P=0 dbar), kg/m³
-!                This is approximately the potential density ρ₀(T,S,P=0)
-!   bulk_pz    - first derivative of density w.r.t. pressure: ∂ρ/∂P, kg/m³/dbar
-!   bulk_pz2   - second derivative of density w.r.t. pressure: ∂²ρ/∂P², kg/m³/dbar²
-!   rhopot     - potential density referenced to surface (σ₀), kg/m³
-!
-! USAGE - Computing In-Situ Density:
-!   In-situ density at depth z (negative, in meters) is computed via Taylor 
-!   expansion around surface pressure:
-!
-!   ρ_insitu(z) = bulk_0 + z·(bulk_pz + z·bulk_pz2)
-!
-!   This accounts for compressibility: water gets denser with increasing pressure.
-!   A compressibility correction is then applied:
-!
-!   ρ_insitu(z) = ρ_insitu·rhopot / (ρ_insitu + 0.1·z·state_eq)
-!
-!   The factor 0.1 is a UNIT CONVERSION from depth [m] to pressure [dbar]:
-!     P [dbar] ≈ 0.1 × |z| [m]
-!   Example: at z = -2000 m → P ≈ 200 dbar
-!   This ensures the pressure-dependent correction term has correct units, since
-!   bulk_pz and bulk_pz2 are derivatives w.r.t. pressure in decibars.
-!
-!   Finally, subtract reference density to get density anomaly:
-!
-!   density_m_rho0(z) = ρ_insitu(z) - density_ref(z)
-!
-! WHY SPLIT FORM?
-!   - Efficient: One EOS call provides both potential and in-situ density
-!   - Accurate: Taylor expansion reduces pressure gradient errors
-!   - Flexible: Can compute density at any depth without repeated EOS calls
-!
-! NOTE: 
-!   - Potential density (rhopot) has NO pressure effects → water mass properties
-!   - In-situ density includes pressure → used for dynamics and PGF calculations
-SUBROUTINE densityJM_components(t, s, bulk_0, bulk_pz, bulk_pz2, rhopot)
-USE MOD_PARSUP !, only: par_ex,pe_status
-USE o_ARRAYS
-USE o_PARAM
-IMPLICIT NONE
-
-  !
-  ! - calculates in-situ density as a function of potential temperature
-  !   (relative to the surface)
-  !   using the Jackett and McDougall equation of state
-  !   (Copyright (c) 1992, CSIRO, Australia)
-  ! - has been derived from the SPEM subroutine rhocal
-  !
-  ! Ralph Timmermann, August 2005
-  !---------------------------------------------------------------------------
-  ! N. Rakowski 2014 the split form
-  !---------------------------------------------------------------------------
-  
-  real(kind=WP),  intent(IN)            :: t,s
-  real(kind=WP),  intent(OUT)           :: bulk_0, bulk_pz, bulk_pz2, rhopot
-  real(kind=WP)                         :: s_sqrt
-
-  real(kind=WP), parameter   :: a0    = 19092.56,     at   = 209.8925
-  real(kind=WP), parameter   :: at2   = -3.041638,    at3  = -1.852732e-3
-  real(kind=WP), parameter   :: at4   = -1.361629e-5
-  real(kind=WP), parameter   :: as    = 104.4077,     ast  = -6.500517
-  real(kind=WP), parameter   :: ast2  = .1553190,     ast3 = 2.326469e-4
-  real(kind=WP), parameter   :: ass   = -5.587545,    asst = 0.7390729
-  real(kind=WP), parameter   :: asst2 = -1.909078e-2
-  real(kind=WP), parameter   :: ap    = -4.721788e-1, apt  = -1.028859e-2
-  real(kind=WP), parameter   :: apt2  = 2.512549e-4,  apt3 = 5.939910e-7
-  real(kind=WP), parameter   :: aps   = 1.571896e-2,  apst = 2.598241e-4
-  real(kind=WP), parameter   :: apst2 = -7.267926e-6, apss = -2.042967e-3
-  real(kind=WP), parameter   :: ap2   = 1.045941e-5,  ap2t = -5.782165e-10
-  real(kind=WP), parameter   :: ap2t2 = 1.296821e-7
-  real(kind=WP), parameter   :: ap2s  = -2.595994e-7,ap2st = -1.248266e-9
-  real(kind=WP), parameter   :: ap2st2= -3.508914e-9
-
-  real(kind=WP), parameter   :: b0 = 999.842594,    bt  = 6.793952e-2
-  real(kind=WP), parameter   :: bt2 = -9.095290e-3, bt3 = 1.001685e-4
-  real(kind=WP), parameter   :: bt4 = -1.120083e-6, bt5 = 6.536332e-9
-  real(kind=WP), parameter   :: bs = 0.824493,      bst = -4.08990e-3
-  real(kind=WP), parameter   :: bst2 = 7.64380e-5,  bst3 = -8.24670e-7
-  real(kind=WP), parameter   :: bst4 = 5.38750e-9
-  real(kind=WP), parameter   :: bss = -5.72466e-3,  bsst = 1.02270e-4
-  real(kind=WP), parameter   :: bsst2 = -1.65460e-6,bss2 = 4.8314e-4
-
-  !compute secant bulk modulus
-
-  s_sqrt = sqrt(s)
-
-  bulk_0 =  a0      + t*(at   + t*(at2  + t*(at3 + t*at4)))      &
-          + s* (as  + t*(ast  + t*(ast2 + t*ast3))               &
-               + s_sqrt*(ass  + t*(asst + t*asst2)))
-
-  bulk_pz =  ap  + t*(apt  + t*(apt2 + t*apt3))                  &
-                  + s*(aps + t*(apst + t*apst2) + s_sqrt*apss)
-
-  bulk_pz2 = ap2 + t*(ap2t + t*ap2t2)		                 &
-                + s *(ap2s + t*(ap2st + t*ap2st2))
-
-  rhopot =  b0 + t*(bt + t*(bt2 + t*(bt3  + t*(bt4  + t*bt5))))	 &
-               + s*(bs + t*(bst + t*(bst2 + t*(bst3 + t*bst4)))  &
-                  + s_sqrt*(bss + t*(bsst + t*bsst2))            &
-                       + s* bss2)
-end subroutine densityJM_components
 !
 !
 !
@@ -2780,11 +2661,9 @@ function ptheta(s,t,p,pr)
   ! Reviewed by ??
   !--------------------------------------------------------
 
-  use o_param, only: WP
   implicit none
   real(kind=WP) 			:: ptheta, s, t, p, pr
   real(kind=WP) 			:: h, xk, q
-  real(kind=WP), external	        :: atg
 
   h = pr - p
   xk = h*atg(s,t,p)
@@ -2821,7 +2700,6 @@ function atg(s,t,p)
   ! Reviewed by ??
   !--------------------------------------------------------
 
-  use o_param, only: WP
   implicit none
   real(kind=WP)  atg, s, t, p, ds
 
@@ -2862,12 +2740,6 @@ subroutine sw_alpha_beta(TF1,SF1, partit, mesh)
   !    sw_beta=0.72088e-3 psu^-1 @ S=40.0psu, ptmp=10.0C (ITS-90), p=4000db
   !    a_over_b=0.34765 psu*C^-1 @ S=40.0psu, ptmp=10.0C, p=4000db
   !-----------------------------------------------------------------
-  use mod_mesh
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  use o_arrays
-  use o_param
-  use g_comm_auto
   implicit none
   !
   type(t_mesh),   intent(in) ,    target :: mesh
@@ -2875,25 +2747,82 @@ subroutine sw_alpha_beta(TF1,SF1, partit, mesh)
   integer                                :: n, nz, nzmin, nzmax
   real(kind=WP)                          :: t1, t1_2, t1_3, t1_4, p1, p1_2, p1_3, s1, s35, s35_2
   real(kind=WP)                          :: a_over_b
+  real(kind=WP)                          :: sw_alpha_lin, sw_beta_lin
+  ! alpha/beta referenced to 2000 dbar for the diapycnal mixing diagnostic
+  real(kind=WP), parameter               :: p_diap   = 2000.0_WP
+  real(kind=WP), parameter               :: p_diap_2 = p_diap*p_diap
+  real(kind=WP), parameter               :: p_diap_3 = p_diap*p_diap*p_diap
+  real(kind=WP)                          :: a_over_b_diap, beta_diap
   real(kind=WP)                          :: TF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D),SF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+#ifdef ENABLE_OPENACC
+  ! on the device after pressure_bv_acc (full equation of state, no diapycnal diagnostic)
+  ab_on_device = pbv_on_device .and. state_equation==1 .and. .not. ldiag_diapmix
+  if (ab_on_device) then
+     call sw_alpha_beta_acc(TF1, SF1, partit, mesh)
+     return
+  end if
+#endif
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax, t1, t1_2, t1_3, t1_4, p1, p1_2, p1_3, s1, s35, s35_2, a_over_b)
+  ! For state_equation==0 (linear EOS, "toy" configs) alpha/beta are constant
+  ! and must mirror the exact linear density law used in density_linear(),
+  ! not the McDougall (1987) nonlinear polynomial below -- otherwise the
+  ! neutral slopes fed into Redi/GM are inconsistent with the density that
+  ! actually drives the model.
+  if (state_equation==0) then
+     if ((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) then
+        sw_alpha_lin = 0.00025_WP
+        sw_beta_lin  = 0.0_WP
+     else if ((toy_ocean) .AND. (TRIM(which_toy)=="dbgyre")) then
+        sw_alpha_lin = 0.0002052_WP
+        sw_beta_lin  = 0.00079_WP
+     else if ((toy_ocean) .AND. (TRIM(which_toy)=="neverworld2")) then
+        sw_alpha_lin = thermal_alpha
+        if (do_haline) then
+           sw_beta_lin = haline_beta
+        else
+           sw_beta_lin = 0.0_WP
+        end if
+     else
+        sw_alpha_lin = 0.2_WP/density_0
+        sw_beta_lin  = 0.8_WP/density_0
+     end if
+  end if
+
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax, t1, t1_2, t1_3, t1_4, p1, p1_2, p1_3, s1, s35, s35_2, a_over_b, a_over_b_diap, beta_diap)
 !$OMP DO
-  do n = 1,myDim_nod2d
-     nzmin = ulevels_nod2d(n)
-     nzmax = nlevels_nod2d(n)
+  do n = 1,partit%myDim_nod2d
+     nzmin = mesh%ulevels_nod2d(n)
+     nzmax = mesh%nlevels_nod2d(n)
      !!PS do nz=1, nlevels_nod2d(n) -1
      do nz=nzmin, nzmax-1
 
+     if (state_equation==0) then
+        if ((toy_ocean) .AND. (TRIM(which_toy)=="neverworld2") .AND. (do_cabbeling .OR. do_thermobar)) then
+           ! local alpha = -(1/rho0)*d(rho)/dT, mirroring density_linear()'s alpha_local:
+           ! thermal_alpha, plus cabbeling's cabbeling_Cb*(T-10) and/or thermobaricity's
+           ! thermobaric_Th*depth (depth positive-downward [m], via abs(Z_3d_n)) -- same
+           ! consistency requirement as the plain-linear/cabbeling-only cases above it.
+           sw_alpha(nz,n) = thermal_alpha
+           if (do_cabbeling) sw_alpha(nz,n) = sw_alpha(nz,n) + cabbeling_Cb*(TF1(nz,n)-10.0_WP)
+           if (do_thermobar) sw_alpha(nz,n) = sw_alpha(nz,n) + thermobaric_Th*abs(mesh%Z_3d_n(nz,n))
+        else
+           sw_alpha(nz,n) = sw_alpha_lin
+        end if
+        sw_beta(nz,n)  = sw_beta_lin
+        if (ldiag_diapmix) then
+           ! a linear EOS has no pressure dependence, so the sigma2 referenced
+           ! coefficients are the ones just computed
+           sw_alpha_diap(nz,n) = sw_alpha_diap(nz,n) + sw_alpha(nz,n)
+           sw_beta_diap (nz,n) = sw_beta_diap (nz,n) + sw_beta (nz,n)
+        end if
+        cycle
+     end if
+
      t1 = TF1(nz,n)*1.00024_WP
-     s1 = SF1(nz,n)
+     s1 = SF1(nz,n) + S_ref_anomaly   ! McDougall polynomial wants absolute (S_ref=0 unless use_salt_anomaly)
     !!PS      p1 = abs(Z(nz))
-     p1 = abs(Z_3d_n(nz,n))
+     p1 = abs(mesh%Z_3d_n(nz,n))
 
      t1_2 = t1*t1
      t1_3 = t1_2*t1
@@ -2926,6 +2855,35 @@ subroutine sw_alpha_beta(TF1,SF1, partit, mesh)
 
      ! calculate alpha
      sw_alpha(nz,n) = a_over_b*sw_beta(nz,n)
+
+     !__________________________________________________________________________
+     ! diapycnal mixing diagnostic: accumulate alpha/beta evaluated at the 2000
+     ! dbar reference pressure, so that they are consistent with the sigma2
+     ! density (density_dmoc) the density classes are built from. Same McDougall
+     ! (1987) polynomial as above, only p1 -> p_diap.
+     if (ldiag_diapmix) then
+        beta_diap = 0.785567e-3_WP - 0.301985e-5_WP*t1 &
+             + 0.555579e-7_WP*t1_2 - 0.415613e-9_WP*t1_3 &
+             + s35*(-0.356603e-6_WP + 0.788212e-8_WP*t1 &
+             + 0.408195e-10_WP*p_diap - 0.602281e-15_WP*p_diap_2) &
+             + s35_2*(0.515032e-8_WP) &
+             + p_diap*(-0.121555e-7_WP + 0.192867e-9_WP*t1 - 0.213127e-11_WP*t1_2) &
+             + p_diap_2*(0.176621e-12_WP - 0.175379e-14_WP*t1) &
+             + p_diap_3*(0.121551e-17_WP)
+
+        a_over_b_diap = 0.665157e-1_WP + 0.170907e-1_WP*t1 &
+             - 0.203814e-3_WP*t1_2 + 0.298357e-5_WP*t1_3 &
+             - 0.255019e-7_WP*t1_4 &
+             + s35*(0.378110e-2_WP - 0.846960e-4_WP*t1 &
+             - 0.164759e-6_WP*p_diap - 0.251520e-11_WP*p_diap_2) &
+             + s35_2*(-0.678662e-5_WP) &
+             + p_diap*(0.380374e-4_WP - 0.933746e-6_WP*t1 + 0.791325e-8_WP*t1_2) &
+             + p_diap_2*t1_2*(0.512857e-12_WP) &
+             - p_diap_3*(0.302285e-13_WP)
+
+        sw_alpha_diap(nz,n) = sw_alpha_diap(nz,n) + a_over_b_diap*beta_diap
+        sw_beta_diap (nz,n) = sw_beta_diap (nz,n) + beta_diap
+     end if
    end do
  end do
 !$OMP END DO
@@ -2951,12 +2909,6 @@ subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
   ! based on thermal expansion and saline contraction coefficients
   ! computes density gradient sigma_xy
   !-------------------------------------------------------------------
-  use mod_mesh
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  use o_param
-  use o_arrays
-  use g_comm_auto
   implicit none
   !
   type(t_mesh),   intent(in) ,    target :: mesh
@@ -2964,18 +2916,20 @@ subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
   real(kind=WP),  intent(IN)             :: TF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D), SF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
   real(kind=WP)                          :: tx(mesh%nl-1), ty(mesh%nl-1), sx(mesh%nl-1), sy(mesh%nl-1), vol(mesh%nl-1), testino(2)
   integer                                :: n, nz, elnodes(3),el, k, nln, uln, nle, ule
-  real(kind=WP)                          :: aux(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+#ifdef ENABLE_OPENACC
+  sxy_on_device = ab_on_device
+  if (sxy_on_device) then
+     call compute_sigma_xy_acc(TF1, SF1, partit, mesh)
+     return
+  end if
+#endif
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(tx, ty, sx, sy, vol, testino, n, nz, elnodes, el, k, nln, uln, nle, ule)
 !$OMP DO
-  DO n=1, myDim_nod2D
-        nln = nlevels_nod2D(n)-1
-        uln = ulevels_nod2D(n)
+  DO n=1, partit%myDim_nod2D
+        nln = mesh%nlevels_nod2D(n)-1
+        uln = mesh%ulevels_nod2D(n)
         !!PS vol(1:nl1) = 0.0_WP
         !!PS tx(1:nl1)  = 0.0_WP
         !!PS ty(1:nl1)  = 0.0_WP
@@ -2986,31 +2940,31 @@ subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
         ty(uln:nln)  = 0.0_WP
         sx(uln:nln)  = 0.0_WP
         sy(uln:nln)  = 0.0_WP
-        DO k=1, nod_in_elem2D_num(n)
-           el=nod_in_elem2D(k, n)
-           nle = nlevels(el)-1
-           ule = ulevels(el)
+        DO k=1, mesh%nod_in_elem2D_num(n)
+           el=mesh%nod_in_elem2D(k, n)
+           nle = mesh%nlevels(el)-1
+           ule = mesh%ulevels(el)
            !!PS DO nz=1, nlevels(el)-1
            DO nz=ule, nle
-              vol(nz) = vol(nz)+elem_area(el)
+              vol(nz) = vol(nz)+mesh%elem_area(el)
 
               !NR  writing the sum over elem2D_nodes explicitly helps the compiler to vectorize the nz-loop
 
-              tx(nz) = tx(nz)+(gradient_sca(1,el)*TF1(nz,elem2D_nodes(1,el)) &
-                             + gradient_sca(2,el)*TF1(nz,elem2D_nodes(2,el)) &
-                             + gradient_sca(3,el)*TF1(nz,elem2D_nodes(3,el)))*elem_area(el)
+              tx(nz) = tx(nz)+(mesh%gradient_sca(1,el)*TF1(nz,mesh%elem2D_nodes(1,el)) &
+                             + mesh%gradient_sca(2,el)*TF1(nz,mesh%elem2D_nodes(2,el)) &
+                             + mesh%gradient_sca(3,el)*TF1(nz,mesh%elem2D_nodes(3,el)))*mesh%elem_area(el)
 
-              ty(nz) = ty(nz)+(gradient_sca(4,el)*TF1(nz,elem2D_nodes(1,el)) &
-                             + gradient_sca(5,el)*TF1(nz,elem2D_nodes(2,el)) &
-                             + gradient_sca(6,el)*TF1(nz,elem2D_nodes(3,el)))*elem_area(el)
+              ty(nz) = ty(nz)+(mesh%gradient_sca(4,el)*TF1(nz,mesh%elem2D_nodes(1,el)) &
+                             + mesh%gradient_sca(5,el)*TF1(nz,mesh%elem2D_nodes(2,el)) &
+                             + mesh%gradient_sca(6,el)*TF1(nz,mesh%elem2D_nodes(3,el)))*mesh%elem_area(el)
 
-              sx(nz) = sx(nz)+(gradient_sca(1,el)*SF1(nz,elem2D_nodes(1,el)) &
-                             + gradient_sca(2,el)*SF1(nz,elem2D_nodes(2,el)) &
-                             + gradient_sca(3,el)*SF1(nz,elem2D_nodes(3,el)))*elem_area(el)
+              sx(nz) = sx(nz)+(mesh%gradient_sca(1,el)*SF1(nz,mesh%elem2D_nodes(1,el)) &
+                             + mesh%gradient_sca(2,el)*SF1(nz,mesh%elem2D_nodes(2,el)) &
+                             + mesh%gradient_sca(3,el)*SF1(nz,mesh%elem2D_nodes(3,el)))*mesh%elem_area(el)
 
-              sy(nz) = sy(nz)+(gradient_sca(4,el)*SF1(nz,elem2D_nodes(1,el)) &
-                             + gradient_sca(5,el)*SF1(nz,elem2D_nodes(2,el)) &
-                             + gradient_sca(6,el)*SF1(nz,elem2D_nodes(3,el)))*elem_area(el)
+              sy(nz) = sy(nz)+(mesh%gradient_sca(4,el)*SF1(nz,mesh%elem2D_nodes(1,el)) &
+                             + mesh%gradient_sca(5,el)*SF1(nz,mesh%elem2D_nodes(2,el)) &
+                             + mesh%gradient_sca(6,el)*SF1(nz,mesh%elem2D_nodes(3,el)))*mesh%elem_area(el)
            END DO
         enddo
         !!PS sigma_xy(1,1:nl1,n) = (-sw_alpha(1:nl1,n)*tx(1:nl1)+sw_beta(1:nl1,n)*sx(1:nl1))/vol(1:nl1)*density_0
@@ -3021,29 +2975,31 @@ subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
 !$OMP END DO
 !$OMP BARRIER
 !$OMP END PARALLEL
-! call exchange_nod(sigma_xy, partit)
-CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
-aux=sigma_xy(1,:,:)
-call exchange_nod(aux, partit)
-sigma_xy(1,:,:)=aux
-CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
-aux=sigma_xy(2,:,:)
-call exchange_nod(aux, partit)
-sigma_xy(2,:,:)=aux
-CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+! Single rank-3 exchange again. e7669b74 / 08e97027 (2023, neither with a commit
+! body or a measurement) split it into two component exchanges wrapped in three
+! MPI_COMM_FESOM barriers. The barriers add nothing: exchange_nod3D_n ends in
+! exchange_nod_end -> MPI_WAITALL, so the exchange is already complete on return,
+! and it is neighbour-only point-to-point. Two 2-year A/B pairs at 512 ranks give
+! -1.4 % and -3.0 %; run-to-run scatter there is ~1.7 %, so: a small gain, not
+! re-tested at the "high CPU numbers" the original commit mentions. See git log.
+! Old code below; restoring it also needs the deleted aux temporary back.
+!!PS ! call exchange_nod(sigma_xy, partit)
+!!PS CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+!!PS aux=sigma_xy(1,:,:)
+!!PS call exchange_nod(aux, partit)
+!!PS sigma_xy(1,:,:)=aux
+!!PS CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+!!PS aux=sigma_xy(2,:,:)
+!!PS call exchange_nod(aux, partit)
+!!PS sigma_xy(2,:,:)=aux
+!!PS CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+  call exchange_nod(sigma_xy, partit)
 end subroutine compute_sigma_xy
 !
 !
 !
 !===============================================================================
 subroutine compute_neutral_slope(partit, mesh)
-    use o_ARRAYS
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use MOD_MESH
-    use o_param
-    use g_config
-    use g_comm_auto
     IMPLICIT NONE
     type(t_mesh),   intent(in) ,    target :: mesh
     type(t_partit), intent(inout),  target :: partit
@@ -3053,22 +3009,24 @@ subroutine compute_neutral_slope(partit, mesh)
     real(kind=WP)                          :: c, ro_z_inv, eps !PS, S_cr, S_d
     real(kind=WP)                          :: f_min=1.0e-6_WP, dep_scale, rssby
     real(kind=WP), dimension(:)            :: c1(mesh%nl-1), c2(mesh%nl-1)
+#ifdef ENABLE_OPENACC
+    if (sxy_on_device) then
+        call compute_neutral_slope_acc(partit, mesh)
+        return
+    end if
+#endif
     
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     !if sigma_xy is not computed
     eps=5.0e-6_WP
 !PS     S_cr=1.0e-2_WP
 !PS     S_d=1.0e-3_WP
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, deltaX1, deltaY1, deltaX2, deltaY2, n, nz, nl1, ul1, el, elnodes, enodes, c, ro_z_inv, dep_scale, rssby, c1, c2) FIRSTPRIVATE(f_min)
 !$OMP DO
-    do n=1, myDim_nod2D
+    do n=1, partit%myDim_nod2D
         slope_tapered(: , :, n)=0._WP
-        nl1=nlevels_nod2d(n)-1
-        ul1=ulevels_nod2d(n)
+        nl1=mesh%nlevels_nod2d(n)-1
+        ul1=mesh%ulevels_nod2d(n)
 !PS         do nz = ul1+1, nl1
 !PS             !without minus, because neutral slope S=-(nabla\rho)/(d\rho/dz)
 !PS             ! --> the minus sign is hidden within the definition of buoyancy
@@ -3129,8 +3087,8 @@ subroutine compute_neutral_slope(partit, mesh)
             
             do nz = ul1, nl1
                 dep_scale = rssby*neutral_slope(3,nz,n)
-                if (abs(Z_3d_n(nz, n))< dep_scale) then 
-                    c2(nz) = 0.5_WP * (1.0_WP + sin(pi*abs(Z_3d_n(nz, n))/dep_scale - pi/2.0_WP    )) 
+                if (abs(mesh%Z_3d_n(nz, n))< dep_scale) then 
+                    c2(nz) = 0.5_WP * (1.0_WP + sin(pi*abs(mesh%Z_3d_n(nz, n))/dep_scale - pi/2.0_WP    )) 
                 end if 
             end do
         end if
@@ -3155,6 +3113,210 @@ subroutine compute_neutral_slope(partit, mesh)
     call exchange_nod(neutral_slope, partit)
     call exchange_nod(slope_tapered, partit)
 end subroutine compute_neutral_slope
+#ifdef ENABLE_OPENACC
+!
+!
+!===============================================================================
+! sw_alpha_beta on the device for the full equation of state (see sw_alpha_beta)
+subroutine sw_alpha_beta_acc(TF1, SF1, partit, mesh)
+    implicit none
+    type(t_mesh),   intent(in) ,    target :: mesh
+    type(t_partit), intent(inout),  target :: partit
+    real(kind=WP)                          :: TF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D), SF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    integer                                :: n, nz, nzmin, nzmax
+    real(kind=WP)                          :: t1, t1_2, t1_3, t1_4, p1, p1_2, p1_3, s1, s35, s35_2, a_over_b, sref
+    logical, save                          :: data_created = .false.
+
+    if (.not. data_created) then
+        !$ACC ENTER DATA CREATE(sw_alpha, sw_beta)
+        data_created = .true.
+    end if
+    sref = S_ref_anomaly
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(nz, nzmin, nzmax, t1, t1_2, t1_3, t1_4, p1, p1_2, p1_3, s1, s35, s35_2, a_over_b)
+    do n = 1,partit%myDim_nod2d
+        nzmin = mesh%ulevels_nod2d(n)
+        nzmax = mesh%nlevels_nod2d(n)
+        do nz=nzmin, nzmax-1
+            t1 = TF1(nz,n)*1.00024_WP
+            s1 = SF1(nz,n) + sref
+            p1 = abs(mesh%Z_3d_n(nz,n))
+            t1_2 = t1*t1
+            t1_3 = t1_2*t1
+            t1_4 = t1_3*t1
+            p1_2 = p1*p1
+            p1_3 = p1_2*p1
+            s35 = s1-35.0_WP
+            s35_2 = s35*s35
+            sw_beta(nz,n) = 0.785567e-3_WP - 0.301985e-5_WP*t1 &
+                 + 0.555579e-7_WP*t1_2 - 0.415613e-9_WP*t1_3 &
+                 + s35*(-0.356603e-6_WP + 0.788212e-8_WP*t1 &
+                 + 0.408195e-10_WP*p1 - 0.602281e-15_WP*p1_2) &
+                 + s35_2*(0.515032e-8_WP) &
+                 + p1*(-0.121555e-7_WP + 0.192867e-9_WP*t1 - 0.213127e-11_WP*t1_2) &
+                 + p1_2*(0.176621e-12_WP - 0.175379e-14_WP*t1) &
+                 + p1_3*(0.121551e-17_WP)
+            a_over_b = 0.665157e-1_WP + 0.170907e-1_WP*t1 &
+                 - 0.203814e-3_WP*t1_2 + 0.298357e-5_WP*t1_3 &
+                 - 0.255019e-7_WP*t1_4 &
+                 + s35*(0.378110e-2_WP - 0.846960e-4_WP*t1 &
+                 - 0.164759e-6_WP*p1 - 0.251520e-11_WP*p1_2) &
+                 + s35_2*(-0.678662e-5_WP) &
+                 + p1*(0.380374e-4_WP - 0.933746e-6_WP*t1 + 0.791325e-8_WP*t1_2) &
+                 + p1_2*t1_2*(0.512857e-12_WP) &
+                 - p1_3*(0.302285e-13_WP)
+            sw_alpha(nz,n) = a_over_b*sw_beta(nz,n)
+        end do
+    end do
+!$ACC END PARALLEL LOOP
+    call exchange_nod(sw_alpha, partit, luse_g2g=.true.)
+    call exchange_nod(sw_beta, partit, luse_g2g=.true.)
+end subroutine sw_alpha_beta_acc
+!
+!
+!===============================================================================
+! compute_sigma_xy on the device: per node and level the element sums in the same
+! element order as the host version
+subroutine compute_sigma_xy_acc(TF1, SF1, partit, mesh)
+    implicit none
+    type(t_mesh),   intent(in) ,    target :: mesh
+    type(t_partit), intent(inout),  target :: partit
+    real(kind=WP),  intent(IN)             :: TF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D), SF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP)                          :: tx, ty, sx, sy, vol
+    integer                                :: n, nz, el, k, nln, uln, nle, ule, e1, e2, e3
+    logical, save                          :: data_created = .false.
+
+    if (.not. data_created) then
+        !$ACC ENTER DATA CREATE(sigma_xy)
+        data_created = .true.
+    end if
+    ! one gang per node, the levels over the vector lanes (coalesced column access)
+!$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) PRIVATE(nln, uln) VECTOR_LENGTH(32)
+    DO n=1, partit%myDim_nod2D
+        nln = mesh%nlevels_nod2D(n)-1
+        uln = mesh%ulevels_nod2D(n)
+!$ACC LOOP VECTOR PRIVATE(tx, ty, sx, sy, vol, el, k, nle, ule, e1, e2, e3)
+        DO nz=uln, nln
+            vol = 0.0_WP
+            tx  = 0.0_WP
+            ty  = 0.0_WP
+            sx  = 0.0_WP
+            sy  = 0.0_WP
+!$ACC LOOP SEQ
+            DO k=1, mesh%nod_in_elem2D_num(n)
+                el  = mesh%nod_in_elem2D(k, n)
+                nle = mesh%nlevels(el)-1
+                ule = mesh%ulevels(el)
+                if (nz>=ule .and. nz<=nle) then
+                    e1 = mesh%elem2D_nodes(1,el)
+                    e2 = mesh%elem2D_nodes(2,el)
+                    e3 = mesh%elem2D_nodes(3,el)
+                    vol = vol+mesh%elem_area(el)
+                    tx = tx+(mesh%gradient_sca(1,el)*TF1(nz,e1) + mesh%gradient_sca(2,el)*TF1(nz,e2) &
+                           + mesh%gradient_sca(3,el)*TF1(nz,e3))*mesh%elem_area(el)
+                    ty = ty+(mesh%gradient_sca(4,el)*TF1(nz,e1) + mesh%gradient_sca(5,el)*TF1(nz,e2) &
+                           + mesh%gradient_sca(6,el)*TF1(nz,e3))*mesh%elem_area(el)
+                    sx = sx+(mesh%gradient_sca(1,el)*SF1(nz,e1) + mesh%gradient_sca(2,el)*SF1(nz,e2) &
+                           + mesh%gradient_sca(3,el)*SF1(nz,e3))*mesh%elem_area(el)
+                    sy = sy+(mesh%gradient_sca(4,el)*SF1(nz,e1) + mesh%gradient_sca(5,el)*SF1(nz,e2) &
+                           + mesh%gradient_sca(6,el)*SF1(nz,e3))*mesh%elem_area(el)
+                end if
+            END DO
+            sigma_xy(1,nz,n) = (-sw_alpha(nz,n)*tx+sw_beta(nz,n)*sx)/vol*density_0
+            sigma_xy(2,nz,n) = (-sw_alpha(nz,n)*ty+sw_beta(nz,n)*sy)/vol*density_0
+        END DO
+    END DO
+!$ACC END PARALLEL LOOP
+    call exchange_nod(sigma_xy, partit, luse_g2g=.true.)
+end subroutine compute_sigma_xy_acc
+!
+!
+!===============================================================================
+! compute_neutral_slope on the device (see compute_neutral_slope)
+subroutine compute_neutral_slope_acc(partit, mesh)
+    IMPLICIT NONE
+    type(t_mesh),   intent(in) ,    target :: mesh
+    type(t_partit), intent(inout),  target :: partit
+    integer                                :: n, nz, nl1, ul1, i
+    real(kind=WP)                          :: ro_z_inv, eps, c1, c2, dep_scale, rssby, f_min
+    real(kind=WP)                          :: scr, sd, ldd_c, ldd_min, ldd_max
+    logical                                :: odm95, ldd97, taper_k
+    logical, save                          :: data_created = .false.
+
+    if (.not. data_created) then
+        !$ACC ENTER DATA CREATE(neutral_slope)
+        if (allocated(fer_tapfac)) then
+            !$ACC ENTER DATA CREATE(fer_tapfac)
+        end if
+        data_created = .true.
+    end if
+    eps     = 5.0e-6_WP
+    f_min   = 1.0e-6_WP
+    odm95   = scaling_ODM95
+    ldd97   = scaling_LDD97
+    taper_k = Fer_GM .and. Redi .and. Redi_Ktaper
+    scr     = ODM95_Scr
+    sd      = ODM95_Sd
+    ldd_c   = LDD97_c
+    ldd_min = LDD97_rmin
+    ldd_max = LDD97_rmax
+    ! one gang per node, the levels over the vector lanes (coalesced column access)
+!$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) PRIVATE(nl1, ul1, rssby) VECTOR_LENGTH(32)
+    do n=1, partit%myDim_nod2D
+        nl1=mesh%nlevels_nod2d(n)-1
+        ul1=mesh%ulevels_nod2d(n)
+        rssby = 0._WP
+        if (ldd97) then
+            rssby = ldd_c/max(abs(mesh%coriolis_node(n)), f_min)
+            rssby = min(ldd_max, max(ldd_min, rssby))
+        end if
+!$ACC LOOP VECTOR PRIVATE(i, ro_z_inv, c1, c2, dep_scale)
+        do nz=1, size(slope_tapered,2)
+            do i=1, 3
+                slope_tapered(i, nz, n)=0._WP
+            end do
+            if (nz<ul1 .or. nz>nl1) cycle
+            ro_z_inv=2._WP*g/density_0/max(bvfreq(nz,n)+bvfreq(nz+1,n), eps**2)
+            neutral_slope(1,nz,n)=sigma_xy(1,nz,n)*ro_z_inv
+            neutral_slope(2,nz,n)=sigma_xy(2,nz,n)*ro_z_inv
+            neutral_slope(3,nz,n)=sqrt(neutral_slope(1,nz,n)**2+neutral_slope(2,nz,n)**2)
+            c1 = 1.0_WP
+            if (odm95) then
+                c1=0.5_WP*(1.0_WP + tanh((scr - neutral_slope(3,nz,n))/sd))
+                if ((bvfreq(nz,n) <= 0.0_WP) .or. (bvfreq(nz+1,n) <= 0.0_WP)) c1=0.0_WP
+            end if
+            c2 = 1.0_WP
+            if (ldd97) then
+                dep_scale = rssby*neutral_slope(3,nz,n)
+                if (abs(mesh%Z_3d_n(nz, n))< dep_scale) then
+                    c2 = 0.5_WP * (1.0_WP + sin(pi*abs(mesh%Z_3d_n(nz, n))/dep_scale - pi/2.0_WP    ))
+                end if
+            end if
+            if (taper_k) then
+                fer_tapfac(nz, n) = c1 * c2
+                do i=1, 3
+                    slope_tapered(i, nz, n)=neutral_slope(i, nz, n) * sqrt(c1 * c2)
+                end do
+            else
+                do i=1, 3
+                    slope_tapered(i, nz, n)=neutral_slope(i, nz, n) * c1 * c2
+                end do
+            end if
+        end do
+    enddo
+!$ACC END PARALLEL LOOP
+    call exchange_nod(neutral_slope, partit, luse_g2g=.true.)
+    call exchange_nod(slope_tapered, partit, luse_g2g=.true.)
+    ! the surface expansion coefficients are read on the host every step; the 3-D fields only by host
+    ! versions of KPP and GM/Redi, the toy configurations and output streams
+    !$ACC UPDATE HOST(sw_alpha(1,:), sw_beta(1,:))
+    if (slope_out_needed .or. toy_ocean .or. use_mle .or. .not. (kpp_on_device .and. redi_on_device)) then
+        !$ACC UPDATE HOST(sw_alpha, sw_beta, sigma_xy, neutral_slope, slope_tapered)
+        if (taper_k) then
+            !$ACC UPDATE HOST(fer_tapfac)
+        end if
+    end if
+end subroutine compute_neutral_slope_acc
+#endif
 !
 !
 !
@@ -3162,33 +3324,21 @@ end subroutine compute_neutral_slope
 !converts insitu temperature to a potential one
 !               tracers%data(1)%values will be modified!
 subroutine insitu2pot(tracers, partit, mesh)
-  use mod_mesh
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  use mod_tracer
-  use o_param
-  use o_arrays
-  use g_config
   implicit none
   type(t_mesh),   intent(in) ,   target   :: mesh
   type(t_partit), intent(inout), target   :: partit
   type(t_tracer), intent(in),    target   :: tracers
-  real(kind=WP),  external                :: ptheta
   real(kind=WP)                           :: pp, pr, tt, ss
   integer                                 :: n, nz, nzmin, nzmax
   real(kind=WP),  dimension(:,:), pointer :: temp, salt
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
   temp=>tracers%data(1)%values(:,:)
   salt=>tracers%data(2)%values(:,:)
   ! Convert in situ temperature into potential temperature
   pr=0.0_WP
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax, tt, ss, pp)
-  do n=1,myDim_nod2d+eDim_nod2D
-     nzmin = ulevels_nod2D(n)
-     nzmax = nlevels_nod2D(n)
+  do n=1,partit%myDim_nod2d+partit%eDim_nod2D
+     nzmin = mesh%ulevels_nod2D(n)
+     nzmax = mesh%nlevels_nod2D(n)
      !!PS do nz=1, nlevels_nod2D(n)-1
      do nz=nzmin, nzmax-1
         tt=temp(nz,n)
@@ -3200,7 +3350,7 @@ subroutine insitu2pot(tracers, partit, mesh)
         !!PS when using partial cell --> i would stick here with Z --> since we
         !!PS anyway do a spinup and it its only used at initialisation time
         !!PS pp=abs(Z_3d_n(nz,n))
-        pp=abs(Z(nz))
+        pp=abs(mesh%Z(nz))
         temp(nz,n)=ptheta(ss, tt, pp, pr)
      end do
   end do
@@ -3210,17 +3360,15 @@ end subroutine insitu2pot
 !
 !
 !===============================================================================
-SUBROUTINE density_linear(t, s, bulk_0, bulk_pz, bulk_pz2, rho_out)
+SUBROUTINE density_linear(t, s, bulk_0, bulk_pz, bulk_pz2, rho_out, depth)
 !coded by Margarita Smolentseva, 21.05.2020
-USE MOD_PARSUP !, only: par_ex,pe_status
-USE o_ARRAYS
-USE o_PARAM
-use g_config !, only: which_toy, toy_ocean
 IMPLICIT NONE
   real(kind=WP),  intent(IN)             :: t,s
   real(kind=WP),  intent(OUT)            :: rho_out
-  real(kind=WP)                          :: rhopot, bulk
+  real(kind=WP)                          :: rhopot, bulk, s_abs
   real(kind=WP), intent(OUT)             :: bulk_0, bulk_pz, bulk_pz2
+  real(kind=WP), intent(IN),    optional :: depth
+  real(kind=WP)                          :: alpha_local
 
   !compute secant bulk modulus
 
@@ -3228,17 +3376,33 @@ IMPLICIT NONE
   bulk_pz  = 0
   bulk_pz2 = 0
 
+  s_abs = s + S_ref_anomaly   ! linear EOS needs absolute S (S_ref=0 unless use_salt_anomaly)
+
   IF((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) THEN
       rho_out  = density_0 - 0.00025_WP*(t - 10.0_WP)*density_0
-      
+
   ELSE IF((toy_ocean) .AND. (TRIM(which_toy)=="dbgyre")) THEN
-      rho_out  = density_0 - density_0*0.0002052_WP*(t - 10.0_WP) + density_0*0.00079_WP*(s - 35.0_WP)
-      
-  ELSE IF((toy_ocean) .AND. (TRIM(which_toy)=="neverworld2")) THEN    
-      rho_out  = density_0 - 0.0002_WP*(t - 10.0_WP)*density_0
-      
+      rho_out  = density_0 - density_0*0.0002052_WP*(t - 10.0_WP) + density_0*0.00079_WP*(s_abs - 35.0_WP)
+
+  ELSE IF((toy_ocean) .AND. (TRIM(which_toy)=="neverworld2")) THEN
+      ! local thermal expansion slope: thermal_alpha, plus cabbeling's quadratic-in-T term
+      ! (do_cabbeling) and/or thermobaricity's depth term (do_thermobar) layered on top --
+      ! both optional, independent, and off by default so the plain linear slope is
+      ! reproduced exactly when neither is active. depth is only present when the caller
+      ! actually has it (see density_linear's optional depth arg) -- absent means 0, i.e.
+      ! surface, matching the pre-thermobaricity behavior for every other call site.
+      alpha_local = thermal_alpha
+      IF (do_cabbeling) alpha_local = alpha_local + 0.5_WP*cabbeling_Cb*(t-10.0_WP)
+      IF (do_thermobar .AND. present(depth)) alpha_local = alpha_local + thermobaric_Th*depth
+      rho_out = density_0 - alpha_local*density_0*(t-10.0_WP)
+      IF (do_haline) THEN
+          ! Linear haline term, independent of do_cabbeling -- see the do_haline
+          ! declaration in Toy_Neverworld2 for the physical rationale/caveats.
+          rho_out = rho_out + density_0*haline_beta*(s_abs - 35.0_WP)
+      END IF
+
   ELSE
-      rho_out  = density_0 + 0.8_WP*(s - 34.0_WP) - 0.2*(t - 20.0_WP)
+      rho_out  = density_0 + 0.8_WP*(s_abs - 34.0_WP) - 0.2*(t - 20.0_WP)
   END IF
 
 end subroutine density_linear
@@ -3251,12 +3415,6 @@ subroutine init_ref_density(partit, mesh)
     ! Coded by Qiang Wang
     ! Reviewed by ??
     !___________________________________________________________________________
-    USE MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use o_PARAM
-    use o_ARRAYS
-    use densityJM_components_interface
     implicit none
 
     !___________________________________________________________________________
@@ -3266,17 +3424,13 @@ subroutine init_ref_density(partit, mesh)
     real(kind=WP)                          :: rhopot, bulk_0, bulk_pz, bulk_pz2, rho
     real(kind=8)                           :: T, S, auxz
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     !___________________________________________________________________________
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax, rhopot, bulk_0, bulk_pz, bulk_pz2, rho, T, S, auxz)
-    do node=1,myDim_nod2d+eDim_nod2d
+    do node=1,partit%myDim_nod2d+partit%eDim_nod2d
         density_ref(:, node) = 0.0_WP
         nzmin = 1
-        nzmax = nlevels_nod2d(node)-1
-        auxz=min(0.0,Z_3d_n(nzmin,node))
+        nzmax = mesh%nlevels_nod2d(node)-1
+        auxz=min(0.0,mesh%Z_3d_n(nzmin,node))
 
         !_______________________________________________________________________
         select case(state_equation)
@@ -3285,21 +3439,21 @@ subroutine init_ref_density(partit, mesh)
             case(1)
                 call densityJM_components(density_ref_T, density_ref_S, bulk_0, bulk_pz, bulk_pz2, rhopot)
             case default !unknown
-                if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+                if (partit%mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
         end select
-        rho = bulk_0 + auxz*bulk_pz + auxz*bulk_pz2
+        rho = bulk_0 + auxz*(bulk_pz + auxz*bulk_pz2)
         density_ref(nzmin, node) = rho*rhopot/(rho+0.1_WP*auxz*real(state_equation))
 
         !_______________________________________________________________________
         do nz=nzmin+1,nzmax
-            auxz=Z_3d_n(nz,node)
-            rho = bulk_0 + auxz*bulk_pz + auxz*bulk_pz2
+            auxz=mesh%Z_3d_n(nz,node)
+            rho = bulk_0 + auxz*(bulk_pz + auxz*bulk_pz2)
             density_ref(nz,node) = rho*rhopot/(rho+0.1_WP*auxz*real(state_equation))
         end do
     end do
 !$OMP END PARALLEL DO
-    if(mype==0) write(*,*) ' --> compute reference density'
+    if(partit%mype==0) write(*,*) ' --> compute reference density'
 end subroutine init_ref_density
 !
 !===============================================================================
@@ -3308,13 +3462,6 @@ subroutine init_ref_density_advanced(tracers, partit, mesh)
     ! Coded by Qiang Wang
     ! Reviewed by ??
     !___________________________________________________________________________
-    USE MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_TRACER
-    use o_PARAM
-    use o_ARRAYS
-    use densityJM_components_interface
     implicit none
 
     !___________________________________________________________________________
@@ -3323,37 +3470,31 @@ subroutine init_ref_density_advanced(tracers, partit, mesh)
     type(t_tracer), intent(in),     target  :: tracers
     integer                                 :: node, nz, nzmin, nzmax
     real(kind=WP)                           :: rhopot, bulk_0, bulk_pz, bulk_pz2, rho
-    real(kind=8)                            :: T, S, auxz, x, y
+    real(kind=WP)                           :: T, S, auxz, x, y
     real(kind=WP),  dimension(:,:), pointer :: temp, salt
-    real(kind=8)                            :: ref_temp1D(mesh%nl-1), ref_salt1D(mesh%nl-1), vol1D(mesh%nl-1)
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
+    real(kind=WP)                           :: ref_temp1D(mesh%nl-1), ref_salt1D(mesh%nl-1), vol1D(mesh%nl-1)
 
 temp=>tracers%data(1)%values(:,:)
 salt=>tracers%data(2)%values(:,:)
 vol1D=0.0_WP
 ref_temp1D=0.0_WP
 ref_salt1D=0.0_WP
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax) REDUCTION(+:vol1D)
-do node=1,myDim_nod2d
-    x=geo_coord_nod2D(1,node)/rad
-    y=geo_coord_nod2D(1,node)/rad
+do node=1,partit%myDim_nod2d
+    x=mesh%geo_coord_nod2D(1,node)/rad
+    y=mesh%geo_coord_nod2D(1,node)/rad
     if ((x>=-6.) .AND. (x<=42) .AND. (y>=30.15) .AND. (y<=42)) CYCLE !exclude Mediterranean Sea
     if ((x>= 2.) .AND. (x<=42) .AND. (y>=41)    .AND. (y<=48)) CYCLE !exclude Black Sea
     nzmin = 1
-    nzmax = nlevels_nod2d(node)-1
+    nzmax = mesh%nlevels_nod2d(node)-1
     do nz=nzmin,nzmax
-       ref_temp1D(nz)=ref_temp1D(nz)+areasvol(nz,node)*temp(nz,node)
-       ref_salt1D(nz)=ref_salt1D(nz)+areasvol(nz,node)*salt(nz,node)
-       vol1D(nz)=vol1D(nz)+areasvol(nz,node)
+       ref_temp1D(nz)=ref_temp1D(nz)+mesh%areasvol(nz,node)*temp(nz,node)
+       ref_salt1D(nz)=ref_salt1D(nz)+mesh%areasvol(nz,node)*salt(nz,node)
+       vol1D(nz)=vol1D(nz)+mesh%areasvol(nz,node)
     end do
 end do
-!$OMP END PARALLEL DO
-call MPI_Allreduce(MPI_IN_PLACE, ref_temp1D, mesh%nl-1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
-call MPI_Allreduce(MPI_IN_PLACE, ref_salt1D, mesh%nl-1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
-call MPI_Allreduce(MPI_IN_PLACE,      vol1D, mesh%nl-1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+call MPI_Allreduce(MPI_IN_PLACE, ref_temp1D, mesh%nl-1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+call MPI_Allreduce(MPI_IN_PLACE, ref_salt1D, mesh%nl-1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+call MPI_Allreduce(MPI_IN_PLACE,      vol1D, mesh%nl-1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
 
 where( vol1D > 1.e-12_WP) !more than 0.!
      ref_temp1D=ref_temp1D/vol1D
@@ -3362,11 +3503,11 @@ end where
 ! we better rewrite this loop (1) do nz...; (2) do node... later
 !___________________________________________________________________________
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax, rhopot, bulk_0, bulk_pz, bulk_pz2, rho, T, S, auxz)
-    do node=1,myDim_nod2d+eDim_nod2d
+    do node=1,partit%myDim_nod2d+partit%eDim_nod2d
         density_ref(:, node) = 0.0_WP
         nzmin = 1
-        nzmax = nlevels_nod2d(node)-1
-        auxz=min(0.0,Z_3d_n(nzmin,node))
+        nzmax = mesh%nlevels_nod2d(node)-1
+        auxz=min(0.0,mesh%Z_3d_n(nzmin,node))
         do nz=nzmin,nzmax
             select case(state_equation)
             case(0)
@@ -3374,17 +3515,17 @@ end where
             case(1)
                 call densityJM_components(ref_temp1D(nz), ref_salt1D(nz), bulk_0, bulk_pz, bulk_pz2, rhopot)
             case default !unknown
-                if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+                if (partit%mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
+                call par_abort(partit%MPI_COMM_FESOM, partit%mype)
             end select    
-            auxz=Z_3d_n(nz,node)
-            rho = bulk_0   + auxz*bulk_pz   + auxz*bulk_pz2
+            auxz=mesh%Z_3d_n(nz,node)
+            rho = bulk_0   + auxz*(bulk_pz   + auxz*bulk_pz2)
             density_ref(nz,node) = rho*rhopot/(rho+0.1_WP*auxz*real(state_equation))
         end do
     end do
 !$OMP END PARALLEL DO
-if(mype==0) write(*,*) ' --> compute reference density'
-if(mype==0) then
+if(partit%mype==0) write(*,*) ' --> compute reference density'
+if(partit%mype==0) then
 do nz=1,68
     select case(state_equation)
     case(0)
@@ -3392,13 +3533,15 @@ do nz=1,68
     case(1) 
         call densityJM_components(ref_temp1D(nz), ref_salt1D(nz), bulk_0, bulk_pz, bulk_pz2, rhopot)
     case default !unknown
-        if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+        if (partit%mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
+        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     end select    
- auxz=Z(nz)
- rho = bulk_0   + auxz*bulk_pz   + auxz*bulk_pz2
+ auxz=mesh%Z(nz)
+ rho = bulk_0   + auxz*(bulk_pz   + auxz*bulk_pz2)
  rho = rho*rhopot/(rho+0.1_WP*auxz*real(state_equation))
  write(*,*) "mytest:", ref_temp1D(nz), ref_salt1D(nz), auxz, rho
 end do
 end if
 end subroutine init_ref_density_advanced
+
+end module oce_ale_pressure_bv_module

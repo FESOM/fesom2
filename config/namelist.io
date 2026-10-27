@@ -18,13 +18,20 @@
 ! Setting these to .true. enables additional output fields (see catalog below).
 ! ============================================================================
 &diag_list
-ldiag_solver      = .false.  ! enables solver diagnostics (convergence, iterations)
+ldiag_solver      = .false.  ! computes the solver diagnostic rhs_diag (currently not written to output)
 lcurt_stress_surf = .false.  ! enables 'curl_surf' output (vorticity of surface stress)
 ldiag_curl_vel3   = .false.  ! enables 'curl_u' output (relative vorticity from 3D velocity)
 ldiag_Ri          = .false.  ! enables Richardson number diagnostics ('shear', 'Ri')
 ldiag_turbflux    = .false.  ! enables turbulent flux diagnostics ('KvdTdz', 'KvdSdz')
-ldiag_salt3D      = .false.  ! enables 3D salinity diagnostics
+ldiag_salt3D      = .false.  ! prints the global salinity integral to the log
 ldiag_dMOC        = .false.  ! enables 'dMOC' output (density MOC diagnostics)
+ldiag_diapmix     = .false.  ! adds 'w_diap_diff', 'dV_diap_dT' to the 'dMOC' output: diapycnal velocity
+                             ! and density class uplift induced by the parameterized vertical mixing,
+                             ! from which the numerically induced diapycnal velocity and spurious MOC
+                             ! are formed in postprocessing. Requires ldiag_dMOC (ldiag_diapmix 
+                             ! is automatically switched off with a warning if ldiag_dMOC unset)
+diap_call_freq    = 1        ! evaluate ldiag_diapmix every N units of diap_call_freq_unit ...
+diap_call_freq_unit = 'd'    ! ... 's' (steps), 'h' (hours), 'd' (days) or 'm' (months)
 ldiag_DVD         = .false.  ! enables 'DVD' output (Discrete Variance Decay diagnostics)
 ldiag_forc        = .false.  ! enables 'FORC' output (comprehensive forcing diagnostics)
 ldiag_extflds     = .false.  ! enables extended field diagnostics
@@ -51,6 +58,10 @@ compression_level = 1        ! compression level for netCDF output (1=fastest, 9
 !   frequency  = output frequency (integer)
 !   unit       = 'y' (yearly), 'm' (monthly), 'd' (daily), 'h' (hourly), 's' (steps)
 !   precision  = 4 (single precision) or 8 (double precision)
+!   Note: in a single-precision build (WP=4) a field requesting precision 8 is
+!   still honoured (written as NF_DOUBLE; means accumulated in real64), but its
+!   samples are single-precision-sourced. FESOM prints one summary line at
+!   startup listing such fields.
 ! ============================================================================
 &nml_list
 io_list =  'sst       ',1, 'm', 4,
@@ -233,6 +244,17 @@ io_list =  'sst       ',1, 'm', 4,
 ! 'GPPc      ',1, 'm', 4,  ! Mean GPP coccolithophores [mmolC/m2/d]
 ! 'NNAc      ',1, 'm', 4,  ! Net N-assimilation coccolithophores [mmolN/(m2*d)]
 ! 'Chldegc   ',1, 'm', 4,  ! Chlorophyll degradation coccolithophores [1/d]
+! 'bflxN     ',1, 'm', 4,  ! Particulate organic N flux into the benthos [mmolN/m2/s] (require Diags)
+! 'bflxC     ',1, 'm', 4,  ! Particulate organic C flux into the benthos [mmolC/m2/s] (require Diags)
+! 'bflxSi    ',1, 'm', 4,  ! Biogenic silica flux into the benthos [mmolSi/m2/s] (require Diags)
+! 'bflxCalc  ',1, 'm', 4,  ! Calcite flux into the benthos [mmolC/m2/s] (require Diags)
+! 'intpbsi   ',1, 'm', 4,  ! Depth-integrated silicate uptake by diatoms [mmolSi/m2/d] (require Diags)
+! 'scavFe    ',1, 'm', 4,  ! Depth-integrated iron scavenging [umolFe/m2/d] (require Diags)
+! 'dpO2s     ',1, 'm', 4,  ! Surface O2 partial pressure difference ocean minus atmosphere [Pa] (require Diags)
+! 'O2min     ',1, 'm', 4,  ! O2 at the shallowest local minimum of the profile [mmolO/m3] (require Diags)
+! 'intDIC    ',1, 'm', 4,  ! Column inventory of DIC [mmolC/m2] (require Diags)
+! 'intDOC    ',1, 'm', 4,  ! Column inventory of DOC [mmolC/m2] (require Diags)
+! 'intPOC    ',1, 'm', 4,  ! Column inventory of particulate organic carbon [mmolC/m2] (require Diags)
 
 ! --- RECOM 3D BIOGEOCHEMISTRY (require use_REcoM=.true. and __recom) ---
 ! 'PAR       ',1, 'm', 4,  ! PAR [W/m2]
@@ -250,9 +272,21 @@ io_list =  'sst       ',1, 'm', 4,
 ! 'respn     ',1, 'm', 4,  ! Respiration by small phytoplankton [mmolC/m2/d]
 ! 'respd     ',1, 'm', 4,  ! Respiration by diatoms [mmolC/m2/d]
 ! 'respc     ',1, 'm', 4,  ! Respiration by coccolithophores [mmolC/(m2*d)]
-! 'NPPn3D    ',1, 'm', 4,  ! Net primary production of small phytoplankton [mmolC/m2/d]
-! 'NPPd3D    ',1, 'm', 4,  ! Net primary production of diatoms [mmolC/m2/d]
-! 'NPPc3D    ',1, 'm', 4,  ! Net primary production of coccolithophores [mmolC/m2/d]
+! 'NPPn3D    ',1, 'm', 4,  ! Net primary production of small phytoplankton [mmolC/(m3*d)]
+! 'NPPd3D    ',1, 'm', 4,  ! Net primary production of diatoms [mmolC/(m3*d)]
+! 'NPPc3D    ',1, 'm', 4,  ! Net primary production of coccolithophores [mmolC/(m3*d)]
+! 'expN      ',1, 'm', 4,  ! Sinking flux of particulate organic N at layer interfaces [mmolN/m2/s] (require Diags)
+! 'expC      ',1, 'm', 4,  ! Sinking flux of particulate organic C at layer interfaces [mmolC/m2/s] (require Diags)
+! 'expSi     ',1, 'm', 4,  ! Sinking flux of biogenic silica at layer interfaces [mmolSi/m2/s] (require Diags)
+! 'expCalc   ',1, 'm', 4,  ! Sinking flux of calcite at layer interfaces [mmolC/m2/s] (require Diags)
+! 'graz      ',1, 'm', 4,  ! Grazing on phytoplankton by all zooplankton [mmolC/(m3*d)] (require Diags, Grazing_detritus)
+! 'limNn     ',1, 'm', 4,  ! Nitrogen limitation of small phytoplankton [-] (require Diags)
+! 'limFen    ',1, 'm', 4,  ! Iron limitation of small phytoplankton [-] (require Diags)
+! 'limNd     ',1, 'm', 4,  ! Nitrogen limitation of diatoms [-] (require Diags)
+! 'limFed    ',1, 'm', 4,  ! Iron limitation of diatoms [-] (require Diags)
+! 'O2sat     ',1, 'm', 4,  ! O2 at saturation, 1 atm moist air [mmolO/m3] (require Diags)
+! 'OmegaA    ',1, 'm', 4,  ! Aragonite saturation state [-]
+! 'CO3satA   ',1, 'm', 4,  ! Carbonate ion at aragonite saturation [mol/m3]
 
 ! --- WATER ISOTOPES IN OCEAN (require lwiso=.true.) ---
 ! 'h2o18     ',1, 'm', 4,  ! h2o18 concentration [kmol/m**3]

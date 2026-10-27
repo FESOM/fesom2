@@ -2,7 +2,7 @@ module iceberg_element
  use MOD_PARTIT
  USE MOD_MESH
  USE MOD_DYN
- USE MOD_PARSUP
+ use par_support_module, only: par_abort
  use iceberg_params
  use iceberg_thermodynamics
  use iceberg_ocean_coupling
@@ -38,10 +38,6 @@ real(kind=WP), dimension(:), pointer    :: eta_n_ib
 type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(inout), target :: partit
 type(t_dyn)   , intent(inout), target :: dynamics
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
  
  nablaeta = 0.
  gradientx= 0.
@@ -49,7 +45,7 @@ type(t_dyn)   , intent(inout), target :: dynamics
  notmynode= .false.
  
  do m = 1, 3
-  node = elem2D_nodes(m,elem)
+  node = mesh%elem2D_nodes(m,elem)
   call nodal_average(mesh, partit, dynamics, node, gradientx(m), gradienty(m), notmynode) 
   if (notmynode) exit
  end do
@@ -63,8 +59,8 @@ type(t_dyn)   , intent(inout), target :: dynamics
 !LA 2023-03-07
 eta_n_ib => dynamics%eta_n_ib(:)
 ! kh 18.03.21 use eta_n_ib buffered values here
-  nablaeta(1) = sum( eta_n_ib(elem2D_nodes(:,elem)) * gradient_sca(1:3, elem)) 
-  nablaeta(2) = sum( eta_n_ib(elem2D_nodes(:,elem)) * gradient_sca(4:6, elem)) 
+  nablaeta(1) = sum( eta_n_ib(mesh%elem2D_nodes(:,elem)) * mesh%gradient_sca(1:3, elem)) 
+  nablaeta(2) = sum( eta_n_ib(mesh%elem2D_nodes(:,elem)) * mesh%gradient_sca(4:6, elem)) 
  else
   call FEM_3eval(mesh, partit, nablaeta(1),nablaeta(2),lon_rad,lat_rad,gradientx,gradienty,elem)
  end if
@@ -95,10 +91,6 @@ real(kind=WP), dimension(:), pointer    :: eta_n_ib
 type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(inout), target :: partit
 type(t_dyn)   , intent(inout), target :: dynamics
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
  
  area_ = 0.
  patch = 0.
@@ -106,18 +98,18 @@ type(t_dyn)   , intent(inout), target :: dynamics
  gradienty = 0.
  notmynode = .false.
  
- if(local_idx > myDim_nod2D) then
+ if(local_idx > partit%myDim_nod2D) then
   notmynode = .true.
   return !not my node
  end if 
 
- do k=1, nod_in_elem2D_num(local_idx)
-   elem  = nod_in_elem2D(k,local_idx)
+ do k=1, mesh%nod_in_elem2D_num(local_idx)
+   elem  = mesh%nod_in_elem2D(k,local_idx)
 
    !do idx_elem = 1,  nod_in_elem2D(local_idx)%nmb
    !elem = nod_in_elem2D(local_idx)%addresses(idx_elem)
    !area_ = voltriangle(elem)
-   area_ = elem_area(elem)
+   area_ = mesh%elem_area(elem)
    patch= patch + area_
 
    !gradientx = gradientx + area * sum( ssh(elem2D_nodes(:,elem)) * bafux_2D(:,elem) )
@@ -126,8 +118,8 @@ type(t_dyn)   , intent(inout), target :: dynamics
 ! 2023-03-07
 eta_n_ib => dynamics%eta_n_ib(:)
 !h 18.03.21 use eta_n_ib buffered values here
-   gradientx = gradientx + area_ * sum( eta_n_ib(elem2D_nodes(:,elem)) * gradient_sca(1:3, elem))
-   gradienty = gradienty + area_ * sum( eta_n_ib(elem2D_nodes(:,elem)) * gradient_sca(4:6, elem))
+   gradientx = gradientx + area_ * sum( eta_n_ib(mesh%elem2D_nodes(:,elem)) * mesh%gradient_sca(1:3, elem))
+   gradienty = gradienty + area_ * sum( eta_n_ib(mesh%elem2D_nodes(:,elem)) * mesh%gradient_sca(4:6, elem))
  end do
  
  gradientx = gradientx / patch
@@ -164,10 +156,6 @@ type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(inout), target :: partit
   real, dimension(partit%myDim_nod2D+partit%eDim_nod2D), intent(in)  	:: field_u
   real, dimension(partit%myDim_nod2D+partit%eDim_nod2D), intent(in)  	:: field_v
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
   
   !convert to deg
   lon_deg = lon/rad
@@ -178,8 +166,8 @@ type(t_partit), intent(inout), target :: partit
   !position 'coords'
   call locbafu_2D(mesh, partit, phi,elem,coords_tmp)
 
-  values_u = field_u(elem2D_nodes(:,elem))
-  values_v = field_v(elem2D_nodes(:,elem))
+  values_u = field_u(mesh%elem2D_nodes(:,elem))
+  values_v = field_v(mesh%elem2D_nodes(:,elem))
 
   u_at_ib = sum( values_u(:) * phi(:))
   v_at_ib = sum( values_v(:) * phi(:))
@@ -234,10 +222,6 @@ type(t_partit), intent(inout), target :: partit
   real, dimension(partit%myDim_nod2D+partit%eDim_nod2D), intent(in)  	:: field_u
   real, dimension(partit%myDim_nod2D+partit%eDim_nod2D), intent(in)  	:: field_v
 !type(t_ice),    intent(inout), target :: ice
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
   
   !location of iceberg
   x = lon
@@ -245,12 +229,12 @@ type(t_partit), intent(inout), target :: partit
    
   
   !coords of the 3 nodes
-  x1 = coord_nod2D(1,elem2D_nodes(1,elem))
-  y1 = coord_nod2D(2,elem2D_nodes(1,elem))
-  x2 = coord_nod2D(1,elem2D_nodes(2,elem))
-  y2 = coord_nod2D(2,elem2D_nodes(2,elem))  
-  x3 = coord_nod2D(1,elem2D_nodes(3,elem))
-  y3 = coord_nod2D(2,elem2D_nodes(3,elem))
+  x1 = mesh%coord_nod2D(1,mesh%elem2D_nodes(1,elem))
+  y1 = mesh%coord_nod2D(2,mesh%elem2D_nodes(1,elem))
+  x2 = mesh%coord_nod2D(1,mesh%elem2D_nodes(2,elem))
+  y2 = mesh%coord_nod2D(2,mesh%elem2D_nodes(2,elem))  
+  x3 = mesh%coord_nod2D(1,mesh%elem2D_nodes(3,elem))
+  y3 = mesh%coord_nod2D(2,mesh%elem2D_nodes(3,elem))
   
   
   !check whether iceberg position is in the element
@@ -261,12 +245,12 @@ type(t_partit), intent(inout), target :: partit
   if( (x > maxlon) .OR. (x < minlon) ) then
     write(*,*) 'FEM_eval error: iceberg lon ', x, ' outside element!'
     write(*,*) 'maxlon:', maxlon, ' minlon:', minlon
-    call par_ex (partit%MPI_COMM_FESOM, partit%mype)
+    call par_abort (partit%MPI_COMM_FESOM, partit%mype)
     stop
   else if( (y > maxlat) .OR. (y < minlat)) then
     write(*,*) 'FEM_eval error: iceberg lat', y, ' outside element!'
     write(*,*) 'maxlat:', maxlat, ' minlat:', minlat
-    call par_ex (partit%MPI_COMM_FESOM, partit%mype)
+    call par_abort (partit%MPI_COMM_FESOM, partit%mype)
     stop
   else
     !everything okay
@@ -282,12 +266,12 @@ type(t_partit), intent(inout), target :: partit
   y  = y - y1 
   
   !nodal values Ti_u, Ti_v
-  T1_u = field_u(elem2D_nodes(1,elem))
-  T1_v = field_v(elem2D_nodes(1,elem))
-  T2_u = field_u(elem2D_nodes(2,elem))
-  T2_v = field_v(elem2D_nodes(2,elem))  
-  T3_u = field_u(elem2D_nodes(3,elem))
-  T3_v = field_v(elem2D_nodes(3,elem))
+  T1_u = field_u(mesh%elem2D_nodes(1,elem))
+  T1_v = field_v(mesh%elem2D_nodes(1,elem))
+  T2_u = field_u(mesh%elem2D_nodes(2,elem))
+  T2_v = field_v(mesh%elem2D_nodes(2,elem))  
+  T3_u = field_u(mesh%elem2D_nodes(3,elem))
+  T3_v = field_v(mesh%elem2D_nodes(3,elem))
   
   !differences wrt node 1
   T2_u = T2_u - T1_u
@@ -342,10 +326,6 @@ subroutine FEM_3eval(mesh, partit, u_at_ib,v_at_ib,lon,lat,ocean_u,ocean_v,elem)
   
 type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(inout), target :: partit
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
   
   !convert to deg
   lon_deg = lon/rad
@@ -386,28 +366,24 @@ subroutine iceberg_elem4all(mesh, partit, elem, lon_deg, lat_deg)
 
 type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(inout), target :: partit
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
  
   call point_in_triangle(mesh, partit, elem, (/lon_deg, lat_deg/)) !all PEs search here
   i_have_element= (elem .ne. 0) !up to 3 PEs .true.
   
   if(i_have_element) then
-   i_have_element= elem2D_nodes(1,elem) <= myDim_nod2D !1 PE still .true.
+   i_have_element= mesh%elem2D_nodes(1,elem) <= partit%myDim_nod2D !1 PE still .true.
    if (use_cavity) then 
-      reject_tmp = all( (mesh%cavity_depth(elem2D_nodes(:,elem))/=0.0) .OR. (mesh%bc_index_nod2D(elem2D_nodes(:,elem))==0.0) )
+      reject_tmp = all( (mesh%cavity_depth(mesh%elem2D_nodes(:,elem))/=0.0) .OR. (mesh%bc_index_nod2D(mesh%elem2D_nodes(:,elem))==0.0) )
       if(reject_tmp) then
       !if( reject_elem(mesh, partit, elem) ) then
        elem=0 !reject element
        i_have_element=.false.
        !write(*,*) 'elem4all: iceberg found in shelf region: elem = 0'
       else 
-       elem=myList_elem2D(elem) !global now
+       elem=partit%myList_elem2D(elem) !global now
       end if 
    else
-    elem=myList_elem2D(elem) !global now
+    elem=partit%myList_elem2D(elem) !global now
    endif 
   end if
   call com_integer(partit, i_have_element,elem) !max 1 PE sends element here; 
@@ -431,10 +407,6 @@ subroutine find_new_iceberg_elem(mesh, partit, old_iceberg_elem, pt, left_mype)
 
 type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(inout), target :: partit
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
   
 
 ibelem_tmp=old_iceberg_elem
@@ -442,16 +414,16 @@ left_mype=0.0
 
 !for each node of the old iceberg element...
 do m=1, 3
- n2=elem2D_nodes(m,old_iceberg_elem)
+ n2=mesh%elem2D_nodes(m,old_iceberg_elem)
  
- if(n2 > myDim_nod2D) cycle !n2 is not my node, so i cannot access all elements around it
+ if(n2 > partit%myDim_nod2D) cycle !n2 is not my node, so i cannot access all elements around it
  
  !...and for each element containing this node (so we get all neighbour elements)...
  !do idx_elem_containing_n2 = 1,  nod_in_elem2D(n2)%nmb
- do idx_elem_containing_n2 = 1,  nod_in_elem2D_num(n2)
+ do idx_elem_containing_n2 = 1,  mesh%nod_in_elem2D_num(n2)
  
   !elem_containing_n2 = nod_in_elem2D(n2)%addresses(idx_elem_containing_n2)
-  elem_containing_n2 = nod_in_elem2D(idx_elem_containing_n2,n2) 
+  elem_containing_n2 = mesh%nod_in_elem2D(idx_elem_containing_n2,n2) 
     
   call locbafu_2D(mesh, partit, werte2D, elem_containing_n2, pt)
    
@@ -459,7 +431,7 @@ do m=1, 3
    old_iceberg_elem=elem_containing_n2
    if (use_cavity) then 
       !if( reject_elem(mesh, partit, old_iceberg_elem) ) then
-      reject_tmp = all( (mesh%cavity_depth(elem2D_nodes(:,elem_containing_n2))/=0.0) .OR. (mesh%bc_index_nod2D(elem2D_nodes(:,elem_containing_n2))==0.0) )
+      reject_tmp = all( (mesh%cavity_depth(mesh%elem2D_nodes(:,elem_containing_n2))/=0.0) .OR. (mesh%bc_index_nod2D(mesh%elem2D_nodes(:,elem_containing_n2))==0.0) )
       if(reject_tmp) then
          left_mype=1.0
          !write(*,*) 'iceberg found in shelf region: left_mype = 1'
@@ -472,6 +444,14 @@ do m=1, 3
          cycle
       end if
    endif
+   ! A valid element WAS found.  Clear any left_mype raised by a cavity
+   ! element rejected earlier in this same search: the `cycle` above leaves
+   ! left_mype=1.0 set, and without this reset the routine returns a perfectly
+   ! good element while still reporting failure.  The caller then treats it as
+   ! "left the domain", resets the position and re-advects through
+   ! parallel2coast -- projecting the velocity along a coast the berg is not
+   ! near.  Only a search that finds nothing may report left_mype=1.0.
+   left_mype=0.0
    RETURN 
   end if
  end do
@@ -506,10 +486,6 @@ SUBROUTINE point_in_triangle(mesh, partit, el2D, pt)
 
 type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(inout), target :: partit
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
   el2D=0
   !DO l=1,elem2D
@@ -555,10 +531,6 @@ SUBROUTINE locbafu_2D(mesh, partit, values, elem, coords)
 
 type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(inout), target :: partit
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
  
   x(1)=coords(1)*rad
   x(2)=coords(2)*rad
@@ -637,14 +609,10 @@ subroutine global2local(mesh, partit, aux, tmp)
 
 type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(inout), target :: partit
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
  aux = 0
- do n = 1, myDim_elem2D
-  aux(myList_elem2D(n)) = n
+ do n = 1, partit%myDim_elem2D
+  aux(partit%myList_elem2D(n)) = n
  end do
 end subroutine global2local
 
@@ -652,19 +620,37 @@ end subroutine global2local
  !***************************************************************************************************************************
  !***************************************************************************************************************************
 
-subroutine com_integer(partit, i_have_element, iceberg_element)
+subroutine com_integer(partit, i_have_element, iceberg_element, ib)
  use MOD_PARTIT !for npes
  implicit none
  
  logical, intent(in):: i_have_element
  integer, intent(inout):: iceberg_element
  
+ integer, intent(in), optional :: ib
+
  integer:: status(MPI_STATUS_SIZE)
  integer:: req
+ integer:: ierr
  logical:: completed
+ real(kind=8) :: t_start
+ !bugfix 2026-08-12: see commit message. 5 min is far longer than a healthy
+ !MPI_IAllreduce over <=288 ranks should ever take, and short enough to still
+ !leave most of a 2h20 compute-job walltime for a rerun once the root cause
+ !is fixed, instead of burning the whole budget on a silent hang.
+ real(kind=8), parameter :: com_integer_timeout = 300.0
+ ! Send buffer for the non-owning branch.  It MUST be a named variable, not the
+ ! literal 0 that used to be passed directly: MPI_IAllreduce is non-blocking, so
+ ! the send buffer has to stay valid until the MPI_TEST loop below completes, and
+ ! a literal may be passed via a compiler temporary that does not.  A non-owning
+ ! PE could therefore contribute garbage instead of 0, making the MPI_SUM
+ ! non-zero when NO PE owns the element.  iceberg_step2 then sees a non-zero
+ ! iceberg_elem, skips its "iceberg_elem == 0 -> restore old position" branch,
+ ! and the berg keeps a position no element contains -- observed in new_ism38 as
+ ! 22-30 % of bergs ending each year a median 620 km OUTSIDE the mesh, sitting
+ ! over grounded ice under ~2.5 km of ice.
+ integer:: zero_send
 type(t_partit), intent(inout), target :: partit
-!#include "associate_part_def.h"
-!#include "associate_part_ass.h"
 
 ! kh 10.02.22
  if(i_have_element) then
@@ -673,19 +659,44 @@ type(t_partit), intent(inout), target :: partit
 !$omp end critical
  else
 !$omp critical
-     call MPI_IAllreduce(0,            iceberg_element, 1, MPI_INTEGER, MPI_SUM, partit%MPI_COMM_FESOM_IB, req, partit%MPIERR_IB)
+     zero_send = 0
+     call MPI_IAllreduce(zero_send,    iceberg_element, 1, MPI_INTEGER, MPI_SUM, partit%MPI_COMM_FESOM_IB, req, partit%MPIERR_IB)
 !$omp end critical
  end if
 
+ !bugfix 2026-08-12: com_integer is a collective - every rank in
+ !MPI_COMM_FESOM_IB must reach this call for a given iceberg, or the ranks
+ !that did reach it wait here forever (production hang: spinup_20261108
+ !jobs 26882618 / 26893155, frozen here for the full walltime with zero
+ !further output and no error). Fail loudly with the state needed to find
+ !the diverging rank/iceberg instead of spinning silently until the batch
+ !scheduler kills the job on walltime.
  completed = .false.
+ t_start = MPI_Wtime()
  do while (.not. completed)
 !$omp critical
      CALL MPI_TEST(req, completed, status, partit%MPIERR_IB)
 !$omp end critical
+     if (.not. completed .and. (MPI_Wtime() - t_start) > com_integer_timeout) then
+      if (present(ib)) then
+       write(*,*) 'FATAL: com_integer deadlock on rank ', partit%mype, &
+            ' after ', com_integer_timeout, ' s waiting on iceberg ib=', ib, &
+            '; i_have_element=', i_have_element, ' iceberg_element=', iceberg_element
+      else
+       write(*,*) 'FATAL: com_integer deadlock on rank ', partit%mype, &
+            ' after ', com_integer_timeout, ' s; i_have_element=', i_have_element, &
+            ' iceberg_element=', iceberg_element
+      end if
+      call MPI_Abort(MPI_COMM_WORLD, 1, ierr)
+     end if
  end do
 
  end subroutine com_integer
 
+
+
+ !***************************************************************************************************************************
+ !***************************************************************************************************************************
 
 
  !***************************************************************************************************************************
@@ -704,23 +715,21 @@ type(t_partit), intent(inout), target :: partit
 ! real   :: arr_r(15)
 ! integer:: i, sender, status(MPI_STATUS_SIZE)
 !!type(t_partit), intent(inout), target :: partit
-!!#include "associate_part_def.h"
-!!#include "associate_part_ass.h"
 !
 ! if (mype==0) then
 !    do i=1, npes-1
 !       CALL MPI_RECV(he_has_element, 1, MPI_LOGICAL, MPI_ANY_SOURCE, 0, MPI_COMM_FESOM, status, MPIerr )		      
 !       sender = status(MPI_SOURCE)
 !       if (he_has_element) then
-!          CALL MPI_RECV(arr_r, 15, MPI_DOUBLE_PRECISION, sender, 1, MPI_COMM_FESOM, status, MPIerr )
-!	  CALL MPI_RECV(iceberg_element, 1, MPI_DOUBLE_PRECISION, sender, 2, MPI_COMM_FESOM, status, MPIerr )
+!          CALL MPI_RECV(arr_r, 15, MPI_WP, sender, 1, MPI_COMM_FESOM, status, MPIerr )
+!	  CALL MPI_RECV(iceberg_element, 1, MPI_WP, sender, 2, MPI_COMM_FESOM, status, MPIerr )
 !	  arr=arr_r
 !       end if
 !    end do
 ! else
 !       CALL MPI_SEND(i_have_element, 1, MPI_LOGICAL, 0, 0, MPI_COMM_FESOM, MPIerr )
 !       if (i_have_element) then
-!          CALL MPI_SEND(arr, 15, MPI_DOUBLE_PRECISION,0, 1, MPI_COMM_FESOM, MPIerr )
+!          CALL MPI_SEND(arr, 15, MPI_WP,0, 1, MPI_COMM_FESOM, MPIerr )
 !	  CALL MPI_SEND(iceberg_element, 1, MPI_INTEGER,0, 2, MPI_COMM_FESOM, MPIerr )
 !       end if 
 ! end if
@@ -730,15 +739,15 @@ type(t_partit), intent(inout), target :: partit
 !!       CALL MPI_RECV(he_has_element, 1, MPI_LOGICAL, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, status, MPIerr )		      
 !!       sender = status(MPI_SOURCE)
 !!       if (he_has_element) then
-!!          CALL MPI_RECV(arr_r, 15, MPI_DOUBLE_PRECISION, sender, 1, MPI_COMM_WORLD, status, MPIerr )
-!!	  CALL MPI_RECV(iceberg_element, 1, MPI_DOUBLE_PRECISION, sender, 2, MPI_COMM_WORLD, status, MPIerr )
+!!          CALL MPI_RECV(arr_r, 15, MPI_WP, sender, 1, MPI_COMM_WORLD, status, MPIerr )
+!!	  CALL MPI_RECV(iceberg_element, 1, MPI_WP, sender, 2, MPI_COMM_WORLD, status, MPIerr )
 !!	  arr=arr_r
 !!       end if
 !!    end do
 !! else
 !!       CALL MPI_SEND(i_have_element, 1, MPI_LOGICAL, 0, 0, MPI_COMM_WORLD, MPIerr )
 !!       if (i_have_element) then
-!!          CALL MPI_SEND(arr, 15, MPI_DOUBLE_PRECISION,0, 1, MPI_COMM_WORLD, MPIerr )
+!!          CALL MPI_SEND(arr, 15, MPI_WP,0, 1, MPI_COMM_WORLD, MPIerr )
 !!	  CALL MPI_SEND(iceberg_element, 1, MPI_INTEGER,0, 2, MPI_COMM_WORLD, MPIerr )
 !!       end if 
 !! end if
@@ -750,9 +759,9 @@ type(t_partit), intent(inout), target :: partit
 ! !3. datatype - Datentyp der Pufferelemente (handle)
 ! !4. root - Wurzelproze�; der, welcher sendet (integer)
 ! !5. comm - Kommunikator (handle) 
-! CALL MPI_BCAST(arr, 15, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, MPIerr)
+! CALL MPI_BCAST(arr, 15, MPI_WP, 0, MPI_COMM_FESOM, MPIerr)
 ! CALL MPI_BCAST(iceberg_element, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, MPIerr)
-! !CALL MPI_BCAST(arr, 15, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, MPIerr)
+! !CALL MPI_BCAST(arr, 15, MPI_WP, 0, MPI_COMM_WORLD, MPIerr)
 ! !CALL MPI_BCAST(iceberg_element, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, MPIerr)
 ! 
 ! ! kh 10.02.21
@@ -790,10 +799,6 @@ type(t_partit), intent(inout), target :: partit
 !
 !type(t_mesh), intent(in) , target :: mesh
 !type(t_partit), intent(inout), target :: partit
-!#include "associate_part_def.h"
-!#include "associate_mesh_def.h"
-!#include "associate_part_ass.h"
-!#include "associate_mesh_ass.h"
 !  
 !  write(mype_char,*) mype
 !  !left-adjust the string..
@@ -836,8 +841,6 @@ type(t_partit), intent(inout), target :: partit
 !  character			:: mype_char*3
 !  INTEGER			:: m, row
 !type(t_partit), intent(inout), target :: partit
-!#include "associate_part_def.h"
-!#include "associate_part_ass.h"
 !  
 !  write(mype_char,*) mype
 !  !left-adjust the string..
@@ -864,9 +867,9 @@ subroutine  matrix_inverse_2x2 (A, AINV, DET, elem, coords)
   integer                                   :: elem
   REAL, DIMENSION(2), INTENT(IN) :: coords
   
-  real(kind=8), dimension(2,2), intent(IN)  :: A
-  real(kind=8), dimension(2,2), intent(OUT) :: AINV
-  real(kind=8), intent(OUT)                 :: DET
+  real(kind=WP), dimension(2,2), intent(IN)  :: A
+  real(kind=WP), dimension(2,2), intent(OUT) :: AINV
+  real(kind=WP), intent(OUT)                 :: DET
   integer                                   :: i,j
   
   DET  = A(1,1)*A(2,2) - A(1,2)*A(2,1)

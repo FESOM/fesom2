@@ -63,9 +63,8 @@ endif()
 option(ENABLE_OPENACC "compile with OpenACC support" OFF)
 message(STATUS "ENABLE_OPENACC: ${ENABLE_OPENACC}")
 option(DISABLE_OPENACC_ATOMICS "disable kernels using atomic statement for reproducible results" ON)
-set(GPU_COMPUTE_CAPABILITY "cc80" CACHE STRING "GPU arch for nvfortran compiler (cc35,cc50,cc60,cc70,cc80,...)")
-# set(GPU_FLAGS "${GPU_COMPUTE_CAPABILITY}" CACHE STRING "GPU arch for nvfortran compiler")
-set(GPU_FLAGS "cuda12.2,${GPU_COMPUTE_CAPABILITY}" CACHE STRING "GPU arch for nvfortran compiler (cc35,cc50,cc60,cc70,cc80,...)")
+set(GPU_COMPUTE_CAPABILITY "cc80" CACHE STRING "NVHPC -gpu target architecture (cc70, cc80, cc89, cc90, ...); used by the Release and Debug builds")
+set(GPU_FLAGS "cuda12.2,${GPU_COMPUTE_CAPABILITY}" CACHE STRING "NVHPC -gpu sub-options of the Debug build (CUDA version, architecture); the Release build uses GPU_COMPUTE_CAPABILITY only")
 
 option(ENABLE_OPENMP "build FESOM with OpenMP" OFF)
 message(STATUS "ENABLE_OPENMP: ${ENABLE_OPENMP}")
@@ -78,6 +77,9 @@ message(STATUS "RECOM_COUPLED: ${RECOM_COUPLED}")
 
 option(USE_ICEPACK "Use ICEPACK" OFF)
 message(STATUS "USE_ICEPACK: ${USE_ICEPACK}")
+
+option(USE_SINGLE_PRECISION "Build FESOM in single precision (WP=4)" OFF)
+message(STATUS "USE_SINGLE_PRECISION: ${USE_SINGLE_PRECISION}")
 
 
 # option to trigger building a library version of FESOM
@@ -93,6 +95,75 @@ if(DEFINED FESOM_ENABLE_IFS_INTERFACE)
   set(ENABLE_IFS_INTERFACE ${FESOM_ENABLE_IFS_INTERFACE}) # To distinguish option in a nested cmake project (bundle)
 endif()
 message(STATUS "ENABLE_IFS_INTERFACE: ${ENABLE_IFS_INTERFACE}")
+
+
+# ---------------------------------------------------------------------------
+# Single precision in coupled configurations.
+#
+# OIFS-via-OASIS coupling (FESOM_COUPLED + OIFS_COUPLED, i.e. AWI-ESM3) is now
+# single-precision-safe:
+#
+#   * cpl_driver.F90 -- the OASIS exchange buffer exfld is typed WP_full
+#     (always real64, matching the oasis_Double transient), and every
+#     FESOM-internal MPI call in the coupling path (grid gather + same-rank
+#     bcast) uses MPI_WP instead of a hardcoded MPI_DOUBLE_PRECISION, so the
+#     MPI type tracks WP. OASIS itself accepts single-precision buffers (its
+#     oasis_put/get and grid-write interfaces are generic over real4/real8 and
+#     promote to double internally), so nothing is corrupted when WP=real32.
+#
+#   * gen_forcing_couple.F90 -- integrate_2D's internal reductions use MPI_WP.
+#     The raw FESOM<->atmosphere net-flux exchange in net_rec_from_atm is
+#     skipped for __oifs (early return), so its remaining hardcoded-double
+#     calls are not reached by an OIFS build.
+#
+# The other coupled modes are NOT yet converted and stay refused:
+#   * FESOM_COUPLED without OIFS (OASIS/ECHAM) -- net_rec_from_atm's raw
+#     double exchange IS reached and is still typed to WP; needs the partner
+#     precision reconciled.
+#   * USE_YAC (cpl_yac_driver.F90) and ENABLE_IFS_INTERFACE -- untouched.
+#   * RECOM_COUPLED -- REcoM's own WP (REcoM_declarations, recom_modules.F90)
+#     is hardcoded to kind 8 and never follows this switch, while routines
+#     REcoM shares with the main model (e.g. read_2ddata_on_grid_NetCDF in
+#     gen_modules_read_NetCDF.F90, called from gen_surface_forcing.F90 for
+#     GloFeDust/GloNDust/River*2D/Erosion*2D/GloSed) type their buffers to the
+#     main model's WP. With USE_SINGLE_PRECISION=ON that's a real32/real64
+#     kind mismatch -- a compile-time type error there, not a silent runtime
+#     corruption, but still unconverted.
+#
+# Set FESOM_ALLOW_SINGLE_PRECISION_COUPLED=ON to override the refusal for the
+# modes below (intended for developing those fixes, not for production).
+# ---------------------------------------------------------------------------
+option(FESOM_ALLOW_SINGLE_PRECISION_COUPLED
+       "Override the guard refusing the not-yet-converted single-precision coupled builds" OFF)
+
+if(USE_SINGLE_PRECISION AND NOT FESOM_ALLOW_SINGLE_PRECISION_COUPLED)
+   set(_fesom_sp_coupled_modes "")
+   # OIFS-via-OASIS is allowed. Pure OASIS/ECHAM (FESOM_COUPLED without OIFS) is not.
+   if(FESOM_COUPLED AND NOT OIFS_COUPLED)
+      list(APPEND _fesom_sp_coupled_modes "FESOM_COUPLED (OASIS/ECHAM, without OIFS)")
+   endif()
+   if(USE_YAC)
+      list(APPEND _fesom_sp_coupled_modes "USE_YAC (YAC)")
+   endif()
+   if(ENABLE_IFS_INTERFACE)
+      list(APPEND _fesom_sp_coupled_modes "ENABLE_IFS_INTERFACE (IFS interface)")
+   endif()
+   if(RECOM_COUPLED)
+      list(APPEND _fesom_sp_coupled_modes "RECOM_COUPLED (REcoM biogeochemistry)")
+   endif()
+   if(_fesom_sp_coupled_modes)
+      string(REPLACE ";" ", " _fesom_sp_coupled_modes "${_fesom_sp_coupled_modes}")
+      message(FATAL_ERROR
+         "USE_SINGLE_PRECISION=ON is not yet supported together with: ${_fesom_sp_coupled_modes}.\n"
+         "These coupling paths still pass MPI_DOUBLE_PRECISION for real(kind=WP) "
+         "buffers (or have not been reviewed), or (RECOM_COUPLED) mix REcoM's own "
+         "always-double WP with the main model's WP, which corrupts memory or fails "
+         "to compile when WP is real32. OIFS-via-OASIS coupling (OIFS_COUPLED) has "
+         "been converted and is allowed.\n"
+         "Build these configurations in double precision (USE_SINGLE_PRECISION=OFF), "
+         "or set FESOM_ALLOW_SINGLE_PRECISION_COUPLED=ON if you are developing the fix.")
+   endif()
+endif()
 
 
 set(ENABLE_MULTIO_DEFAULT OFF)
@@ -173,7 +244,7 @@ add_custom_target(fesom_version_info-generated.F90 ALL
 #if(FESOM_STANDALONE)
 #   list(REMOVE_ITEM sources_Fortran ${src_home}/cpl_driver.F90)
 #endif()
-list(REMOVE_ITEM sources_Fortran ${src_home}/fvom_init.F90 ${src_home}/oce_local.F90 ${src_home}/gen_comm.F90)
+list(REMOVE_ITEM sources_Fortran ${src_home}/fvom_init.F90 ${src_home}/mod_mesh_utils.F90 ${src_home}/oce_local.F90 ${src_home}/gen_comm.F90)
 list(REMOVE_ITEM sources_Fortran ${src_home}/fesom_main.F90)
 
 find_package( NETCDF REQUIRED COMPONENTS C Fortran )
@@ -292,6 +363,10 @@ if(USE_ICEPACK)
    target_compile_definitions(${PROJECT_NAME} PRIVATE __icepack)
 endif()
 
+if(USE_SINGLE_PRECISION)
+   target_compile_definitions(${PROJECT_NAME} PRIVATE USE_SINGLE_PRECISION)
+endif()
+
 if(CVMIX)
    target_compile_definitions(${PROJECT_NAME} PRIVATE __cvmix)
 endif()
@@ -304,7 +379,18 @@ if(VERBOSE)
    target_compile_definitions(${PROJECT_NAME} PRIVATE VERBOSE)
 endif()
 
+# OPENMP_REPRODUCIBLE serializes the OpenMP loops whose lock-based scatter
+# updates would otherwise accumulate in a thread-dependent order. It only has
+# any meaning when OpenMP is actually enabled - see FESOM/fesom2#444.
 if(OPENMP_REPRODUCIBLE)
+   if(NOT ENABLE_OPENMP)
+      message(FATAL_ERROR
+         "OPENMP_REPRODUCIBLE=ON requires ENABLE_OPENMP=ON. "
+         "It only serializes OpenMP worksharing loops, so it does nothing "
+         "without OpenMP. Re-run with -DENABLE_OPENMP=ON, or drop "
+         "-DOPENMP_REPRODUCIBLE=ON.")
+   endif()
+   message(STATUS "OPENMP_REPRODUCIBLE: ON (OpenMP loops serialized for reproducibility)")
    target_compile_definitions(${PROJECT_NAME} PRIVATE __openmp_reproducible)
 endif()
 
@@ -323,13 +409,33 @@ endif()
 # CMAKE_Fortran_COMPILER_ID will also work if a wrapper is being used (e.g. mpif90 wraps ifort -> compiler id is Intel)
 if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel OR ${CMAKE_Fortran_COMPILER_ID} STREQUAL  IntelLLVM )
    
-   # Base compiler flags
-   target_compile_options(${PROJECT_NAME} PRIVATE -O3 -r8 -i4 -fp-model precise -no-prec-div -fimf-use-svml -init=zero -no-wrap-margin -fpe0 -fpp -fPIC)
+   # Base compiler flags (default real kind follows USE_SINGLE_PRECISION)
+   if(USE_SINGLE_PRECISION)
+      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -r4 -i4 -fp-model precise -no-prec-div -fimf-use-svml -init=zero -no-wrap-margin -fpe0 -fpp -fPIC)
+   else()
+      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -r8 -i4 -fp-model precise -no-prec-div -fimf-use-svml -init=zero -no-wrap-margin -fpe0 -fpp -fPIC)
+   endif()
    
    # compiler flags not supported by IntelLLVM
    if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
       target_compile_options(${PROJECT_NAME} PRIVATE -no-prec-sqrt -ip )
    endif()   
+
+   # -no-prec-sqrt above, combined with -qopt-zmm-usage=high from the mn5-gpp
+   #  platform blocks below, makes ifort compile a vectorised
+   # sqrt() as vrsqrt14pd plus an *unmasked* Newton-Raphson refinement. The
+   # refined value is blended back under a write mask, so results stay correct
+   # -- but on a lane whose argument is exactly 0 the refinement evaluates
+   # 0*Inf, which raises the IEEE invalid flag, and -fpe0 (also above) turns
+   # that into SIGFPE. So the arithmetic is fine and only the trap is wrong.
+   #
+   if(${CMAKE_Fortran_COMPILER_ID} STREQUAL Intel)
+      set_source_files_properties(
+         ${src_home}/cvmix_driver/cvmix_tke.F90
+         ${src_home}/oce_fer_gm.F90
+         ${src_home}/oce_ale_pressure_bv.F90
+         PROPERTIES COMPILE_OPTIONS -prec-sqrt)
+   endif()
    
    if(ENABLE_OPENMP)
       target_compile_options(${PROJECT_NAME} PRIVATE -qopenmp)
@@ -371,6 +477,9 @@ if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel OR ${CMAKE_Fortran_COMPILER_ID} 
       # |*Intel/Para...MPI-mt | -O3 -xCORE-AVX2                                           | 113s |
       target_compile_options(${PROJECT_NAME} PRIVATE -xCORE-AVX2)
    else()
+      message(WARNING "FESOM_PLATFORM_STRATEGY is '${FESOM_PLATFORM_STRATEGY}': no platform-specific Intel flags, "
+                      "falling back to -xHost. On AMD hosts (e.g. Levante) this runs about 2x slower per step than the "
+                      "platform branch; build through configure.sh/env.sh or export FESOM_PLATFORM_STRATEGY.")
       target_compile_options(${PROJECT_NAME} PRIVATE -xHost)
    endif()
    
@@ -381,13 +490,19 @@ if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel OR ${CMAKE_Fortran_COMPILER_ID} 
 
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
 #    target_compile_options(${PROJECT_NAME} PRIVATE -O3 -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -ffree-line-length-none)
+   # default real kind follows USE_SINGLE_PRECISION: promote to 8 for DP, leave at 4 for SP
+   if(USE_SINGLE_PRECISION)
+      set(_FESOM_GNU_RKIND "")
+   else()
+      set(_FESOM_GNU_RKIND -fdefault-real-8 -fdefault-double-8)
+   endif()
    if(${FESOM_PLATFORM_STRATEGY} STREQUAL ubuntu )
       message(STATUS "Allowing type mismatches on Ubuntu for CI Testing" )  # NOTE(PG): Would be nicer to grab the CI=True from the env variable
-      target_compile_options(${PROJECT_NAME} PRIVATE -O2 -g -fbacktrace -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -cpp)
+      target_compile_options(${PROJECT_NAME} PRIVATE -O2 -g -fbacktrace -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  ${_FESOM_GNU_RKIND} -ffree-line-length-none -cpp)
    else()
-      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -cpp)
+      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  ${_FESOM_GNU_RKIND} -ffree-line-length-none -cpp)
    endif()
-   if(CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+   if(CMAKE_Fortran_COMPILER_ID STREQUAL "GNU" AND FESOM_ALLOW_ARG_MISMATCH)
       if(CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL 10)
          target_compile_options(${PROJECT_NAME} PRIVATE -fallow-argument-mismatch) # gfortran v10 is strict about erroneous API calls: "Rank mismatch between actual argument at (1) and actual argument at (2) (scalar and rank-1)"
       else()
@@ -450,7 +565,13 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
 
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray )
 	#target_compile_options(${PROJECT_NAME} PRIVATE -c -emf -hbyteswapio -hflex_mp=conservative -hfp1 -hadd_paren -Ounroll0 -hipa0 -r am -s real64 -N 1023 -g -G2 -O3)
-   target_compile_options(${PROJECT_NAME} PRIVATE -c -emf -hbyteswapio -hflex_mp=conservative -hfp1 -hadd_paren -Ounroll0 -hipa0 -r am -s real64 -N 1023 -g -G2 -O2 -hnoacc -M878)  #-hnoacc is a workaround for cray automatically activate -hacc, -M878 is to suppress ftn-878 warning
+   # default real kind follows USE_SINGLE_PRECISION
+   if(USE_SINGLE_PRECISION)
+      set(_FESOM_CRAY_RKIND real32)
+   else()
+      set(_FESOM_CRAY_RKIND real64)
+   endif()
+   target_compile_options(${PROJECT_NAME} PRIVATE -c -emf -hbyteswapio -hflex_mp=conservative -hfp1 -hadd_paren -Ounroll0 -hipa0 -r am -s ${_FESOM_CRAY_RKIND} -N 1023 -g -G2 -O2 -hnoacc -M878)  #-hnoacc is a workaround for cray automatically activate -hacc, -M878 is to suppress ftn-878 warning
    if(${ENABLE_OPENMP})
       target_compile_options(${PROJECT_NAME} PRIVATE -homp)
    else()
@@ -464,21 +585,34 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray )
    endif()
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL NVHPC )
    target_compile_definitions(${PROJECT_NAME} PRIVATE ENABLE_NVHPC_WORKAROUNDS)
+   # backslash is an ordinary character in Fortran strings (as with gfortran and ifx)
+   target_compile_options(${PROJECT_NAME} PRIVATE -Mbackslash)
+   # default real kind follows USE_SINGLE_PRECISION
+   if(USE_SINGLE_PRECISION)
+      set(_FESOM_NVHPC_RKIND -r4)
+   else()
+      set(_FESOM_NVHPC_RKIND -Mr8)
+   endif()
    if(${ENABLE_OPENACC})
+      target_compile_definitions(${PROJECT_NAME} PRIVATE ENABLE_OPENACC)
       target_compile_options(${PROJECT_NAME} PRIVATE
-      $<$<CONFIG:DEBUG>:-Mallocatable=95 -Mr8 -pgf90libs -Mnofma -Minfo=all -acc=verystrict -gpu=math_uniform,cuda12.2,cc80>
-      $<$<CONFIG:RELEASE>:-Mallocatable=95 -Mr8 -pgf90libs -Minfo=all -acc=verystrict -gpu=cc80>)
-      set(CMAKE_EXE_LINKER_FLAGS_DEBUG "-acc=verystrict -Mnofma -gpu=math_uniform,cuda12.2,cc80")
-      set(CMAKE_EXE_LINKER_FLAGS_RELEASE "-acc=verystrict -gpu=cc80")
+      $<$<CONFIG:DEBUG>:-Mallocatable=95 ${_FESOM_NVHPC_RKIND} -pgf90libs -Mnofma -Minfo=all -acc=verystrict -gpu=math_uniform,${GPU_FLAGS}>
+      $<$<CONFIG:RELEASE>:-Mallocatable=95 ${_FESOM_NVHPC_RKIND} -pgf90libs -Minfo=all -acc=verystrict -gpu=${GPU_COMPUTE_CAPABILITY},pinned>)
+      set(CMAKE_EXE_LINKER_FLAGS_DEBUG "-acc=verystrict -Mnofma -gpu=math_uniform,${GPU_FLAGS}")
+      set(CMAKE_EXE_LINKER_FLAGS_RELEASE "-acc=verystrict -gpu=${GPU_COMPUTE_CAPABILITY},pinned")
+      set(CMAKE_SHARED_LINKER_FLAGS_DEBUG "-acc=verystrict -Mnofma -gpu=math_uniform,${GPU_FLAGS}")
+      set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "-acc=verystrict -gpu=${GPU_COMPUTE_CAPABILITY},pinned")
       if(${DISABLE_OPENACC_ATOMICS})
          target_compile_definitions(${PROJECT_NAME} PRIVATE DISABLE_OPENACC_ATOMICS)
       endif()
    else()
       target_compile_options(${PROJECT_NAME} PRIVATE 
-      $<$<CONFIG:DEBUG>:-Mallocatable=95 -Mr8 -pgf90libs -Mnofma>
-      $<$<CONFIG:RELEASE>:-Mallocatable=95 -Mr8 -pgf90libs>)
+      $<$<CONFIG:DEBUG>:-Mallocatable=95 ${_FESOM_NVHPC_RKIND} -pgf90libs -Mnofma>
+      $<$<CONFIG:RELEASE>:-Mallocatable=95 ${_FESOM_NVHPC_RKIND} -pgf90libs>)
    endif()
 endif()
+
+target_compile_options(${PROJECT_NAME} PRIVATE ${FESOM_RUNTIME_CHECK_FLAGS} ${FESOM_BUILD_CHECK_FLAGS})
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${NETCDF_Fortran_INCLUDE_DIRECTORIES} ${OASIS_Fortran_INCLUDE_DIRECTORIES})
 target_include_directories(${PROJECT_NAME} PRIVATE ${MCT_Fortran_INCLUDE_DIRECTORIES} ${MPEU_Fortran_INCLUDE_DIRECTORIES})
@@ -516,11 +650,13 @@ endif()
    
 # fesom.x executable
 add_executable(${PROJECT_NAME}.x ${src_home}/fesom_main.F90)
+target_compile_options(${PROJECT_NAME}.x PRIVATE ${FESOM_RUNTIME_CHECK_FLAGS} ${FESOM_BUILD_CHECK_FLAGS})
 target_link_libraries(${PROJECT_NAME}.x PUBLIC ${PROJECT_NAME})
 
 # fesom_meshdiag executable (optional)
 if(BUILD_MESHDIAG)
     add_executable(fesom_meshdiag ${src_home}/fesom_meshdiag.F90)
+    target_compile_options(fesom_meshdiag PRIVATE ${FESOM_RUNTIME_CHECK_FLAGS} ${FESOM_BUILD_CHECK_FLAGS})
     target_link_libraries(fesom_meshdiag PUBLIC ${PROJECT_NAME})
     target_link_libraries(fesom_meshdiag PRIVATE MPI::MPI_Fortran)
     

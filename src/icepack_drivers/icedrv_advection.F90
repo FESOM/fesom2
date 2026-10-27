@@ -56,7 +56,6 @@ submodule (icedrv_main) icedrv_advection
         integer(kind=int_kind)           :: n,          q,     row,        &
                                             elem,       elnodes(3)
     
-#include "associate_mesh.h"
     
         ! Taylor-Galerkin (Lax-Wendroff) rhs
       
@@ -68,18 +67,18 @@ submodule (icedrv_main) icedrv_advection
     
         do elem = 1, nx_elem_nh  !assembling rhs over elements
     
-           elnodes = elem2D_nodes(:,elem)
+           elnodes = mesh%elem2D_nodes(:,elem)
     
            ! Derivatives
-           dx  = gradient_sca(1:3,elem)
-           dy  = gradient_sca(4:6,elem)
-           vol = elem_area(elem)
+           dx  = mesh%gradient_sca(1:3,elem)
+           dy  = mesh%gradient_sca(4:6,elem)
+           vol = mesh%elem_area(elem)
            um  = sum(uvel(elnodes))
            vm  = sum(vvel(elnodes))
     
            ! Diffusivity
     
-           diff =ice% ice_diff * sqrt( elem_area(elem) / scale_area )
+           diff =ice% ice_diff * sqrt( mesh%elem_area(elem) / scale_area )
            do n = 1, 3
               row = elnodes(n)
               do q = 1, 3
@@ -105,7 +104,6 @@ submodule (icedrv_main) icedrv_advection
       
         type(t_mesh), intent(in), target :: mesh
 
-#include "associate_mesh.h"
           
         ! Initialization of arrays necessary to implement FCT algorithm
         allocate(trl(nx))   ! low-order solutions
@@ -114,7 +112,7 @@ submodule (icedrv_main) icedrv_advection
         allocate(icefluxes(nx_elem_nh, 3))
         allocate(icepplus(nx), icepminus(nx))
         allocate(rhs_tr(nx),  rhs_trdiv(nx))
-        allocate(mass_matrix(sum(nn_num(1:nx_nh))))
+        allocate(mass_matrix(sum(mesh%nn_num(1:nx_nh))))
 
       
         trl(:)    = c0
@@ -145,51 +143,55 @@ submodule (icedrv_main) icedrv_advection
         integer(kind=int_kind)                 :: elem, elnodes(3), q, offset, col, ipos
         integer(kind=int_kind), allocatable    :: col_pos(:)
         real(kind=dbl_kind)                    :: aa
+        ! Row sum and area each accumulate O(nn_num) rounded terms, so the mismatch
+        ! scales with the area. An absolute tolerance is unreachable for WP=real32.
+        ! Not a parameter: nvfortran rejects spacing() in an initialization expression.
+        real(kind=WP)                          :: mass_matrix_rtol
         integer(kind=int_kind)                 :: flag=0 ,iflag=0
         type(t_mesh), intent(in), target       :: mesh
       
-#include "associate_mesh.h"
       
         allocate(col_pos(nx))
           
         do elem=1,nx_elem_nh
-           elnodes=elem2D_nodes(:,elem)
+           elnodes=mesh%elem2D_nodes(:,elem)
            do n = 1, 3
               row = elnodes(n)
               if ( row > nx_nh ) cycle
               ! Global-to-local neighbourhood correspondence
-              do q = 1, nn_num(row)
-                 col_pos(nn_pos(q,row))=q
+              do q = 1, mesh%nn_num(row)
+                 col_pos(mesh%nn_pos(q,row))=q
               enddo
-              offset = ssh_stiff%rowptr(row) - ssh_stiff%rowptr(1)
+              offset = mesh%ssh_stiff%rowptr(row) - mesh%ssh_stiff%rowptr(1)
               do q = 1, 3
                  col  = elnodes(q)
                  ipos = offset+col_pos(col)
-                 mass_matrix(ipos) = mass_matrix(ipos) + elem_area(elem) / 12.0_WP
+                 mass_matrix(ipos) = mass_matrix(ipos) + mesh%elem_area(elem) / 12.0_WP
                  if ( q == n ) then
-                 mass_matrix(ipos) = mass_matrix(ipos) + elem_area(elem) / 12.0_WP
+                 mass_matrix(ipos) = mass_matrix(ipos) + mesh%elem_area(elem) / 12.0_WP
                  end if
               enddo
            enddo
         enddo
       
         ! TEST: area == sum of row entries in mass_matrix:
+        mass_matrix_rtol = 100.0_WP*spacing(1.0_WP)
         do q = 1, nx_nh
-           offset = ssh_stiff%rowptr(q)   - ssh_stiff%rowptr(1) + 1
-           n      = ssh_stiff%rowptr(q+1) - ssh_stiff%rowptr(1)
+           offset = mesh%ssh_stiff%rowptr(q)   - mesh%ssh_stiff%rowptr(1) + 1
+           n      = mesh%ssh_stiff%rowptr(q+1) - mesh%ssh_stiff%rowptr(1)
            aa     = sum(mass_matrix(offset:n))
-           if ( abs(area(1,q)-aa) > p1) then
+           if ( abs(mesh%area(1,q)-aa) > mass_matrix_rtol*mesh%area(1,q)) then
               iflag = q
               flag  = 1
            endif
         enddo
       
         if ( flag > 0 ) then
-           offset = ssh_stiff%rowptr(iflag)   - ssh_stiff%rowptr(1)+1
-           n      = ssh_stiff%rowptr(iflag+1) - ssh_stiff%rowptr(1)
+           offset = mesh%ssh_stiff%rowptr(iflag)   - mesh%ssh_stiff%rowptr(1)+1
+           n      = mesh%ssh_stiff%rowptr(iflag+1) - mesh%ssh_stiff%rowptr(1)
            aa     = sum(mass_matrix(offset:n))
       
-           write(*,*) '#### MASS MATRIX PROBLEM', mype, iflag, aa, area(1,iflag)
+           write(*,*) '#### MASS MATRIX PROBLEM', mype, iflag, aa, mesh%area(1,iflag)
         endif
         deallocate(col_pos)
     
@@ -220,18 +222,17 @@ submodule (icedrv_main) icedrv_advection
         type(t_mesh),        target,        intent(in)     :: mesh
         real(kind=dbl_kind), dimension(nx), intent(inout)  :: trc
     
-#include "associate_mesh.h"
       
         gamma = ice%ice_gamma_fct       ! Added diffusivity parameter
                                     ! Adjust it to ensure posivity of solution
       
         do row = 1, nx_nh
-           clo  = ssh_stiff%rowptr(row)   - ssh_stiff%rowptr(1) + 1
-           clo2 = ssh_stiff%rowptr(row+1) - ssh_stiff%rowptr(1)
+           clo  = mesh%ssh_stiff%rowptr(row)   - mesh%ssh_stiff%rowptr(1) + 1
+           clo2 = mesh%ssh_stiff%rowptr(row+1) - mesh%ssh_stiff%rowptr(1)
            cn   = clo2 - clo + 1
-           location(1:cn) = nn_pos(1:cn, row)
+           location(1:cn) = mesh%nn_pos(1:cn, row)
            trl(row) = (rhs_tr(row) + gamma * sum(mass_matrix(clo:clo2) * &
-                      trc(location(1:cn)))) / area(1,row) +              &
+                      trc(location(1:cn)))) / mesh%area(1,row) +              &
                       (1.0_WP-gamma) * trc(row)
         enddo
       
@@ -255,13 +256,12 @@ submodule (icedrv_main) icedrv_advection
         type(t_mesh),        target,        intent(in)     :: mesh
         real(kind=dbl_kind), dimension(nx), intent(inout)  :: trc
       
-#include "associate_mesh.h"
       
         ! Taylor-Galerkin solution
        
         ! First guess solution
         do row = 1, nx_nh
-           d_tr(row) = rhs_tr(row) / area(1,row)
+           d_tr(row) = rhs_tr(row) / mesh%area(1,row)
         end do
       
         call exchange_nod(d_tr, p_partit)
@@ -269,12 +269,12 @@ submodule (icedrv_main) icedrv_advection
         ! Iterate
         do n = 1, num_iter_solve - 1
            do row = 1, nx_nh
-              clo  = ssh_stiff%rowptr(row) - ssh_stiff%rowptr(1) + 1
-              clo2 = ssh_stiff%rowptr(row+1) - ssh_stiff%rowptr(1)
+              clo  = mesh%ssh_stiff%rowptr(row) - mesh%ssh_stiff%rowptr(1) + 1
+              clo2 = mesh%ssh_stiff%rowptr(row+1) - mesh%ssh_stiff%rowptr(1)
               cn   = clo2 - clo + 1
-              location(1:cn) = nn_pos(1:cn,row)
+              location(1:cn) = mesh%nn_pos(1:cn,row)
               rhs_new  = rhs_tr(row) - sum(mass_matrix(clo:clo2) * d_tr(location(1:cn)))
-              trl(row) = d_tr(row) + rhs_new / area(1,row)
+              trl(row) = d_tr(row) + rhs_new / mesh%area(1,row)
            enddo
            do row = 1, nx_nh
               d_tr(row) = trl(row)
@@ -307,7 +307,6 @@ submodule (icedrv_main) icedrv_advection
         real(kind=dbl_kind), dimension(nx), intent(inout)  :: trc
         type(t_ice),        target,        intent(in)     :: ice  
         
-#include "associate_mesh.h"
       
         gamma = ice%ice_gamma_fct        ! It should coinside with gamma in
                                      ! ts_solve_low_order
@@ -332,11 +331,11 @@ submodule (icedrv_main) icedrv_advection
         enddo
        
         do elem = 1, nx_elem_nh
-           elnodes = elem2D_nodes(:,elem)
-           vol     = elem_area(elem)
+           elnodes = mesh%elem2D_nodes(:,elem)
+           vol     = mesh%elem_area(elem)
            do q = 1, 3
               icefluxes(elem,q) = -sum(icoef(:,q) * (gamma * trc(elnodes) +       &
-                                  d_tr(elnodes))) * (vol / area(1,elnodes(q))) / 12.0_WP
+                                  d_tr(elnodes))) * (vol / mesh%area(1,elnodes(q))) / 12.0_WP
            enddo
         enddo
        
@@ -353,9 +352,9 @@ submodule (icedrv_main) icedrv_advection
         !==========================
        
         do row = 1, nx_nh
-           n = nn_num(row)
-           tmax(row) = maxval(trl(nn_pos(1:n,row)))
-           tmin(row) = minval(trl(nn_pos(1:n,row)))
+           n = mesh%nn_num(row)
+           tmax(row) = maxval(trl(mesh%nn_pos(1:n,row)))
+           tmin(row) = minval(trl(mesh%nn_pos(1:n,row)))
            ! Admissible increments
            tmax(row) = tmax(row) - trl(row)
            tmin(row) = tmin(row) - trl(row)
@@ -368,7 +367,7 @@ submodule (icedrv_main) icedrv_advection
         icepplus = c0
         icepminus = c0
         do elem = 1, nx_elem_nh
-           elnodes = elem2D_nodes(:,elem)
+           elnodes = mesh%elem2D_nodes(:,elem)
            do q = 1, 3
               n    = elnodes(q)
               flux = icefluxes(elem,q)
@@ -408,7 +407,7 @@ submodule (icedrv_main) icedrv_advection
          !========================
        
          do elem = 1, nx_elem_nh
-            elnodes = elem2D_nodes(:,elem)
+            elnodes = mesh%elem2D_nodes(:,elem)
             ae = c1
             do q = 1, 3
                n    = elnodes(q)
@@ -428,7 +427,7 @@ submodule (icedrv_main) icedrv_advection
              trc(n) = trl(n)
           end do
           do elem = 1, nx_elem_nh
-             elnodes = elem2D_nodes(:,elem)
+             elnodes = mesh%elem2D_nodes(:,elem)
              do q = 1, 3
                 n = elnodes(q)
                 trc(n) = trc(n) + icefluxes(elem,q)
@@ -457,7 +456,6 @@ submodule (icedrv_main) icedrv_advection
         type(t_mesh),        target,        intent(in)     :: mesh
         real(kind=dbl_kind), dimension(nx), intent(inout)  :: trc    
 
-#include "associate_mesh.h"
     
         ! Computes the rhs in a Taylor-Galerkin way (with urrayspwind 
         ! type of correction for the advection operator).
@@ -472,12 +470,12 @@ submodule (icedrv_main) icedrv_advection
       
         do elem = 1, nx_elem_nh   !! assembling rhs over elements
                                   !! elem=myList_elem2D(m)
-           elnodes = elem2D_nodes(:,elem)
+           elnodes = mesh%elem2D_nodes(:,elem)
       
            ! Derivatives
-           dx  = gradient_sca(1:3,elem)
-           dy  = gradient_sca(4:6,elem)
-           vol = elem_area(elem)
+           dx  = mesh%gradient_sca(1:3,elem)
+           dy  = mesh%gradient_sca(4:6,elem)
+           vol = mesh%elem_area(elem)
            um  = sum(uvel(elnodes))
            vm  = sum(vvel(elnodes))
       
@@ -523,13 +521,12 @@ submodule (icedrv_main) icedrv_advection
         type(t_mesh),        target,        intent(in)     :: mesh
         real(kind=dbl_kind), dimension(nx), intent(inout)  :: trc
     
-#include "associate_mesh.h"
     
         ! Computes Taylor-Galerkin solution
         ! first approximation
       
         do row = 1, nx_nh
-           d_tr(row) = rhs_trdiv(row) / area(1,row)
+           d_tr(row) = rhs_trdiv(row) / mesh%area(1,row)
         enddo
       
         call exchange_nod(d_tr, p_partit)
@@ -538,12 +535,12 @@ submodule (icedrv_main) icedrv_advection
       
         do n = 1, num_iter_solve-1
            do row = 1, nx_nh
-              clo            = ssh_stiff%rowptr(row)   - ssh_stiff%rowptr(1) + 1
-              clo2           = ssh_stiff%rowptr(row+1) - ssh_stiff%rowptr(1)
+              clo            = mesh%ssh_stiff%rowptr(row)   - mesh%ssh_stiff%rowptr(1) + 1
+              clo2           = mesh%ssh_stiff%rowptr(row+1) - mesh%ssh_stiff%rowptr(1)
               cn             = clo2 - clo + 1
-              location(1:cn) = nn_pos(1:cn, row)
+              location(1:cn) = mesh%nn_pos(1:cn, row)
               rhs_new        = rhs_trdiv(row) - sum(mass_matrix(clo:clo2) * d_tr(location(1:cn)))
-              trl(row)       = d_tr(row) + rhs_new / area(1,row)
+              trl(row)       = d_tr(row) + rhs_new / mesh%area(1,row)
            enddo
            do row = 1, nx_nh
               d_tr(row) = trl(row)

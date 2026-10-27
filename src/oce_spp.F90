@@ -13,7 +13,6 @@ use o_arrays
 USE MOD_ICE
 use mod_mesh
 USE MOD_PARTIT
-USE MOD_PARSUP
 use g_comm_auto
 use o_tracers
 use g_config,         only: dt
@@ -26,10 +25,6 @@ type(t_mesh)  , intent(in), target :: mesh
 type(t_partit), intent(in), target :: partit
 real(kind=WP), dimension(:)  , pointer :: thdgr, S_oc_array
 real(kind=WP)                , pointer :: rhoice, rhowat, Sice
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 thdgr      => ice%thermo%thdgr
 S_oc_array => ice%srfoce_salt
 rhoice     => ice%thermo%rhoice
@@ -37,10 +32,10 @@ rhowat     => ice%thermo%rhowat
 Sice       => ice%thermo%Sice
 
 aux=rhoice/rhowat*dt
-do row=1, myDim_nod2d +eDim_nod2D! myDim is sufficient
-   if (thdgr(row)>0.0_WP .and. ulevels_nod2D(row)==1) then
+do row=1, partit%myDim_nod2d +partit%eDim_nod2D! myDim is sufficient
+   if (thdgr(row)>0.0_WP .and. mesh%ulevels_nod2D(row)==1) then
       ice_rejected_salt(row)= &
-      (S_oc_array(row)-Sice)*thdgr(row)*aux*area(1, row)
+      (S_oc_array(row)-Sice)*thdgr(row)*aux*mesh%area(1, row)
       !unit: psu m3
    else
       ice_rejected_salt(row)=0.0_WP
@@ -56,7 +51,6 @@ subroutine app_rejected_salt(ttf, partit, mesh)
   use o_param,  only: SPP_dep_N, SPP_dep_S, SPP_drhodz_cr_N, SPP_drhodz_cr_S, SPP_expon
   use mod_mesh
   USE MOD_PARTIT
-  USE MOD_PARSUP
   use o_tracers
   use g_comm_auto
   implicit none
@@ -75,13 +69,9 @@ subroutine app_rejected_salt(ttf, partit, mesh)
   type(t_partit), intent(in), target :: partit
   real(kind=WP),  intent (inout)     :: ttf(mesh%nl-1,partit%myDim_nod2D+partit%eDim_nod2D)
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
-  do row=1,myDim_nod2d+eDim_nod2D   ! myDim is sufficient
-     if (ulevels_nod2D(row)>1) cycle
+  do row=1,partit%myDim_nod2d+partit%eDim_nod2D   ! myDim is sufficient
+     if (mesh%ulevels_nod2D(row)>1) cycle
      if (ice_rejected_salt(row)<=0.0_WP) cycle
      ! do not parameterize brine rejection in regions with low salinity
      ! 1. it leads to further decrease of SSS
@@ -89,7 +79,7 @@ subroutine app_rejected_salt(ttf, partit, mesh)
      
      ! set different salt prine rejection depth and critical density slope for 
      ! northern and southern hemisphere
-     if (geo_coord_nod2D(2,row)>0.0_WP) then
+     if (mesh%geo_coord_nod2D(2,row)>0.0_WP) then
         spp_dep       = SPP_dep_N
         SPP_drhodz_cr = SPP_drhodz_cr_N
      else
@@ -97,17 +87,17 @@ subroutine app_rejected_salt(ttf, partit, mesh)
         SPP_drhodz_cr = SPP_drhodz_cr_S
      end if 
      
-     nzmin = ulevels_nod2D(row)
-     nzmax = nlevels_nod2D(row)
+     nzmin = mesh%ulevels_nod2D(row)
+     nzmax = mesh%nlevels_nod2D(row)
      if (ttf(nzmin,row) < 10.0_WP) cycle
      !if (geo_coord_nod2D(2,row)>0.0_WP) then  !NH
         kml=1
         spar(nzmin)=0.0_WP
         do k=nzmin, nzmax-1
            drhodz=bvfreq(k, row)*density_0/g
-           if (drhodz>=SPP_drhodz_cr .or. Z_3d_n(k,row)<-abs(spp_dep)) exit
+           if (drhodz>=SPP_drhodz_cr .or. mesh%Z_3d_n(k,row)<-abs(spp_dep)) exit
            kml=kml+1
-           spar(k+1)=area(k+1,row)*hnode(k+1,row)*(Z_3d_n(1,row)-Z_3d_n(k+1,row))**SPP_expon
+           spar(k+1)=mesh%area(k+1,row)*mesh%hnode(k+1,row)*(mesh%Z_3d_n(1,row)-mesh%Z_3d_n(k+1,row))**SPP_expon
         end do
         
         !_______________________________________________________________________
@@ -124,10 +114,10 @@ subroutine app_rejected_salt(ttf, partit, mesh)
             !PS substract than ice_rejected_salt(row)... which is the amount of salt 
             !PS to take away by salt plum from the first layer that than is 
             !PS distributed by spar in the subsequent layers ... !
-            ttf(nzmin,row)=ttf(nzmin,row)-ice_rejected_salt(row)/areasvol(1,row)/hnode(1,row)
+            ttf(nzmin,row)=ttf(nzmin,row)-ice_rejected_salt(row)/mesh%areasvol(1,row)/mesh%hnode(1,row)
             spar(nzmin+1:kml)=spar(nzmin+1:kml)/sum(spar(nzmin+1:kml))
             do k=nzmin+1,kml
-                ttf(k,row)=ttf(k,row)+ice_rejected_salt(row)*spar(k)/areasvol(k,row)/hnode(k,row)
+                ttf(k,row)=ttf(k,row)+ice_rejected_salt(row)*spar(k)/mesh%areasvol(k,row)/mesh%hnode(k,row)
             end do
         endif
       !endif

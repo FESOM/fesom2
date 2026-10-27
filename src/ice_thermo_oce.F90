@@ -1,94 +1,51 @@
-module ice_thermodynamics_interfaces
-    interface
-        subroutine thermodynamics(ice, partit, mesh)
-        USE MOD_ICE
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        type(t_ice)   , intent(inout), target :: ice
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine thermodynamics
-        
-        subroutine cut_off(ice, partit, mesh)
-        USE MOD_ICE
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        type(t_ice)   , intent(inout), target :: ice
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine cut_off
-    end interface  
-end module ice_thermodynamics_interfaces
+module ice_thermo_oce_module
+    USE o_param
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_ICE
+    USE g_config
+    USE o_arrays, only: fw_ice, fw_snw
+    USE g_forcing_param
+    USE g_forcing_arrays
+    USE g_comm_auto
+    USE g_sbf, only: l_snow
+    USE g_clock
 
-module ice_therm_interface
-    interface
-        subroutine therm_ice(ithermp, h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rsss, &
-        ug, ustar, T_oc, S_oc, H_ML, t, ice_dt, ch, ce, ch_i, ce_i, evap_in, fw,  fwice, fwsnw, ehf, evap, &
-        rsf, dhgrowth, dhsngrowth, dAgrowth, iflice, hflatow, hfsenow, hflwrdout, hfswrow, &
-        hflwrow, hfradow, lid_clo, geolon, geolat, subli)
-        USE MOD_ICE
-        type(t_ice_thermo), intent(in), target :: ithermp
-        real(kind=WP)   h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rsss, &
-                        ug, ustar, T_oc, S_oc, H_ML, t, ice_dt, ch, ce, ch_i, ce_i, evap_in, fw, fwice, fwsnw, ehf, &
-                        dhgrowth, dhsngrowth, dAgrowth, ahf, prec, subli, subli_i, rsf, &
-                        rhow, show, rhice, shice, sh, thick, thact, lat, &
-                        rh, rA, qhst, sn, hsntmp, o2ihf, evap, iflice, hflatow, &
-                        hfsenow, hflwrdout, hfswrow, hflwrow, hfradow, lid_clo, geolon, geolat
-        end subroutine therm_ice
-    end interface
-end module ice_therm_interface
+    implicit none
 
-module ice_budget_interfaces
-    interface
-        subroutine budget(ithermp, hice, hsn, t, ta, qa, fsh, flo, ug, S_oc, ch_i, ce_i, fh, subli)
-        USE MOD_ICE
-        type(t_ice_thermo), intent(in), target :: ithermp
-        real(kind=WP)  hice, hsn, t, ta, qa, fsh, flo, ug, S_oc, ch_i, ce_i, fh, subli
-        end subroutine budget
-        
-        subroutine obudget(ithermp, qa, fsh, flo, t, ug, ta, ch, ce, geolon, & 
-                           geolat, fh, evap, hflatow, hfsenow, hflwrdout, hfswrow, &
-                           hflwrow, hfradow) 
-        USE MOD_ICE
-        type(t_ice_thermo), intent(in), target :: ithermp
-        real(kind=WP)   qa, t, ta, fsh, flo, ug, ch, ce, geolon, geolat, fh, evap, &
-                        hfsenow, hflatow, hflwrdout, hfswrow, hflwrow, hfradow
-        end subroutine obudget
-        
-        subroutine flooding(ithermp, h, hsn)
-        USE MOD_ICE
-        type(t_ice_thermo), intent(in), target :: ithermp
-        real(kind=WP)   h, hsn
-        end subroutine flooding
-    end interface
-end module ice_budget_interfaces
+    private
+    public :: cut_off
+#if !defined (__oasis) && !defined (__ifsinterface) && !defined (__yac)
+    public :: thermodynamics, therm_ice, budget, obudget, flooding, &
+              TFrez, compute_solar_zenith_angle, albw_taylor, &
+              albw_briegleb, open_water_albedo_at
+#ifdef ENABLE_OPENACC
+    public :: thermodynamics_acc, thermo_device_ok
+    logical, save :: thermo_data_created = .false.
+#endif
+#endif
+
+contains
+
 !
 !
 !_______________________________________________________________________________
 subroutine cut_off(ice, partit, mesh)
-    use o_param
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_ICE
-    use g_config, only: use_cavity
     implicit none
     type(t_mesh),   intent(in),    target :: mesh
     type(t_partit), intent(inout), target :: partit
     type(t_ice),    intent(inout), target :: ice
     integer                               :: n
+#if defined (__oifs)
+    integer                               :: n_coldice
+    integer, save                         :: n_coldwarn = 0
+#endif
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
 #if defined (__oifs) || defined (__ifsinterface)
     real(kind=WP), dimension(:), pointer  :: ice_temp
 #endif /* (__oifs) */
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     a_ice    => ice%data(1)%values(:)
     m_ice    => ice%data(2)%values(:)
     m_snow   => ice%data(3)%values(:)
@@ -96,10 +53,18 @@ subroutine cut_off(ice, partit, mesh)
     ice_temp => ice%data(4)%values(:)
 #endif /* (__oifs) */
 
+#if defined (__oifs)
+    n_coldice = 0
+#endif
+
     !___________________________________________________________________________
     ! upper cutoff: a_ice
+#if defined (__oifs)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n) REDUCTION(+:n_coldice)
+#else
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
-DO n=1, myDim_nod2D+eDim_nod2D
+#endif
+DO n=1, partit%myDim_nod2D+partit%eDim_nod2D
    if (a_ice(n) > 1.0_WP)   a_ice(n)=1.0_WP
     ! lower cutoff: a_ice
    if (a_ice(n) < .1e-8_WP) then
@@ -127,11 +92,30 @@ DO n=1, myDim_nod2D+eDim_nod2D
     if (ice_temp(n) > 273.15_WP) ice_temp(n)=273.15_WP
 #endif /* (__oifs) */
 
-#if defined (__oifs) || defined (__ifsinterface)
+#if defined (__oifs)
+    ! No lower clamp. A surface temperature this far below anything physical
+    ! means the skin solve has diverged, and silently resetting it to the
+    ! seawater freezing point hides the divergence instead of reporting it.
+    ! Count and report below.
+    if (ice_temp(n) < 173.15_WP .and. a_ice(n) >= 0.1e-8_WP) n_coldice = n_coldice + 1
+#elif defined (__ifsinterface)
+    ! Preserve the 2.6.7.1 IFS-FESOM safeguard while its legacy surface
+    ! temperature scheme is in use.
     if (ice_temp(n) < 173.15_WP .and. a_ice(n) >= 0.1e-8_WP) ice_temp(n)=271.35_WP
 #endif /* (__oifs) */
 END DO
 !$OMP END PARALLEL DO
+
+#if defined (__oifs)
+    ! Rate limited: a diverging skin solve usually diverges every step.
+    if (n_coldice > 0) then
+        n_coldwarn = n_coldwarn + 1
+        if (n_coldwarn <= 5 .or. mod(n_coldwarn, 100) == 0) then
+            write(*,*) 'WARNING: ice_temp below 173.15 K on ', n_coldice, &
+                       ' node(s), rank ', partit%mype, ', occurrence ', n_coldwarn
+        end if
+    end if
+#endif /* (__oifs) */
 end subroutine cut_off
 
 #if !defined (__oasis) && !defined (__ifsinterface) && !defined (__yac)
@@ -153,18 +137,6 @@ subroutine thermodynamics(ice, partit, mesh)
   ! variables.
   !------------------------------------------------------------------------
   
-    USE MOD_ICE
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
-    use o_param
-    use o_arrays, only: fw_ice, fw_snw
-    use g_config
-    use g_forcing_param
-    use g_forcing_arrays
-    use g_comm_auto
-    use g_sbf, only: l_snow
-    use ice_therm_interface
     implicit none
     type(t_ice)   , intent(inout), target :: ice
     type(t_mesh)  , intent(in)   , target :: mesh
@@ -189,7 +161,6 @@ subroutine thermodynamics(ice, partit, mesh)
     real(kind=WP), dimension(:)  , pointer :: thdgr, thdgrsn, thdgra, thdgr_old, t_skin, ustar_aux
     real(kind=WP), dimension(:)  , pointer :: S_oc_array, T_oc_array, u_w, v_w
     real(kind=WP), dimension(:)  , pointer :: fresh_wa_flux, net_heat_flux
-    real(kind=WP), external  :: TFrez  ! Sea water freeze temperature
     myDim_nod2d   => partit%myDim_nod2D
     eDim_nod2D    => partit%eDim_nod2D
     ulevels_nod2D  (1    :myDim_nod2D+eDim_nod2D) => mesh%ulevels_nod2D(:)
@@ -225,7 +196,8 @@ subroutine thermodynamics(ice, partit, mesh)
     ! Friction velocity 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j, elem, h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rsss, rsf, evap_in, ug, ustar, T_oc, S_oc, &
 !$OMP                                  h_ml, t, ch, ce, ch_i, ce_i, fw, ehf, evap, ithdgr, ithdgrsn, iflice, hflatow, hfsenow, hflwrdout,    &
-!$OMP                                  subli, lid_clo, lat, geolon, geolat, o2ihf)
+!$OMP                                  subli, lid_clo, lat, geolon, geolat, o2ihf, fwice, fwsnw, ithdgra, &
+!$OMP                                  hfswrow, hflwrow, hfradow)
 !$OMP DO
     do i=1, myDim_nod2D
         ustar=0.0_WP
@@ -414,10 +386,6 @@ subroutine therm_ice(ithermp, h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rss
     ! subli - sublimatione over ice
     ! o2ihf - ocean to ice heat flux [W/m2] 
 
-    USE MOD_ICE
-    use g_forcing_param,  only: use_virt_salt  
-    use o_param
-    use ice_budget_interfaces
     implicit none
     type(t_ice_thermo), intent(in), target :: ithermp
     integer k
@@ -427,7 +395,6 @@ subroutine therm_ice(ithermp, h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rss
     real(kind=WP)  rhow,show,rhice,shice,sh,snthick,thick,thact,lat
     real(kind=WP)  rh,rA,qhst,sn,hsntmp,o2ihf,evap
     real(kind=WP)  iflice, hflatow, hfsenow, hflwrdout, hfswrow, hflwrow, hfradow
-    real(kind=WP), external  :: TFrez  ! Sea water freeze temperature.
     real(kind=WP)  lid_clo, geolon, geolat
     !___________________________________________________________________________
     logical      , pointer :: snowdist, new_iclasses
@@ -678,8 +645,6 @@ subroutine budget (ithermp, hice,hsn,t,ta,qa,fsh,flo,ug,S_oc,ch_i,ce_i,fh,subli)
     ! A similar change was also made for the obudget routine.
     ! It was found through experiments that the results are quite similar to that from the
     ! original code, and the simulated ice volume is only slightly larger after modification. 
-    use MOD_ICE
-    use o_param, only: WP
     implicit none
     type(t_ice_thermo), intent(in), target :: ithermp
     integer iter, imax      ! Number of iterations
@@ -688,7 +653,6 @@ subroutine budget (ithermp, hice,hsn,t,ta,qa,fsh,flo,ug,S_oc,ch_i,ce_i,fh,subli)
     real(kind=WP)  alb             ! Albedo of sea ice
     real(kind=WP)  q1, q2	  ! coefficients for saturated specific humidity
     real(kind=WP)  A1,A2,A3,B,C, d1, d2, d3   
-    real(kind=WP), external :: TFrez
     !___________________________________________________________________________
     real(kind=WP), pointer :: boltzmann, emiss_ice, tmelt, cl, clhi, con, cpair, &
                               inv_rhowat, inv_rhoair, rhoair, albim, albi, albsn, albsnm
@@ -792,23 +756,19 @@ subroutine obudget (ithermp, qa,fsh,flo,t,ug,ta,ch,ce,geolon, geolat, fh, evap, 
     !
     ! OUTPUT: fh - growth rate
     !         evap - evaporation
-    use MOD_ICE  
-    use MOD_MESH
-    use o_param, only: WP
-    use g_clock
     implicit none
     type(t_ice_thermo), intent(in), target :: ithermp
     real(kind=WP) qa,t,ta,fsh,flo,ug,ch,ce,fh,evap
     real(kind=WP) hfsenow, hfswrow, hflwrow, hfradow, hflatow, hftotow, hflwrdout,b
     real(kind=WP) q1, q2 		! coefficients for saturated specific humidity
-    real(kind=WP) c1, c4, c5, coszen, geolon, geolat
-    real(kind=WP), external  :: compute_solar_zenith_angle, albw_taylor, albw_briegleb
+    real(kind=WP) c1, c4, c5, geolon, geolat
     logical :: standard_saturation_shum_formula = .true.
     integer :: ii
     !___________________________________________________________________________
     integer, pointer :: open_water_albedo
     real(kind=WP), pointer :: boltzmann, emiss_wat, inv_rhowat, inv_rhoair, rhoair, &
-                              tmelt, cl, clhw, cpair, albw
+                              tmelt, cl, clhw, cpair
+    real(kind=WP)          :: albw
     boltzmann  => ithermp%boltzmann
     emiss_wat  => ithermp%emiss_wat
     inv_rhowat => ithermp%inv_rhowat
@@ -818,7 +778,6 @@ subroutine obudget (ithermp, qa,fsh,flo,t,ug,ta,ch,ce,geolon, geolat, fh, evap, 
     cl         => ithermp%cl
     clhw       => ithermp%clhw
     cpair      => ithermp%cpair
-    albw       => ithermp%albw
     open_water_albedo => ithermp%open_water_albedo
     
     !___________________________________________________________________________
@@ -827,14 +786,9 @@ subroutine obudget (ithermp, qa,fsh,flo,t,ug,ta,ch,ce,geolon, geolat, fh, evap, 
     c5 = 237.3_WP
     q1 = 640380._WP
     q2 = -5107.4_WP
-    if(open_water_albedo > 0)then
-        coszen=compute_solar_zenith_angle(daynew, timenew/3600., geolon, geolat)
-        if(open_water_albedo > 1)then
-           albw=albw_briegleb(coszen)
-        else
-           albw=albw_taylor(coszen)
-        endif
-     endif
+    ! open water albedo of this vertex, kept local: ithermp is shared by all
+    ! vertices and threads
+    albw = open_water_albedo_at(ithermp, geolon, geolat)
 
     ! (saturated) surface specific humidity
     if(standard_saturation_shum_formula) then
@@ -870,7 +824,6 @@ end subroutine obudget
 !
 !_______________________________________________________________________________
 subroutine flooding (ithermp, h, hsn)
-    use MOD_ICE
     type(t_ice_thermo), intent(in), target :: ithermp
     real(kind=WP) h,hsn,hdraft,hflood
     !___________________________________________________________________________
@@ -897,9 +850,9 @@ end subroutine flooding
 !
 !_______________________________________________________________________________
 function TFrez(S)
+    !$ACC ROUTINE SEQ
     ! Nonlinear correlation for the water freezing temperature.
     ! Millero (1978) - UNESCO. Reference - See A. Gill, 1982.
-    use o_param, only: WP
     implicit none
     real(kind=WP) :: S, TFrez
 
@@ -908,6 +861,27 @@ function TFrez(S)
 end function TFrez
 
 
+! Open water albedo at one vertex: the namelist value albw, or a value that
+! depends on the solar zenith angle if open_water_albedo>0. Used for the surface
+! heat flux (obudget) and for the shortwave penetration (cal_shortwave_rad), which
+! have to agree.
+function open_water_albedo_at(ithermp, geolon, geolat) result(alb)
+    type(t_ice_thermo), intent(in) :: ithermp
+    real(kind=WP)     , intent(in) :: geolon, geolat   ! geographical coordinates [rad]
+    real(kind=WP)                  :: alb, coszen
+    alb = ithermp%albw
+    if (ithermp%open_water_albedo > 0) then
+        coszen = compute_solar_zenith_angle(daynew, timenew/3600., geolon, geolat)
+        if (ithermp%open_water_albedo > 1) then
+            alb = albw_briegleb(coszen)
+        else
+            alb = albw_taylor(coszen)
+        end if
+    end if
+end function open_water_albedo_at
+!
+!
+!_______________________________________________________________________________
 function compute_solar_zenith_angle(day_of_year, hour_utc, longitude, latitude) result(cos_zenith)
     !-----------------------------------------------------------------------
     ! Purpose: Compute the cosine of the solar zenith angle given the day of the year,
@@ -929,7 +903,6 @@ function compute_solar_zenith_angle(day_of_year, hour_utc, longitude, latitude) 
     ! Written for Apache 2.0 licensed projects.
     !-----------------------------------------------------------------------
 
-    use o_param, only: WP  ! Ensure precision consistency
 
     implicit none
 
@@ -942,7 +915,6 @@ function compute_solar_zenith_angle(day_of_year, hour_utc, longitude, latitude) 
     real(kind=WP)              :: cos_zenith
 
     ! Constants
-    real(kind=WP), parameter   :: PI = 3.141592653589793_WP
     real(kind=WP), parameter   :: DEG_TO_RAD = PI / 180.0_WP
     real(kind=WP), parameter   :: RAD_TO_DEG = 180.0_WP / PI
     real(kind=WP), parameter   :: DAYS_PER_YEAR = 365.25_WP
@@ -981,7 +953,6 @@ end function compute_solar_zenith_angle
     !     method:   taylor et al. (1996)
     !     author:   frank kauker
     !     date:     26. april 2017
-    use o_param, only: WP
     implicit none
   
     real(kind=WP), intent(in)  :: coszen
@@ -998,7 +969,6 @@ end function compute_solar_zenith_angle
     !     author:   frank kauker
     !     date:     26. april 2017
     
-    use o_param, only: WP
     implicit none
   
     real(kind=WP), intent(in)  :: coszen
@@ -1012,4 +982,348 @@ end function compute_solar_zenith_angle
 !
 !
 !_______________________________________________________________________________
+#ifdef ENABLE_OPENACC
+!
+!
+!_______________________________________________________________________________
+! configurations thermodynamics_acc covers: constant open-water albedo, no observed thickness distribution
+logical function thermo_device_ok(ice)
+    type(t_ice), intent(in) :: ice
+    thermo_device_ok = ice%thermo%open_water_albedo == 0 .and. .not. ice%thermo%new_iclasses
+end function thermo_device_ok
+!
+!
+!_______________________________________________________________________________
+! budget for the device: the parameters of ice%thermo passed as scalars
+subroutine budget_acc(hice,hsn,t,ta,qa,fsh,flo,ug,S_oc,ch_i,ce_i,fh,subli, &
+                      boltzmann, emiss_ice, tmelt, cl, clhi, con, cpair, inv_rhowat, inv_rhoair, rhoair, &
+                      albim, albi, albsn, albsnm)
+    !$ACC ROUTINE SEQ
+    implicit none
+    real(kind=WP), intent(in)    :: hice,hsn,ta,qa,fsh,flo,ug,S_oc,ch_i,ce_i
+    real(kind=WP), intent(inout) :: t
+    real(kind=WP), intent(out)   :: fh, subli
+    real(kind=WP), intent(in)    :: boltzmann, emiss_ice, tmelt, cl, clhi, con, cpair, inv_rhowat, inv_rhoair, rhoair, &
+                                    albim, albi, albsn, albsnm
+    integer        :: iter, imax
+    real(kind=WP)  :: hfsen,hfrad,hflat,hftot,alb,q1,q2,A1,A2,A3,B,C,d1,d2,d3
+    q1   = 11637800.0_WP
+    q2   = -5897.8_WP
+    imax = 5
+    if (t<0.0_WP) then
+        if (hsn.gt.0.0_WP) then
+            alb=albsn
+        else
+            alb=albi
+        endif
+    else
+        if (hsn.gt.0.0_WP) then
+            alb=albsnm
+        else
+            alb=albim
+        endif
+    endif
+    d1=rhoair*cpair*Ch_i
+    d2=rhoair*Ce_i
+    d3=d2*clhi
+    A1=(1.0_WP-alb)*fsh + flo + d1*ug*ta + d3*ug*qa
+    do iter=1,imax
+        B=q1*inv_rhoair*exp(q2/(t+tmelt))
+        A2=-d1*ug*t-d3*ug*B &
+            -emiss_ice*boltzmann*((t+tmelt)**4)
+        A3=-d3*ug*B*q2/((t+tmelt)**2)
+        C=con/hice
+        A3=A3+C+d1*ug &
+            +4.0_WP*emiss_ice*boltzmann*((t+tmelt)**3)
+        C=C*(TFrez(S_oc)-t)
+        t=t+(A1+A2+C)/A3
+    end do
+    t=min(0.0_WP,t)
+    hfrad= (1.0_WP-alb)*fsh &
+        +flo &
+        -emiss_ice*boltzmann*((t+tmelt)**4)
+    hfsen=d1*ug*(ta-t)
+    subli=d2*ug*(qa-B)
+    hflat=clhi*subli
+    hftot=hfrad+hfsen+hflat
+    fh= -hftot/cl
+    subli=subli*inv_rhowat
+end subroutine budget_acc
+!
+!
+!_______________________________________________________________________________
+! thermodynamics on the device (thermo_device_ok): the same per-node computation as thermodynamics,
+! therm_ice, obudget and flooding; forcing and ice state are uploaded, the results brought back.
+subroutine thermodynamics_acc(ice, partit, mesh)
+    implicit none
+    type(t_ice)   , intent(inout), target :: ice
+    type(t_mesh)  , intent(in)   , target :: mesh
+    type(t_partit), intent(inout), target :: partit
+    integer        :: i, k, nod_size, myDim_nod2D, iclasses
+    real(kind=WP)  :: h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss,rsf,evap_in
+    real(kind=WP)  :: ug,ustar,T_oc,S_oc,h_ml,t,ch,ce,ch_i,ce_i,fw,fwice,fwsnw,ehf,evap
+    real(kind=WP)  :: ithdgr, ithdgrsn, ithdgra, iflice, hflatow, hfsenow, hflwrdout, subli, hfswrow, hflwrow, hfradow
+    real(kind=WP)  :: lid_clo, o2ihf, Aold, dhgrowth, dhsngrowth, dAgrowth, ahf, prec, subli_i
+    real(kind=WP)  :: rhow, show, rhice, shice, sh, snthick, thick, thact, rh, rA, qhst, sn, hsntmp
+    real(kind=WP)  :: b, hftotow, hdraft, hflood
+    real(kind=WP)  :: hmin, Sice, Armin, cc, cl, con, consn, rhosno, rhoice, inv_rhowat, inv_rhosno, c_melt
+    real(kind=WP)  :: boltzmann, emiss_ice, emiss_wat, tmelt, clhi, clhw, cpair, inv_rhoair, rhoair
+    real(kind=WP)  :: albim, albi, albsn, albsnm, albw, h0, h0_s, ice_dt, cd_oce_ice, l_ref_sss
+    logical        :: snowdist, l_virt_salt, l_ref_local, l_l_snow
+    real(kind=WP), parameter :: c1 = 3.8e-3_WP, c4 = 17.27_WP, c5 = 237.3_WP
+    real(kind=WP), dimension(:)  , pointer :: u_ice, v_ice, a_ice, m_ice, m_snow, a_ice_old, m_ice_old, m_snow_old
+    real(kind=WP), dimension(:)  , pointer :: thdgr, thdgrsn, thdgra, thdgr_old, t_skin, ustar_aux
+    real(kind=WP), dimension(:)  , pointer :: S_oc_array, T_oc_array, u_w, v_w, fresh_wa_flux, net_heat_flux
+
+    myDim_nod2D = partit%myDim_nod2D
+    nod_size    = partit%myDim_nod2D+partit%eDim_nod2D
+    u_ice         => ice%uice(:)
+    v_ice         => ice%vice(:)
+    a_ice         => ice%data(1)%values(:)
+    m_ice         => ice%data(2)%values(:)
+    m_snow        => ice%data(3)%values(:)
+    a_ice_old     => ice%data(1)%values_old(:)
+    m_ice_old     => ice%data(2)%values_old(:)
+    m_snow_old    => ice%data(3)%values_old(:)
+    thdgr         => ice%thermo%thdgr
+    thdgrsn       => ice%thermo%thdgrsn
+    thdgra        => ice%thermo%thdgra
+    thdgr_old     => ice%thermo%thdgr_old
+    t_skin        => ice%thermo%t_skin
+    ustar_aux     => ice%thermo%ustar
+    u_w           => ice%srfoce_u(:)
+    v_w           => ice%srfoce_v(:)
+    T_oc_array    => ice%srfoce_temp(:)
+    S_oc_array    => ice%srfoce_salt(:)
+    net_heat_flux => ice%flx_h(:)
+    fresh_wa_flux => ice%flx_fw(:)
+    ! parameters
+    hmin=ice%thermo%hmin;  Sice=ice%thermo%Sice;  Armin=ice%thermo%Armin;  cc=ice%thermo%cc;  cl=ice%thermo%cl
+    con=ice%thermo%con;  consn=ice%thermo%consn;  rhosno=ice%thermo%rhosno;  rhoice=ice%thermo%rhoice
+    inv_rhowat=ice%thermo%inv_rhowat;  inv_rhosno=ice%thermo%inv_rhosno;  c_melt=ice%thermo%c_melt
+    boltzmann=ice%thermo%boltzmann;  emiss_ice=ice%thermo%emiss_ice;  emiss_wat=ice%thermo%emiss_wat;  tmelt=ice%thermo%tmelt
+    clhi=ice%thermo%clhi;  clhw=ice%thermo%clhw;  cpair=ice%thermo%cpair;  inv_rhoair=ice%thermo%inv_rhoair;  rhoair=ice%thermo%rhoair
+    albim=ice%thermo%albim;  albi=ice%thermo%albi;  albsn=ice%thermo%albsn;  albsnm=ice%thermo%albsnm;  albw=ice%thermo%albw
+    h0=ice%thermo%h0;  h0_s=ice%thermo%h0_s;  h_ml=ice%thermo%h_ml;  iclasses=ice%thermo%iclasses;  snowdist=ice%thermo%snowdist
+    ice_dt=ice%ice_dt;  cd_oce_ice=ice%cd_oce_ice
+    ch_i=Ch_atm_ice;  ce_i=Ce_atm_ice
+    l_virt_salt=use_virt_salt;  l_ref_local=ref_sss_local;  l_ref_sss=ref_sss;  l_l_snow=l_snow
+
+    if (.not. thermo_data_created) then
+        !$ACC ENTER DATA CREATE(shortwave, longwave, tair, shum, prec_rain, prec_snow, evaporation, runoff, u_wind, v_wind) &
+        !$ACC CREATE(ice_sublimation, flice, fw_ice, fw_snw, hf_Qlat, hf_Qsen, hf_Qradtot, hf_Qswr, hf_Qlwr, hf_Qlwrout) &
+        !$ACC CREATE(real_salt_flux, ch_atm_oce_arr, ce_atm_oce_arr, u_ice, v_ice, a_ice, m_ice, m_snow, a_ice_old, m_ice_old, m_snow_old) &
+        !$ACC CREATE(thdgr, thdgrsn, thdgra, thdgr_old, t_skin, ustar_aux, u_w, v_w, T_oc_array, S_oc_array, net_heat_flux, fresh_wa_flux) &
+        !$ACC COPYIN(mesh%geo_coord_nod2D)
+        thermo_data_created = .true.
+    end if
+    ! state and forcing of this step (computed or read on the host)
+    !$ACC UPDATE DEVICE(shortwave, longwave, tair, shum, prec_rain, prec_snow, evaporation, runoff, u_wind, v_wind) &
+    !$ACC DEVICE(ch_atm_oce_arr, ce_atm_oce_arr, u_ice, v_ice, a_ice, m_ice, m_snow, thdgr, t_skin, u_w, v_w, T_oc_array, S_oc_array)
+
+    !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(ustar)
+    do i=1, myDim_nod2D
+        ustar=0.0_WP
+        if(mesh%ulevels_nod2d(i)>1) cycle
+        ustar=((u_ice(i)-u_w(i))**2 + (v_ice(i)-v_w(i))**2)
+        ustar_aux(i)=sqrt(ustar*cd_oce_ice)
+    end do
+    !$ACC END PARALLEL LOOP
+    call exchange_nod(ustar_aux, partit, luse_g2g=.true.)
+
+    !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) &
+    !$ACC PRIVATE(k, h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss,rsf,evap_in,ug,ustar,T_oc,S_oc,t,ch,ce,fw,fwice,fwsnw,ehf,evap) &
+    !$ACC PRIVATE(ithdgr, ithdgrsn, ithdgra, iflice, hflatow, hfsenow, hflwrdout, subli, hfswrow, hflwrow, hfradow) &
+    !$ACC PRIVATE(lid_clo, o2ihf, Aold, dhgrowth, dhsngrowth, dAgrowth, ahf, prec, subli_i) &
+    !$ACC PRIVATE(rhow, show, rhice, shice, sh, snthick, thick, thact, rh, rA, qhst, sn, hsntmp, b, hftotow, hdraft, hflood)
+    do i=1, nod_size
+        if(mesh%ulevels_nod2d(i)>1) cycle
+        rsss    = l_ref_sss
+        h       = m_ice(i)
+        hsn     = m_snow(i)
+        A       = a_ice(i)
+        fsh     = shortwave(i)
+        flo     = longwave(i)
+        Ta      = Tair(i)
+        qa      = shum(i)
+        if (.not. l_l_snow) then
+            if (Ta>=0.0_WP) then
+            rain=prec_rain(i)
+            snow=0.0_WP
+            else
+            rain=0.0_WP
+            snow=prec_rain(i)
+            endif
+            evap_in=evaporation(i)
+        else
+            rain = prec_rain(i)
+            snow = prec_snow(i)
+            evap_in=0.0_WP
+        end if
+        runo    = runoff(i)
+        ug      = sqrt(u_wind(i)**2+v_wind(i)**2)
+        ustar   = ustar_aux(i)
+        T_oc    = T_oc_array(i)
+        S_oc    = S_oc_array(i)
+        if(l_ref_local) rsss = S_oc
+        t       = t_skin(i)
+        ch      = Ch_atm_oce_arr(i)
+        ce      = Ce_atm_oce_arr(i)
+        fw      = 0.0_WP
+        fwice   = 0.0_WP
+        fwsnw   = 0.0_WP
+        ithdgra = 0.0_WP
+        ehf     = 0.0_WP
+        if (mesh%geo_coord_nod2D(2, i)>0) then
+            lid_clo=h0
+        else
+            lid_clo=h0_s
+        endif
+        ! therm_ice
+        dhgrowth=h
+        snthick=hsn*(con/consn)/max(A,Armin)
+        thick=h/max(A,Armin)
+        if (snowdist) thick=snthick+thick
+        rhow=0.0_WP
+        evap=0.0_WP
+        ! obudget (open_water_albedo = 0, standard saturation formula)
+        b=c1*exp(c4*T_oc/(T_oc+c5))
+        hfswrow  = (1.0_WP-albw)*fsh
+        hflwrow  = flo
+        hflwrdout= -emiss_wat*boltzmann*((T_oc+tmelt)**4)
+        hfradow  = hfswrow + hflwrow + hflwrdout
+        hfsenow  = rhoair*cpair*ch*ug*(ta-T_oc)
+        evap     = rhoair*ce*ug*(qa-b)
+        hflatow  = clhw*evap
+        hftotow  = hfradow+hfsenow+hflatow
+        rhow     = -hftotow/cl
+        evap     = evap*inv_rhowat
+        ! back in therm_ice
+        hflatow  = hflatow  *(1.0_WP-A)
+        hfsenow  = hfsenow  *(1.0_WP-A)
+        hfradow  = hfradow  *(1.0_WP-A)
+        hfswrow  = hfswrow  *(1.0_WP-A)
+        hflwrow  = hflwrow  *(1.0_WP-A)
+        hflwrdout= hflwrdout*(1.0_WP-A)
+        rhice=0.0_WP
+        subli=0.0_WP
+        if (thick.gt.hmin) then
+            do k=1,iclasses
+                thact = real((2*k-1),WP)*thick/real(iclasses,WP)
+                if(.not. snowdist) thact=thact+snthick
+                call budget_acc(thact, hsn,t,Ta,qa,fsh,flo,ug,S_oc,ch_i,ce_i,shice,subli_i, &
+                                boltzmann, emiss_ice, tmelt, cl, clhi, con, cpair, inv_rhowat, inv_rhoair, rhoair, &
+                                albim, albi, albsn, albsnm)
+                rhice=rhice+shice
+                subli=subli+subli_i
+            end do
+            rhice=rhice/real(iclasses,WP)
+            subli=subli/real(iclasses,WP)
+        end if
+        rhow=rhow*ice_dt
+        rhice=rhice*ice_dt
+        show =rhow*(1.0_WP-A)
+        shice=rhice*A
+        sh   =show+shice
+        ahf=-cl*sh/ice_dt
+        prec=rain+runo+snow*(1.0_WP-A)
+        hsn=hsn+snow*ice_dt*A*1000.0_WP*inv_rhosno
+        dhsngrowth=hsn
+        evap=evap*(1.0_WP-A)
+        subli=subli*A
+        hsntmp= -min(sh,0.0_WP)*rhoice*inv_rhosno
+        hsntmp=min(hsntmp,hsn)
+        hsn=hsn-hsntmp
+        rh=sh+hsntmp*rhosno/rhoice
+        h=max(h,0.0_WP)
+        o2ihf= (T_oc-TFrez(S_oc))*0.006_WP*ustar*cc*A  &
+            +(T_oc-Tfrez(S_oc))*H_ML/ice_dt*cc*(1.0_WP-A)
+        rh=rh-o2ihf*ice_dt/cl
+        qhst=h+rh
+        sn=hsn+min(qhst,0.0_WP)*rhoice*inv_rhosno
+        sn=max(sn,0.0_WP)
+        hsn=sn
+        h=max(qhst,0.0_WP)
+        if (h.lt.1E-6_WP) h=0._WP
+        dhgrowth=h-dhgrowth
+        dhsngrowth=hsn-dhsngrowth
+        dhgrowth=dhgrowth/ice_dt
+        dhsngrowth=dhsngrowth/ice_dt
+        ehf = ahf + cl*(dhgrowth+(rhosno/rhoice)*dhsngrowth)
+        if (.not. l_virt_salt) then
+            fwice = - dhgrowth*rhoice*inv_rhowat
+            fwsnw = - dhsngrowth*rhosno*inv_rhowat
+            fw= prec + evap + fwice + fwsnw
+            rsf= fwice*Sice
+        else
+            fwice = - dhgrowth*rhoice*inv_rhowat*(rsss-Sice)/rsss
+            fwsnw = - dhsngrowth*rhosno*inv_rhowat
+            fw= prec + evap + fwice + fwsnw
+            rsf = 0.0_WP
+        end if
+        rh=-min(h,-rh)
+        rA= rhow - o2ihf*ice_dt/cl
+        Aold = A
+        A=A + c_melt*min(rh,0.0_WP)*A/max(h,hmin) + max(rA,0.0_WP)*(1._WP-A)/lid_clo
+        A=min(A,h*1.e6_WP)
+        A=min(max(A,0.0_WP),1._WP)
+        dAgrowth = (A-Aold)/ice_dt
+        iflice=h
+        ! flooding
+        hdraft=(rhosno*hsn+h*rhoice)*inv_rhowat
+        hflood=hdraft-min(hdraft,h)
+        h=h+hflood
+        hsn=hsn-hflood*rhoice*inv_rhosno
+        iflice=(h-iflice)/ice_dt
+        if (.not. l_virt_salt) then
+            rsf=rsf-iflice*rhoice*inv_rhowat*Sice
+        else
+            fw=fw+iflice*rhoice*inv_rhowat*Sice/rsss
+        end if
+        evap=evap+subli
+        ithdgr   = dhgrowth
+        ithdgrsn = dhsngrowth
+        ithdgra  = dAgrowth
+        ! back in thermodynamics
+        m_ice_old(i)      = m_ice(i)
+        m_snow_old(i)     = m_snow(i)
+        a_ice_old(i)      = a_ice(i)
+        thdgr_old(i)      = thdgr(i)
+        m_ice(i)          = h
+        m_snow(i)         = hsn
+        a_ice(i)          = A
+        t_skin(i)         = t
+        fresh_wa_flux(i)  = fw
+        net_heat_flux(i)  = ehf
+        evaporation(i)    = evap
+        ice_sublimation(i)= subli
+        thdgr(i)          = ithdgr
+        thdgrsn(i)        = ithdgrsn
+        thdgra(i)         = ithdgrA
+        flice(i)          = iflice
+        fw_ice(i)         = - fwice
+        fw_snw(i)         = - fwsnw
+        hf_Qlat(i)        = - hflatow
+        hf_Qsen(i)        = - hfsenow
+        hf_Qradtot(i)     = - hfradow
+        hf_Qswr(i)        = - hfswrow
+        hf_Qlwr(i)        = - hflwrow
+        hf_Qlwrout(i)     = - hflwrdout
+        real_salt_flux(i) = rsf
+        if (.not. l_l_snow) then
+            prec_rain(i)     = rain
+            prec_snow(i)     = snow
+        end if
+    end do
+    !$ACC END PARALLEL LOOP
+    !$ACC UPDATE HOST(m_ice, m_snow, a_ice, m_ice_old, m_snow_old, a_ice_old, thdgr_old, t_skin, fresh_wa_flux, net_heat_flux) &
+    !$ACC HOST(evaporation, ice_sublimation, thdgr, thdgrsn, thdgra, flice, fw_ice, fw_snw, hf_Qlat, hf_Qsen, hf_Qradtot) &
+    !$ACC HOST(hf_Qswr, hf_Qlwr, hf_Qlwrout, real_salt_flux, ustar_aux)
+    if (.not. l_l_snow) then
+        !$ACC UPDATE HOST(prec_rain, prec_snow)
+    end if
+end subroutine thermodynamics_acc
+#endif
 #endif /* #if !defined (__coupled) && !defined (__ifsinterface) */
+
+end module ice_thermo_oce_module

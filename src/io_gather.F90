@@ -1,6 +1,5 @@
 module io_gather_module
   USE MOD_PARTIT
-  USE MOD_PARSUP
   implicit none
   public init_io_gather, gather_nod2D, gather_real4_nod2D, gather_elem2D, gather_real4_elem2D
   private
@@ -28,31 +27,27 @@ contains
   subroutine init_nod2D_lists(partit)
     implicit none
     type(t_partit), intent(inout), target  :: partit
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
     ! EO args
 
     ! todo: initialize with the other comm arrays, probably in "init_gatherLists" subroutine 
-    if(mype /= 0) then
-      if(.not. allocated(partit%remPtr_nod2D)) allocate(partit%remPtr_nod2D(npes))
-#include "associate_part_ass.h"
+    if(partit%mype /= 0) then
+      if(.not. allocated(partit%remPtr_nod2D)) allocate(partit%remPtr_nod2D(partit%npes))
     end if
-    call MPI_Bcast(remPtr_nod2D, size(remPtr_nod2D), MPI_INTEGER, 0, MPI_COMM_FESOM, MPIerr)
-    if(mype /= 0) then
-      if(.not. allocated(partit%remList_nod2D)) allocate(partit%remList_nod2D(remPtr_nod2D(npes)))
-#include "associate_part_ass.h"
+    call MPI_Bcast(partit%remPtr_nod2D, size(partit%remPtr_nod2D), MPI_INTEGER, 0, partit%MPI_COMM_FESOM, partit%MPIerr)
+    if(partit%mype /= 0) then
+      if(.not. allocated(partit%remList_nod2D)) allocate(partit%remList_nod2D(partit%remPtr_nod2D(partit%npes)))
     end if
-    call MPI_Bcast(remList_nod2D, size(remList_nod2D), MPI_INTEGER, 0, MPI_COMM_FESOM, MPIerr)
+    call MPI_Bcast(partit%remList_nod2D, size(partit%remList_nod2D), MPI_INTEGER, 0, partit%MPI_COMM_FESOM, partit%MPIerr)
 
-    if(mype == 0) rank0Dim_nod2D = myDim_nod2D
-    call mpi_bcast(rank0Dim_nod2D, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, MPIerr)
+    if(partit%mype == 0) rank0Dim_nod2D = partit%myDim_nod2D
+    call mpi_bcast(rank0Dim_nod2D, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, partit%MPIerr)
 
-    if(mype == 0) then
+    if(partit%mype == 0) then
       allocate(rank0List_nod2D(0))
-      call mpi_bcast(myList_nod2D, myDim_nod2D, MPI_INTEGER, 0, MPI_COMM_FESOM, MPIerr)
+      call mpi_bcast(partit%myList_nod2D, partit%myDim_nod2D, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, partit%MPIerr)
     else
       allocate(rank0List_nod2D(rank0Dim_nod2D))
-      call mpi_bcast(rank0List_nod2D, size(rank0List_nod2D), MPI_INTEGER, 0, MPI_COMM_FESOM, MPIerr)
+      call mpi_bcast(rank0List_nod2D, size(rank0List_nod2D), MPI_INTEGER, 0, partit%MPI_COMM_FESOM, partit%MPIerr)
     end if
     
     nod2D_lists_initialized = .true.
@@ -61,34 +56,29 @@ contains
 
   subroutine init_elem2D_lists(partit)
     USE MOD_PARTIT
-    USE MOD_PARSUP
     implicit none
     type(t_partit), intent(inout), target  :: partit
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
     ! EO args
 
     ! todo: initialize with the other comm arrays, probably in "init_gatherLists" subroutine 
-    if(mype /= 0) then
-      if(.not. allocated(partit%remPtr_elem2D)) allocate(partit%remPtr_elem2D(npes))
-#include "associate_part_ass.h"
+    if(partit%mype /= 0) then
+      if(.not. allocated(partit%remPtr_elem2D)) allocate(partit%remPtr_elem2D(partit%npes))
     end if
-    call MPI_Bcast(remPtr_elem2D, size(remPtr_elem2D), MPI_INTEGER, 0, MPI_COMM_FESOM, MPIerr)
-    if(mype /= 0) then
-      if(.not. allocated(partit%remList_elem2D)) allocate(partit%remList_elem2D(remPtr_elem2D(npes)))
-#include "associate_part_ass.h"
+    call MPI_Bcast(partit%remPtr_elem2D, size(partit%remPtr_elem2D), MPI_INTEGER, 0, partit%MPI_COMM_FESOM, partit%MPIerr)
+    if(partit%mype /= 0) then
+      if(.not. allocated(partit%remList_elem2D)) allocate(partit%remList_elem2D(partit%remPtr_elem2D(partit%npes)))
     end if
-    call MPI_Bcast(remList_elem2D, size(remList_elem2D), MPI_INTEGER, 0, MPI_COMM_FESOM, MPIerr)
+    call MPI_Bcast(partit%remList_elem2D, size(partit%remList_elem2D), MPI_INTEGER, 0, partit%MPI_COMM_FESOM, partit%MPIerr)
 
-    if(mype == 0) rank0Dim_elem2D = myDim_elem2D
-    call mpi_bcast(rank0Dim_elem2D, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, MPIerr)
+    if(partit%mype == 0) rank0Dim_elem2D = partit%myDim_elem2D
+    call mpi_bcast(rank0Dim_elem2D, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, partit%MPIerr)
 
-    if(mype == 0) then
+    if(partit%mype == 0) then
       allocate(rank0List_elem2D(0))
-      call mpi_bcast(myList_elem2D, myDim_elem2D, MPI_INTEGER, 0, MPI_COMM_FESOM, MPIerr)
+      call mpi_bcast(partit%myList_elem2D, partit%myDim_elem2D, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, partit%MPIerr)
     else
       allocate(rank0List_elem2D(rank0Dim_elem2D))
-      call mpi_bcast(rank0List_elem2D, size(rank0List_elem2D), MPI_INTEGER, 0, MPI_COMM_FESOM, MPIerr)
+      call mpi_bcast(rank0List_elem2D, size(rank0List_elem2D), MPI_INTEGER, 0, partit%MPI_COMM_FESOM, partit%MPIerr)
     end if
 
     elem2D_lists_initialized = .true.
@@ -98,7 +88,6 @@ contains
   ! thread-safe procedure
   subroutine gather_nod2D(arr2D, arr2D_global, root_rank, tag, io_comm, partit)
     USE MOD_PARTIT
-    USE MOD_PARSUP
     use, intrinsic :: iso_fortran_env, only: real64
     implicit none
     type(t_partit), intent(inout), target  :: partit
@@ -115,8 +104,6 @@ contains
     integer                   :: req(partit%npes-1)
     integer :: request_index
     integer :: mpi_precision = MPI_DOUBLE_PRECISION
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
     if(.not. nod2D_lists_initialized) stop "io_gather_module has not been initialized"
 
@@ -127,7 +114,6 @@ contains
   ! thread-safe procedure
   subroutine gather_real4_nod2D(arr2D, arr2D_global, root_rank, tag, io_comm, partit)
     USE MOD_PARTIT
-    USE MOD_PARSUP
     use, intrinsic :: iso_fortran_env, only: real32
     implicit none
     type(t_partit), intent(inout), target  :: partit
@@ -144,8 +130,6 @@ contains
     integer                   :: req(partit%npes-1)
     integer :: request_index
     integer :: mpi_precision = MPI_REAL
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
     if(.not. nod2D_lists_initialized) stop "io_gather_module has not been initialized"
 
@@ -156,7 +140,6 @@ contains
   ! thread-safe procedure
   subroutine gather_elem2D(arr2D, arr2D_global, root_rank, tag, io_comm, partit)
     USE MOD_PARTIT
-    USE MOD_PARSUP
     use, intrinsic :: iso_fortran_env, only: real64
     implicit none
     type(t_partit), intent(inout), target  :: partit
@@ -173,8 +156,6 @@ contains
     integer                                :: req(partit%npes-1)
     integer :: request_index
     integer :: mpi_precision = MPI_DOUBLE_PRECISION
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
     if(.not. elem2D_lists_initialized) stop "io_gather_module has not been initialized"
 
@@ -185,7 +166,6 @@ contains
   ! thread-safe procedure
   subroutine gather_real4_elem2D(arr2D, arr2D_global, root_rank, tag, io_comm, partit)
     USE MOD_PARTIT
-    USE MOD_PARSUP
     use, intrinsic :: iso_fortran_env, only: real32
     implicit none
     type(t_partit), intent(inout), target  :: partit
@@ -202,8 +182,6 @@ contains
     integer                   :: req(partit%npes-1)
     integer :: request_index
     integer :: mpi_precision = MPI_REAL
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
     if(.not. elem2D_lists_initialized) stop "io_gather_module has not been initialized"
 

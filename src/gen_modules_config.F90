@@ -5,6 +5,12 @@
 ! S. Danilov, 5.04.2012
 !
 ! ======================================================================
+#if defined(_OPENACC) && !defined(ENABLE_OPENACC)
+#error OpenACC is active in the compiler but FESOM was configured without ENABLE_OPENACC
+#endif
+#if defined(ENABLE_OPENACC) && !defined(_OPENACC)
+#error ENABLE_OPENACC needs an OpenACC compiler flag (NVHPC -acc, Cray -hacc)
+#endif
 module g_config
   use o_param
   implicit none
@@ -26,18 +32,20 @@ module g_config
 ! kh 01.03.21 paths in test environments can easily become longer than 100 characters (the former value) 
   character(MAX_PATH)        :: MeshPath='./mesh/'
   character(MAX_PATH)        :: ClimateDataPath='./hydrography/'
+  character(MAX_PATH)        :: ForcingDataPath='./forcing/'
   character(MAX_PATH)        :: TideForcingPath='./tide_forcing/'
   character(MAX_PATH)        :: ResultPath='./result/'
   character(MAX_PATH)        :: RestartInPath=''
   character(MAX_PATH)        :: RestartOutPath=''
   character(20)              :: MeshId='NONE'
-  namelist /paths/  MeshPath, ClimateDataPath, &
+  namelist /paths/  MeshPath, ClimateDataPath, ForcingDataPath, &
        TideForcingPath, ResultPath, MeshId, &
        RestartInPath, RestartOutPath
        
   !_____________________________________________________________________________
   ! *** restart_log ***
   integer                :: logfile_outfreq=1      ! logfile info. outp. freq., # steps
+  real(kind=WP)          :: blowup_eta_max=10.0_WP ! blow-up check: stop if |eta_n| exceeds this [m]
   integer                :: restart_length=1
   character(3)           :: restart_length_unit='m'
   integer                :: raw_restart_length=1
@@ -48,7 +56,7 @@ module g_config
   namelist /restart_log/   restart_length    , restart_length_unit, & 
                            raw_restart_length, raw_restart_length_unit, &
                            bin_restart_length, bin_restart_length_unit, &
-                           logfile_outfreq
+                           logfile_outfreq, blowup_eta_max
   !_____________________________________________________________________________
   ! *** ale_def ***
   ! Which ALE case to use : 'linfs', 'zlevel', 'zstar'
@@ -116,6 +124,52 @@ module g_config
   integer                :: n_levels = 1       ! Number of levels for hierarchic partitioning
   integer, dimension(10) :: n_part = RESHAPE((/0/), (/10/), (/0/)) ! Number of partitions on each hierarchy level
   namelist /machine/ n_levels, n_part
+
+  ! --- parallel output/restart writing -------------------------------------
+  ! Lives in namelist.config, NOT namelist.io: namelist.io is read by
+  ! ini_mean_io on the first call to output(), i.e. inside the timestep loop,
+  ! long after the restart file group has been built. A setting placed there
+  ! would silently have no effect on restarts.
+  logical :: parallel_write = .false.   !< collective writes instead of gather-to-one
+  integer :: n_writers     = 0          !< 0 = as many as the block-size guard allows
+  !> Vertical extent of an output chunk, in levels. 0 = all levels, 1 = one level.
+  !>
+  !> Chunk size = chunk_levels * block * bytes_per_value, where
+  !>   block = ceil(nod2D / n_writers) is one writer's share of the horizontal
+  !>   dimension. The horizontal extent is NOT free: a chunk wider than a
+  !>   writer's block would span two writers, and HDF5 would then have to ship
+  !>   and re-compress it between ranks -- exactly what this design avoids.
+  !>   The VERTICAL extent is free, because a writer owns every level of its
+  !>   own nodes, so raising chunk_levels costs no write performance at all.
+  !>
+  !> NG5 (nod2D = 7402886, nz = 69), float32:
+  !>   n_writers = 256, chunk_levels = 1   ->   0.12 MB
+  !>   n_writers = 256, chunk_levels = 8   ->   0.93 MB   (default)
+  !>   n_writers = 256, chunk_levels = 69  ->   8.0 MB
+  !>   n_writers =  64, chunk_levels = 69  ->  31.9 MB
+  !>   n_writers =  20, chunk_levels = 69  -> 102 MB
+  !>
+  !> Which value suits depends on how the data is read. Tall chunks (many
+  !> levels) favour profiles and time series at a point, and conversion to
+  !> zarr; flat chunks favour maps at a single depth, because reading one level
+  !> out of a chunk of k costs k times the bytes. Default 8 is a compromise
+  !> leaning toward maps, which are the more common access pattern here.
+  integer :: chunk_levels  = 8
+  !> Restart writers and restart readers, separately from the output writers.
+  !> -1 means "same as n_writers", which is what one knob used to give.
+  !>
+  !> The three want different values, measured on NG5/8192: output peaks near
+  !> 512 writers, restarts peak lower, and reading peaks lower still -- 128
+  !> readers beat 512 by a third (141.2 s gather -> 52.9 s at 512 -> 39.9 s at
+  !> 128). Output writes compressed chunks whose boundaries must coincide with
+  !> writer blocks, so its optimum is tied to chunk size; a read decompresses
+  !> whole chunks and has no such constraint, which is why its optimum sits
+  !> elsewhere. Zero keeps its meaning of "as many as the block-size guard
+  !> allows" for all three.
+  integer :: n_writers_restart = -1     !< -1 = use n_writers
+  integer :: n_readers_restart = -1     !< -1 = use n_writers
+  namelist /io_parallel/ parallel_write, n_writers, chunk_levels, &
+                         n_writers_restart, n_readers_restart
   
   !_____________________________________________________________________________
   ! *** configuration***
@@ -139,6 +193,16 @@ module g_config
   integer                       :: ib_num=0
   integer                       :: steps_per_ib_step=8
 
+! LA 2026 -- passive iron tracer carried by icebergs
+! Each iceberg carries a fixed Fe concentration of its ice; melting releases
+! Fe in proportion to the meltwater flux.  Purely diagnostic: the resulting
+! ibiron field is written out but does not feed back on the ocean.
+  logical                       :: use_icb_iron=.false.      ! master switch
+  real(kind=WP)                 :: icb_iron_const=50.0e-6_WP ! Fe content of iceberg ice
+                                                             ! [mol m-3]; 50e-6 = 50 nmol L-1
+  logical                       :: l_icb_iron_file=.false.   ! read per-iceberg Fe from
+                                                             ! icb_iron.dat instead of the constant
+
 ! kh 02.02.21
 ! ib_async_mode == 0: original sequential behavior for both ice sections (for testing purposes, creating reference results etc.)
 ! ib_async_mode == 1: OpenMP code active to overlapped computations in first (ocean ice) and second (icebergs) parallel section
@@ -148,7 +212,7 @@ module g_config
 
   namelist /icebergs/   use_icebergs, turn_off_hf, turn_off_fw, use_icesheet_coupling, lbalance_fw, cell_saturation, lmin_latent_hf, &
                         ib_num, steps_per_ib_step, ib_async_mode, thread_support_level_required, lverbose_icb, l_allowgrounding, &
-                        l_cap_ibhf_n
+                        l_cap_ibhf_n, use_icb_iron, icb_iron_const, l_icb_iron_file
 
 !wiso-code!!!
   logical                       :: lwiso  =.false.  ! enable isotope?
@@ -157,26 +221,37 @@ module g_config
   logical                       :: use_cavity = .false. ! switch on/off cavity usage
   logical                       :: use_cavity_partial_cell = .false. ! switch on/off cavity usage
   logical                       :: use_cavity_fw2press = .true. ! switch on/off cavity+zstar input of freshwater leads to increase in pressure
+  real(kind=WP)                 :: cavity_gamma_scale = 1.0_WP ! factor on the ice-shelf turbulent heat and salt transfer velocities (gat, gas) of the three-equation melt model
   real(kind=WP)                 :: cavity_partial_cell_thresh=0.0_WP ! same as partial_cell_tresh but for surface
   logical                       :: toy_ocean=.false. ! Ersatz forcing has to be supplied
   character(100)                :: which_toy="soufflet" 
   logical                       :: flag_debug=.false.    ! prints name of actual subroutine he is in 
   logical                       :: flag_warn_cflz=.true. ! switches off cflz warning
+  integer                       :: conservation_freq=0   ! print volume, heat and salt budgets every N steps (CONS lines); 0: off
   logical                       :: use_transit=.false.    ! switches off transient tracers
+  !_____________________________________________________________________________
+  ! *** freshwater hosing experiments ***
+  logical                       :: use_hosing=.false.     ! impose an Antarctic freshwater anomaly
+  character(10)                 :: hosing_mode='surf'     ! 'surf' = surface virtual salinity flux, 'depth' = distributed over depth
+  real(kind=WP)                 :: hosing_hSv=0.0_WP      ! freshwater anomaly magnitude [Sv]
   logical                       :: compute_oasis_corners=.false. ! switches on corner calculation for 1st order conserv remapping 
+  logical                       :: use_atm_ice_tskin=.false.  ! OpenIFS: receive the ice-tile skin temperature (tsk_ico) and use it as the ice surface temperature
+  logical                       :: use_atm_mslp=.false.       ! OpenIFS: receive mean sea-level pressure (mslp_oce) into press_air, for the air-sea gas exchange (REcoM, transient tracers)
 
 #if defined(__recom) && defined(__usetp)
 ! number of groups for multi FESOM group loop parallelization
   integer                       :: num_fesom_groups=1
-  namelist /run_config/ use_modini, check_modini, check_fesom, use_ice,use_floatice, use_sw_pene, use_cavity, &
+  namelist /run_config/ use_modini, check_modini, check_fesom, use_ice,use_floatice, use_sw_pene, conservation_freq, use_cavity, &
                         use_cavity_partial_cell, cavity_partial_cell_thresh, &
-                        use_cavity_fw2press, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso, &
-                        use_transit, compute_oasis_corners, num_fesom_groups
+                        use_cavity_fw2press, cavity_gamma_scale, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso, &
+                        use_transit, compute_oasis_corners, use_atm_ice_tskin, use_atm_mslp, num_fesom_groups, &
+                        use_hosing, hosing_mode, hosing_hSv
 #else
-  namelist /run_config/ use_modini, check_modini, check_fesom, use_ice,use_floatice, use_sw_pene, use_cavity, & 
+  namelist /run_config/ use_modini, check_modini, check_fesom, use_ice,use_floatice, use_sw_pene, conservation_freq, use_cavity, & 
                         use_cavity_partial_cell, cavity_partial_cell_thresh, &
-                        use_cavity_fw2press, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso, &
-                        use_transit, compute_oasis_corners
+                        use_cavity_fw2press, cavity_gamma_scale, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso, &
+                        use_transit, compute_oasis_corners, use_atm_ice_tskin, use_atm_mslp, &
+                        use_hosing, hosing_mode, hosing_hSv
 #endif
 
   !_____________________________________________________________________________
@@ -184,9 +259,9 @@ module g_config
   real(kind=WP)                 :: dt
   integer                       :: save_count_mean, save_count_restart
   logical                       :: r_restart
-  real(kind=WP)                 :: rtime_ice=0.0, rtime_tot=0.0
+  real(kind=WP)                 :: rtime_ice=0.0, rtime_tot=0.0, rtime_ice_evp=0.0, rtime_ice_adv=0.0, rtime_ice_therm=0.0
   real(kind=WP)                 :: rtime_oce=0.0, rtime_oce_dyn=0.0, rtime_oce_dynssh=0.0,  rtime_oce_solvessh=0.0
-  real(kind=WP)                 :: rtime_oce_solvetra=0.0, rtime_oce_GMRedi=0.0, rtime_oce_mixpres=0.0
+  real(kind=WP)                 :: rtime_oce_solvetra=0.0, rtime_oce_GMRedi=0.0, rtime_oce_presdens=0.0, rtime_oce_mixing=0.0
   real(kind=WP)                 :: dummy=1.e10
   
   

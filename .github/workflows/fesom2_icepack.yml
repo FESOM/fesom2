@@ -1,9 +1,17 @@
 
 name: FESOM2 Icepack
 
-# Controls when the action will run. Triggers the workflow on push or pull request. 
+# Controls when the action will run. Triggers the workflow on pull request.
 
-on: [push, pull_request]
+on:
+  workflow_dispatch: {}
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+    branches:
+      - main
 
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
@@ -11,6 +19,7 @@ jobs:
   icepack_test:
     # Containers must run in Linux based operating systems
     runs-on: ubuntu-latest
+    timeout-minutes: 12
     # Docker Hub image that `container-job` executes in
     container: koldunovn/fesom2_test:refactoring2
 

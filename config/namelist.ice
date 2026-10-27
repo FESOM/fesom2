@@ -57,15 +57,17 @@ ice_ave_steps  = 1              ! ice time step = ice_ave_steps × ocean time st
 Sice           = 4.0            ! bulk ice salinity [ppt] (typical range: 3.2-5.0)
 
 ! --- Ice Thickness Distribution ---
-iclasses       = 7              ! number of ice thickness categories (default: 7)
+iclasses       = 7              ! number of ice thickness categories (default: 7; must be 15 with new_iclasses)
                                 ! set to 15 if using EM distribution (new_iceclasses=.true.)
 new_iclasses   = .false.        ! use ice thickness distribution from EM observations
                                 ! (Castro-Morales et al., JGR, 2013)
-h_cutoff       = 3.0            ! thickness cutoff for new_iclasses [m]
+h_cutoff       = 3.0            ! cutoff of the thickness pdf for new_iclasses, in units of the mean thickness (weights are for 3.0)
 
 ! --- Lead Closing Parameters ---
 h0             = 0.5            ! lead closing parameter for Northern Hemisphere [m]
 h0_s           = 0.5            ! lead closing parameter for Southern Hemisphere [m]
+                                ! coupled (ice_thermo_cpl.F90): the lower bound of a thickness-dependent
+                                ! lead closing parameter, max(h0, min(1.5 m, old ice thickness))
 
 ! --- Minimum Thresholds ---
 hmin           = 0.01           ! minimum ice thickness [m]

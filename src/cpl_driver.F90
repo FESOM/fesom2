@@ -21,6 +21,8 @@ module cpl_driver
   use o_param,  only : rad
   USE MOD_PARTIT
   use mpi
+
+
   implicit none
   save   
   !
@@ -32,8 +34,15 @@ module cpl_driver
   ! (final number of fields depends now on lwiso switch and is set in subroutine cpl_oasis3mct_define_unstr)
 
 #if defined (__oifs)
-  integer                    :: nsend = 7
+#if defined(__recom)
+  integer                    :: nsend = 9
+  integer                    :: nrecv = 16
+!With oifs, without recom:
+#else
+  integer                    :: nsend = 8
   integer                    :: nrecv = 15
+#endif
+!Without oifs
 #else
   integer                    :: nsend = 4
   integer                    :: nrecv = 12
@@ -76,7 +85,14 @@ module cpl_driver
   integer                    :: o2a_call_count=0
   integer                    :: a2o_call_count=0
 
-  REAL(kind=WP), POINTER                          :: exfld(:)          ! buffer for receiving global exchange fields
+  ! The OASIS exchange buffer is kept always-double (WP_full), independent of the
+  ! model working precision WP. This matches the oasis_Double transient defined in
+  ! cpl_oasis3mct_define_unstr and keeps the FESOM<->atmosphere exchange in double
+  ! precision even in a single-precision (USE_SINGLE_PRECISION, WP=real32) build.
+  ! It mirrors OpenIFS, which couples through its dedicated double coupling kind
+  ! JPRO regardless of the model kind JPRB. cplsnd stays at WP (it accumulates model
+  ! fields); the WP->WP_full conversion happens on assignment to exfld.
+  REAL(kind=WP_full), POINTER                     :: exfld(:)          ! buffer for receiving global exchange fields
   real(kind=WP), allocatable, dimension(:,:)      :: cplsnd
 
 
@@ -99,6 +115,11 @@ module cpl_driver
   public seconds_til_now 
   public send_id, recv_id
   public nsend, nrecv, cpl_send, cpl_recv
+
+  ! position of tsk_ico in cpl_recv; 0 when use_atm_ice_tskin is off
+  integer, public            :: recv_tsk_ico = 0
+  ! position of mslp_oce in cpl_recv; 0 when use_atm_mslp is off
+  integer, public            :: recv_mslp_oce = 0
   public source_root, target_root, commRank
   public a2o_fcorr_stat
 
@@ -107,11 +128,11 @@ contains
     subroutine node_contours(my_x_corners, my_y_corners, partit, mesh)
         USE MOD_MESH
         USE MOD_PARTIT
-        USE MOD_PARSUP
         USE o_PARAM
         use g_comm_auto
         use o_ARRAYS
         use g_rotate_grid
+        use oce_mesh_module, only: elem_center, edge_center
 
         IMPLICIT NONE
         type(t_mesh),   intent(in), target :: mesh
@@ -127,41 +148,37 @@ contains
         integer, allocatable, dimension(:)    :: nedges, nelems, nedges1, nelems1, nedges2, nelems2
         real(kind=WP)                         :: this_x_coord, this_y_coord
 
-include "associate_part_def.h"
-include "associate_mesh_def.h"
-include "associate_part_ass.h"
-include "associate_mesh_ass.h"
 
     if (.not. allocated(my_x_corners)) then
-        ALLOCATE(my_x_corners(myDim_nod2D, 25)) !maxval(nod_in_elem2D_num, 1)*2+2))
+        ALLOCATE(my_x_corners(partit%myDim_nod2D, 25)) !maxval(nod_in_elem2D_num, 1)*2+2))
     endif
     if (.not. allocated(my_y_corners)) then
-        ALLOCATE(my_y_corners(myDim_nod2D, 25)) !maxval(nod_in_elem2D_num, 1)*2+2))
+        ALLOCATE(my_y_corners(partit%myDim_nod2D, 25)) !maxval(nod_in_elem2D_num, 1)*2+2))
     endif
-    do n=1, myDim_nod2D
+    do n=1, partit%myDim_nod2D
         ! find the type/of node: internal or at boundary
         bEdge_left =0
         belem_left =0
         bEdge_right=0
         belem_right=0
 
-        do ee=1, nod_in_elem2D_num(n)
-           elem=nod_in_elem2D(ee,n)
-           if (elem2D_nodes(1,elem)==n) then
-              edge_left=elem_edges(3,elem)
-              edge_right=elem_edges(2,elem)
-           elseif (elem2D_nodes(2,elem)==n) then
-              edge_left=elem_edges(1,elem)
-              edge_right=elem_edges(3,elem)
+        do ee=1, mesh%nod_in_elem2D_num(n)
+           elem=mesh%nod_in_elem2D(ee,n)
+           if (mesh%elem2D_nodes(1,elem)==n) then
+              edge_left=mesh%elem_edges(3,elem)
+              edge_right=mesh%elem_edges(2,elem)
+           elseif (mesh%elem2D_nodes(2,elem)==n) then
+              edge_left=mesh%elem_edges(1,elem)
+              edge_right=mesh%elem_edges(3,elem)
            else
-              edge_left=elem_edges(2,elem)
-              edge_right=elem_edges(1,elem)
+              edge_left=mesh%elem_edges(2,elem)
+              edge_right=mesh%elem_edges(1,elem)
            end if
-           if (myList_edge2D(edge_left)>edge2D_in) then
+           if (partit%myList_edge2D(edge_left)>mesh%edge2D_in) then
               bEdge_left=bEdge_left+1
               belem_left(bEdge_left)=elem
            end if
-           if (myList_edge2D(edge_right)>edge2D_in) then
+           if (partit%myList_edge2D(edge_right)>mesh%edge2D_in) then
               bEdge_right=bEdge_right+1
               belem_right(bEdge_right)=elem
            end if
@@ -169,25 +186,25 @@ include "associate_mesh_ass.h"
 
     ! now we have three cases
        if (bEdge_left==0) then      ! inner contour
-          elem=nod_in_elem2D(1, n)  ! we can start from any
-          allocate(nedges(nod_in_elem2D_num(n)))
+          elem=mesh%nod_in_elem2D(1, n)  ! we can start from any
+          allocate(nedges(mesh%nod_in_elem2D_num(n)))
           nedges=0
-          allocate(nelems(nod_in_elem2D_num(n)))
+          allocate(nelems(mesh%nod_in_elem2D_num(n)))
           nelems=0
           !!!!!!! inner_node_contour
 include "node_contour_inner.h"
           if (pos_increment<0) then 
-             current_pos=2*nod_in_elem2D_num(n)
+             current_pos=2*mesh%nod_in_elem2D_num(n)
           else
              current_pos =1
           end if
-          do nn=1, nod_in_elem2D_num(n)
-             call edge_center(edges(1, nedges(nn)), edges(2, nedges(nn)), my_x_corners(n, current_pos), my_y_corners(n, current_pos), mesh)
+          do nn=1, mesh%nod_in_elem2D_num(n)
+             call edge_center(mesh%edges(1, nedges(nn)), mesh%edges(2, nedges(nn)), my_x_corners(n, current_pos), my_y_corners(n, current_pos), mesh)
              current_pos=current_pos+pos_increment
              call elem_center(nelems(nn), my_x_corners(n, current_pos), my_y_corners(n, current_pos), mesh)
              current_pos=current_pos+pos_increment
           end do
-          current_pos=2*nod_in_elem2D_num(n)+1
+          current_pos=2*mesh%nod_in_elem2D_num(n)+1
           do nn=current_pos, size(my_x_corners, 2)
              my_x_corners(n, nn)=my_x_corners(n, current_pos-1)
              my_y_corners(n, nn)=my_y_corners(n, current_pos-1)
@@ -198,29 +215,29 @@ include "node_contour_inner.h"
 
        if (bEdge_left==1) then ! standard boundary node
           elem=belem_left(1)
-          allocate(nedges(nod_in_elem2D_num(n)+1))
+          allocate(nedges(mesh%nod_in_elem2D_num(n)+1))
           nedges=0
-          allocate(nelems(nod_in_elem2D_num(n)))
+          allocate(nelems(mesh%nod_in_elem2D_num(n)))
           nelems=0
           !!!!!!!boundary_node_contour
 include "node_contour_boundary.h"
           if (pos_increment<0) then 
-             current_pos=2*nod_in_elem2D_num(n)+2 !one more for the node n itself also we have 2 boundary edges
+             current_pos=2*mesh%nod_in_elem2D_num(n)+2 !one more for the node n itself also we have 2 boundary edges
           else
              current_pos =1
           end if
-          do nn=1, nod_in_elem2D_num(n)
-             call edge_center(edges(1, nedges(nn)), edges(2, nedges(nn)), my_x_corners(n, current_pos), my_y_corners(n, current_pos), mesh)
+          do nn=1, mesh%nod_in_elem2D_num(n)
+             call edge_center(mesh%edges(1, nedges(nn)), mesh%edges(2, nedges(nn)), my_x_corners(n, current_pos), my_y_corners(n, current_pos), mesh)
              current_pos=current_pos+pos_increment
              call elem_center(nelems(nn), my_x_corners(n, current_pos), my_y_corners(n, current_pos), mesh)
              current_pos=current_pos+pos_increment
           end do
-          nn=nod_in_elem2D_num(n)+1
-          call edge_center(edges(1, nedges(nn)), edges(2, nedges(nn)), my_x_corners(n, current_pos), my_y_corners(n, current_pos), mesh)
+          nn=mesh%nod_in_elem2D_num(n)+1
+          call edge_center(mesh%edges(1, nedges(nn)), mesh%edges(2, nedges(nn)), my_x_corners(n, current_pos), my_y_corners(n, current_pos), mesh)
           current_pos=current_pos+pos_increment
-          my_x_corners(n, current_pos)=coord_nod2D(1,n)
-          my_y_corners(n, current_pos)=coord_nod2D(2,n)
-          current_pos=2*nod_in_elem2D_num(n)+3
+          my_x_corners(n, current_pos)=mesh%coord_nod2D(1,n)
+          my_y_corners(n, current_pos)=mesh%coord_nod2D(2,n)
+          current_pos=2*mesh%nod_in_elem2D_num(n)+3
           do nn=current_pos, size(my_x_corners, 2)
              my_x_corners(n, nn)=my_x_corners(n, current_pos-1)
              my_y_corners(n, nn)=my_y_corners(n, current_pos-1)
@@ -231,16 +248,16 @@ include "node_contour_boundary.h"
 
        if (bEdge_left==2) then  ! strange boundary node
            elem=belem_left(1)
-           allocate(nedges (nod_in_elem2D_num(n)+1))
-           allocate(nedges1(nod_in_elem2D_num(n)+1))
+           allocate(nedges (mesh%nod_in_elem2D_num(n)+1))
+           allocate(nedges1(mesh%nod_in_elem2D_num(n)+1))
            nedges =0
            nedges1=0
-           allocate(nelems (nod_in_elem2D_num(n)))
-           allocate(nelems1(nod_in_elem2D_num(n)))
+           allocate(nelems (mesh%nod_in_elem2D_num(n)))
+           allocate(nelems1(mesh%nod_in_elem2D_num(n)))
            nelems=0
            nelems1=0
            if (pos_increment<0) then 
-            current_pos=2*nod_in_elem2D_num(n)+4 !two more for the node n itself also we have 4 boundary edges
+            current_pos=2*mesh%nod_in_elem2D_num(n)+4 !two more for the node n itself also we have 4 boundary edges
            else
             current_pos =1
            end if
@@ -254,24 +271,24 @@ include "node_contour_boundary.h"
            end where
            nn1=nn
            do nn=1, nn1
-              call edge_center(edges(1, nedges1(nn)), edges(2, nedges1(nn)), my_x_corners(n, current_pos), my_y_corners(n, current_pos), mesh)
+              call edge_center(mesh%edges(1, nedges1(nn)), mesh%edges(2, nedges1(nn)), my_x_corners(n, current_pos), my_y_corners(n, current_pos), mesh)
               current_pos=current_pos+pos_increment
               call elem_center(nelems1(nn), my_x_corners(n, current_pos), my_y_corners(n, current_pos), mesh)
               current_pos=current_pos+pos_increment
            end do
            nn=nn1+1
-           call edge_center(edges(1, nedges1(nn)), edges(2, nedges1(nn)), my_x_corners(n, current_pos), my_y_corners(n, current_pos), mesh)
+           call edge_center(mesh%edges(1, nedges1(nn)), mesh%edges(2, nedges1(nn)), my_x_corners(n, current_pos), my_y_corners(n, current_pos), mesh)
            current_pos=current_pos+pos_increment
            nn=nn1+2
-           my_x_corners(n, current_pos)=coord_nod2D(1,n)
-           my_y_corners(n, current_pos)=coord_nod2D(2,n)
+           my_x_corners(n, current_pos)=mesh%coord_nod2D(1,n)
+           my_y_corners(n, current_pos)=mesh%coord_nod2D(2,n)
            current_pos=current_pos+pos_increment
            !!!!!!!
            elem=belem_left(2)
-           allocate(nedges2(nod_in_elem2D_num(n)+1))
+           allocate(nedges2(mesh%nod_in_elem2D_num(n)+1))
            nedges =0
            nedges2=0
-           allocate(nelems2(nod_in_elem2D_num(n)))
+           allocate(nelems2(mesh%nod_in_elem2D_num(n)))
            nelems =0
            nelems2=0
            !!!!!!!boundary_node_contour
@@ -284,18 +301,18 @@ include "node_contour_boundary.h"
            end where
            nn2=nn
            do nn=nn1+3, nn1+nn2+2
-              call edge_center(edges(1, nedges2(nn)), edges(2, nedges2(nn)), my_x_corners(n, current_pos), my_y_corners(n, current_pos), mesh)
+              call edge_center(mesh%edges(1, nedges2(nn)), mesh%edges(2, nedges2(nn)), my_x_corners(n, current_pos), my_y_corners(n, current_pos), mesh)
               current_pos=current_pos+pos_increment
               call elem_center(nelems2(nn), my_x_corners(n, current_pos), my_y_corners(n, current_pos), mesh)
               current_pos=current_pos+pos_increment
            end do
            nn=nn1+nn2+3
-           call edge_center(edges(1, nedges2(nn)), edges(2, nedges2(nn)), my_x_corners(n, current_pos), my_y_corners(n, current_pos), mesh)
+           call edge_center(mesh%edges(1, nedges2(nn)), mesh%edges(2, nedges2(nn)), my_x_corners(n, current_pos), my_y_corners(n, current_pos), mesh)
            current_pos=current_pos+pos_increment
            nn=nn1+nn2+4
-           my_x_corners(n, nn)=coord_nod2D(1,n)
-           my_y_corners(n, nn)=coord_nod2D(2,n)
-           current_pos=2*nod_in_elem2D_num(n)+5
+           my_x_corners(n, nn)=mesh%coord_nod2D(1,n)
+           my_y_corners(n, nn)=mesh%coord_nod2D(2,n)
+           current_pos=2*mesh%nod_in_elem2D_num(n)+5
            do nn=current_pos, size(my_x_corners, 2)
               my_x_corners(n, nn)=my_x_corners(n, current_pos-1)
               my_y_corners(n, nn)=my_y_corners(n, current_pos-1)
@@ -304,7 +321,7 @@ include "node_contour_boundary.h"
            deallocate(nedges, nelems, nedges1, nelems1, nedges2, nelems2)
        end if
     end do
-    do n=1, myDim_nod2D
+    do n=1, partit%myDim_nod2D
        do nn=1, size(my_x_corners, 2)
           this_x_coord=my_x_corners(n, nn)
           this_y_coord=my_y_corners(n, nn)
@@ -408,7 +425,6 @@ include "node_contour_boundary.h"
 #endif
     use mod_mesh
     USE MOD_PARTIT
-    USE MOD_PARSUP
     use g_rotate_grid
     use mod_oasis, only: oasis_write_area, oasis_write_mask
 #if defined (__XIOS)
@@ -477,10 +493,6 @@ include "node_contour_boundary.h"
     real(kind=WP), allocatable :: all_x_corners(:,:,:)     ! global longitude node corners
     real(kind=WP), allocatable :: all_y_corners(:,:,:)     ! global latitude node corners
 
-include "associate_part_def.h"
-include "associate_mesh_def.h"
-include "associate_part_ass.h"
-include "associate_mesh_ass.h"
 
 
 #ifdef VERBOSE
@@ -512,8 +524,8 @@ include "associate_mesh_ass.h"
     ! ... Some MPI stuff relevant for optional exchange via root only
     ! -----------------------------------------------------------------
 
-    localRank = mype 
-    localSize = npes
+    localRank = partit%mype 
+    localSize = partit%npes
 
 #ifdef VERBOSE
     print *, 'This is FESOM local rank ', localRank, commRank
@@ -524,32 +536,32 @@ include "associate_mesh_ass.h"
 ! ... Define the partition
 ! -----------------------------------------------------------------
 
-    my_number_of_points = myDim_nod2d
-    number_of_all_points = nod2d
-    if (mype .eq. 0) then 
+    my_number_of_points = partit%myDim_nod2d
+    number_of_all_points = mesh%nod2d
+    if (partit%mype .eq. 0) then 
       print *, 'FESOM Before ALLGATHERV'
     endif
     CALL MPI_ALLGATHER(my_number_of_points, 1, MPI_INTEGER, & 
-                       counts_from_all_pes, 1, MPI_INTEGER, MPI_COMM_FESOM, ierror)
-    if (mype .eq. 0) then
+                       counts_from_all_pes, 1, MPI_INTEGER, partit%MPI_COMM_FESOM, ierror)
+    if (partit%mype .eq. 0) then
       print *, 'FESOM after ALLGATHERV'
     endif
 
-    if (mype .eq. 0) then
+    if (partit%mype .eq. 0) then
       my_displacement = 0
     else
-      my_displacement = SUM(counts_from_all_pes(1:mype))
+      my_displacement = SUM(counts_from_all_pes(1:partit%mype))
     endif
 
     ig_paral(1) = 1                       ! Apple Partition
     ig_paral(2) = my_displacement         ! Global Offset
     ig_paral(3) = my_number_of_points     ! Local Extent
 
-    if (mype .eq. 0) then
+    if (partit%mype .eq. 0) then
       print *, 'FESOM before def partition'
     endif
     CALL oasis_def_partition( part_id(1), ig_paral, ierror )
-    if (mype .eq. 0) then
+    if (partit%mype .eq. 0) then
       print *, 'FESOM after def partition'
     endif
     if ( ierror /= 0 ) then
@@ -559,12 +571,12 @@ include "associate_mesh_ass.h"
       
     ALLOCATE(my_x_coords(my_number_of_points))
     ALLOCATE(my_y_coords(my_number_of_points))
-    ALLOCATE(my_x_corners(myDim_nod2D, 25))
-    ALLOCATE(my_y_corners(myDim_nod2D, 25))
+    ALLOCATE(my_x_corners(partit%myDim_nod2D, 25))
+    ALLOCATE(my_y_corners(partit%myDim_nod2D, 25))
 
     do i = 1, my_number_of_points
-      this_x_coord = coord_nod2D(1, i)
-      this_y_coord = coord_nod2D(2, i)
+      this_x_coord = mesh%coord_nod2D(1, i)
+      this_y_coord = mesh%coord_nod2D(2, i)
       call r2g(my_x_coords(i), my_y_coords(i), this_x_coord, this_y_coord)
     end do   
 
@@ -572,16 +584,16 @@ include "associate_mesh_ass.h"
     my_y_coords=my_y_coords/rad
 
     if (compute_oasis_corners) then
-      if (mype .eq. 0) then
+      if (partit%mype .eq. 0) then
         print *, 'FESOM before corner computation'
       endif
       call node_contours(my_x_corners, my_y_corners, partit, mesh)
-      if (mype .eq. 0) then
+      if (partit%mype .eq. 0) then
         print *, 'FESOM after corner computation'
       endif
     endif
 
-    if (mype .eq. localroot) then
+    if (partit%mype .eq. localroot) then
       ALLOCATE(all_x_coords(number_of_all_points, 1))
       ALLOCATE(all_y_coords(number_of_all_points, 1))
       ALLOCATE(all_area(number_of_all_points, 1))
@@ -598,39 +610,39 @@ include "associate_mesh_ass.h"
 
 
     displs_from_all_pes(1) = 0
-    do i = 2, npes
+    do i = 2, partit%npes
       displs_from_all_pes(i) = SUM(counts_from_all_pes(1:(i-1)))
     enddo  
 
-    if (mype .eq. 0) then 
-      print *, 'FESOM before 1st GatherV', displs_from_all_pes(npes), counts_from_all_pes(npes), number_of_all_points
+    if (partit%mype .eq. 0) then 
+      print *, 'FESOM before 1st GatherV', displs_from_all_pes(partit%npes), counts_from_all_pes(partit%npes), number_of_all_points
     endif
-    CALL MPI_GATHERV(my_x_coords, my_number_of_points, MPI_DOUBLE_PRECISION, all_x_coords,  &
-                    counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
+    CALL MPI_GATHERV(my_x_coords, my_number_of_points, MPI_WP, all_x_coords,  &
+                    counts_from_all_pes, displs_from_all_pes, MPI_WP, localroot, partit%MPI_COMM_FESOM, ierror)
 
-    if (mype .eq. 0) then 
+    if (partit%mype .eq. 0) then 
       print *, 'FESOM before 2nd GatherV'
     endif
-    CALL MPI_GATHERV(my_y_coords, my_number_of_points, MPI_DOUBLE_PRECISION, all_y_coords,  &
-                    counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
+    CALL MPI_GATHERV(my_y_coords, my_number_of_points, MPI_WP, all_y_coords,  &
+                    counts_from_all_pes, displs_from_all_pes, MPI_WP, localroot, partit%MPI_COMM_FESOM, ierror)
 
-    if (mype .eq. 0) then 
+    if (partit%mype .eq. 0) then 
       print *, 'FESOM before 3rd GatherV'
     endif
-    CALL MPI_GATHERV(area(1,:), my_number_of_points, MPI_DOUBLE_PRECISION, all_area,  &
-                    counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
+    CALL MPI_GATHERV(mesh%area(1,:), my_number_of_points, MPI_WP, all_area,  &
+                    counts_from_all_pes, displs_from_all_pes, MPI_WP, localroot, partit%MPI_COMM_FESOM, ierror)
 
     if (compute_oasis_corners) then
       do j = 1, 25
-        CALL MPI_GATHERV(my_x_corners(:,j), myDim_nod2D, MPI_DOUBLE_PRECISION, all_x_corners(:,:,j),  &
-                      counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
-        CALL MPI_GATHERV(my_y_corners(:,j), myDim_nod2D, MPI_DOUBLE_PRECISION, all_y_corners(:,:,j),  &
-                      counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
+        CALL MPI_GATHERV(my_x_corners(:,j), partit%myDim_nod2D, MPI_WP, all_x_corners(:,:,j),  &
+                      counts_from_all_pes, displs_from_all_pes, MPI_WP, localroot, partit%MPI_COMM_FESOM, ierror)
+        CALL MPI_GATHERV(my_y_corners(:,j), partit%myDim_nod2D, MPI_WP, all_y_corners(:,:,j),  &
+                      counts_from_all_pes, displs_from_all_pes, MPI_WP, localroot, partit%MPI_COMM_FESOM, ierror)
       end do
     endif
 
-    CALL MPI_Barrier(MPI_COMM_FESOM, ierror)
-    if (mype .eq. 0) then 
+    CALL MPI_Barrier(partit%MPI_COMM_FESOM, ierror)
+    if (partit%mype .eq. 0) then 
       print *, 'FESOM after Barrier'
     endif
 
@@ -638,7 +650,7 @@ include "associate_mesh_ass.h"
     if(partit%my_fesom_group == 0) then
 #endif
 
-    if (mype .eq. localroot) then
+    if (partit%mype .eq. localroot) then
       print *, 'FESOM before grid writing to oasis grid files'
        CALL oasis_start_grids_writing(il_flag)
        IF (il_flag .NE. 0) THEN
@@ -688,6 +700,10 @@ include "associate_mesh_ass.h"
     cpl_send( 5)='sia_feom' ! 5. sea ice albedo [%-100]            ->
     cpl_send( 6)='u_feom'   ! 6. eastward  surface velocity [m/s]  ->
     cpl_send( 7)='v_feom'   ! 7. northward surface velocity [m/s]  ->
+    cpl_send( 8)='sit_feom' ! 8. effective sea ice thickness [m]   ->
+#if defined (__recom)
+    cpl_send( 9)='FCO2_feom'! 9. CO2 flux [kgCO2 m-2 s-1]             ->
+#endif
 #else
     cpl_send( 1)='sst_feom' ! 1. sea surface temperature [°C]      ->
     cpl_send( 2)='sit_feom' ! 2. sea ice thickness [m]             ->
@@ -728,6 +744,12 @@ include "associate_mesh_ass.h"
     cpl_recv(13) = 'calv_oce'
     cpl_recv(14) = 'u10w_oce'
     cpl_recv(15) = 'v10w_oce'
+#if defined (__recom)
+    cpl_recv(16) = 'XCO2_oce'
+#endif
+    if (recv_tsk_ico > 0) cpl_recv(recv_tsk_ico) = 'tsk_ico'
+    if (recv_mslp_oce > 0) cpl_recv(recv_mslp_oce) = 'mslp_oce'
+!Not oifs
 #else
     cpl_recv(1)  = 'taux_oce'
     cpl_recv(2)  = 'tauy_oce'
@@ -760,7 +782,7 @@ include "associate_mesh_ass.h"
 ! --- icebergs ---
 #endif
 
-    if (mype .eq. 0) then 
+    if (partit%mype .eq. 0) then 
        print *, 'FESOM after declaring the transient variables'
     endif
 
@@ -786,7 +808,7 @@ include "associate_mesh_ass.h"
        endif
     enddo
 
-    if (mype .eq. 0) then 
+    if (partit%mype .eq. 0) then 
        print *, 'FESOM after announcing send variables'
     endif
 
@@ -803,7 +825,7 @@ include "associate_mesh_ass.h"
        endif
     enddo
 
-    if (mype .eq. 0) then 
+    if (partit%mype .eq. 0) then 
        print *, 'FESOM after announcing revieved variables'
     endif
 
@@ -828,13 +850,13 @@ include "associate_mesh_ass.h"
 
    ! WAS VOM FOLGENDEN BRAUCHE ICH NOCH ??? 
 
-   allocate(cplsnd(nsend, myDim_nod2D+eDim_nod2D))
-   allocate(exfld(myDim_nod2D))
+   allocate(cplsnd(nsend, partit%myDim_nod2D+partit%eDim_nod2D))
+   allocate(exfld(partit%myDim_nod2D))
    cplsnd=0.
    o2a_call_count=0
 
-   CALL MPI_BARRIER(MPI_COMM_FESOM, ierror)
-   if (mype .eq. 0) then 
+   CALL MPI_BARRIER(partit%MPI_COMM_FESOM, ierror)
+   if (partit%mype .eq. 0) then 
       print *, 'Survived cpl_oasis3mct_define'
    endif   
 
@@ -847,7 +869,6 @@ include "associate_mesh_ass.h"
   subroutine cpl_oasis3mct_send(ind, data_array, action, partit)
     use o_param
     USE MOD_PARTIT
-    USE MOD_PARSUP
     implicit none
     save
     !---------------------------------------------------------------------
@@ -892,7 +913,9 @@ include "associate_mesh_ass.h"
     endif     
 #endif
     call oasis_put(send_id(ind), seconds_til_now, exfld, info)
-    action=(info==4 .OR. info==8)
+    ! Fields put before the last one of a coupling group return OASIS_Waitgroup;
+    ! they are buffered and transmitted together with the last one.
+    action=(info==OASIS_Sent .OR. info==OASIS_SentOut .OR. info==OASIS_Waitgroup)
     if (action) then
        if (ind==nsend) then
           cplsnd=0.
@@ -911,7 +934,6 @@ include "associate_mesh_ass.h"
     use o_param
     use g_comm_auto
     USE MOD_PARTIT
-    USE MOD_PARSUP
     implicit none
     save
     !---------------------------------------------------------------------
@@ -985,7 +1007,7 @@ include "associate_mesh_ass.h"
       end if
 
       if(num_fesom_groups > 1) then
-          call MPI_Bcast(data_array, partit%myDim_nod2d, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%MPIerr)
+          call MPI_Bcast(data_array, partit%myDim_nod2d, MPI_WP, 0, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%MPIerr)
       end if
 #endif
 

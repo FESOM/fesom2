@@ -18,9 +18,14 @@ module g_cvmix_idemix
     
     !___________________________________________________________________________
     ! module calls from cvmix library
-    use cvmix_idemix,  only :  init_idemix, calc_idemix_v0, cvmix_coeffs_idemix                 
+    use cvmix_idemix,  only :  init_idemix, calc_idemix_v0, cvmix_coeffs_idemix
     use cvmix_put_get, only : cvmix_put
-    use cvmix_kinds_and_types 
+    ! CVMix is a fixed double-precision library (kind cvmix_r8). FESOM's WP may be real4
+    ! (single precision); convert WP<->cvmix_r8 at the CVMix call boundary below so CVMix
+    ! always runs in double precision. In a double-precision FESOM build cvmix_r8==WP, so
+    ! the casts/temps are exact no-ops and the result is bit-identical. cvmix_r8 is provided
+    ! by the full use of cvmix_kinds_and_types below.
+    use cvmix_kinds_and_types
     
     !___________________________________________________________________________
     ! module calls from FESOM
@@ -28,7 +33,7 @@ module g_cvmix_idemix
     use o_param           
     use mod_mesh
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_abort
     use o_arrays
     use g_comm_auto 
     use g_read_other_NetCDF
@@ -126,55 +131,51 @@ module g_cvmix_idemix
 
         type(t_mesh),   intent(in),    target :: mesh
         type(t_partit), intent(inout), target :: partit
-#include "../associate_part_def.h"
-#include "../associate_mesh_def.h"
-#include "../associate_part_ass.h"
-#include "../associate_mesh_ass.h"
         !_______________________________________________________________________
-        if(mype==0) then
+        if(partit%mype==0) then
             write(*,*) '____________________________________________________________'
-            write(*,*) ' --> initialise IDEMIX'
+            write(*,*) ' --> initialise IDEMIX', partit%mype
             write(*,*)
         end if
             
         !_______________________________________________________________________
         ! allocate + initialse idemix arrays --> with size myDim_nod2D+eDim_nod2D
-        node_size=myDim_nod2D+eDim_nod2D
-        elem_size=myDim_elem2D+eDim_elem2D
+        node_size=partit%myDim_nod2D+partit%eDim_nod2D
+        elem_size=partit%myDim_elem2D+partit%eDim_elem2D
         
-        allocate(iwe_n(nl,node_size), iwe(nl,elem_size))
+        allocate(iwe_n(mesh%nl,node_size), iwe(mesh%nl,elem_size))
         iwe_n(:,:)          = 0.0_WP
         iwe(:,:)            = 0.0_WP
-        allocate(iwe_v0_n(nl,node_size), iwe_v0(nl,elem_size))
+        allocate(iwe_v0_n(mesh%nl,node_size), iwe_v0(mesh%nl,elem_size))
         iwe_v0_n(:,:)       = 0.0_WP
         iwe_v0(:,:)         = 0.0_WP
         
         ! internal wave related vertical viscosity and diffusivity
-        allocate(iwe_Av(nl,elem_size))
-        allocate(iwe_Kv(nl,elem_size))
+        allocate(iwe_Av(mesh%nl,elem_size))
+        allocate(iwe_Kv(mesh%nl,elem_size))
         iwe_Av(:,:)         = 0.0_WP
         iwe_Kv(:,:)         = 0.0_WP
         
-        allocate(iwe_old(nl))
+        allocate(iwe_old(mesh%nl))
         iwe_old(:)          = 0.0_WP
         
-        allocate(vol_wcelli(nl,node_size))
+        allocate(vol_wcelli(mesh%nl,node_size))
         vol_wcelli(:,:)     = 0.0_WP        
         
-        allocate(cvmix_dummy_1(nl,elem_size))
-        allocate(cvmix_dummy_2(nl,elem_size))
-        allocate(cvmix_dummy_3(nl,elem_size))
+        allocate(cvmix_dummy_1(mesh%nl,elem_size))
+        allocate(cvmix_dummy_2(mesh%nl,elem_size))
+        allocate(cvmix_dummy_3(mesh%nl,elem_size))
         cvmix_dummy_1(:,:)  = 0.0_WP
         cvmix_dummy_2(:,:)  = 0.0_WP
         cvmix_dummy_3(:,:)  = 0.0_WP
         
         ! diagnostic 
-        allocate(iwe_Ttot(nl,elem_size))
-        allocate(iwe_Tdif(nl,elem_size))
-        allocate(iwe_Thdi(nl,elem_size))
-        allocate(iwe_Tdis(nl,elem_size), iwe_Tdis_n(nl,node_size))
-        allocate(iwe_Tsur(nl,elem_size))
-        allocate(iwe_Tbot(nl,elem_size))
+        allocate(iwe_Ttot(mesh%nl,elem_size))
+        allocate(iwe_Tdif(mesh%nl,elem_size))
+        allocate(iwe_Thdi(mesh%nl,elem_size))
+        allocate(iwe_Tdis(mesh%nl,elem_size), iwe_Tdis_n(mesh%nl,node_size))
+        allocate(iwe_Tsur(mesh%nl,elem_size))
+        allocate(iwe_Tbot(mesh%nl,elem_size))
         iwe_Ttot(:,:)       = 0.0_WP
         iwe_Tdif(:,:)       = 0.0_WP
         iwe_Thdi(:,:)       = 0.0_WP
@@ -183,8 +184,8 @@ module g_cvmix_idemix
         iwe_Tbot(:,:)       = 0.0_WP
         iwe_Tdis_n(:,:)     = 0.0_WP
         
-        allocate(iwe_c0(nl,elem_size))
-        allocate(iwe_alpha_c(nl,elem_size), iwe_alpha_c_n(nl,node_size))
+        allocate(iwe_c0(mesh%nl,elem_size))
+        allocate(iwe_alpha_c(mesh%nl,elem_size), iwe_alpha_c_n(mesh%nl,node_size))
         iwe_c0(:,:)         = 0.0_WP
         iwe_alpha_c(:,:)    = 0.0_WP
         iwe_alpha_c_n(:,:)  = 0.0_WP
@@ -213,7 +214,7 @@ module g_cvmix_idemix
         end if    
         
         !_______________________________________________________________________
-        if (mype==0) then
+        if (partit%mype==0) then
             write(*,*) "     idemix_tau_v        = ", idemix_tau_v
             write(*,*) "     idemix_tau_h        = ", idemix_tau_h
             write(*,*) "     idemix_gamma        = ", idemix_gamma
@@ -232,34 +233,44 @@ module g_cvmix_idemix
         file_exist=.False.
         inquire(file=trim(idemix_surforc_file),exist=file_exist) 
         if (file_exist) then
-            if (mype==0) write(*,*) ' --> read IDEMIX near inertial wave surface forcing'
+            if (partit%mype==0) write(*,*) ' --> read IDEMIX near inertial wave surface forcing'
             call read_other_NetCDF(idemix_surforc_file, idemix_surforc_vname, 1, iwe_fsrf, .true., .false., partit, mesh)
             !                                                                                                   |           
             !                                  .false.=interpolate on element centroids instead of vertices <---+   
             
             ! only 20% of the niw-input are available to penetrate into the deeper ocean
             ! divide by density_0 --> convert from W/m^2 to m^3/s^3
-            iwe_fsrf = iwe_fsrf/density_0 * idemix_sforcusage 
-            
+            iwe_fsrf = iwe_fsrf/density_0 * idemix_sforcusage
+
+            ! check for total surface energy that is infused, compare with IDEMIX2 Etot_srf
+            loc_Etot = 0.0_WP
+            do elem=1, partit%myDim_elem2D
+                if (mesh%elem2D_nodes(1,elem)<=partit%myDim_nod2D) then
+                    loc_Etot = loc_Etot + mesh%elem_area(elem)*iwe_fsrf(elem)*density_0
+                end if
+            end do
+            call MPI_AllREDUCE(loc_Etot, glb_Etot, 1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+            if (partit%mype==0) write(*,*) " --> IDEMIX total srf. energy Etot_srf =", glb_Etot*1.0e-12, ' TW'
+
         else
-            if (mype==0) then
+            if (partit%mype==0) then
                 write(*,*) '____________________________________________________________________'
                 write(*,*) ' ERROR: IDEMIX surface forcing file not found! Cant apply IDEMIX'
                 write(*,*) '        vertical mixing parameterisation! '
                 write(*,*) '        --> check your namelist.cvmix, idemix_surforc_file &  '
                 write(*,*) '            idemix_botforc_file'
                 write(*,*) '____________________________________________________________________'
+                call par_abort(partit%MPI_COMM_FESOM, partit%mype)
             end if
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
         end if 
         
         !_______________________________________________________________________
         ! read idemix bottom near tidal forcing from cesm data set --> file 
         ! from N. Brüggemann interpoalted to regular grid
         file_exist=.False.
-        inquire(file=trim(idemix_surforc_file),exist=file_exist) 
+        inquire(file=trim(idemix_botforc_file),exist=file_exist) 
         if (file_exist) then
-            if (mype==0) write(*,*) ' --> read IDEMIX near tidal bottom forcing'
+            if (partit%mype==0) write(*,*) ' --> read IDEMIX near tidal bottom forcing'
             call read_other_NetCDF(idemix_botforc_file, idemix_botforc_vname, 1, iwe_fbot, .true., .false., partit, mesh)
             !                                                                                                  |           
             !                                 .false.=interpolate on element centroids instead of vertices <---+   
@@ -268,16 +279,16 @@ module g_cvmix_idemix
             ! much is lossed during interpolation and compare with value of the 
             ! original files
             loc_Etot = 0.0_WP
-            do elem=1, myDim_elem2D
+            do elem=1, partit%myDim_elem2D
                 ! REMEMBER!!!: the partition on elements is not unique there are 
                 ! elements that belong to two CPUs. For unique elements the index
                 ! of the First trinagle node must  be <= myDim_nod2D
-                if (elem2D_nodes(1,elem)<=myDim_nod2D) then
-                    loc_Etot = loc_Etot + elem_area(elem)*iwe_fbot(elem)
+                if (mesh%elem2D_nodes(1,elem)<=partit%myDim_nod2D) then
+                    loc_Etot = loc_Etot + mesh%elem_area(elem)*iwe_fbot(elem)
                 end if     
             end do
-            call MPI_AllREDUCE(loc_Etot, glb_Etot, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-            if (mype==0) write(*,*) " --> IDEMIX total tidal energy Etot_bot =", glb_Etot*1.0e-12, ' TW'
+            call MPI_AllREDUCE(loc_Etot, glb_Etot, 1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+            if (partit%mype==0) write(*,*) " --> IDEMIX total tidal energy Etot_bot =", glb_Etot*1.0e-12, ' TW'
             
             ! normalize total tidal energy at bottom with respect to the total 
             ! tidal energy that is e.g in the original forcing files to accomodate 
@@ -287,36 +298,38 @@ module g_cvmix_idemix
                 iwe_fbot = iwe_fbot * idemix_botforc_Etot/glb_Etot
                 
                 loc_Etot = 0.0_WP
-                do elem=1, myDim_elem2D
+                do elem=1, partit%myDim_elem2D
                     ! REMEMBER!!!: the partition on elements is not unique there are 
                     ! elements that belong to two CPUs. For unique elements the index
                     ! of the First trinagle node must  be <= myDim_nod2D
-                    if (elem2D_nodes(1,elem)<=myDim_nod2D) then
-                        loc_Etot = loc_Etot + elem_area(elem)*iwe_fbot(elem)
+                    if (mesh%elem2D_nodes(1,elem)<=partit%myDim_nod2D) then
+                        loc_Etot = loc_Etot + mesh%elem_area(elem)*iwe_fbot(elem)
                     end if     
                 end do
-                call MPI_AllREDUCE(loc_Etot, glb_Etot, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-                if (mype==0) write(*,*) " --> IDEMIX Etot_bot after normalizing =", glb_Etot*1.0e-12, ' TW'
+                call MPI_AllREDUCE(loc_Etot, glb_Etot, 1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+                if (partit%mype==0) write(*,*) " --> IDEMIX Etot_bot after normalizing =", glb_Etot*1.0e-12, ' TW'
             end if 
             
             ! divide by density_0 --> convert from W/m^2 to m^3/s^3
             iwe_fbot  = iwe_fbot/density_0
-            
         else
-            if (mype==0) then
+            if (partit%mype==0) then
                 write(*,*) '____________________________________________________________________'
                 write(*,*) ' ERROR: IDEMIX bottom forcing file not found! Cant apply IDEMIX'
                 write(*,*) '        vertical mixing parameterisation! '
                 write(*,*) '        --> check your namelist.cvmix, idemix_surforc_file &  '
                 write(*,*) '            idemix_botforc_file'
                 write(*,*) '____________________________________________________________________'
+                call par_abort(partit%MPI_COMM_FESOM, partit%mype)
             end if 
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+            
         end if 
         
         !_______________________________________________________________________
         ! initialise IDEMIX parameters
-        call init_idemix(idemix_tau_v,idemix_tau_h,idemix_gamma,idemix_jstar,idemix_mu0)! ,handle_old_vals)! ,idemix_userdef_constants)
+        call init_idemix(real(idemix_tau_v, cvmix_r8), real(idemix_tau_h, cvmix_r8), &
+                         real(idemix_gamma, cvmix_r8), real(idemix_jstar, cvmix_r8), &
+                         real(idemix_mu0, cvmix_r8))! ,handle_old_vals)! ,idemix_userdef_constants)
     end subroutine init_cvmix_idemix
     !
     !
@@ -334,27 +347,33 @@ module g_cvmix_idemix
         real(kind=WP) :: grad_v0Eiw(2), deltaX1, deltaY1, deltaX2, deltaY2
         real(kind=WP) :: tsum1, tsum2, tsum3, tsum4, tvol
         logical       :: debug=.false.
+        ! double-precision (cvmix_r8) buffers for the cvmix_coeffs_idemix call boundary.
+        ! One per array argument; sliced identically to the original WP actual arguments so
+        ! the sequence association is unchanged. Exact no-op when WP==cvmix_r8.
+        real(cvmix_r8) :: dzw_r8(mesh%nl), dzt_r8(mesh%nl), iwe_new_r8(mesh%nl)
+        real(cvmix_r8) :: iwe_old_r8(mesh%nl), alpha_c_r8(mesh%nl)
+        real(cvmix_r8) :: KappaM_r8(mesh%nl), KappaH_r8(mesh%nl), Nsqr_r8(mesh%nl)
+        real(cvmix_r8) :: iwe_Ttot_r8(mesh%nl), iwe_Tdif_r8(mesh%nl), iwe_Thdi_r8(mesh%nl)
+        real(cvmix_r8) :: iwe_Tdis_r8(mesh%nl), iwe_Tsur_r8(mesh%nl), iwe_Tbot_r8(mesh%nl)
+        real(cvmix_r8) :: c0_r8(mesh%nl), v0_r8(mesh%nl)
+        real(cvmix_r8) :: cvmix_int_1_r8(mesh%nl), cvmix_int_2_r8(mesh%nl), cvmix_int_3_r8(mesh%nl)
 
-#include "../associate_part_def.h"
-#include "../associate_mesh_def.h"
-#include "../associate_part_ass.h"
-#include "../associate_mesh_ass.h"
         ! nils
         tstep_count = tstep_count + 1
-        node_size = myDim_nod2D
-        elem_size = myDim_elem2D
+        node_size = partit%myDim_nod2D
+        elem_size = partit%myDim_elem2D
         
         !_______________________________________________________________________
         do elem = 1,elem_size
-            nln = nlevels(elem)-1
-            uln = ulevels(elem)
+            nln = mesh%nlevels(elem)-1
+            uln = mesh%ulevels(elem)
             
             !___________________________________________________________________
             ! calculate for TKE square of Brünt-Väisälä frequency, be aware that
             ! bvfreq contains already the squared brünt Väisälä frequency ...
             bvfreq2          = 0.0_WP
             do nz= uln, nln 
-                elnodes1     = elem2d_nodes(:,elem)
+                elnodes1     = mesh%elem2d_nodes(:,elem)
                 bvfreq2(nz)  = sum(bvfreq(nz,elnodes1))/3.0_WP
             end do
             
@@ -362,53 +381,79 @@ module g_cvmix_idemix
             ! dz_trr distance between tracer points, surface and bottom dz_trr is half 
             ! the layerthickness ...
             dz_trr           = 0.0_WP
-            dz_trr(uln+1:nln)= helem(uln:nln-1,elem)*0.5_WP + helem(uln+1:nln,elem)*0.5_WP
-            dz_trr(uln)      = helem(uln,elem)*0.5_WP
-            dz_trr(nln+1)    = helem(nln,elem)*0.5_WP
+            dz_trr(uln+1:nln)= mesh%helem(uln:nln-1,elem)*0.5_WP + mesh%helem(uln+1:nln,elem)*0.5_WP
+            dz_trr(uln)      = mesh%helem(uln,elem)*0.5_WP
+            dz_trr(nln+1)    = mesh%helem(nln,elem)*0.5_WP
             
             !___________________________________________________________________
             ! main call to calculate idemix
             iwe_old = iwe(:,elem)
+            !___________________________________________________________________
+            ! copy WP input/inout arrays into cvmix_r8 temps before the call
+            ! (slices match the original actual arguments exactly)
+            dzw_r8(uln:nln)        = real(mesh%helem(uln:nln, elem),     cvmix_r8)
+            dzt_r8(uln:nln+1)      = real(dz_trr(uln:nln+1),        cvmix_r8)
+            iwe_old_r8(uln:nln+1)  = real(iwe_old(uln:nln+1),       cvmix_r8)
+            Nsqr_r8(uln:nln+1)     = real(bvfreq2(uln:nln+1),       cvmix_r8)
+            iwe_Thdi_r8(uln:nln+1) = real(iwe_Thdi(uln:nln+1,elem), cvmix_r8)
+            KappaM_r8(uln:nln+1)   = real(iwe_Av(uln:nln+1, elem),  cvmix_r8) ! inout
+            KappaH_r8(uln:nln+1)   = real(iwe_Kv(uln:nln+1, elem),  cvmix_r8) ! inout
             call cvmix_coeffs_idemix(&
                 ! parameter
-                dzw             = helem(uln:nln, elem),               &
-                dzt             = dz_trr(uln:nln+1),                  &
+                dzw             = dzw_r8(uln:nln),                   &
+                dzt             = dzt_r8(uln:nln+1),                 &
 !                 nlev            = nln,                                &
                 nlev            = nln-uln+1,                          &
-                max_nlev        = nl-1,                               &  
-                dtime           = dt,                                 &
-                coriolis        = mesh%coriolis(elem),                &
-                ! essentials 
-                iwe_new         = iwe(uln:nln+1,elem),                & ! out
-                iwe_old         = iwe_old(uln:nln+1),                 & ! in
-                forc_iw_surface = iwe_fsrf(elem),                     & ! in
-                forc_iw_bottom  = iwe_fbot(elem),                     & ! in
+                max_nlev        = mesh%nl-1,                               &
+                dtime           = real(dt, cvmix_r8),                 &
+                coriolis        = real(mesh%coriolis(elem), cvmix_r8),&
+                ! essentials
+                iwe_new         = iwe_new_r8(uln:nln+1),             & ! out
+                iwe_old         = iwe_old_r8(uln:nln+1),             & ! in
+                forc_iw_surface = real(iwe_fsrf(elem), cvmix_r8),     & ! in
+                forc_iw_bottom  = real(iwe_fbot(elem), cvmix_r8),     & ! in
                 ! FIXME: nils: better output IDEMIX Ri directly
-                alpha_c         = iwe_alpha_c(uln:nln+1, elem),       & ! out (for Ri IMIX)
-                ! only for Osborn shortcut 
+                alpha_c         = alpha_c_r8(uln:nln+1),             & ! out (for Ri IMIX)
+                ! only for Osborn shortcut
                 ! FIXME: nils: put this to cvmix_tke
-                KappaM_out      = iwe_Av(  uln:nln+1, elem),          & ! out
-                KappaH_out      = iwe_Kv(  uln:nln+1, elem),          & ! out
-                Nsqr            = bvfreq2( uln:nln+1),                & ! in
+                KappaM_out      = KappaM_r8(uln:nln+1),              & ! inout
+                KappaH_out      = KappaH_r8(uln:nln+1),              & ! inout
+                Nsqr            = Nsqr_r8(uln:nln+1),                & ! in
                 ! diagnostics
-                iwe_Ttot        = iwe_Ttot(uln:nln+1, elem),          &
-                iwe_Tdif        = iwe_Tdif(uln:nln+1, elem),          &
-                iwe_Thdi        = iwe_Thdi(uln:nln+1, elem),          &
-                iwe_Tdis        = iwe_Tdis(uln:nln+1, elem),          &
-                iwe_Tsur        = iwe_Tsur(uln:nln+1, elem),          &
-                iwe_Tbot        = iwe_Tbot(uln:nln+1, elem),          &
-                c0              = iwe_c0(  uln:nln+1, elem),          &
-                v0              = iwe_v0(  uln:nln+1, elem),          &
+                iwe_Ttot        = iwe_Ttot_r8(uln:nln+1),            &
+                iwe_Tdif        = iwe_Tdif_r8(uln:nln+1),            &
+                iwe_Thdi        = iwe_Thdi_r8(uln:nln+1),            &
+                iwe_Tdis        = iwe_Tdis_r8(uln:nln+1),            &
+                iwe_Tsur        = iwe_Tsur_r8(uln:nln+1),            &
+                iwe_Tbot        = iwe_Tbot_r8(uln:nln+1),            &
+                c0              = c0_r8(uln:nln+1),                  &
+                v0              = v0_r8(uln:nln+1),                  &
                 ! debugging
                 debug           = debug,                              &
                 !i = i,                                        &
                 !j = j,                                        &
                 !tstep_count = tstep_count,                    &
-                cvmix_int_1     = cvmix_dummy_1(uln:nln+1, elem),     &
-                cvmix_int_2     = cvmix_dummy_2(uln:nln+1, elem),     &
-                cvmix_int_3     = cvmix_dummy_3(uln:nln+1, elem)      &
+                cvmix_int_1     = cvmix_int_1_r8(uln:nln+1),         &
+                cvmix_int_2     = cvmix_int_2_r8(uln:nln+1),         &
+                cvmix_int_3     = cvmix_int_3_r8(uln:nln+1)          &
                 )
-            
+            !___________________________________________________________________
+            ! copy cvmix_r8 output/inout temps back into the WP FESOM arrays
+            iwe(uln:nln+1,elem)         = real(iwe_new_r8(uln:nln+1),     WP)
+            iwe_alpha_c(uln:nln+1,elem) = real(alpha_c_r8(uln:nln+1),     WP)
+            iwe_Av(uln:nln+1, elem)     = real(KappaM_r8(uln:nln+1),      WP)
+            iwe_Kv(uln:nln+1, elem)     = real(KappaH_r8(uln:nln+1),      WP)
+            iwe_Ttot(uln:nln+1, elem)   = real(iwe_Ttot_r8(uln:nln+1),    WP)
+            iwe_Tdif(uln:nln+1, elem)   = real(iwe_Tdif_r8(uln:nln+1),    WP)
+            iwe_Tdis(uln:nln+1, elem)   = real(iwe_Tdis_r8(uln:nln+1),    WP)
+            iwe_Tsur(uln:nln+1, elem)   = real(iwe_Tsur_r8(uln:nln+1),    WP)
+            iwe_Tbot(uln:nln+1, elem)   = real(iwe_Tbot_r8(uln:nln+1),    WP)
+            iwe_c0(uln:nln+1, elem)     = real(c0_r8(uln:nln+1),          WP)
+            iwe_v0(uln:nln+1, elem)     = real(v0_r8(uln:nln+1),          WP)
+            cvmix_dummy_1(uln:nln+1,elem) = real(cvmix_int_1_r8(uln:nln+1), WP)
+            cvmix_dummy_2(uln:nln+1,elem) = real(cvmix_int_2_r8(uln:nln+1), WP)
+            cvmix_dummy_3(uln:nln+1,elem) = real(cvmix_int_3_r8(uln:nln+1), WP)
+
         end do !-->do node = 1,node_size
         
         !_______________________________________________________________________
@@ -417,24 +462,24 @@ module g_cvmix_idemix
         ! and iwe_Tdis and iwe_alpha_c are needed by TKE also on vertices 
         ! --> iwe_Tdis_n, iwe_alpha_c_n
         do node=1, node_size 
-            uln = ulevels_nod2D(node)
-            nln = nlevels_nod2D(node)-1
+            uln = mesh%ulevels_nod2D(node)
+            nln = mesh%nlevels_nod2D(node)-1
             do nz=uln, nln
                 tvol =0.0_WP
                 tsum1=0.0_WP
                 tsum2=0.0_WP
                 tsum3=0.0_WP
                 tsum4=0.0_WP
-                do k=1, nod_in_elem2D_num(node)
-                    elem = nod_in_elem2D(k,node)
-                    nu1  = ulevels(elem)
-                    nl1  = nlevels(elem)-1
+                do k=1, mesh%nod_in_elem2D_num(node)
+                    elem = mesh%nod_in_elem2D(k,node)
+                    nu1  = mesh%ulevels(elem)
+                    nl1  = mesh%nlevels(elem)-1
                     if (nl1<nz .or. nz<nu1) cycle
-                    tvol = tvol +                     elem_area(elem)
-                    tsum1= tsum1+iwe(        nz,elem)*elem_area(elem)
-                    tsum2= tsum2+iwe_v0(     nz,elem)*elem_area(elem)
-                    tsum3= tsum3+iwe_Tdis(   nz,elem)*elem_area(elem)
-                    tsum4= tsum4+iwe_alpha_c(nz,elem)*elem_area(elem)
+                    tvol = tvol +                     mesh%elem_area(elem)
+                    tsum1= tsum1+iwe(        nz,elem)*mesh%elem_area(elem)
+                    tsum2= tsum2+iwe_v0(     nz,elem)*mesh%elem_area(elem)
+                    tsum3= tsum3+iwe_Tdis(   nz,elem)*mesh%elem_area(elem)
+                    tsum4= tsum4+iwe_alpha_c(nz,elem)*mesh%elem_area(elem)
                 end do
                 iwe_n(        nz,node)=tsum1/tvol
                 iwe_v0_n(     nz,node)=tsum2/tvol
@@ -468,23 +513,23 @@ module g_cvmix_idemix
             ! calculate inverse volume and restrict iwe_v0 to fullfill stability 
             do node = 1,node_size
                 ! number of above bottom levels at node
-                nln = nlevels_nod2D(node)-1
-                uln = ulevels_nod2D(node)
+                nln = mesh%nlevels_nod2D(node)-1
+                uln = mesh%ulevels_nod2D(node)
                 
                 ! thickness of mid-level to mid-level interface at node
                 dz_trr             = 0.0_WP
-                dz_trr(uln+1:nln)  = Z_3d_n(uln:nln-1,node)-Z_3d_n(uln+1:nln,node)
-                dz_trr(uln)        = hnode(uln,node)/2.0_WP
-                dz_trr(nln+1)      = hnode(nln,node)/2.0_WP
+                dz_trr(uln+1:nln)  = mesh%Z_3d_n(uln:nln-1,node)-mesh%Z_3d_n(uln+1:nln,node)
+                dz_trr(uln)        = mesh%hnode(uln,node)/2.0_WP
+                dz_trr(nln+1)      = mesh%hnode(nln,node)/2.0_WP
                 
                 ! surface cell 
-                vol_wcelli(uln,node)   = 1/areasvol(uln,node)/dz_trr(uln)
+                vol_wcelli(uln,node)   = 1/mesh%areasvol(uln,node)/dz_trr(uln)
                 do nz=uln+1,nln
                     ! inverse volumne centered around full depth levels
-                    vol_wcelli(nz,node)= 1/areasvol(nz-1,node)/dz_trr(nz)
+                    vol_wcelli(nz,node)= 1/mesh%areasvol(nz-1,node)/dz_trr(nz)
                 end do 
                 ! bottom cell 
-                vol_wcelli(nln+1,node) = 1/areasvol(nln,node)/dz_trr(nln+1)
+                vol_wcelli(nln+1,node) = 1/mesh%areasvol(nln,node)/dz_trr(nln+1)
                 
             end do !-->do node = 1,node_size
             call exchange_nod(vol_wcelli, partit)
@@ -494,7 +539,7 @@ module g_cvmix_idemix
             do niter=1, idemix_n_hor_iwe_prop_iter
                 !_______________________________________________________________
                 ! calculate horizontal diffusion term for internal wave energy
-                do edge=1,myDim_edge2D
+                do edge=1,partit%myDim_edge2D
                     !___________________________________________________________
                     ! deltaX1,deltaY1 ... cross edge dx and dy for the two elements 
                     ! that contribute to the edge
@@ -511,27 +556,27 @@ module g_cvmix_idemix
                     !               \   /
                     !                \ /
                     !                 o
-                    deltaX1  = edge_cross_dxdy(1,edge)
-                    deltaY1  = edge_cross_dxdy(2,edge)
+                    deltaX1  = mesh%edge_cross_dxdy(1,edge)
+                    deltaY1  = mesh%edge_cross_dxdy(2,edge)
                     ! ednode ... vertices that form the edgeiwe_Thdi
-                    ednodes  = edges(:,edge)
+                    ednodes  = mesh%edges(:,edge)
                     ! el ... elements that contribute to edge
-                    el       = edge_tri(:,edge)
+                    el       = mesh%edge_tri(:,edge)
                     ! elnodes1 ... nodes that contribute to element el(1) 
-                    elnodes1 = elem2d_nodes(:,el(1))
+                    elnodes1 = mesh%elem2d_nodes(:,el(1))
                     ! nl1 ... number of layers at element el(1)
-                    nl1      = nlevels(el(1))
+                    nl1      = mesh%nlevels(el(1))
                     ! nu1 ... upper index of ocean default = 1 but can consider cavity !=1
-                    nu1      = ulevels(el(1))
+                    nu1      = mesh%ulevels(el(1))
                     
                     ! thickness of mid-level to mid-level interface of element el(1)
                     dz_trr         = 0.0_WP
-                    dz_trr(nu1)    = helem(nu1,el(1))/2.0_WP
+                    dz_trr(nu1)    = mesh%helem(nu1,el(1))/2.0_WP
                     !!PS do nz=2,nl1-1
                     do nz=nu1+1,nl1-1
-                        dz_trr(nz) = helem(nz-1,el(1))/2.0_WP + helem(nz,el(1))/2.0_WP
+                        dz_trr(nz) = mesh%helem(nz-1,el(1))/2.0_WP + mesh%helem(nz,el(1))/2.0_WP
                     end do
-                    dz_trr(nl1)    = helem(nl1-1,el(1))/2.0_WP
+                    dz_trr(nl1)    = mesh%helem(nl1-1,el(1))/2.0_WP
                     
                     !___________________________________________________________
                     ! the same as above but for el(2)--> if el(2)==0 than this edge 
@@ -539,20 +584,20 @@ module g_cvmix_idemix
                     nl2=0
                     nu2=0
                     if (el(2)>0) then 
-                        deltaX2  = edge_cross_dxdy(3,edge)
-                        deltaY2  = edge_cross_dxdy(4,edge)
-                        elnodes2 = elem2d_nodes(:,el(2))
-                        nl2      = nlevels(el(2))
-                        nu2      = ulevels(el(2))
+                        deltaX2  = mesh%edge_cross_dxdy(3,edge)
+                        deltaY2  = mesh%edge_cross_dxdy(4,edge)
+                        elnodes2 = mesh%elem2d_nodes(:,el(2))
+                        nl2      = mesh%nlevels(el(2))
+                        nu2      = mesh%ulevels(el(2))
                         
                         ! thickness of mid-level to mid-level interface of element el(2)
                         dz_trr2         = 0.0_WP
-                        dz_trr2(nu2)    = helem(nu2,el(2))/2.0_WP
+                        dz_trr2(nu2)    = mesh%helem(nu2,el(2))/2.0_WP
                         !!PS do nz=2,nl2-1
                         do nz=nu2+1,nl2-1
-                            dz_trr2(nz) = helem(nz-1,el(2))/2.0_WP + helem(nz,el(2))/2.0_WP
+                            dz_trr2(nz) = mesh%helem(nz-1,el(2))/2.0_WP + mesh%helem(nz,el(2))/2.0_WP
                         end do
-                        dz_trr2(nl2)    = helem(nl2-1,el(2))/2.0_WP
+                        dz_trr2(nl2)    = mesh%helem(nl2-1,el(2))/2.0_WP
                     endif
                     
                     !___________________________________________________________
@@ -568,8 +613,8 @@ module g_cvmix_idemix
                         ! --> calc: grad_h(v_0*E_iw)
                         ! calculate flux from el(1) with respect to edge mid 
                         ! point
-                        grad_v0Eiw(1) = sum(gradient_sca(1:3,el(1))*iwe_v0_n(nz,elnodes1)*iwe_n(nz,elnodes1))
-                        grad_v0Eiw(2) = sum(gradient_sca(4:6,el(1))*iwe_v0_n(nz,elnodes1)*iwe_n(nz,elnodes1))
+                        grad_v0Eiw(1) = sum(mesh%gradient_sca(1:3,el(1))*iwe_v0_n(nz,elnodes1)*iwe_n(nz,elnodes1))
+                        grad_v0Eiw(2) = sum(mesh%gradient_sca(4:6,el(1))*iwe_v0_n(nz,elnodes1)*iwe_n(nz,elnodes1))
                         dz_el         = dz_trr(nz)
                         
                         ! calculate flux 
@@ -598,8 +643,8 @@ module g_cvmix_idemix
                             ! --> calc: grad_h(v_0*E_iw)
                             ! first calculate flux from el(1) with respect to edge mid 
                             ! point
-                            grad_v0Eiw(1) = sum(gradient_sca(1:3,el(2))*iwe_v0_n(nz,elnodes2)*iwe_n(nz,elnodes2))
-                            grad_v0Eiw(2) = sum(gradient_sca(4:6,el(2))*iwe_v0_n(nz,elnodes2)*iwe_n(nz,elnodes2))
+                            grad_v0Eiw(1) = sum(mesh%gradient_sca(1:3,el(2))*iwe_v0_n(nz,elnodes2)*iwe_n(nz,elnodes2))
+                            grad_v0Eiw(2) = sum(mesh%gradient_sca(4:6,el(2))*iwe_v0_n(nz,elnodes2)*iwe_n(nz,elnodes2))
                             dz_el         = dz_trr2(nz)
                             
                             ! calculate flux 
@@ -631,13 +676,13 @@ module g_cvmix_idemix
                         !_______________________________________________________
                         ! --> calc: grad_h(v_0*E_iw)
                         ! calculate grad(iwe*iwe_v0) for el(1)
-                        grad_v0Eiw(1) = sum(gradient_sca(1:3,el(1))*iwe_v0_n(nz,elnodes1)*iwe_n(nz,elnodes1))
-                        grad_v0Eiw(2) = sum(gradient_sca(4:6,el(1))*iwe_v0_n(nz,elnodes1)*iwe_n(nz,elnodes1))
+                        grad_v0Eiw(1) = sum(mesh%gradient_sca(1:3,el(1))*iwe_v0_n(nz,elnodes1)*iwe_n(nz,elnodes1))
+                        grad_v0Eiw(2) = sum(mesh%gradient_sca(4:6,el(1))*iwe_v0_n(nz,elnodes1)*iwe_n(nz,elnodes1))
                         
                         ! calculate grad(iwe*iwe_v0) for el(2) and average for el(1)
                         ! and el(2)
-                        grad_v0Eiw(1) = (grad_v0Eiw(1) + sum(gradient_sca(1:3,el(2))*iwe_v0_n(nz,elnodes2)*iwe_n(nz,elnodes2)))*0.5_WP
-                        grad_v0Eiw(2) = (grad_v0Eiw(2) + sum(gradient_sca(4:6,el(2))*iwe_v0_n(nz,elnodes2)*iwe_n(nz,elnodes2)))*0.5_WP
+                        grad_v0Eiw(1) = (grad_v0Eiw(1) + sum(mesh%gradient_sca(1:3,el(2))*iwe_v0_n(nz,elnodes2)*iwe_n(nz,elnodes2)))*0.5_WP
+                        grad_v0Eiw(2) = (grad_v0Eiw(2) + sum(mesh%gradient_sca(4:6,el(2))*iwe_v0_n(nz,elnodes2)*iwe_n(nz,elnodes2)))*0.5_WP
                         
                         ! mean mid level to midlevel tickness between el(1) and el(2)
                         dz_el         = (dz_trr(nz)+dz_trr2(nz))*0.5_WP
@@ -666,8 +711,8 @@ module g_cvmix_idemix
                         ! --> calc: grad_h(v_0*E_iw)
                         ! calculate flux from el(1) with respect to edge mid 
                         ! point
-                        grad_v0Eiw(1) = sum(gradient_sca(1:3,el(1))*iwe_v0_n(nz,elnodes1)*iwe_n(nz,elnodes1))
-                        grad_v0Eiw(2) = sum(gradient_sca(4:6,el(1))*iwe_v0_n(nz,elnodes1)*iwe_n(nz,elnodes1))
+                        grad_v0Eiw(1) = sum(mesh%gradient_sca(1:3,el(1))*iwe_v0_n(nz,elnodes1)*iwe_n(nz,elnodes1))
+                        grad_v0Eiw(2) = sum(mesh%gradient_sca(4:6,el(1))*iwe_v0_n(nz,elnodes1)*iwe_n(nz,elnodes1))
                         dz_el         = dz_trr(nz)
                         
                         ! calculate flux 
@@ -694,8 +739,8 @@ module g_cvmix_idemix
                         ! --> calc: grad_h(v_0*E_iw)
                         ! first calculate flux from el(1) with respect to edge mid 
                         ! point
-                        grad_v0Eiw(1) = sum(gradient_sca(1:3,el(2))*iwe_v0_n(nz,elnodes2)*iwe_n(nz,elnodes2))
-                        grad_v0Eiw(2) = sum(gradient_sca(4:6,el(2))*iwe_v0_n(nz,elnodes2)*iwe_n(nz,elnodes2))
+                        grad_v0Eiw(1) = sum(mesh%gradient_sca(1:3,el(2))*iwe_v0_n(nz,elnodes2)*iwe_n(nz,elnodes2))
+                        grad_v0Eiw(2) = sum(mesh%gradient_sca(4:6,el(2))*iwe_v0_n(nz,elnodes2)*iwe_n(nz,elnodes2))
                         dz_el         = dz_trr2(nz)
                         
                         ! calculate flux 
@@ -724,18 +769,18 @@ module g_cvmix_idemix
             ! convert: iwe_n (nodes) --> iwe (elem)
             call exchange_nod(iwe_n, partit) !Warning: don't forget to communicate before averaging on elements!!!
             do elem=1, elem_size
-                elnodes1=elem2D_nodes(:,elem)
-                do nz=ulevels(elem),nlevels(elem)-1
+                elnodes1=mesh%elem2D_nodes(:,elem)
+                do nz=mesh%ulevels(elem),mesh%nlevels(elem)-1
                     iwe(nz,elem) = sum(iwe_n(nz,elnodes1))/3.0_WP    ! (elementwise)                
                 end do
             end do
             
             !___________________________________________________________________
-            ! diagnostic: add horizontal propgation to the total production rate
-            ! of internal wave energy iwe_Tot
-            do node = 1,node_size
-                iwe_Thdi(:,node) = ( iwe(:,node) - iwe_Thdi(:,node) )/dt
-                iwe_Ttot(:,node) = iwe_Ttot(:,node) + iwe_Thdi(:,node)
+            ! diagnostic: add horizontal propagation to the total production rate
+            ! of internal wave energy iwe_Ttot
+            do elem = 1, elem_size
+                iwe_Thdi(:,elem) = ( iwe(:,elem) - iwe_Thdi(:,elem) )/dt
+                iwe_Ttot(:,elem) = iwe_Ttot(:,elem) + iwe_Thdi(:,elem)
             end do
         end if !-->if (idemix_n_hor_iwe_prop_iter>0) then
         
@@ -746,18 +791,18 @@ module g_cvmix_idemix
             !___________________________________________________________________
             ! write out diffusivity --> convert from elem to vertices
             do node=1, node_size 
-                uln = ulevels_nod2D(node)
-                nln = nlevels_nod2D(node)-1
+                uln = mesh%ulevels_nod2D(node)
+                nln = mesh%nlevels_nod2D(node)-1
                 do nz=uln, nln
                     tvol =0.0_WP
                     tsum1=0.0_WP
-                    do k=1, nod_in_elem2D_num(node)
-                        elem = nod_in_elem2D(k,node)
-                        nu1  = ulevels(elem)
-                        nl1  = nlevels(elem)-1
+                    do k=1, mesh%nod_in_elem2D_num(node)
+                        elem = mesh%nod_in_elem2D(k,node)
+                        nu1  = mesh%ulevels(elem)
+                        nl1  = mesh%nlevels(elem)-1
                         if (nl1<nz .or. nz<nu1) cycle
-                        tvol = tvol +elem_area(elem)
-                        tsum1= tsum1+iwe_Kv(nz,elem)*elem_area(elem)
+                        tvol = tvol +mesh%elem_area(elem)
+                        tsum1= tsum1+iwe_Kv(nz,elem)*mesh%elem_area(elem)
                     end do
                     Kv(nz,node)=tsum1/tvol
                 end do

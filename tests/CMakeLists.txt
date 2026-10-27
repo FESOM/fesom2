@@ -17,6 +17,7 @@ endif()
 
 # Testing configuration options
 option(ENABLE_MPI_TESTS "Enable MPI tests (requires mpiexec/mpirun)" ON)
+option(ENABLE_CONSERVATION_TESTS "Enable the conservation budget tests (conservation_*, requires Python 3)" OFF)
 set(TEST_TIMEOUT 600 CACHE STRING "Default timeout for tests in seconds")
 
 # Validate test data directory
@@ -65,6 +66,9 @@ add_subdirectory(integration)
 
 # Add mesh partitioner tests
 add_subdirectory(meshpartitioner)
+
+# Add OpenMP source-level guards (issues #444/#528)
+add_subdirectory(openmp)
 
 
 # Add remote mesh pipeline tests

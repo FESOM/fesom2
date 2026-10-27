@@ -3,7 +3,8 @@ MODULE o_tracers
 USE MOD_MESH
 USE MOD_TRACER
 USE MOD_PARTIT
-USE MOD_PARSUP
+use par_support_module, only: par_abort
+use oce_muscl_adv_module, only: fill_up_dn_grad
 IMPLICIT NONE
 
 CONTAINS
@@ -13,7 +14,7 @@ CONTAINS
 SUBROUTINE init_tracers_AB(tr_num, tracers, partit, mesh)
     USE MOD_MESH
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_abort
     USE MOD_TRACER
     use g_config, only: flag_debug
     use o_arrays
@@ -47,7 +48,7 @@ end do
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO
 #else
-!ACC PARALLEL LOOP DEFAULT(PRESENT)
+!$ACC PARALLEL LOOP DEFAULT(PRESENT)
 #endif
        do n=1, partit%myDim_nod2D+partit%eDim_nod2D
            tracers%data(tr_num)%valuesAB(:, n)  =-(0.5_WP+epsilon)*tracers%data(tr_num)%valuesold(1, :, n)+(1.5_WP+epsilon)*tracers%data(tr_num)%values(:, n)
@@ -55,13 +56,13 @@ end do
 #ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
 #else
-!ACC END PARALLEL LOOP
+!$ACC END PARALLEL LOOP
 #endif
     elseif (tracers%data(tr_num)%AB_order==3) then
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO
 #else
-!ACC PARALLEL LOOP DEFAULT(PRESENT)
+!$ACC PARALLEL LOOP DEFAULT(PRESENT)
 #endif
        do n=1, partit%myDim_nod2D+partit%eDim_nod2D
            tracers%data(tr_num)%valuesAB(:, n)  =5.0_WP*tracers%data(tr_num)%valuesold(2, :, n)-16.0_WP*tracers%data(tr_num)%valuesold(1, :, n)+23.0_WP*tracers%data(tr_num)%values(:, n)
@@ -70,7 +71,7 @@ end do
 #ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
 #else
-!ACC END PARALLEL LOOP
+!$ACC END PARALLEL LOOP
 #endif
     else
        write(*,*)
@@ -88,14 +89,14 @@ end do
        write(*,*) '____________________________________________________________________'
        print *, achar(27)//'[0m'
        write(*,*)
-       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+       call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     end if
 
     if (tracers%data(tr_num)%AB_order==2) then
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO
 #else
-!ACC PARALLEL LOOP DEFAULT(PRESENT)
+!$ACC PARALLEL LOOP DEFAULT(PRESENT)
 #endif
        do n=1, partit%myDim_nod2d+partit%eDim_nod2D
           tracers%data(tr_num)%valuesold(1, :, n)=tracers%data(tr_num)%values(:, n)
@@ -103,13 +104,13 @@ end do
 #ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
 #else
-!ACC END PARALLEL LOOP
+!$ACC END PARALLEL LOOP
 #endif
     elseif (tracers%data(tr_num)%AB_order==3) then
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO
 #else
-!ACC PARALLEL LOOP DEFAULT(PRESENT)
+!$ACC PARALLEL LOOP DEFAULT(PRESENT)
 #endif
        do n=1, partit%myDim_nod2d+partit%eDim_nod2D
           tracers%data(tr_num)%valuesold(2, :, n)=tracers%data(tr_num)%valuesold(1, :, n)
@@ -118,118 +119,170 @@ end do
 #ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
 #else
-!ACC END PARALLEL LOOP
+!$ACC END PARALLEL LOOP
 #endif
     end if
 
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_elements'//achar(27)//'[0m'
 !PS     call tracer_gradient_elements(tracers%data(tr_num)%valuesAB, partit, mesh)
-    call tracer_gradient_elements(tracers%data(tr_num)%values, partit, mesh)
+#ifndef ENABLE_OPENACC
+    call tracer_gradient_elements(tracers%data(tr_num)%values, tr_xy, partit, mesh)
     call exchange_elem_begin(tr_xy, partit)
+#else
+    ! values is current on the device here; the gradients stay there (advection,
+    ! fill_up_dn_grad and the diffusion use them on the device)
+    call tracer_gradient_elements(tracers%data(tr_num)%values, tr_xy, partit, mesh, on_device_in=.true.)
+    call exchange_elem_begin(tr_xy, partit, luse_g2g=.true.)
+#endif
 
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_z'//achar(27)//'[0m'
-    call tracer_gradient_z(tracers%data(tr_num)%values, partit, mesh)    !WHY NOT AB HERE? DSIDOREN!
+#ifndef ENABLE_OPENACC
+    call tracer_gradient_z(tracers%data(tr_num)%values, tr_z, partit, mesh)    !WHY NOT AB HERE? DSIDOREN!
+#else
+    call tracer_gradient_z(tracers%data(tr_num)%values, tr_z, partit, mesh, on_device_in=.true.)
+#endif
     call exchange_elem_end(partit)      ! tr_xy used in fill_up_dn_grad
 !$OMP BARRIER
 
+#ifndef ENABLE_OPENACC
     call exchange_nod_begin(tr_z, partit) ! not used in fill_up_dn_grad 
+#else
+    call exchange_nod_begin(tr_z, partit, luse_g2g=.true.) ! not used in fill_up_dn_grad
+#endif
 
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[38m'//'             --> call fill_up_dn_grad'//achar(27)//'[0m'
     call fill_up_dn_grad(tracers%work, partit, mesh)
     call exchange_nod_end(partit)       ! tr_z halos should have arrived by now.
 
-    if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_elements'//achar(27)//'[0m'
-    call tracer_gradient_elements(tracers%data(tr_num)%values, partit, mesh) !redefine tr_arr to the current timestep
     call exchange_elem(tr_xy, partit)
 
 END SUBROUTINE init_tracers_AB
 !
 !
 !=======================================================================
-SUBROUTINE tracer_gradient_elements(ttf, partit, mesh)
+SUBROUTINE tracer_gradient_elements(ttf, ttf_grad, partit, mesh, do_overz_in, on_device_in)
     !computes elemental gradient of tracer
     USE MOD_MESH
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_abort
     USE MOD_TRACER
     USE o_PARAM
     USE o_ARRAYS
     IMPLICIT NONE
 
-    type(t_mesh),   intent(in),    target :: mesh
-    type(t_partit), intent(inout), target :: partit
-    real(kind=WP)                         :: ttf(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-    integer                               :: elem,  elnodes(3)
-    integer                               :: nz, nzmin, nzmax
+    real(kind=WP) , intent(in)   , dimension(:,:)   :: ttf !(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP) , intent(inout), dimension(:,:,:) :: ttf_grad
+    type(t_mesh)  , intent(in)   , target           :: mesh
+    type(t_partit), intent(inout), target           :: partit
+    logical       , intent(in)   , optional         :: do_overz_in
+    ! OpenACC: compute on the device (ttf and ttf_grad present there); default host
+    logical       , intent(in)   , optional         :: on_device_in
+    logical                                         :: on_device
+    integer                                         :: elem,  elnodes(3)
+    integer                                         :: nz, nzmin, nzmax
+    logical                                         :: do_overz
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h" 
+    
+    !
+    !___________________________________________________________________________
+    do_overz = .True.
+    if (present(do_overz_in)) do_overz = do_overz_in
+    on_device = .false.
+    if (present(on_device_in)) on_device = on_device_in
 
+    !
+    !___________________________________________________________________________
+    if (do_overz) then 
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, elnodes, nz, nzmin, nzmax)
 #else
-!ACC PARALLEL LOOP DEFAULT(PRESENT) PRIVATE(elnodes)
+!$ACC PARALLEL LOOP DEFAULT(PRESENT) PRIVATE(elnodes, nz, nzmin, nzmax) IF(on_device)
 #endif
-    DO elem=1, myDim_elem2D
-        elnodes=elem2D_nodes(:,elem)
-        nzmin = ulevels(elem)
-        nzmax = nlevels(elem)
-        !!PS DO nz=1, nlevels(elem)-1
-        DO nz=nzmin, nzmax-1   
-            tr_xy(1,nz, elem)=sum(gradient_sca(1:3,elem)*ttf(nz,elnodes))
-            tr_xy(2,nz, elem)=sum(gradient_sca(4:6,elem)*ttf(nz,elnodes))
-        END DO
-    END DO
+        do elem=1, partit%myDim_elem2D
+            elnodes=mesh%elem2D_nodes(:,elem)
+            nzmin = mesh%ulevels(elem)
+            nzmax = mesh%nlevels(elem)
+            do nz=nzmin, nzmax-1   
+                ttf_grad(1,nz, elem)=sum(mesh%gradient_sca(1:3,elem)*ttf(nz,elnodes))
+                ttf_grad(2,nz, elem)=sum(mesh%gradient_sca(4:6,elem)*ttf(nz,elnodes))
+            end do
+        end do
 #ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
 #else
-!ACC END PARALLEL LOOP
+!$ACC END PARALLEL LOOP
 #endif
+
+    !
+    !___________________________________________________________________________
+    else ! (do_overz==.False.)
+        nzmin = 1
+        nzmax = size(ttf, 1)
+#ifndef ENABLE_OPENACC
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, elnodes, nz)
+#else
+!$ACC PARALLEL LOOP DEFAULT(PRESENT) PRIVATE(elnodes, nz) IF(on_device)
+#endif
+        do elem=1, partit%myDim_elem2D
+            elnodes=mesh%elem2D_nodes(:,elem)
+            do nz=nzmin+1, nzmax-1   
+                ttf_grad(1,nz, elem)=sum(mesh%gradient_sca(1:3,elem)*ttf(nz,elnodes))
+                ttf_grad(2,nz, elem)=sum(mesh%gradient_sca(4:6,elem)*ttf(nz,elnodes))
+            end do
+        end do
+#ifndef ENABLE_OPENACC
+!$OMP END PARALLEL DO
+#else
+!$ACC END PARALLEL LOOP
+#endif        
+    end if
 END SUBROUTINE tracer_gradient_elements
 !
 !
 !========================================================================================
-SUBROUTINE tracer_gradient_z(ttf, partit, mesh)
+SUBROUTINE tracer_gradient_z(ttf, ttf_grad, partit, mesh, on_device_in)
     !computes vertical gradient of tracer
     USE MOD_MESH
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_abort
     USE MOD_TRACER
     USE o_PARAM
     USE o_ARRAYS
     USE g_CONFIG
     IMPLICIT NONE
-    type(t_mesh),   intent(in),    target :: mesh
-    type(t_partit), intent(inout), target :: partit
-    real(kind=WP)            :: ttf(mesh%nl-1,partit%myDim_nod2D+partit%eDim_nod2D)
+    
+    real(kind=WP),  intent(in   ), dimension(:,:) :: ttf !(mesh%nl-1,partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP),  intent(inout), dimension(:,:) :: ttf_grad !(mesh%nl-1,partit%myDim_nod2D+partit%eDim_nod2D)
+    type(t_partit), intent(inout), target         :: partit
+    type(t_mesh),   intent(in),    target         :: mesh
+    
+    ! OpenACC: compute on the device (ttf and ttf_grad present there); default host
+    logical, intent(in), optional                 :: on_device_in
+    logical                  :: on_device
     real(kind=WP)            :: dz
     integer                  :: n, nz, nzmin, nzmax
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h" 
+    on_device = .false.
+    if (present(on_device_in)) on_device = on_device_in
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax, dz)
 #else
-!ACC PARALLEL LOOP DEFAULT(PRESENT)
+!$ACC PARALLEL LOOP DEFAULT(PRESENT) PRIVATE(nz, nzmin, nzmax, dz) IF(on_device)
 #endif
-    DO n=1, myDim_nod2D+eDim_nod2D
-        nzmax=nlevels_nod2D(n)
-        nzmin=ulevels_nod2D(n)
+    DO n=1, partit%myDim_nod2D+partit%eDim_nod2D
+        nzmax=mesh%nlevels_nod2D(n)
+        nzmin=mesh%ulevels_nod2D(n)
         DO nz=nzmin+1,  nzmax-1
-            dz=0.5_WP*(hnode(nz-1,n)+hnode(nz,n))
-            tr_z(nz, n)=(ttf(nz-1,n)-ttf(nz,n))/dz
+            dz=0.5_WP*(mesh%hnode(nz-1,n)+mesh%hnode(nz,n))
+            ttf_grad(nz, n)=(ttf(nz-1,n)-ttf(nz,n))/dz
         END DO
-        tr_z(nzmin, n)=0.0_WP
-        tr_z(nzmax, n)=0.0_WP
+        ttf_grad(nzmin, n)=0.0_WP
+        ttf_grad(nzmax, n)=0.0_WP
     END DO
 #ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
 #else
-!ACC END PARALLEL LOOP
+!$ACC END PARALLEL LOOP
 #endif
 END SUBROUTINE tracer_gradient_z
 !
@@ -240,7 +293,7 @@ SUBROUTINE relax_to_clim(tr_num, tracers, partit, mesh)
     use o_arrays
     USE MOD_MESH
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_abort
     USE MOD_TRACER
     IMPLICIT NONE
 
@@ -251,10 +304,6 @@ SUBROUTINE relax_to_clim(tr_num, tracers, partit, mesh)
     integer                                :: n, nzmin, nzmax    
     real(kind=WP), dimension(:,:), pointer :: trarr
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h" 
     trarr=>tracers%data(tr_num)%values(:,:)
 
     if ((clim_relax>1.0e-8_WP).and.(tracers%data(tr_num)%ID==1)) then
@@ -264,9 +313,9 @@ SUBROUTINE relax_to_clim(tr_num, tracers, partit, mesh)
 !ACC UPDATE DEVICE(relax2clim, Tclim)
 !ACC PARALLEL LOOP DEFAULT(PRESENT)
 #endif
-        DO n=1, myDim_nod2D
-            nzmin = ulevels_nod2D(n)    
-            nzmax = nlevels_nod2D(n)    
+        DO n=1, partit%myDim_nod2D
+            nzmin = mesh%ulevels_nod2D(n)    
+            nzmax = mesh%nlevels_nod2D(n)    
             !!PS tr_arr(1:nlevels_nod2D(n)-1,n,tr_num)=tr_arr(1:nlevels_nod2D(n)-1,n,tr_num)+&
             !!PS         relax2clim(n)*dt*(Tclim(1:nlevels_nod2D(n)-1,n)-tr_arr(1:nlevels_nod2D(n)-1,n,tr_num))
             trarr(nzmin:nzmax-1,n)=trarr(nzmin:nzmax-1,n)+&
@@ -285,9 +334,9 @@ SUBROUTINE relax_to_clim(tr_num, tracers, partit, mesh)
 !ACC UPDATE DEVICE(Sclim)
 !ACC PARALLEL LOOP DEFAULT(PRESENT)
 #endif
-        DO n=1, myDim_nod2D
-            nzmin = ulevels_nod2D(n)    
-            nzmax = nlevels_nod2D(n)  
+        DO n=1, partit%myDim_nod2D
+            nzmin = mesh%ulevels_nod2D(n)    
+            nzmax = mesh%nlevels_nod2D(n)  
             trarr(nzmin:nzmax-1,n)=trarr(nzmin:nzmax-1,n)+&
                     relax2clim(n)*dt*(Sclim(nzmin:nzmax-1,n)-trarr(nzmin:nzmax-1,n))
         END DO

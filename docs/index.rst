@@ -26,12 +26,15 @@ Authors
    :caption: Contents:
 
    getting_started/getting_started
+   getting_started/single_precision
    general_configuration/general_configuration
    ocean_configuration/ocean_configuration
    forcing_configuration
    output_configuration
    seaice_configuration
    icepack_in_fesom
+   recom_in_fesom
+   fesom_as_library
    data_processing/data_processing
    geometry
    meshes/meshes
@@ -46,6 +49,8 @@ Authors
    code_documentation/io_mesh_info
    developer_documentation/github_actions_test_suite
    developer_documentation/running_the_test_suite_offline
+   developer_documentation/gpu_and_dwarfs
+   developer_documentation/profiler
    
 
 Proposed structure:
