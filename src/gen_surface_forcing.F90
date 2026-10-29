@@ -52,7 +52,8 @@ MODULE g_sbf
    USE g_read_other_NetCDF, only: read_other_NetCDF, read_2ddata_on_grid_netcdf
 
    USE netcdf
-   use io_redistribute, only: redist_scatter_type, redist_build_scatter, redist_scatter_r4, redist_scatter_p2p_r4
+   use io_redistribute, only: redist_scatter_type, redist_build_scatter, redist_scatter_r4, redist_scatter_p2p_r4, &
+                              redist_p2p_xfer, redist_p2p_post, redist_p2p_complete
    use forcing_provider_netcdf_module, only: netcdf_reader_handle
 
    IMPLICIT NONE
@@ -171,6 +172,8 @@ MODULE g_sbf
                                                              ! -1 = one reader per field, each field on a different rank
    character(len=10), save    :: forcing_exchange = 'alltoallv' ! 'redist' only: 'alltoallv' (one MPI_Alltoallv over all ranks)
                                                              ! or 'p2p' (messages only between ranks that exchange cells)
+                                                             ! or 'p2p_ahead' ('p2p', and each refresh reads and sends the
+                                                             ! next record, which the next refresh only has to receive)
    character(len=256), save   :: nm_xwind_file = 'xwind.dat' ! name of file with winds, if netcdf file then provide only name from "nameyyyy.nc" yyyy.nc will be added by model
    character(len=256), save   :: nm_ywind_file = 'ywind.dat' ! name of file with winds, if netcdf file then provide only name from "nameyyyy.nc" yyyy.nc will be added by model
    character(len=256), save   :: nm_xstre_file = 'xstre.dat' ! name of file with stress, if netcdf file then provide only name from "nameyyyy.nc" yyyy.nc will be added by model
@@ -261,6 +264,10 @@ MODULE g_sbf
       integer                                  :: rrow0 = 0, rnrow = 0, roff = 1 ! slab rows, block offset in slab
       type(netcdf_reader_handle)               :: rfile
       integer                                  :: rfile_year = -1
+      ! forcing_exchange='p2p_ahead': the next record's exchange, posted at the previous refresh
+      type(redist_p2p_xfer)                    :: rx_ahead
+      real(4),  allocatable, dimension(:)      :: rslab_ahead  ! slab of that record (readers)
+      integer                                  :: rahead_index = -1, rahead_year = -1
       ! ocean-only with 'redist': rwant/rout are the raw cells the stencil cells' fill reads;
       ! fsrc(:,k) operands of filled cell k (>0 raw cell in rout, <0 filled cell), fout box cells
       integer,  allocatable, dimension(:,:)    :: fsrc
@@ -1281,8 +1288,8 @@ CONTAINS
          if (partit%mype==0) write(*,*) "  ocean_fill_reference needs the whole grid on one rank, not supported with 'redist'"
          call par_abort(partit%MPI_COMM_FESOM, partit%mype)
       end if
-      if (trim(forcing_exchange)/='alltoallv' .and. trim(forcing_exchange)/='p2p') then
-         if (partit%mype==0) write(*,*) "  forcing_exchange must be 'alltoallv' or 'p2p', got '", trim(forcing_exchange), "'"
+      if (trim(forcing_exchange)/='alltoallv' .and. trim(forcing_exchange)/='p2p' .and. trim(forcing_exchange)/='p2p_ahead') then
+         if (partit%mype==0) write(*,*) "  forcing_exchange must be 'alltoallv', 'p2p' or 'p2p_ahead', got '", trim(forcing_exchange), "'"
          call par_abort(partit%MPI_COMM_FESOM, partit%mype)
       end if
       
@@ -2903,7 +2910,11 @@ END SUBROUTINE sbc_do_recom
       type(flfi_type), pointer :: flf
       type(netcdf_reader_handle) :: fresh
       integer :: k, ierr
+      logical :: ahead, hit
       flf => sbc_flfi(fld_idx)
+      ! every rank takes the same branches: they depend on time_index, nc_Ntime and the year only
+      ahead = trim(forcing_exchange)=='p2p_ahead'
+      hit = ahead .and. flf%rx_ahead%active .and. flf%rahead_index == time_index .and. flf%rahead_year == yearnew
       call fesom_profiler_start("sbc_ioread")
       if (flf%rsched%count > 0) then
          if (flf%rfile_year /= yearnew) then
@@ -2914,14 +2925,20 @@ END SUBROUTINE sbc_do_recom
             call flf%rfile%initialize(trim(flf%file_name), trim(flf%var_name))
             flf%rfile_year = yearnew
          end if
-         call flf%rfile%read_netcdf_rows(time_index, flf%rrow0, flf%rnrow, flf%rslab)
+         if (.not. hit) call flf%rfile%read_netcdf_rows(time_index, flf%rrow0, flf%rnrow, flf%rslab)
       end if
       call fesom_profiler_end("sbc_ioread")
       call fesom_profiler_start("sbc_alltoallv")
-      if (trim(forcing_exchange)=='alltoallv') then
-         call redist_scatter_r4(flf%rsched, 1, flf%rslab(flf%roff:), flf%rout, partit%MPI_COMM_FESOM, ierr)
+      if (hit) then
+         call redist_p2p_complete(flf%rsched, flf%rx_ahead, 1, ierr, flf%rout)
       else
-         call redist_scatter_p2p_r4(flf%rsched, 1, flf%rslab(flf%roff:), flf%rout, partit%MPI_COMM_FESOM, ierr)
+         ! a record sent ahead that is not the one asked for is received and dropped
+         if (flf%rx_ahead%active) call redist_p2p_complete(flf%rsched, flf%rx_ahead, 1, ierr)
+         if (trim(forcing_exchange)=='alltoallv') then
+            call redist_scatter_r4(flf%rsched, 1, flf%rslab(flf%roff:), flf%rout, partit%MPI_COMM_FESOM, ierr)
+         else
+            call redist_scatter_p2p_r4(flf%rsched, 1, flf%rslab(flf%roff:), flf%rout, partit%MPI_COMM_FESOM, ierr)
+         end if
       end if
       call fesom_profiler_end("sbc_alltoallv")
       ! boxdata is a pointer dummy, so it keeps the box bounds
@@ -2935,6 +2952,24 @@ END SUBROUTINE sbc_do_recom
          end do
       end if
 
+      ! read the next record of this year's file and send it now; the next refresh only receives it
+      if (ahead .and. time_index < flf%nc_Ntime) then
+         call fesom_profiler_start("sbc_ioread")
+         if (flf%rsched%count > 0) then
+            if (.not. allocated(flf%rslab_ahead)) allocate(flf%rslab_ahead(size(flf%rslab)))
+            call flf%rfile%read_netcdf_rows(time_index+1, flf%rrow0, flf%rnrow, flf%rslab_ahead)
+         end if
+         call fesom_profiler_end("sbc_ioread")
+         call fesom_profiler_start("sbc_alltoallv")
+         if (flf%rsched%count > 0) then
+            call redist_p2p_post(flf%rsched, flf%rx_ahead, 1, flf%rslab_ahead(flf%roff:), partit%MPI_COMM_FESOM, 7400+fld_idx, ierr)
+         else
+            call redist_p2p_post(flf%rsched, flf%rx_ahead, 1, flf%rout, partit%MPI_COMM_FESOM, 7400+fld_idx, ierr)
+         end if
+         call fesom_profiler_end("sbc_alltoallv")
+         flf%rahead_index = time_index + 1
+         flf%rahead_year  = yearnew
+      end if
    END SUBROUTINE sbc_redist_distribute
 
    SUBROUTINE fill_land(data, nlon, nlat)
