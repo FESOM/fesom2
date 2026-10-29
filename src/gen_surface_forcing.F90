@@ -42,7 +42,7 @@ MODULE g_sbf
    USE g_comm_auto
    USE g_support
    USE g_rotate_grid
-   USE g_config, only: dummy, ClimateDataPath, ForcingDataPath, dt, flag_debug
+   USE g_config, only: dummy, ClimateDataPath, ForcingDataPath, dt, flag_debug, use_modini
    USE g_clock,  only: timeold, timenew, dayold, daynew, yearold, yearnew, cyearnew
    USE g_forcing_arrays,    only: runoff, chl
 #if defined (__recom)
@@ -67,11 +67,11 @@ MODULE g_sbf
    public  RUNOFF_MAPPER
    public  julday   ! get julian day from date
    public  atmdata
-   public  i_totfl, i_xwind, i_ywind, i_xstre, i_ystre, i_humi, i_qsr, i_qlw, i_tair, i_prec, i_mslp, i_cloud, i_snow
+   public  i_totfl, i_xwind, i_ywind, i_xstre, i_ystre, i_humi, i_qsr, i_qlw, i_tair, i_prec, i_mslp, i_cloud, i_snow, i_xmodini, i_ymodini
    public  l_xwind, l_ywind, l_xstre, l_ystre, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow
    private
 
-   integer :: i_totfl = 12 ! total number of fluxes
+   integer :: i_totfl = 14 ! total number of fluxes
    integer :: i_xwind = 1  ! index of 10m wind velocity (x-component) [m/s]
    integer :: i_ywind = 2  ! index of 10m wind velocity (y-component) [m/s]
    integer :: i_xstre = 3  ! index of surface wind stress (x-component) [N/m2]
@@ -84,6 +84,8 @@ MODULE g_sbf
    integer :: i_mslp  = 10 ! index of mean sea level pressure         [Pascals]
    integer :: i_cloud = 11 ! index of mean sea level pressure         [0-1]
    integer :: i_snow  = 12 ! index of mean sea level pressure         [Kg/m^2/s]
+   integer :: i_xmodini = 13 ! index of modini 10m wind velocity (x-component) [m/s]
+   integer :: i_ymodini = 14 ! index of modini 10m wind velocity (y-component) [m/s]
 
    logical :: l_totfl = .false. 
    logical :: l_xwind = .false. 
@@ -173,6 +175,8 @@ MODULE g_sbf
    character(len=256), save   :: nm_snow_file  = 'snow.dat'  ! name of file with snow  precipitation, if netcdf file then provide only name from "nameyyyy.nc" yyyy.nc will be added by model
    character(len=256), save   :: nm_mslp_file  = 'mslp.dat'  ! name of file with mean sea level pressure, if netcdf file then provide only name from "nameyyyy.nc" yyyy.nc will be added by model
    character(len=256), save   :: nm_cloud_file = 'cloud.dat' ! name of file with clouds, if netcdf file then provide only name from "nameyyyy.nc" yyyy.nc will be added by model
+   character(len=256), save   :: nm_xmodini_file = 'xmodini.dat' ! name of file with modini winds, if netcdf file then provide only name from "nameyyyy.nc" yyyy.nc will be added by model
+   character(len=256), save   :: nm_ymodini_file = 'ymodini.dat' ! name of file with modini winds, if netcdf file then provide only name from "nameyyyy.nc" yyyy.nc will be added by model
 
    character(len=34), save   :: nm_xwind_var = 'uwnd' ! name of variable in file with wind
    character(len=34), save   :: nm_ywind_var = 'vwnd' ! name of variable in file with wind
@@ -186,6 +190,8 @@ MODULE g_sbf
    character(len=34), save   :: nm_snow_var  = 'snow' ! name of variable in file with snow  precipitation
    character(len=34), save   :: nm_mslp_var  = 'mslp' ! name of variable in file with mean sea level pressure
    character(len=34), save   :: nm_cloud_var = 'cloud'! name of variable in file with clouds
+   character(len=34), save   :: nm_xmodini_var = 'uwnd' ! name of variable in file with modini wind
+   character(len=34), save   :: nm_ymodini_var = 'vwnd' ! name of variable in file with modini wind
 
    ! ========== netCDF time param
    integer, save :: nm_nc_iyear = 1948    ! initial year of time axis in netCDF (1948 like CoastDat,1800 NCEP)
@@ -622,6 +628,14 @@ CONTAINS
       if (l_snow)  sbc_flfi(i_snow)%var_name=ADJUSTL(trim(nm_snow_var))
       if (l_mslp)  sbc_flfi(i_mslp)%var_name=ADJUSTL(trim(nm_mslp_var))
       if (l_cloud) sbc_flfi(i_cloud)%var_name=ADJUSTL(trim(nm_cloud_var))
+      if (use_modini) then
+         write(sbc_flfi(i_xmodini)%file_name, *) trim(make_full_path(nm_xmodini_file)),trim(yyear),'.nc'
+         write(sbc_flfi(i_ymodini)%file_name, *) trim(make_full_path(nm_ymodini_file)),trim(yyear),'.nc'
+         sbc_flfi(i_xmodini)%file_name=ADJUSTL(trim(sbc_flfi(i_xmodini)%file_name))
+         sbc_flfi(i_ymodini)%file_name=ADJUSTL(trim(sbc_flfi(i_ymodini)%file_name))
+         sbc_flfi(i_xmodini)%var_name=ADJUSTL(trim(nm_xmodini_var))
+         sbc_flfi(i_ymodini)%var_name=ADJUSTL(trim(nm_ymodini_var))
+      endif
    END SUBROUTINE nc_sbc_ini_fillnames
 
    function prepend_path(base, filename) result(full_path)
@@ -1201,9 +1215,10 @@ CONTAINS
 
       namelist /nam_sbc/ nm_xwind_file, nm_ywind_file, nm_xstre_file, nm_ystre_file, nm_humi_file, nm_qsr_file, &
                         nm_qlw_file, nm_tair_file, nm_prec_file, nm_snow_file, &
-                        nm_mslp_file, nm_xwind_var, nm_ywind_var, nm_xstre_var, nm_ystre_var, nm_humi_var, &
+                        nm_mslp_file, nm_xmodini_file, nm_ymodini_file, &
+                        nm_xwind_var, nm_ywind_var, nm_xstre_var, nm_ystre_var, nm_humi_var, &
                         nm_qsr_var, nm_qlw_var, nm_tair_var, nm_prec_var, nm_snow_var, &
-                        nm_mslp_var, nm_cloud_var, nm_cloud_file, nm_nc_iyear, nm_nc_imm, nm_nc_idd, nm_nc_freq, nm_nc_tmid, y_perpetual, &
+                        nm_mslp_var, nm_cloud_var, nm_xmodini_var, nm_ymodini_var, nm_cloud_file, nm_nc_iyear, nm_nc_imm, nm_nc_idd, nm_nc_freq, nm_nc_tmid, y_perpetual, &
                         forcing_distribution, &
                         l_xwind, l_ywind, l_xstre, l_ystre, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow, &
                         nm_runoff_file, runoff_data_source, runoff_climatology, nm_sss_data_file, sss_data_source, &
@@ -1339,6 +1354,21 @@ CONTAINS
          i_mslp  =i_totfl
       end if
 
+      if (use_modini) then
+         if (partit%mype==0) then
+            write(*,*) "      nm_xmodini_file = ", trim(nm_xmodini_file) ," ! name of file with modini zonal winds"
+            write(*,*) "      nm_xmodini_var  = ", trim(nm_xmodini_var)  ," ! name of variable in file with modini zonal wind "
+         end if
+         i_totfl  =i_totfl+1
+         i_xmodini=i_totfl
+         if (partit%mype==0) then
+            write(*,*) "      nm_ymodini_file = ", trim(nm_ymodini_file) ," ! name of file with modini meridional winds"
+            write(*,*) "      nm_ymodini_var  = ", trim(nm_ymodini_var)  ," ! name of variable in file with modini meridional wind "
+         end if
+         i_totfl  =i_totfl+1
+         i_ymodini=i_totfl
+      end if
+
       if (partit%mype==0) then
          write(*,*) 'total fluxes to read: ', i_totfl
       end if
@@ -1423,6 +1453,9 @@ CONTAINS
         end if 
     end if     
     
+    ! modini drives only the wind fields from forcing files; runoff and SSS come
+    ! from the coupler in a modini run, so their files are neither present nor read
+    if (.not. use_modini) then
     !___________________________________________________________________________
     ! check river runoff
     ! when used runoff_data_source='CORE1' or 'CORE2' we use a total climatological 
@@ -1531,6 +1564,7 @@ CONTAINS
         call par_abort(partit%MPI_COMM_FESOM, partit%mype)
 
     end if   
+    end if ! --> if (.not. use_modini)
     
     !___________________________________________________________________________
     ! check Sweeney chlorophyl climatology or just constant value
@@ -1698,7 +1732,7 @@ CONTAINS
       include 'netcdf.inc'
       real(real64) :: rdate ! date (absolute Julian day, must be real64)
       integer      :: fld_idx, i
-      logical      :: do_rotation_wind, do_rotation_stre, force_newcoeff, update_monthly_flag
+      logical      :: do_rotation_wind, do_rotation_stre, do_rotation_modini, force_newcoeff, update_monthly_flag
       integer      :: yyyy, dd, mm, flag_flpyr=0
       integer,   pointer   :: nc_Ntime, t_indx, t_indx_p1
       real(real64), pointer :: nc_time(:)
@@ -1734,6 +1768,7 @@ CONTAINS
       
       do_rotation_wind=.false.
       do_rotation_stre=.false.
+      do_rotation_modini=.false.
 
       do fld_idx = 1, i_totfl
         ! compute model rdate based on the calendar option of the forcing file so
@@ -1779,6 +1814,7 @@ CONTAINS
             call fesom_profiler_end("sbc_getcoeff")
             if ((l_xwind .and. (fld_idx==i_xwind)) .and. rotated_grid) do_rotation_wind=.true.
             if ((l_xstre .and. (fld_idx==i_xstre)) .and. rotated_grid) do_rotation_stre=.true.
+            if ((use_modini .and. (fld_idx==i_xmodini)) .and. rotated_grid) do_rotation_modini=.true.
          endif
       end do
 
@@ -1799,6 +1835,15 @@ CONTAINS
          end do
 !$OMP END PARALLEL DO
       end if
+
+      if (do_rotation_modini) then
+!$OMP PARALLEL DO
+         do i=1, partit%myDim_nod2D+partit%eDim_nod2D
+            call vector_g2r(coef_a(i_xmodini,i), coef_a(i_ymodini,i), mesh%coord_nod2D(1,i), mesh%coord_nod2D(2,i), 0)
+            call vector_g2r(coef_b(i_xmodini,i), coef_b(i_ymodini,i), mesh%coord_nod2D(1,i), mesh%coord_nod2D(2,i), 0)
+         end do
+!$OMP END PARALLEL DO
+      end if
       
     !===========================================================================
 
@@ -1807,7 +1852,7 @@ CONTAINS
 
     !___________________________________________________________________________ 
     ! read in SSS for applying SSS restoring
-    if (surf_relax_S > 0._WP) then
+    if (surf_relax_S > 0._WP .and. (.not. use_modini)) then
         if (sss_data_source=='CORE1' .or. sss_data_source=='CORE2') then
             if (update_monthly_flag) then
                 i=month
@@ -1835,7 +1880,7 @@ CONTAINS
      
     !___________________________________________________________________________
     ! runoff --> depends on simulated month
-    if(runoff_data_source=='Dai09' .or. runoff_data_source=='JRA55') then
+    if((runoff_data_source=='Dai09' .or. runoff_data_source=='JRA55') .and. (.not. use_modini)) then
         ! its the time point for reading the runoff, always at the beginning of 
         ! a new month
         if(update_monthly_flag) then
