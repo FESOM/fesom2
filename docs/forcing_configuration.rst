@@ -65,3 +65,19 @@ Forcing file names are provided without the year suffix; the code appends ``.<ye
 - **chl_data_source='Sweeney'**, **nm_chl_data_file='<add path>'**, **chl_const=0.1** chlorophyll data for shortwave penetration (active when ``use_sw_pene`` in ``namelist.config`` is ``.true.``). Choose ``'Sweeney'`` for the supplied climatology file or ``'None'`` to use the constant value ``chl_const``.
 - **use_runoff_mapper=.false.**, **runoff_basins_file='<add path>'**, **runoff_radius=500000.** enable and configure the runoff mapper that spreads river discharge over neighbouring coastal cells using the provided basin map and radius.
 - In coupled runs the received runoff is split into liquid and solid parts, available as the output streams ``runoff_liquid`` and ``runoff_solid`` in addition to the total ``runoff``.
+
+Ocean-only forcing
+''''''''''''''''''
+
+- **use_ocean_only_forcing=.false.** take forcing values only from ocean cells of the forcing grid and fill land cells from their ocean neighbours, so that coastal model nodes do not interpolate land values. ``namelist.forcing.JRA`` turns it on.
+- **nm_ocean_mask_file**, **nm_ocean_mask_var='sftof'**, **ocean_mask_threshold=90.** file and variable with the ocean fraction in percent on the forcing grid; a cell is ocean where the fraction exceeds the threshold. All forcing fields must be on the grid of the mask.
+- The fill repeats sweeps over the grid until every land cell has a value: each sweep gives every unfilled land cell next to filled cells the mean of those neighbours. Which cells are filled in which sweep, and from which neighbours, depends only on the mask, so the model records it once at start-up and replays it for each record in one pass over the land cells. The result is the same to the bit as the sweeps; the first replay on each rank is checked against them and stops the run on any difference.
+- **ocean_fill_reference=.false.** ``.true.`` runs the original sweeps instead of the replay, for tests.
+
+Distributing the forcing over the ranks
+'''''''''''''''''''''''''''''''''''''''
+
+Every rank needs the forcing only at the corners of the bilinear stencils of its own nodes. These keys choose how the records get there; all of them give the model the same numbers to the bit (the ``integration_pi_forcing_*`` tests check this).
+
+- **forcing_distribution='bcast'** one rank reads each field and broadcasts the whole grid to every rank. Simple, and fine for small grids or few ranks.
+- **forcing_distribution='scatter'** the reading rank sends each rank only the box that covers its stencils. Less traffic than ``'bcast'``, but every rank still waits for that one reader.
