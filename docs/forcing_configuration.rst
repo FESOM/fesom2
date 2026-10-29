@@ -72,7 +72,7 @@ Ocean-only forcing
 - **use_ocean_only_forcing=.false.** take forcing values only from ocean cells of the forcing grid and fill land cells from their ocean neighbours, so that coastal model nodes do not interpolate land values. ``namelist.forcing.JRA`` turns it on.
 - **nm_ocean_mask_file**, **nm_ocean_mask_var='sftof'**, **ocean_mask_threshold=90.** file and variable with the ocean fraction in percent on the forcing grid; a cell is ocean where the fraction exceeds the threshold. All forcing fields must be on the grid of the mask.
 - The fill repeats sweeps over the grid until every land cell has a value: each sweep gives every unfilled land cell next to filled cells the mean of those neighbours. Which cells are filled in which sweep, and from which neighbours, depends only on the mask, so the model records it once at start-up and replays it for each record in one pass over the land cells. The result is the same to the bit as the sweeps; the first replay on each rank is checked against them and stops the run on any difference.
-- **ocean_fill_reference=.false.** ``.true.`` runs the original sweeps instead of the replay, for tests.
+- **ocean_fill_reference=.false.** ``.true.`` runs the original sweeps instead of the replay, for tests; not supported with ``forcing_distribution='redist'``.
 
 Distributing the forcing over the ranks
 '''''''''''''''''''''''''''''''''''''''
@@ -81,3 +81,6 @@ Every rank needs the forcing only at the corners of the bilinear stencils of its
 
 - **forcing_distribution='bcast'** one rank reads each field and broadcasts the whole grid to every rank. Simple, and fine for small grids or few ranks.
 - **forcing_distribution='scatter'** the reading rank sends each rank only the box that covers its stencils. Less traffic than ``'bcast'``, but every rank still waits for that one reader.
+- **forcing_distribution='redist'** several ranks read row blocks of the record, and a schedule built once at start-up sends each rank exactly the cells its stencils use (with ocean-only forcing, also the cells their land fill reads). This is the option that keeps the forcing cost flat as the rank count grows.
+- **n_forcing_readers=0** (``'redist'`` only) number of reading ranks: ``0`` one per node, ``n > 0`` that many, ``-1`` one per field, each field on a different rank. With files that store a record as one compressed chunk (as JRA55-do does), every reader decompresses the whole record whatever rows it needs, so ``-1`` is the cheapest: one decompression per field and record.
+- **forcing_exchange='alltoallv'** (``'redist'`` only) how the cells travel: ``'alltoallv'`` one ``MPI_Alltoallv`` over all ranks, which becomes slow at large rank counts; ``'p2p'`` messages only between the ranks that exchange cells.

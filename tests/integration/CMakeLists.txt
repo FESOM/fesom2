@@ -255,6 +255,12 @@ if(ENABLE_MPI_TESTS AND NOT FESOM_COUPLED AND NOT OIFS_COUPLED AND NOT USE_YAC)
         add_fesom_test(integration_pi_forcing_scatter_mpi8 MPI_TEST NP 8 TIMEOUT ${TEST_TIMEOUT} LABEL forcing
             COMPARE_TO ${_ref}
             FORCING_SBC "forcing_distribution='scatter'")
+        add_fesom_test(integration_pi_forcing_redist_mpi8 MPI_TEST NP 8 TIMEOUT ${TEST_TIMEOUT} LABEL forcing
+            COMPARE_TO ${_ref}
+            FORCING_SBC "forcing_distribution='redist'" "n_forcing_readers=2")
+        add_fesom_test(integration_pi_forcing_p2p_mpi8 MPI_TEST NP 8 TIMEOUT ${TEST_TIMEOUT} LABEL forcing
+            COMPARE_TO ${_ref}
+            FORCING_SBC "forcing_distribution='redist'" "forcing_exchange='p2p'" "n_forcing_readers=3")
 
         # ocean-only forcing: the mask is written once, before any of these runs
         set(_mask "${CMAKE_CURRENT_BINARY_DIR}/forcing_ocean_mask/sftof_core2_test.nc")
@@ -268,7 +274,9 @@ if(ENABLE_MPI_TESTS AND NOT FESOM_COUPLED AND NOT OIFS_COUPLED AND NOT USE_YAC)
             FORCING_SBC "forcing_distribution='bcast'" "ocean_fill_reference=.true." ${_oo})
         foreach(_case
                 "bcast|forcing_distribution='bcast'"
-                "scatter|forcing_distribution='scatter'")
+                "scatter|forcing_distribution='scatter'"
+                "redist|forcing_distribution='redist';n_forcing_readers=2"
+                "p2p|forcing_distribution='redist';forcing_exchange='p2p';n_forcing_readers=-1")
             string(REPLACE "|" ";" _case "${_case}")
             list(POP_FRONT _case _name)
             add_fesom_test(integration_pi_forcing_oceanonly_${_name}_mpi8 MPI_TEST NP 8 TIMEOUT ${TEST_TIMEOUT} LABEL forcing

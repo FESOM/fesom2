@@ -52,6 +52,8 @@ MODULE g_sbf
    USE g_read_other_NetCDF, only: read_other_NetCDF, read_2ddata_on_grid_netcdf
 
    USE netcdf
+   use io_redistribute, only: redist_scatter_type, redist_build_scatter, redist_scatter_r4, redist_scatter_p2p_r4
+   use forcing_provider_netcdf_module, only: netcdf_reader_handle
 
    IMPLICIT NONE
    
@@ -162,7 +164,13 @@ MODULE g_sbf
    integer, save  :: nm_sbc_unit     = 103       ! unit to open namelist file, skip 100-102 for cray fortran
    logical        :: ic_cyclic=.true.
   !============== namelistatmdata variables ================
-   character(len=10), save    :: forcing_distribution = 'bcast' ! 'bcast' or 'scatter' (each rank receives only its interpolation box)
+   character(len=10), save    :: forcing_distribution = 'bcast' ! 'bcast', 'scatter' (each rank receives only its interpolation box)
+                                                             ! or 'redist' (row slabs read by several ranks, a fixed schedule
+                                                             ! delivers each rank the cells its stencils use)
+   integer, save              :: n_forcing_readers = 0       ! 'redist' only: ranks reading forcing; 0 = one per node,
+                                                             ! -1 = one reader per field, each field on a different rank
+   character(len=10), save    :: forcing_exchange = 'alltoallv' ! 'redist' only: 'alltoallv' (one MPI_Alltoallv over all ranks)
+                                                             ! or 'p2p' (messages only between ranks that exchange cells)
    character(len=256), save   :: nm_xwind_file = 'xwind.dat' ! name of file with winds, if netcdf file then provide only name from "nameyyyy.nc" yyyy.nc will be added by model
    character(len=256), save   :: nm_ywind_file = 'ywind.dat' ! name of file with winds, if netcdf file then provide only name from "nameyyyy.nc" yyyy.nc will be added by model
    character(len=256), save   :: nm_xstre_file = 'xstre.dat' ! name of file with stress, if netcdf file then provide only name from "nameyyyy.nc" yyyy.nc will be added by model
@@ -245,6 +253,21 @@ MODULE g_sbf
       integer,  allocatable, dimension(:)      :: scat_counts, scat_displs ! I/O rank only
       real(4),  allocatable, dimension(:)      :: scat_pack    ! I/O rank only
       real(4),  allocatable, dimension(:,:)    :: readbuf      ! full grid, I/O rank only
+      ! ========== forcing_distribution='redist': box arrays as for 'scatter', filled through a fixed schedule
+      type(redist_scatter_type)                :: rsched
+      integer,  allocatable, dimension(:,:)    :: rwant        ! (2, nwant) box cell (i, j) of each request
+      real(4),  allocatable, dimension(:)      :: rslab        ! rows this reader reads, file order
+      real(4),  allocatable, dimension(:)      :: rout         ! (nwant) received cells
+      integer                                  :: rrow0 = 0, rnrow = 0, roff = 1 ! slab rows, block offset in slab
+      type(netcdf_reader_handle)               :: rfile
+      integer                                  :: rfile_year = -1
+      ! ocean-only with 'redist': rwant/rout are the raw cells the stencil cells' fill reads;
+      ! fsrc(:,k) operands of filled cell k (>0 raw cell in rout, <0 filled cell), fout box cells
+      integer,  allocatable, dimension(:,:)    :: fsrc
+      integer,  allocatable, dimension(:)      :: fcnt
+      real(4),  allocatable, dimension(:)      :: fval
+      integer,  allocatable, dimension(:,:)    :: fout
+      integer                                  :: nfev = 0, nout = 0
       ! ========== interpolation coeficients
    end type flfi_type
    type(flfi_type), allocatable, save, target :: sbc_flfi(:)  !array for information about flux files
@@ -896,6 +919,8 @@ CONTAINS
         sbc_flfi(fld_idx)%read_forcing_rootrank = next_io_rank(partit%MPI_COMM_FESOM, sbc_flfi(fld_idx)%async_netcdf_allowed, partit)
         if (trim(forcing_distribution)=='scatter') then
           call sbc_box_alloc(fld_idx, partit)
+        else if (trim(forcing_distribution)=='redist') then
+          call sbc_redist_alloc(fld_idx, partit)
         else
           allocate(sbc_flfi(fld_idx)%sbcdata_a(nc_Nlon,nc_Nlat))
           allocate(sbc_flfi(fld_idx)%sbcdata_b(nc_Nlon,nc_Nlat))
@@ -1026,6 +1051,9 @@ CONTAINS
       if (trim(forcing_distribution)=='scatter') then
         if (.not. sbcdata1_from_cache) call sbc_box_distribute(fld_idx, t_indx,    sbcdata1, partit)
         if (.not. sbcdata2_from_cache) call sbc_box_distribute(fld_idx, t_indx_p1, sbcdata2, partit)
+      else if (trim(forcing_distribution)=='redist') then
+        if (.not. sbcdata1_from_cache) call sbc_redist_distribute(fld_idx, t_indx,    sbcdata1, partit)
+        if (.not. sbcdata2_from_cache) call sbc_redist_distribute(fld_idx, t_indx_p1, sbcdata2, partit)
       else
       !read data from file
       ! profiler sections are entered on every rank
@@ -1226,7 +1254,7 @@ CONTAINS
                         nm_mslp_file, nm_xwind_var, nm_ywind_var, nm_xstre_var, nm_ystre_var, nm_humi_var, &
                         nm_qsr_var, nm_qlw_var, nm_tair_var, nm_prec_var, nm_snow_var, &
                         nm_mslp_var, nm_cloud_var, nm_cloud_file, nm_nc_iyear, nm_nc_imm, nm_nc_idd, nm_nc_freq, nm_nc_tmid, y_perpetual, &
-                        forcing_distribution, &
+                        forcing_distribution, n_forcing_readers, forcing_exchange, &
                         l_xwind, l_ywind, l_xstre, l_ystre, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow, &
                         nm_runoff_file, runoff_data_source, runoff_climatology, nm_sss_data_file, sss_data_source, &
                         chl_data_source, nm_chl_data_file, chl_const, use_runoff_mapper, runoff_basins_file, runoff_radius, &
@@ -1248,6 +1276,15 @@ CONTAINS
       endif
       READ( nm_sbc_unit, nml=nam_sbc, iostat=iost )
       close( nm_sbc_unit )
+
+      if (trim(forcing_distribution)=='redist' .and. use_ocean_only_forcing .and. ocean_fill_reference) then
+         if (partit%mype==0) write(*,*) "  ocean_fill_reference needs the whole grid on one rank, not supported with 'redist'"
+         call par_abort(partit%MPI_COMM_FESOM, partit%mype)
+      end if
+      if (trim(forcing_exchange)/='alltoallv' .and. trim(forcing_exchange)/='p2p') then
+         if (partit%mype==0) write(*,*) "  forcing_exchange must be 'alltoallv' or 'p2p', got '", trim(forcing_exchange), "'"
+         call par_abort(partit%MPI_COMM_FESOM, partit%mype)
+      end if
       
       if (partit%mype==0) then
          write(*,*) "Start: Ocean forcing initialization."
@@ -2778,6 +2815,128 @@ END SUBROUTINE sbc_do_recom
       call fesom_profiler_end("sbc_scatterv")
    END SUBROUTINE sbc_box_distribute
 
+   SUBROUTINE sbc_redist_alloc(fld_idx, partit)
+      ! schedule, built once, that brings each rank the cells its bilinear stencils use.
+      ! Global index: file column + (row-1)*file columns; sbcdata(1) and sbcdata(nlon) are wrap columns.
+      IMPLICIT NONE
+      integer,        intent(in)            :: fld_idx
+      type(t_partit), intent(inout), target :: partit
+      type(flfi_type), pointer :: flf
+      integer :: ii, i, j, k, c, b(4), nlon, nlat, nlon_f, nwant, nreq, ierr
+      integer :: nodecomm, noderank, isroot, nnodes, shift
+      logical, allocatable :: used(:,:)
+      integer, allocatable :: gwant(:)
+      flf => sbc_flfi(fld_idx)
+      nlon = flf%nc_Nlon; nlat = flf%nc_Nlat; nlon_f = nlon - 2
+      b = flf%box
+      allocate(flf%sbcdata_a(b(1):b(2), b(3):b(4)), flf%sbcdata_b(b(1):b(2), b(3):b(4)))
+      flf%sbcdata_a = 0.0; flf%sbcdata_b = 0.0
+
+      allocate(used(b(1):b(2), b(3):b(4)))
+      used = .false.
+      do ii = 1, partit%myDim_nod2D+partit%eDim_nod2D
+         used(bilin_i0(fld_idx,ii), bilin_j0(fld_idx,ii)) = .true.
+         used(bilin_i1(fld_idx,ii), bilin_j0(fld_idx,ii)) = .true.
+         used(bilin_i0(fld_idx,ii), bilin_j1(fld_idx,ii)) = .true.
+         used(bilin_i1(fld_idx,ii), bilin_j1(fld_idx,ii)) = .true.
+      end do
+      if (use_ocean_only_forcing) then
+         call sbc_redist_fill_setup(flf, used, b, nlon, nlat, nlon_f, gwant, nwant)
+      else
+      nwant = count(used)
+      allocate(flf%rwant(2, max(1,nwant)), gwant(max(1,nwant)), flf%rout(max(1,nwant)))
+      k = 0
+      do j = b(3), b(4)
+         do i = b(1), b(2)
+            if (.not. used(i,j)) cycle
+            k = k + 1
+            c = i - 1
+            if (i == 1)    c = nlon_f
+            if (i == nlon) c = 1
+            flf%rwant(:,k) = (/i, j/)
+            gwant(k) = c + (j-1)*nlon_f
+         end do
+      end do
+      end if
+      deallocate(used)
+
+      nreq = n_forcing_readers
+      if (nreq == 0) then ! one reader per node
+         call MPI_Comm_split_type(partit%MPI_COMM_FESOM, MPI_COMM_TYPE_SHARED, 0, MPI_INFO_NULL, nodecomm, ierr)
+         call MPI_Comm_rank(nodecomm, noderank, ierr)
+         isroot = merge(1, 0, noderank == 0)
+         call MPI_Allreduce(isroot, nnodes, 1, MPI_INTEGER, MPI_SUM, partit%MPI_COMM_FESOM, ierr)
+         call MPI_Comm_free(nodecomm, ierr)
+         nreq = nnodes
+      end if
+      ! one reader per field, fields on different ranks (one decompression per reader and refresh)
+      shift = 0
+      if (n_forcing_readers == -1) then
+         nreq  = 1
+         shift = ((fld_idx-1) * partit%npes) / max(1, i_totfl)
+      end if
+      call redist_build_scatter(flf%rsched, gwant, nwant, nlon_f*nlat, nreq, partit%MPI_COMM_FESOM, flag_debug, ierr, &
+                                min_block=nlon_f, reader_shift=shift)
+      if (ierr /= 0) then
+         write(error_unit,*) 'ERROR: forcing redist schedule failed for field ', fld_idx, ' on rank ', partit%mype, ' ierr=', ierr
+         call par_abort(partit%MPI_COMM_FESOM, partit%mype)
+      end if
+      deallocate(gwant)
+
+      ! whole rows covering this reader's block [first, last]
+      if (flf%rsched%count > 0) then
+         flf%rrow0 = (flf%rsched%first - 1)/nlon_f + 1
+         flf%rnrow = (flf%rsched%last  - 1)/nlon_f + 1 - flf%rrow0 + 1
+         flf%roff  = flf%rsched%first - (flf%rrow0 - 1)*nlon_f
+      end if
+      allocate(flf%rslab(max(1, nlon_f*flf%rnrow)))
+      if (partit%mype==0) write(*,*) ' --> [forcing] redist: field ', fld_idx, ' readers ', flf%rsched%n_readers, &
+                              ' cells received on rank 0 ', nwant, ' of ', nlon_f*nlat
+   END SUBROUTINE sbc_redist_alloc
+
+   SUBROUTINE sbc_redist_distribute(fld_idx, time_index, boxdata, partit)
+      use fesom_profiler, only: fesom_profiler_start, fesom_profiler_end
+      IMPLICIT NONE
+      integer,        intent(in)            :: fld_idx, time_index
+      real(4), dimension(:,:), pointer      :: boxdata
+      type(t_partit), intent(inout), target :: partit
+      type(flfi_type), pointer :: flf
+      type(netcdf_reader_handle) :: fresh
+      integer :: k, ierr
+      flf => sbc_flfi(fld_idx)
+      call fesom_profiler_start("sbc_ioread")
+      if (flf%rsched%count > 0) then
+         if (flf%rfile_year /= yearnew) then
+            if (flf%rfile%is_open()) then
+               call flf%rfile%finalize()
+               flf%rfile = fresh
+            end if
+            call flf%rfile%initialize(trim(flf%file_name), trim(flf%var_name))
+            flf%rfile_year = yearnew
+         end if
+         call flf%rfile%read_netcdf_rows(time_index, flf%rrow0, flf%rnrow, flf%rslab)
+      end if
+      call fesom_profiler_end("sbc_ioread")
+      call fesom_profiler_start("sbc_alltoallv")
+      if (trim(forcing_exchange)=='alltoallv') then
+         call redist_scatter_r4(flf%rsched, 1, flf%rslab(flf%roff:), flf%rout, partit%MPI_COMM_FESOM, ierr)
+      else
+         call redist_scatter_p2p_r4(flf%rsched, 1, flf%rslab(flf%roff:), flf%rout, partit%MPI_COMM_FESOM, ierr)
+      end if
+      call fesom_profiler_end("sbc_alltoallv")
+      ! boxdata is a pointer dummy, so it keeps the box bounds
+      if (use_ocean_only_forcing) then
+         call fesom_profiler_start("sbc_fill_land")
+         call sbc_redist_fill_apply(flf, boxdata)
+         call fesom_profiler_end("sbc_fill_land")
+      else
+         do k = 1, flf%rsched%nwant
+            boxdata(flf%rwant(1,k), flf%rwant(2,k)) = flf%rout(k)
+         end do
+      end if
+
+   END SUBROUTINE sbc_redist_distribute
+
    SUBROUTINE fill_land(data, nlon, nlat)
       ! replayed land fill, checked once per rank against the original sweeps
       IMPLICIT NONE
@@ -2928,6 +3087,141 @@ END SUBROUTINE sbc_do_recom
       end do
       deallocate(raw)
    END SUBROUTINE fill_land_fast
+
+   SUBROUTINE sbc_redist_fill_setup(flf, used, b, nlon, nlat, nlon_f, gwant, nwant)
+      ! raw cells the land fill of this rank's stencil cells reads, and the replay for those cells
+      IMPLICIT NONE
+      type(flfi_type),      intent(inout) :: flf
+      integer,              intent(in)    :: b(4), nlon, nlat, nlon_f
+      logical,              intent(in)    :: used(b(1):b(2), b(3):b(4))
+      integer, allocatable, intent(out)   :: gwant(:)
+      integer,              intent(out)   :: nwant
+      logical, allocatable :: needraw(:,:)
+      integer, allocatable :: fidx(:,:), ridx(:,:), stack(:,:)
+      integer :: i, j, k, n, m, sp, code, ni, nj, c
+      integer, parameter :: di(0:3) = (/-1, 1, 0, 0/), dj(0:3) = (/0, 0, -1, 1/)
+      allocate(needraw(nlon, nlat), fidx(nlon, nlat), ridx(nlon, nlat), stack(2, max(1, fill_nland)))
+      needraw = .false.; fidx = 0; ridx = 0
+      ! closure: fidx marks land cells to fill (1 for now), needraw raw cells to receive
+      sp = 0
+      do j = b(3), b(4)
+         do i = b(1), b(2)
+            if (.not. used(i,j)) cycle
+            if (fill_iter(i,j) >= 1) then
+               if (fidx(i,j) == 0) then
+                  fidx(i,j) = 1; sp = sp + 1; stack(:,sp) = (/i, j/)
+               end if
+            else
+               needraw(i,j) = .true.
+            end if
+         end do
+      end do
+      do while (sp > 0)
+         i = stack(1,sp); j = stack(2,sp); sp = sp - 1
+         code = fill_code(i,j)
+         do k = 0, 3
+            if (.not. btest(code,k)) cycle
+            ni = i + di(k); nj = j + dj(k)
+            if (btest(code,k+4)) then
+               if (fidx(ni,nj) == 0) then
+                  fidx(ni,nj) = 1; sp = sp + 1; stack(:,sp) = (/ni, nj/)
+               end if
+            else
+               needraw(ni,nj) = .true.
+            end if
+         end do
+      end do
+      deallocate(stack)
+      ! raw cells: what this rank receives, in grid order
+      nwant = count(needraw)
+      allocate(flf%rwant(2, max(1,nwant)), gwant(max(1,nwant)), flf%rout(max(1,nwant)))
+      k = 0
+      do j = 1, nlat
+         do i = 1, nlon
+            if (.not. needraw(i,j)) cycle
+            k = k + 1
+            c = i - 1
+            if (i == 1)    c = nlon_f
+            if (i == nlon) c = 1
+            flf%rwant(:,k) = (/i, j/)
+            gwant(k) = c + (j-1)*nlon_f
+            ridx(i,j) = k
+         end do
+      end do
+      ! cells to fill, in sweep order: a filled operand always comes from an earlier sweep
+      n = 0
+      do m = 1, fill_nland
+         i = fill_order(1,m); j = fill_order(2,m)
+         if (fidx(i,j) == 0) cycle
+         n = n + 1
+         fidx(i,j) = n
+      end do
+      flf%nfev = n
+      allocate(flf%fsrc(4, max(1,n)), flf%fcnt(max(1,n)), flf%fval(max(1,n)))
+      flf%fsrc = 0
+      do m = 1, fill_nland
+         i = fill_order(1,m); j = fill_order(2,m)
+         if (fidx(i,j) == 0) cycle
+         n = fidx(i,j)
+         code = fill_code(i,j)
+         flf%fcnt(n) = 0
+         do k = 0, 3
+            if (.not. btest(code,k)) cycle
+            ni = i + di(k); nj = j + dj(k)
+            flf%fcnt(n) = flf%fcnt(n) + 1
+            if (btest(code,k+4)) then
+               flf%fsrc(flf%fcnt(n), n) = -fidx(ni,nj)
+            else
+               flf%fsrc(flf%fcnt(n), n) = ridx(ni,nj)
+            end if
+         end do
+      end do
+      ! stencil cells and where their value comes from
+      flf%nout = count(used)
+      allocate(flf%fout(3, max(1, flf%nout)))
+      m = 0
+      do j = b(3), b(4)
+         do i = b(1), b(2)
+            if (.not. used(i,j)) cycle
+            m = m + 1
+            if (fill_iter(i,j) >= 1) then
+               flf%fout(:,m) = (/i, j, -fidx(i,j)/)
+            else
+               flf%fout(:,m) = (/i, j, ridx(i,j)/)
+            end if
+         end do
+      end do
+      deallocate(needraw, fidx, ridx)
+   END SUBROUTINE sbc_redist_fill_setup
+
+   SUBROUTINE sbc_redist_fill_apply(flf, boxdata)
+      ! replay the land fill for this rank's cells from the received raw cells, as fill_land_fast
+      IMPLICIT NONE
+      type(flfi_type),                  intent(inout) :: flf
+      real(4), dimension(:,:), pointer                :: boxdata
+      real(4) :: sum_val
+      integer :: k, m, s
+      do k = 1, flf%nfev
+         sum_val = 0.0
+         do m = 1, flf%fcnt(k)
+            s = flf%fsrc(m,k)
+            if (s > 0) then
+               sum_val = sum_val + flf%rout(s)
+            else
+               sum_val = sum_val + flf%fval(-s)
+            end if
+         end do
+         flf%fval(k) = sum_val / real(flf%fcnt(k))
+      end do
+      do m = 1, flf%nout
+         s = flf%fout(3,m)
+         if (s > 0) then
+            boxdata(flf%fout(1,m), flf%fout(2,m)) = flf%rout(s)
+         else
+            boxdata(flf%fout(1,m), flf%fout(2,m)) = flf%fval(-s)
+         end if
+      end do
+   END SUBROUTINE sbc_redist_fill_apply
 
    SUBROUTINE fill_land_from_ocean(data, mask, nlon, nlat)
       !! Iteratively fill land cells with extrapolated ocean values.
