@@ -5,6 +5,19 @@ Forcing configuration (namelist.forcing)
 
 ``namelist.forcing`` describes how atmospheric boundary conditions are read and processed. It controls the bulk formulae, optional land-ice freshwater, the age tracer mask, and all file names/variables for surface forcing, runoff and SSS restoring.
 
+Choosing how the forcing is read
+================================
+
+Keys in ``&nam_sbc`` select how the forcing records reach the ranks and whether land cells of the forcing grid are masked before interpolation. Every combination gives the same model output to the bit; they differ in time and memory.
+
+- **Small forcing grids or few ranks** (for example CORE2 forcing, up to a few hundred ranks): the default ``forcing_distribution='bcast'`` is fine. One rank reads each field and broadcasts the whole grid.
+- **Memory per rank matters, or up to a few thousand ranks**: ``forcing_distribution='scatter'``. Each rank holds only the box of the forcing grid its interpolation needs. One rank still reads each field and the others wait for it.
+- **Many ranks, or any run with** ``use_ocean_only_forcing``: ``forcing_distribution='redist'`` with ``forcing_exchange='p2p_ahead'`` and ``n_forcing_readers=-1``. Several ranks read, each rank receives only the cells it uses, and the next record is read and sent while the model steps. ``forcing_exchange='p2p'`` is the same without the read-ahead. ``'alltoallv'`` uses one collective over all ranks and slows down past a few hundred ranks, so prefer ``'p2p'`` or ``'p2p_ahead'``.
+- **n_forcing_readers** (``'redist'`` only): ``-1`` gives each field its own reading rank, which is cheapest for files that store a record as one compressed chunk (JRA55-do); ``0`` uses one reader per node; ``n`` uses that many.
+- **use_ocean_only_forcing**: turn it on whenever the forcing comes with an ocean mask (JRA55-do, ``namelist.forcing.JRA``), so that coastal nodes do not interpolate land values. CORE2 files have no mask, so CORE2 forcing runs without it.
+
+The keys are described one by one under ``&nam_sbc`` below.
+
 Sections of the namelist
 ========================
 
