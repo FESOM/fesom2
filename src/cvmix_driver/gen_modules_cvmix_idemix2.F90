@@ -343,7 +343,7 @@ module g_cvmix_idemix2
         integer                     :: node_size, elem_size, elem, node, nfbin, &
                                        fbin_i, elnodes(3), nzmax, nlu, nln, nz
         real(kind=WP)               :: loc_Etot=0.0_WP, glb_Etot=0.0_WP
-        real(kind=WP)               :: t0, t1
+        real(kind=WP_full)               :: t0, t1
         !_______________________________________________________________________
         if(partit%mype==0) then
             write(*,*) '____________________________________________________________'
@@ -1316,7 +1316,7 @@ module g_cvmix_idemix2
         real(kind=WP) :: inv_area, area_third
         logical       :: topo_shelf=.False.
         ! Timing variables
-        real(kind=WP) :: t_start, t_end, t0, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10
+        real(kind=WP_full) :: t_start, t_end, t0, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10
         real(kind=WP) :: time_params, time_groupvel, time_M2_integ, time_niw_integ
         real(kind=WP) :: time_Eiw_vdiff=0.0, time_Eiw_hdiff=0.0, time_waveint=0.0, time_Kv_Av=0.0, time_total=0.0
 

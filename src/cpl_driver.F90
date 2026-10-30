@@ -893,7 +893,7 @@ include "node_contour_boundary.h"
     !
     integer                :: info
     !
-    real (kind=WP)          :: t1, t2, t3
+    real (kind=WP_full)          :: t1, t2, t3
     !
     !--------------------------------------------------------------------
     !
@@ -953,7 +953,7 @@ include "node_contour_boundary.h"
     integer                :: info
     integer                :: j
     integer                :: ncount = 0
-    real (kind=WP)         :: t1, t2, t3        
+    real (kind=WP_full)         :: t1, t2, t3        
     !
     !--------------------------------------------------------------------
     !    

@@ -57,7 +57,7 @@ subroutine iceberg_calculation(ice, mesh, partit, dynamics, istep)
  ! regardless of the working precision WP
  real(kind=8) :: t_start_block
  real(kind=8), parameter :: block_reduce_timeout = 300.0
- real(kind=WP) 	:: t0, t1, t2, t3, t4, t0_restart, t1_restart   	!=
+ real(kind=WP_full) 	:: t0, t1, t2, t3, t4, t0_restart, t1_restart   	!=
  logical	:: firstcall=.true. 					!=
  logical	:: lastsubstep  					!=
 
@@ -372,7 +372,7 @@ use iceberg_params, only: length_ib, width_ib, scaling, elem_block, elem_area_gl
  logical   			:: i_have_element					!=
  real	   			:: left_mype						!=
  integer   			:: old_element						!=
- real(kind=WP) 			:: t0, t1, t2, t3, t4, t5, t6, t7, t8                   !=
+ real(kind=WP_full) 			:: t0, t1, t2, t3, t4, t5, t6, t7, t8                   !=
  											!=
  !for restart										!=
  logical, save   		:: firstcall=.true.					!=
@@ -761,7 +761,7 @@ use iceberg_params, only: length_ib, width_ib, scaling !, smallestvol_icb, arr_b
  logical   			:: i_have_element					!=
  real	   			:: left_mype						!=
  integer   			:: old_element						!=
- real(kind=WP) 			:: t0, t1, t2, t3, t4					!=
+ real(kind=WP_full) 			:: t0, t1, t2, t3, t4					!=
  											!=
  !for restart										!=
  logical, save   		:: firstcall=.true.					!=

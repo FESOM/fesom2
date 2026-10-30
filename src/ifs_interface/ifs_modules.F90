@@ -515,10 +515,10 @@ CONTAINS
 
       ELSE
          
-         remap%src%grid_corner_lat(:,:) = 0.0
-         remap%src%grid_corner_lon(:,:) = 0.0
-         remap%dst%grid_corner_lat(:,:) = 0.0
-         remap%dst%grid_corner_lon(:,:) = 0.0
+         remap%src%grid_corner_lat(:,:) = 0.0_scripdp
+         remap%src%grid_corner_lon(:,:) = 0.0_scripdp
+         remap%dst%grid_corner_lat(:,:) = 0.0_scripdp
+         remap%dst%grid_corner_lon(:,:) = 0.0_scripdp
          remap%src%grid_corner_lat_units = ''
          remap%src%grid_corner_lon_units = ''
          remap%dst%grid_corner_lat_units = ''
@@ -1493,13 +1493,13 @@ CONTAINS
       TYPE(parinterinfo), INTENT(IN) :: pinfo
       ! Source data/
       INTEGER, INTENT(IN) :: nsrclocpoints
-      REAL, INTENT(IN), DIMENSION(nsrclocpoints) :: zsrc
+      REAL(scripdp), INTENT(IN), DIMENSION(nsrclocpoints) :: zsrc
 
       ! Output arguments
 
       ! Destination data
       INTEGER , INTENT(IN):: ndstlocpoints
-      REAL, DIMENSION(ndstlocpoints) :: zdst
+      REAL(scripdp), DIMENSION(ndstlocpoints) :: zdst
 
       ! Local variables
 
@@ -1586,7 +1586,7 @@ CONTAINS
 
       ! Do the interpolation
 
-      zdst(:)=0.0
+      zdst(:)=0.0_scripdp
       DO i=1,pinfo%num_links
          zdst(pinfo%dst_address(i)) = zdst(pinfo%dst_address(i)) + &
             & pinfo%remap_matrix(1,i)*zrecv(pinfo%src_address(i))
@@ -1613,13 +1613,13 @@ CONTAINS
       TYPE(parinterinfo), INTENT(IN) :: pinfo
       ! Source data/
       INTEGER, INTENT(IN) :: nsrclocpoints
-      REAL, INTENT(IN), DIMENSION(nsrclocpoints,nfield) :: zsrc
+      REAL(scripdp), INTENT(IN), DIMENSION(nsrclocpoints,nfield) :: zsrc
 
       ! Output arguments
 
       ! Destination data
       INTEGER, INTENT(IN):: ndstlocpoints
-      REAL, DIMENSION(ndstlocpoints,nfield) :: zdst
+      REAL(scripdp), DIMENSION(ndstlocpoints,nfield) :: zdst
 
       INTEGER :: nsend(0:nproc-1), nrecv(0:nproc-1),nrdisp(0:nproc-1), nsdisp(0:nproc-1)
 
@@ -1759,7 +1759,7 @@ CONTAINS
 
       !$omp do
       DO nf=1,nfield
-         zdst(:,nf)=0.0
+         zdst(:,nf)=0.0_scripdp
          DO i=1,pinfo%num_links
             zdst(pinfo%dst_address(i),nf) = zdst(pinfo%dst_address(i),nf) + &
                & pinfo%remap_matrix(1,i)*zrecvnf(pinfo%src_address(i),nf)

@@ -35,11 +35,11 @@ module io_MEANDATA
   ! Sub-decomposition timers for FESOM `output`. Accumulated per-rank by the
   ! output() routine; reduced + printed once at finalize from fesom_module.
   ! Cost is one MPI_Wtime() pair per region per call — negligible.
-  real(WP), public, save :: rtime_om_update_means = 0.0_WP   !< update_means accumulator (every step)
-  real(WP), public, save :: rtime_om_streamloop   = 0.0_WP   !< per-stream loop incl. write_mean dispatch
-  real(WP), public, save :: rtime_om_pack         = 0.0_WP   !< Fortran nested-loop pack from local_values_*_copy → tmp2/tmp3
-  real(WP), public, save :: rtime_om_mask         = 0.0_WP   !< io_xios_apply_wet_* / apply_ice_mask_* full-array scans
-  real(WP), public, save :: rtime_om_xsend        = 0.0_WP   !< pure io_xios_send_* (xios_send_field) call
+  real(WP_full), public, save :: rtime_om_update_means = 0.0_WP_full   !< update_means accumulator (every step)
+  real(WP_full), public, save :: rtime_om_streamloop   = 0.0_WP_full   !< per-stream loop incl. write_mean dispatch
+  real(WP_full), public, save :: rtime_om_pack         = 0.0_WP_full   !< Fortran nested-loop pack from local_values_*_copy → tmp2/tmp3
+  real(WP_full), public, save :: rtime_om_mask         = 0.0_WP_full   !< io_xios_apply_wet_* / apply_ice_mask_* full-array scans
+  real(WP_full), public, save :: rtime_om_xsend        = 0.0_WP_full   !< pure io_xios_send_* (xios_send_field) call
 !
 !--------------------------------------------------------------------------------------------
 !
@@ -135,7 +135,7 @@ module io_MEANDATA
     integer                                            :: dimID(2), dimvarID(2), varID
     integer                                            :: freq=1
     character                                          :: freq_unit='m'
-    real(kind=WP)                                      :: rtime_per_stream=0._WP   !< cumulative wall in this stream's write_mean dispatch over the run; printed sorted at finalize
+    real(kind=WP_full)                                      :: rtime_per_stream=0._WP_full   !< cumulative wall in this stream's write_mean dispatch over the run; printed sorted at finalize
     logical                                            :: is_in_use=.false.
     logical :: is_elem_based = .false.
     logical :: is_fbin_based = .false.
@@ -3727,7 +3727,7 @@ subroutine write_mean(entry, entry_index)
           integer, pointer :: own(:)
           real(real64), allocatable :: tmp2_r8(:), tmp3_r8(:,:)
           real(real32), allocatable :: tmp2_r4(:), tmp3_r4(:,:)
-          real(WP) :: tp0, tp1, tm0, tm1, ts0, ts1
+          real(WP_full) :: tp0, tp1, tm0, tm1, ts0, ts1
           if (entry%is_elem_based) then
             own   => io_xios_owned_elem_local()
             n_own =  io_xios_n_owned_elem()
@@ -4276,7 +4276,7 @@ ctime=timenew+(daynew-1.)*86400
     !___________________________________________________________________________
     !PS if (partit%flag_debug .and. partit%mype==0)  print *, achar(27)//'[33m'//' -I/O-> call update_means'//achar(27)//'[0m'
     block
-      real(WP) :: tum0, tum1
+      real(WP_full) :: tum0, tum1
       tum0 = MPI_Wtime()
       call update_means
       tum1 = MPI_Wtime()
@@ -4290,7 +4290,7 @@ ctime=timenew+(daynew-1.)*86400
     !___________________________________________________________________________
     ! loop over defined streams
     block
-    real(WP) :: tsl0, tsl1
+    real(WP_full) :: tsl0, tsl1
     tsl0 = MPI_Wtime()
     do n=1, io_NSTREAMS
         !_______________________________________________________________________
@@ -4556,7 +4556,7 @@ ctime=timenew+(daynew-1.)*86400
             ! this is where the magic happens --> here do_output_callback is
             ! triggered as a method of the io_stream object --> call write_mean(...)
             block
-              real(WP) :: tps0, tps1
+              real(WP_full) :: tps0, tps1
               tps0 = MPI_Wtime()
               call entry%thread%run()
               tps1 = MPI_Wtime()
