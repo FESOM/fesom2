@@ -29,6 +29,7 @@ module fesom_main_storage_module
                                  siarean, siareas, siextentn, siextents, &
                                  sivoln, sivols
   use mo_tidal
+  use mod_diag_tracer_tendency, only: store_tracer_old, tracer_tendency
   use oce_setup_step_module, only: tracer_init
   use oce_setup_step_module, only: ocean_setup
   use ice_setup_step_module, only: ice_setup, ice_timestep
@@ -1177,7 +1178,11 @@ contains
         end if
         
         call before_oce_step(f%dynamics, f%tracers, f%partit, f%mesh) ! prepare the things if required
-        
+
+        !___store layer content c*h at the start of the step (before REcoM) for the
+        !   ltra_diag tracer tendency diagnostic
+        call store_tracer_old(f%tracers, f%partit, f%mesh)
+
         !___now recom____________________________________________________
 #if defined (__recom)
 #if defined(__usetp)
@@ -1242,6 +1247,8 @@ contains
 #if defined (FESOM_PROFILING)
         call fesom_profiler_end("oce_timestep_ale")
 #endif
+        !___ltra_diag: total tracer tendency over the step [mmol/m2/s]
+        call tracer_tendency(f%tracers, f%partit, f%mesh)
         if (use_transit) then
           ! Prevent negative concentrations of SF6, CFC-11 and CFC-12 during the first years (inital values are zero)
           do tr_num=1, f%tracers%num_tracers

@@ -109,7 +109,10 @@ gamma2_tra    = 0.            ! additional biharmonic diffusion coefficient [dim
 
 ! --- Vertical Diffusion and Time Stepping ---
 i_vert_diff   = .true.        ! use implicit vertical diffusion (recommended for stability)
-ltra_diag     = .false.       ! per-tracer diagnostics in the advection (extra cost)
+ltra_diag     = .false.       ! tracer budget diagnostics (all terms in mmol/m2/s, see io_meandata 'otracers'; extra cost)
+! ltra_diag_ids = 1001, 1002, 1003, 1018
+!   tracer IDs that get the budget diagnostics when ltra_diag=.true. (max. 20);
+!   not set = all tracers. Example: DIN, DIC, Alk, DSi.
 /
 
 ! ============================================================================

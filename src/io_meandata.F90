@@ -619,6 +619,7 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
     integer,dimension(15)     :: sel_forcvar=0
     integer                   :: sel_dmoc=0, sel_trgrd_xyz=0, sel_dvd=0, sel_redi=0
     character(len=10)         :: id_string
+    character(len=20)         :: bname   ! ltra_diag budget stream prefix (DIN, DIC, Alk, DSi or tra_<ID>)
 
     type(t_mesh), intent(in) , target :: mesh
     type(t_partit), intent(inout), target :: partit
@@ -1822,35 +1823,9 @@ CASE ('otracers  ')
          call def_stream((/mesh%nl-1, mesh%nod2D/),  (/mesh%nl-1, partit%myDim_nod2D/),  'DIN', 'Dissolved Inorganic Nitrogen', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
          endif
 
-      else if (tracers%data(j)%ID==1002) then    ! NOTE Divide tracers%work%tra_advvert(:,:,j) by dt
+      else if (tracers%data(j)%ID==1002) then
          if (use_REcoM) then
          call def_stream((/mesh%nl-1, mesh%nod2D/),  (/mesh%nl-1, partit%myDim_nod2D/),  'DIC', 'Dissolved Inorganic C', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
-            if (tracers%data(j)%ltra_diag) then
-               ! horizontal advection
-               call def_stream((/mesh%nl-1, mesh%nod2D/),  (/mesh%nl-1, partit%myDim_nod2D/),  'DIC_hor_adv', 'Horizontal advection part of dissolved Inorganic C', '[mmol/m3/s]', tracers%work%tra_advhoriz(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
-               ! vertical advection
-               call def_stream((/mesh%nl-1, mesh%nod2D/),  (/mesh%nl-1, partit%myDim_nod2D/),  'DIC_ver_adv', 'Vertical advection part of dissolved Inorganic C', '[mmol/m3/s]', tracers%work%tra_advvert(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
-               ! horizontal diffusion
-               call def_stream((/mesh%nl-1, mesh%nod2D/),  (/mesh%nl-1, partit%myDim_nod2D/),  'DIC_tra_diff_part_hor_redi', 'Horizontal diffusion of dissolved Inorganic C (includes Redi diffusivity if Redi=.true.)', '[mmol/m3/s]', tracers%work%tra_diff_part_hor_redi(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
-               if (.not. tracers%data(j)%i_vert_diff) then
-               ! vertical diffusion (Explicit)
-                   call def_stream((/mesh%nl-1, mesh%nod2D/),  (/mesh%nl-1, partit%myDim_nod2D/),  'DIC_tra_diff_part_ver_expl', 'Vertical diffusion of dissolved Inorganic C (Explicit)', '[mmol/m3/s]', tracers%work%tra_diff_part_ver_expl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-               end if
-
-               ! projection of horizontal Redi diffussivity onto vertical
-               call def_stream((/mesh%nl-1, mesh%nod2D/),  (/mesh%nl-1, partit%myDim_nod2D/),  'DIC_tra_diff_part_ver_redi_expl', 'Projection of horizontal Redi diffussivity onto vertical for dissolved Inorganic C (Explicit)', '[mmol/m3/s]', tracers%work%tra_diff_part_ver_redi_expl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
-               ! vertical diffusion (Implicit)
-               call def_stream((/mesh%nl-1, mesh%nod2D/),  (/mesh%nl-1, partit%myDim_nod2D/),  'DIC_tra_diff_part_ver_impl', 'Vertical diffusion of dissolved Inorganic C (Implicit)', '[mmol/m3/s]', tracers%work%tra_diff_part_ver_impl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
-               ! recom_sms
-               call def_stream((/mesh%nl-1, mesh%nod2D/),  (/mesh%nl-1, partit%myDim_nod2D/),  'DIC_recom_sms', 'Recom SMS', '[mmol/m3/s]', tracers%work%tra_recom_sms(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-            end if
-
          endif
 
       else if (tracers%data(j)%ID==1003) then
@@ -2049,6 +2024,57 @@ CASE ('otracers  ')
 #if defined(__recom)
       end if
 #endif
+
+      !___ltra_diag tracer budget terms, all as layer-integrated rates [mmol/m2/s]
+      !   (tracer * layer thickness per second). For each layer:
+      !   *_tendency = *_hor_adv + *_ver_adv + *_tra_diff_part_hor_redi + *_tra_diff_part_ver_redi_expl
+      !              + *_tra_diff_part_ver_impl (or *_ver_expl) + *_recom_sms + *_bf
+      if (tracers%data(j)%ltra_diag) then
+         select case (tracers%data(j)%ID)
+            case (1001)
+               bname = 'DIN'
+            case (1002)
+               bname = 'DIC'
+            case (1003)
+               bname = 'Alk'
+            case (1018)
+               bname = 'DSi'
+            case default
+               bname = 'tra_'//trim(id_string)
+         end select
+         call def_stream((/mesh%nl-1, mesh%nod2D/), (/mesh%nl-1, partit%myDim_nod2D/), trim(bname)//'_hor_adv', &
+              'Horizontal advection of '//trim(bname)//' (LO + anti-diffusive)', '[mmol/m2/s]', tracers%work%tra_advhoriz(:,:,j), &
+              io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+         call def_stream((/mesh%nl-1, mesh%nod2D/), (/mesh%nl-1, partit%myDim_nod2D/), trim(bname)//'_ver_adv', &
+              'Vertical advection of '//trim(bname)//' (LO incl. implicit w_split part + anti-diffusive)', '[mmol/m2/s]', tracers%work%tra_advvert(:,:,j), &
+              io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+         call def_stream((/mesh%nl-1, mesh%nod2D/), (/mesh%nl-1, partit%myDim_nod2D/), trim(bname)//'_tra_diff_part_hor_redi', &
+              'Horizontal diffusion of '//trim(bname)//' (includes Redi diffusivity if Redi=.true.)', '[mmol/m2/s]', tracers%work%tra_diff_part_hor_redi(:,:,j), &
+              io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+         call def_stream((/mesh%nl-1, mesh%nod2D/), (/mesh%nl-1, partit%myDim_nod2D/), trim(bname)//'_tra_diff_part_ver_redi_expl', &
+              'Projection of horizontal Redi diffusivity onto vertical for '//trim(bname)//' (Explicit)', '[mmol/m2/s]', tracers%work%tra_diff_part_ver_redi_expl(:,:,j), &
+              io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+         if (tracers%data(j)%i_vert_diff) then
+            call def_stream((/mesh%nl-1, mesh%nod2D/), (/mesh%nl-1, partit%myDim_nod2D/), trim(bname)//'_tra_diff_part_ver_impl', &
+                 'Vertical diffusion of '//trim(bname)//' (Implicit; includes the surface boundary flux)', '[mmol/m2/s]', tracers%work%tra_diff_part_ver_impl(:,:,j), &
+                 io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+         else
+            call def_stream((/mesh%nl-1, mesh%nod2D/), (/mesh%nl-1, partit%myDim_nod2D/), trim(bname)//'_tra_diff_part_ver_expl', &
+                 'Vertical diffusion of '//trim(bname)//' (Explicit)', '[mmol/m2/s]', tracers%work%tra_diff_part_ver_expl(:,:,j), &
+                 io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+         end if
+#if defined(__recom)
+         call def_stream((/mesh%nl-1, mesh%nod2D/), (/mesh%nl-1, partit%myDim_nod2D/), trim(bname)//'_recom_sms', &
+              'REcoM sources minus sinks of '//trim(bname), '[mmol/m2/s]', tracers%work%tra_recom_sms(:,:,j), &
+              io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+         call def_stream((/mesh%nl-1, mesh%nod2D/), (/mesh%nl-1, partit%myDim_nod2D/), trim(bname)//'_bf', &
+              'Benthic (bottom) flux of '//trim(bname), '[mmol/m2/s]', tracers%work%tra_benthic(:,:,j), &
+              io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+#endif
+         call def_stream((/mesh%nl-1, mesh%nod2D/), (/mesh%nl-1, partit%myDim_nod2D/), trim(bname)//'_tendency', &
+              'Total tendency of '//trim(bname), '[mmol/m2/s]', tracers%work%tra_tendency(:,:,j), &
+              io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      end if
 
     end do
 
