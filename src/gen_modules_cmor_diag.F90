@@ -23,6 +23,8 @@ module cmor_variables_diag
   public :: osalttend, opottemprmadvect, opottempdiff
   public :: osaltrmadvect, osaltdiff
   public :: rsdoabsorb
+  ! Vertically integrated u*T and v*T on elements (CMIP7 hfx/hfy, depth-integrated)
+  public :: utemp_int, vtemp_int, ldiag_cmor_trflx_int, compute_cmor_trflx_int
 
   private
 
@@ -60,6 +62,15 @@ module cmor_variables_diag
   real(kind=WP), save, allocatable :: osaltrmadvect(:)      ! Salt tendency from advection [psu*m/s] - 2D
   real(kind=WP), save, allocatable :: osaltdiff(:)          ! Salt tendency from diffusion [psu*m/s] - 2D
   real(kind=WP), save, allocatable :: rsdoabsorb(:,:)       ! Shortwave absorption per layer [W/m^2] - 3D (nl-1, nod2D)
+
+  ! Column integrals of u*T and v*T on elements [m2 s-1 degC], eastward and northward.
+  ! Computed only when an output stream uses them: ini_mean_io sets
+  ! ldiag_cmor_trflx_int when it defines utemp_int or vtemp_int.
+  logical,       save              :: ldiag_cmor_trflx_int = .false.
+  real(kind=WP), save, allocatable :: utemp_int(:)          ! (myDim_elem2D)
+  real(kind=WP), save, allocatable :: vtemp_int(:)          ! (myDim_elem2D)
+  ! rotated-to-geographic coefficients per element: (u,v)_geo = (r1*u+r2*v, r3*u+r4*v)
+  real(kind=WP), save, allocatable :: trflx_int_r2g(:,:)    ! (4, myDim_elem2D)
 
   ! Auxiliary arrays for tendency tracking
   ! FESOM 2 uses (level, nod2D) indexing
@@ -114,6 +125,9 @@ contains
     allocate(osaltrmadvect(partit%myDim_nod2D))
     allocate(osaltdiff(partit%myDim_nod2D))
     allocate(rsdoabsorb(mesh%nl-1, partit%myDim_nod2D))
+    allocate(utemp_int(partit%myDim_elem2D), vtemp_int(partit%myDim_elem2D))
+    utemp_int = 0.0_WP
+    vtemp_int = 0.0_WP
 
     ! Allocate previous tracer arrays (level, nod2D)
     allocate(previous_temp(mesh%nl-1, partit%myDim_nod2D))
@@ -383,6 +397,8 @@ contains
     sivoln    = sivoln_acc    / n_cmor_acc
     sivols    = sivols_acc    / n_cmor_acc
 
+    if (ldiag_cmor_trflx_int) call compute_cmor_trflx_int(tracers, dynamics, partit, mesh)
+
     ! Update previous tracer values for next time step
     do n2 = 1, partit%myDim_nod2D
         do k = mesh%ulevels_nod2D(n2), mesh%nlevels_nod2D(n2)-1
@@ -395,13 +411,93 @@ contains
 
 
   !=================================================================
+  ! Column integrals of the heat transport velocity product on elements:
+  !   utemp_int = sum_k u_k * T_k * h_k,  vtemp_int = sum_k v_k * T_k * h_k   [m2 s-1 degC]
+  ! u, v are the element velocities plus the GM bolus velocity (Fer_GM), and T_k
+  ! is the mean of the three vertex temperatures, as in diag_trflx (utemp/vtemp).
+  ! h_k is the mean of the three vertex layer thicknesses hnode of this step, so a
+  ! time mean of the integral is the time mean of the transport, also when hnode
+  ! changes (zlevel, zstar). Multiply by rho_0*cp and a face width to get W.
+  ! The pair is rotated to geographic east/north here, at the element centroid,
+  ! as io_r2g does for utemp/vtemp in the native output.
+  ! Does not need ldiag_trflx.
+  !=================================================================
+  subroutine compute_cmor_trflx_int(tracers, dynamics, partit, mesh)
+    use g_rotate_grid, only: vector_r2g
+    implicit none
+    type(t_tracer), intent(in),    target :: tracers
+    type(t_dyn),    intent(in),    target :: dynamics
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh),   intent(in),    target :: mesh
+
+    integer       :: elem, nz, k, elnodes(3)
+    real(kind=WP) :: su, sv, uu, vv, tc, hc, x(3), xmin, xc, yc, a, b
+    real(kind=WP), dimension(:,:,:), pointer :: UV, fer_UV
+    real(kind=WP), dimension(:,:),   pointer :: temp
+
+    if (.not. allocated(utemp_int)) return
+    UV   => dynamics%uv(:,:,:)
+    temp => tracers%data(1)%values(:,:)
+    if (Fer_GM) fer_UV => dynamics%fer_uv(:,:,:)
+
+    if (.not. allocated(trflx_int_r2g)) then
+        allocate(trflx_int_r2g(4, partit%myDim_elem2D))
+        do elem = 1, partit%myDim_elem2D
+            if (rotated_grid .or. force_rotation) then
+                elnodes = mesh%elem2D_nodes(:, elem)
+                ! centroid in rotated coordinates, across the cyclic seam as elem_center
+                x    = mesh%coord_nod2D(1, elnodes)
+                xmin = minval(x)
+                do k = 1, 3
+                    if (x(k)-xmin >= cyclic_length/2.0_WP) x(k) = x(k) - cyclic_length
+                    if (x(k)-xmin < -cyclic_length/2.0_WP) x(k) = x(k) + cyclic_length
+                end do
+                xc = sum(x)/3.0_WP
+                yc = sum(mesh%coord_nod2D(2, elnodes))/3.0_WP
+                a = 1.0_WP; b = 0.0_WP
+                call vector_r2g(a, b, xc, yc, 0)
+                trflx_int_r2g(1, elem) = a
+                trflx_int_r2g(3, elem) = b
+                a = 0.0_WP; b = 1.0_WP
+                call vector_r2g(a, b, xc, yc, 0)
+                trflx_int_r2g(2, elem) = a
+                trflx_int_r2g(4, elem) = b
+            else
+                trflx_int_r2g(:, elem) = (/ 1.0_WP, 0.0_WP, 0.0_WP, 1.0_WP /)
+            end if
+        end do
+    end if
+
+    do elem = 1, partit%myDim_elem2D
+        elnodes = mesh%elem2D_nodes(:, elem)
+        su = 0.0_WP
+        sv = 0.0_WP
+        do nz = mesh%ulevels(elem), mesh%nlevels(elem)-1
+            uu = UV(1, nz, elem)
+            vv = UV(2, nz, elem)
+            if (Fer_GM) then
+                uu = uu + fer_UV(1, nz, elem)
+                vv = vv + fer_UV(2, nz, elem)
+            end if
+            tc = sum(temp(nz, elnodes))/3.0_WP
+            hc = sum(mesh%hnode(nz, elnodes))/3.0_WP
+            su = su + uu*tc*hc
+            sv = sv + vv*tc*hc
+        end do
+        utemp_int(elem) = trflx_int_r2g(1, elem)*su + trflx_int_r2g(2, elem)*sv
+        vtemp_int(elem) = trflx_int_r2g(3, elem)*su + trflx_int_r2g(4, elem)*sv
+    end do
+  end subroutine compute_cmor_trflx_int
+
+
+  !=================================================================
   ! Save advection del_ttf snapshot for tendency decomposition.
   ! Called from oce_ale_tracer.F90 after advection, before diffusion.
   !=================================================================
   subroutine save_cmor_advection(tr_num, del_ttf, local_nod2D, nlev)
     implicit none
     integer, intent(in) :: tr_num, local_nod2D, nlev
-    real(kind=WP), intent(in) :: del_ttf(nlev, local_nod2D)
+    real(kind=WP_full), intent(in) :: del_ttf(nlev, local_nod2D)
 
     if (.not. initialized) return
 

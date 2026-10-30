@@ -27,7 +27,7 @@ contains
 ! Than compute for all cavity points (ulevels_nod2D>1), which is the closest
 ! cavity line point to that point --> use their coordinates and depth
 subroutine compute_nrst_pnt2cavline(partit, mesh)
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     implicit none
 
     type(t_partit), intent(inout), target :: partit
@@ -120,7 +120,7 @@ subroutine compute_nrst_pnt2cavline(partit, mesh)
         ! line point
         if (aux_idx==0) then
             write(*,*) 'ERROR: no cavity line point found within 3000km of cavity node at lon/lat=', aux_x/rad, aux_y/rad
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
         end if
         mesh%cavity_nrst_cavlpnt_xyz(1,node)=cavl_lon(aux_idx)
         mesh%cavity_nrst_cavlpnt_xyz(2,node)=cavl_lat(aux_idx)

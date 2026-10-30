@@ -3,7 +3,7 @@ module write_step_info_module
             toy_ocean, blowup_eta_max
     USE MOD_MESH
     USE MOD_PARTIT
-    USE par_support_module, only: par_ex
+    USE par_support_module, only: par_abort
     USE MOD_TRACER
     USE MOD_DYN
     USE MOD_ICE
@@ -553,7 +553,7 @@ subroutine check_blowup(istep, mon, ice, dynamics, tracers, partit, mesh)
     end if
     call blowup(istep, ice, dynamics, tracers, partit, mesh)
     if (partit%mype==0) write(*,*) ' --> finished writing blow up file'
-    call par_ex(partit%MPI_COMM_FESOM, partit%mype, abort=1)
+    call par_abort(partit%MPI_COMM_FESOM, partit%mype)
 end subroutine check_blowup
 !===============================================================================
 subroutine write_enegry_info(dynamics, partit, mesh)

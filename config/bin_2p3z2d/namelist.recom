@@ -78,7 +78,6 @@ het_resp_noredfield   = .true.      ! respiration formulation of the first zoopl
 diatom_mucus          = .true.      ! nutrient limitation enhances diatom aggregation
 O2dep_remin           = .true.      ! oxygen-dependent remineralization of organic matter (k_o2_remin)
 use_photodamage       = .true.      ! light-dependent chlorophyll degradation after Alvarez et al. (2018)
-HetRespFlux_plus      = .true.      ! more stable zooplankton respiration flux (not used by the current code)
 CO2lim                = .true.      ! CO2 dependence of growth and calcification (&paco2lim)
 OmegaC_diss           = .false.     ! calcite dissolution from the mocsy saturation state OmegaC
                                     ! (Aumont et al. 2015, Gehlen et al. 2007); set calc_diss_guts = 0 when .false.
@@ -89,16 +88,11 @@ use_density_scaling   = .true.      ! scale sinking with seawater density (balla
 use_viscosity_scaling = .true.      ! scale sinking with seawater viscosity (ballasting)
 
 ! --- External Sources ---
-UseFeDust             = .true.      ! iron input from dust (not used by the current code, see fe_data_source)
-UseDustClim           = .true.      ! dust deposition climatology (not used by the current code)
-UseDustClimAlbani     = .true.      ! Albani dust climatology, otherwise Mahowald (not used by the current code)
 useRivers             = .false.     ! riverine nutrient input (nm_river_data_file)
 useRivFe              = .false.     ! riverine iron source
 useErosion            = .false.     ! input from erosion (nm_erosion_data_file)
 NitrogenSS            = .false.     ! external nitrogen sources and sinks (riverine, aeolian and denitrification)
 useAeolianN           = .false.     ! aeolian nitrogen deposition (nm_aen_data_file)
-REcoMDataPath         = '/albedo/work/projects/MarESys/ogurses/input/mesh_CORE2_finaltopo_mean/'
-                                    ! REcoM input directory (not used by the current code)
 
 ! --- Carbon Chemistry and Atmospheric CO2 ---
 constant_CO2          = .true.      ! use CO2_for_spinup instead of the time series in nm_co2_data_file
@@ -125,15 +119,6 @@ lb_tscale             = 1.0         ! fraction of the loopback fluxes added to t
 &pasinking
 Vdet_a                = 0.0288      ! increase of detritus sinking speed with depth [1/day] (allow_var_sinking)
 Vcalc                 = 0.0144      ! depth dependence of calcite dissolution [1/day]
-/
-
-! ============================================================================
-! INITIALIZATION
-! ============================================================================
-&painitialization_N
-cPhyN                 = 0.2d0       ! initial small phytoplankton N (not used by the current code)
-cHetN                 = 0.2d0       ! initial first zooplankton N (not used by the current code)
-cZoo2N                = 0.2d0       ! initial second zooplankton N (not used by the current code)
 /
 
 ! ============================================================================
@@ -171,7 +156,6 @@ k_si                  = 4.d0        ! half-saturation constant for silicate upta
 ! --- Maximum Photosynthesis ---
 P_cm                  = 3.0d0       ! maximum C-specific photosynthesis rate, small phytoplankton [1/day]
 P_cm_d                = 3.5d0       ! maximum C-specific photosynthesis rate, diatoms [1/day]
-P_cm_c                = 2.8d0       ! maximum C-specific photosynthesis rate, coccolithophores [1/day] (not used by the current code)
 /
 
 ! ============================================================================

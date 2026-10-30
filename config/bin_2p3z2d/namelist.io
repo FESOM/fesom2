@@ -269,6 +269,17 @@ io_list =  'sst       ',1, 'm', 4,
 ! 'GPPc      ',1, 'm', 4,  ! Mean GPP coccolithophores [mmolC/m2/d]
 ! 'NNAc      ',1, 'm', 4,  ! Net N-assimilation coccolithophores [mmolN/(m2*d)]
 ! 'Chldegc   ',1, 'm', 4,  ! Chlorophyll degradation coccolithophores [1/d]
+! 'bflxN     ',1, 'm', 4,  ! Particulate organic N flux into the benthos [mmolN/m2/s] (require Diags)
+! 'bflxC     ',1, 'm', 4,  ! Particulate organic C flux into the benthos [mmolC/m2/s] (require Diags)
+! 'bflxSi    ',1, 'm', 4,  ! Biogenic silica flux into the benthos [mmolSi/m2/s] (require Diags)
+! 'bflxCalc  ',1, 'm', 4,  ! Calcite flux into the benthos [mmolC/m2/s] (require Diags)
+! 'intpbsi   ',1, 'm', 4,  ! Depth-integrated silicate uptake by diatoms [mmolSi/m2/d] (require Diags)
+! 'scavFe    ',1, 'm', 4,  ! Depth-integrated iron scavenging [umolFe/m2/d] (require Diags)
+! 'dpO2s     ',1, 'm', 4,  ! Surface O2 partial pressure difference ocean minus atmosphere [Pa] (require Diags)
+! 'O2min     ',1, 'm', 4,  ! O2 at the shallowest local minimum of the profile [mmolO/m3] (require Diags)
+! 'intDIC    ',1, 'm', 4,  ! Column inventory of DIC [mmolC/m2] (require Diags)
+! 'intDOC    ',1, 'm', 4,  ! Column inventory of DOC [mmolC/m2] (require Diags)
+! 'intPOC    ',1, 'm', 4,  ! Column inventory of particulate organic carbon [mmolC/m2] (require Diags)
 
 ! --- RECOM 3D BIOGEOCHEMISTRY (require use_REcoM=.true. and __recom) ---
 ! 'PAR       ',1, 'm', 4,  ! PAR [W/m2]
@@ -289,6 +300,18 @@ io_list =  'sst       ',1, 'm', 4,
 ! 'NPPn3D    ',1, 'm', 4,  ! Net primary production of small phytoplankton [mmolC/(m3*d)]
 ! 'NPPd3D    ',1, 'm', 4,  ! Net primary production of diatoms [mmolC/(m3*d)]
 ! 'NPPc3D    ',1, 'm', 4,  ! Net primary production of coccolithophores [mmolC/(m3*d)]
+! 'expN      ',1, 'm', 4,  ! Sinking flux of particulate organic N at layer interfaces [mmolN/m2/s] (require Diags)
+! 'expC      ',1, 'm', 4,  ! Sinking flux of particulate organic C at layer interfaces [mmolC/m2/s] (require Diags)
+! 'expSi     ',1, 'm', 4,  ! Sinking flux of biogenic silica at layer interfaces [mmolSi/m2/s] (require Diags)
+! 'expCalc   ',1, 'm', 4,  ! Sinking flux of calcite at layer interfaces [mmolC/m2/s] (require Diags)
+! 'graz      ',1, 'm', 4,  ! Grazing on phytoplankton by all zooplankton [mmolC/(m3*d)] (require Diags, Grazing_detritus)
+! 'limNn     ',1, 'm', 4,  ! Nitrogen limitation of small phytoplankton [-] (require Diags)
+! 'limFen    ',1, 'm', 4,  ! Iron limitation of small phytoplankton [-] (require Diags)
+! 'limNd     ',1, 'm', 4,  ! Nitrogen limitation of diatoms [-] (require Diags)
+! 'limFed    ',1, 'm', 4,  ! Iron limitation of diatoms [-] (require Diags)
+! 'O2sat     ',1, 'm', 4,  ! O2 at saturation, 1 atm moist air [mmolO/m3] (require Diags)
+! 'OmegaA    ',1, 'm', 4,  ! Aragonite saturation state [-]
+! 'CO3satA   ',1, 'm', 4,  ! Carbonate ion at aragonite saturation [mol/m3]
 
 ! --- WATER ISOTOPES IN OCEAN (require lwiso=.true.) ---
 ! 'h2o18     ',1, 'm', 4,  ! h2o18 concentration [kmol/m**3]

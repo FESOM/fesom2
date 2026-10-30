@@ -1181,7 +1181,7 @@ subroutine ocean_update_runoff(NBASIN_RUNOFF, BASIN_RUNOFF)
    USE fesom_main_storage_module, only: fesom => f
    USE MOD_MESH
    USE MOD_PARTIT
-   use par_support_module, only: par_ex
+   use par_support_module, only: par_abort
    USE g_forcing_arrays,    only: runoff
    USE g_sbf,               only: RUNOFF_MAPPER
    use g_support
@@ -1199,7 +1199,7 @@ subroutine ocean_update_runoff(NBASIN_RUNOFF, BASIN_RUNOFF)
       if (total_number_of_basins/=NBASIN_RUNOFF) then
          if (fesom%partit%mype==0) write(*,*) 'mismatch in number of runoff basins between ocean and atmosphere:', total_number_of_basins, NBASIN_RUNOFF
          if (fesom%partit%mype==0) write(*,*) 'the model will stop!'
-         call par_ex(fesom%partit%MPI_COMM_FESOM, fesom%partit%mype)
+         call par_abort(fesom%partit%MPI_COMM_FESOM, fesom%partit%mype)
          stop
       end if
       lfirst=.false.

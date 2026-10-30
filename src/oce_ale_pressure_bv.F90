@@ -4,16 +4,16 @@ module oce_ale_pressure_bv_module
     USE MOD_MESH
     USE MOD_TRACER
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     USE o_ARRAYS
     USE g_support
-    USE o_mixing_KPP_mod, only: dbsfc
+    USE o_mixing_KPP_mod, only: dbsfc, kpp_on_device
     USE diagnostics, only: ldiag_dMOC, dmoc_is_due, ldiag_diapmix, sw_alpha_diap, sw_beta_diap
     USE g_comm_auto
     USE Toy_Neverworld2, only: thermal_alpha, do_cabbeling, cabbeling_Cb, do_thermobar, &
             thermobaric_Th, do_haline, haline_beta
 
-    USE oce_density_kernels, only: densityJM_components
+    USE oce_density_kernels, only: densityJM_components, densityJM_components_abs
 
     implicit none
 
@@ -31,7 +31,12 @@ module oce_ale_pressure_bv_module
               ptheta, atg, sw_alpha_beta, &
               compute_sigma_xy, compute_neutral_slope, insitu2pot, &
               density_linear, init_ref_density, &
-              init_ref_density_advanced
+              init_ref_density_advanced, sxy_on_device, pbv_on_device
+
+    ! OpenACC: pressure_bv of this step ran on the device (density and layer depths current there)
+    logical :: pbv_on_device = .false.
+    ! ... and sw_alpha_beta, compute_sigma_xy (their results current on the device)
+    logical :: ab_on_device = .false., sxy_on_device = .false.
 
 contains
 
@@ -60,6 +65,18 @@ subroutine pressure_bv(tracers, partit, mesh)
     smallvalue=1.0e-20
     buoyancy_crit=0.0003_WP
     mixing_kpp = (mix_scheme_nmb==1 .or. mix_scheme_nmb==18)
+#ifdef ENABLE_OPENACC
+    ! the device version covers the configurations without cavities, linfs, the dMOC
+    ! diagnostic, vertical N2 smoothing and the linear equation of state
+    pbv_on_device = .not. (ldiag_dMOC .or. use_cavity .or. trim(which_ale)=='linfs' .or. N2smth_v .or. state_equation/=1)
+    if (pbv_on_device) then
+        call pressure_bv_acc(tracers, partit, mesh)
+        if (N2smth_h) call smooth_nod3D_acc(bvfreq, N2smth_hidx, partit, mesh)
+        ! the mixing scheme (host) needs N2
+        !$ACC UPDATE HOST(bvfreq)
+        return
+    end if
+#endif
     !___________________________________________________________________________
     ! Screen salinity
     a    =0.0_WP
@@ -125,7 +142,7 @@ subroutine pressure_bv(tracers, partit, mesh)
                     call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
                 case default !unknown
                     if (partit%mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+                    call par_abort(partit%MPI_COMM_FESOM, partit%mype)
             end select
         end do
 
@@ -190,7 +207,7 @@ subroutine pressure_bv(tracers, partit, mesh)
                         call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
                     case default !unknown
                         if (partit%mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+                        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
                 end select
                 !_______________________________________________________________
                 ! compute institu-density in cavity at each depth layer (includes
@@ -337,6 +354,169 @@ subroutine pressure_bv(tracers, partit, mesh)
 if (N2smth_h) call smooth_nod (bvfreq, N2smth_hidx, partit, mesh)
 
 end subroutine pressure_bv
+#ifdef ENABLE_OPENACC
+!
+!
+!===============================================================================
+! pressure_bv on the device, one water column per thread, same arithmetic as the host version for
+! its configuration (see pressure_bv); temperature, salinity and the layer depths are uploaded.
+subroutine pressure_bv_acc(tracers, partit, mesh)
+    IMPLICIT NONE
+    type(t_mesh),   intent(in) ,    target  :: mesh
+    type(t_partit), intent(inout),  target  :: partit
+    type(t_tracer), intent(in),     target  :: tracers
+    ! column work arrays have this fixed size (private arrays of run-time size would
+    ! come from the per-thread device heap)
+    integer, parameter                      :: pbv_nl_max = 128
+    real(kind=WP), parameter                :: sigma_theta_crit=0.125_WP       ! Levitus threshold for MLD2
+    real(kind=WP), parameter                :: sigma_theta_crit_cmor=0.03_WP   ! Griffies threshold for MLD3
+    real(kind=WP)                           :: rhopot(pbv_nl_max), bulk_0(pbv_nl_max), bulk_pz(pbv_nl_max)
+    real(kind=WP)                           :: bulk_pz2(pbv_nl_max), rho(pbv_nl_max), dbsfc1(pbv_nl_max)
+    real(kind=WP)                           :: zmean, dz_inv, a, rho_up, rho_dn, t, s, db_max, bulk_up, bulk_dn
+    real(kind=WP)                           :: rho_surf, sref
+    integer                                 :: node, nz, nzmax, nzmin
+    logical                                 :: flag1, flag2, flag3, mixing_kpp
+    logical, save                           :: data_created = .false.
+    real(kind=WP),  dimension(:,:), pointer :: temp, salt
+    temp=>tracers%data(1)%values(:,:)
+    salt=>tracers%data(2)%values(:,:)
+
+    if (mesh%nl > pbv_nl_max) then
+        if (partit%mype==0) write(*,*) 'pressure_bv_acc: mesh%nl =', mesh%nl, ' > pbv_nl_max =', pbv_nl_max
+        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
+    end if
+    mixing_kpp = (mix_scheme_nmb==1 .or. mix_scheme_nmb==18)
+    sref = S_ref_anomaly
+    if (.not. data_created) then
+        !$ACC ENTER DATA CREATE(density_m_rho0, density_sigma0, bvfreq, MLD1, MLD2, MLD3, MLD1_ind, MLD2_ind, MLD3_ind) COPYIN(density_ref)
+        if (mixing_kpp) then
+            !$ACC ENTER DATA CREATE(dbsfc)
+        end if
+        data_created = .true.
+    end if
+    ! temperature and salinity are current on the host at the start of the step (the
+    ! tracer step uploads them again)
+    !$ACC UPDATE DEVICE(temp, salt)
+    if (.not. geom_on_device) then
+        !$ACC UPDATE DEVICE(mesh%Z_3d_n)
+    end if
+
+    !___________________________________________________________________________
+    ! screen salinity
+    a = 0.0_WP
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) REDUCTION(min:a) PRIVATE(nz, nzmin, nzmax)
+    do node=1, partit%myDim_nod2D+partit%eDim_nod2D
+        nzmin = mesh%ulevels_nod2D(node)
+        nzmax = mesh%nlevels_nod2D(node)
+        do nz=nzmin,nzmax-1
+            a=min(a, salt(nz,node))
+        enddo
+    enddo
+!$ACC END PARALLEL LOOP
+    if( a < -S_ref_anomaly ) then
+        write (*,*)' --> pressure_bv: s<0 happens!', a
+        partit%pe_status=1
+        do node=1, partit%myDim_nod2D+partit%eDim_nod2D
+            nzmin = mesh%ulevels_nod2D(node)
+            nzmax = mesh%nlevels_nod2D(node)
+            do nz=nzmin, nzmax-1
+                if (salt(nz, node) < -S_ref_anomaly) write (*,*) 'the model blows up at n=', partit%mylist_nod2D(node), ' ; ', 'nz=', nz
+            end do
+        end do
+    endif
+
+    !___________________________________________________________________________
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(rhopot, bulk_0, bulk_pz, bulk_pz2, rho, dbsfc1, &
+!$ACC     zmean, dz_inv, rho_up, rho_dn, t, s, db_max, bulk_up, bulk_dn, rho_surf, nz, nzmin, nzmax, flag1, flag2, flag3)
+    do node=1, partit%myDim_nod2D+partit%eDim_nod2D
+        nzmin = mesh%ulevels_nod2D(node)
+        nzmax = mesh%nlevels_nod2D(node)
+        do nz=1, mesh%nl
+            rho(nz)      = 0.0_WP
+            bulk_0(nz)   = 0.0_WP
+            bulk_pz(nz)  = 0.0_WP
+            bulk_pz2(nz) = 0.0_WP
+            rhopot(nz)   = 0.0_WP
+            dbsfc1(nz)   = 0.0_WP
+        end do
+        db_max   = 0.0_WP
+
+        ! equation of state
+        do nz=nzmin, nzmax-1
+            t=temp(nz, node)
+            s=salt(nz, node)
+            call densityJM_components_abs(t, s + sref, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
+        end do
+
+        ! density for the PGF and buoyancy difference to the surface
+        do nz=nzmin, nzmax-1
+            rho(nz) = bulk_0(nz) + mesh%Z_3d_n(nz,node)*(bulk_pz(nz)   + mesh%Z_3d_n(nz,node)*bulk_pz2(nz))
+            rho(nz) = rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*mesh%Z_3d_n(nz,node)*real(state_equation))-density_ref(nz,node)
+            density_m_rho0(nz,node) = rho(nz)
+            density_sigma0(nz,node) = rhopot(nz)-density_ref(nz,node)
+            rho_surf=bulk_0(nzmin)   + mesh%Z_3d_n(nz,node)*(bulk_pz(nzmin)   + mesh%Z_3d_n(nz,node)*bulk_pz2(nzmin))
+            rho_surf=rho_surf*rhopot(nzmin)/(rho_surf+0.1_WP*mesh%Z_3d_n(nz,node)*real(state_equation))
+            dbsfc1(nz) = -g * ( rho_surf - (rho(nz)+density_ref(nz,node)) ) / (rho(nz)+density_ref(nz,node))
+            db_max = max(dbsfc1(nz)/abs(mesh%Z_3d_n(nzmin,node)-mesh%Z_3d_n(max(nz, nzmin+1),node)), db_max)
+        end do
+        dbsfc1(nzmax)=dbsfc1(nzmax-1)
+        if (mixing_kpp) then
+            do nz=nzmin, nzmax
+                dbsfc(nz, node)=dbsfc1(nz)
+            end do
+        end if
+
+        ! N2 and the mixed layer depths (see pressure_bv)
+        MLD1(node)=mesh%Z_3d_n(nzmin+1,node)
+        MLD2(node)=mesh%Z_3d_n(nzmin+1,node)
+        MLD3(node)=mesh%Z_3d_n(nzmin+1,node)
+        MLD1_ind(node)=nzmin+1
+        MLD2_ind(node)=nzmin+1
+        MLD3_ind(node)=nzmin+1
+        flag1=.true.
+        flag2=.true.
+        flag3=.true.
+        do nz=nzmin+1,nzmax-1
+            zmean   = 0.5_WP*(mesh%Z_3d_n(nz-1, node)+mesh%Z_3d_n(nz, node))
+            bulk_up = bulk_0(nz-1) + zmean*(bulk_pz(nz-1) + zmean*bulk_pz2(nz-1))
+            bulk_dn = bulk_0(nz)   + zmean*(bulk_pz(nz)   + zmean*bulk_pz2(nz))
+            rho_up  = bulk_up*rhopot(nz-1) / (bulk_up + 0.1_WP*zmean*real(state_equation))
+            rho_dn  = bulk_dn*rhopot(nz)   / (bulk_dn + 0.1_WP*zmean*real(state_equation))
+            dz_inv  = 1.0_WP/(mesh%Z_3d_n(nz-1,node)-mesh%Z_3d_n(nz,node))
+            bvfreq(nz,node)  = -g*dz_inv*(rho_up-rho_dn)/density_0
+            if (bvfreq(nz, node) > db_max .and. flag1) then
+                MLD1(node)    =mesh%Z_3d_n(nz, node)
+                MLD1_ind(node)=nz
+                flag1=.false.
+            end if
+            if ((rhopot(nz)-rhopot(nzmin) > sigma_theta_crit) .and. flag2) then
+                MLD2(node)=MLD2(node)+(mesh%Z_3d_n(nz,node)-MLD2(node))/(rhopot(nz)-rhopot(nz-1)+1.e-20)*(rhopot(1)+sigma_theta_crit-rhopot(nz-1))
+                MLD2_ind(node)=nz
+                flag2=.false.
+            elseif (flag2) then
+                MLD2(node)=mesh%Z_3d_n(nz,node)
+            end if
+            if ((rhopot(nz)-rhopot(nzmin) > sigma_theta_crit_cmor) .and. flag3) then
+                MLD3(node)=MLD3(node)+(mesh%Z_3d_n(nz,node)-MLD3(node))/(rhopot(nz)-rhopot(nz-1)+1.e-20)*(rhopot(1)+sigma_theta_crit_cmor-rhopot(nz-1))
+                MLD3_ind(node)=nz
+                flag3=.false.
+            elseif (flag3) then
+                MLD3(node)=mesh%Z_3d_n(nz,node)
+            end if
+        end do
+        if (flag2) MLD2_ind(node)=nzmax-1
+        if (flag3) MLD3_ind(node)=nzmax-1
+        bvfreq(nzmin,node)=bvfreq(nzmin+1,node)
+        bvfreq(nzmax,node)=bvfreq(nzmax-1,node)
+    end do
+!$ACC END PARALLEL LOOP
+    ! host copies of the results
+    !$ACC UPDATE HOST(density_m_rho0, density_sigma0, MLD1, MLD2, MLD3, MLD1_ind, MLD2_ind, MLD3_ind)
+    if (mixing_kpp) then
+        !$ACC UPDATE HOST(dbsfc)
+    end if
+end subroutine pressure_bv_acc
+#endif
 !
 !
 !
@@ -369,7 +549,7 @@ subroutine pressure_force_4_linfs(tracers, partit, mesh)
             write(*,*) '            see in namelist.oce --> which_pgf = sergey,   '
             write(*,*) '            shchepetkin, easypgf '
             write(*,*) '________________________________________________________'
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
         end if
 
     !___________________________________________________________________________
@@ -390,7 +570,7 @@ subroutine pressure_force_4_linfs(tracers, partit, mesh)
             write(*,*) '            see in namelist.oce --> which_pgf = nemo,   '
             write(*,*) '            shchepetkin, cubicspline '
             write(*,*) '________________________________________________________'
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
         end if
     end if
 end subroutine pressure_force_4_linfs
@@ -571,7 +751,7 @@ subroutine pressure_force_4_linfs_nemo(tracers, partit, mesh)
                         call densityJM_components(interp_n_temp, interp_n_salt, bulk_0, bulk_pz, bulk_pz2, rhopot)
                     case default !unknown
                         if (partit%mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+                        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
                 end select
                 interp_n_dens(ni) = bulk_0 + Z_n(nle)*(bulk_pz + Z_n(nle)*bulk_pz2)
                 !!PS interp_n_dens(ni) = interp_n_dens(ni)*rhopot/(interp_n_dens(ni)+0.1_WP*Z_n(nle))*real(state_equation))-density_0
@@ -920,7 +1100,7 @@ subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
                     call densityJM_components(density_ref_T, density_ref_S, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2, dref_rhopot)
                 case default !unknown
                     if (partit%mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+                    call par_abort(partit%MPI_COMM_FESOM, partit%mype)
             end select
         end if
 
@@ -1010,7 +1190,7 @@ subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
                             call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni))
                         case default !unknown
                             if (partit%mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+                            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
                     end select
                     rho_at_Zn(ni) = bulk_0(ni) + Z_n(nlz)*(bulk_pz(ni) + Z_n(nlz)*bulk_pz2(ni))
                     rho_at_Zn(ni) = rho_at_Zn(ni)*rhopot(ni)/(rho_at_Zn(ni)+0.1_WP*Z_n(nlz)*real(state_equation))-aux_dref
@@ -1049,7 +1229,7 @@ subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
                             call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni))
                         case default !unknown
                             if (partit%mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+                            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
                     end select
                     rho_at_Zn(ni) = bulk_0(ni) + Z_n(nlz)*(bulk_pz(ni) + Z_n(nlz)*bulk_pz2(ni))
                     rho_at_Zn(ni) = rho_at_Zn(ni)*rhopot(ni)/(rho_at_Zn(ni)+0.1_WP*Z_n(nlz)*real(state_equation))-aux_dref
@@ -1152,7 +1332,7 @@ subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
                         call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni))
                     case default !unknown
                         if (partit%mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+                        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
                 end select
                 rho_at_Zn(ni) = bulk_0(ni) + Z_n(nlz)*(bulk_pz(ni) + Z_n(nlz)*bulk_pz2(ni))
                 rho_at_Zn(ni) = rho_at_Zn(ni)*rhopot(ni)/(rho_at_Zn(ni)+0.1_WP*Z_n(nlz)*real(state_equation))-aux_dref
@@ -1191,7 +1371,7 @@ subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
                         call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni))
                     case default !unknown
                         if (partit%mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+                        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
                 end select
                 rho_at_Zn(ni) = bulk_0(ni) + Z_n(nlz)*(bulk_pz(ni) + Z_n(nlz)*bulk_pz2(ni))
                 rho_at_Zn(ni) = rho_at_Zn(ni)*rhopot(ni)/(rho_at_Zn(ni)+0.1_WP*Z_n(nlz)*real(state_equation))-aux_dref
@@ -1636,6 +1816,25 @@ subroutine pressure_force_4_zxxxx(tracers, partit, mesh)
     type(t_mesh),   intent(in) ,    target :: mesh
     type(t_partit), intent(inout),  target :: partit
     type(t_tracer), intent(in),     target :: tracers
+#ifdef ENABLE_OPENACC
+    logical, save :: thin_elements_checked = .false., no_thin_elements = .false.
+    integer       :: elem
+    ! the device version merges the surface and bottom treatment of the host version,
+    ! which differ for elements with a single layer: those stay on the host
+    if (.not. thin_elements_checked) then
+        no_thin_elements = .true.
+        do elem=1, partit%myDim_elem2D
+            if (mesh%nlevels(elem)-1 <= mesh%ulevels(elem)) no_thin_elements = .false.
+        end do
+        thin_elements_checked = .true.
+    end if
+    ! on the device when the density of this step is there
+    pgf_on_device = (trim(which_pgf)=='shchepetkin') .and. pbv_on_device .and. no_thin_elements
+    if (pgf_on_device) then
+        call pressure_force_4_zxxxx_shchepetkin_acc(partit, mesh)
+        return
+    end if
+#endif
     !___________________________________________________________________________
     if     (trim(which_pgf)=='shchepetkin') then
         call pressure_force_4_zxxxx_shchepetkin(partit, mesh)
@@ -1651,7 +1850,7 @@ subroutine pressure_force_4_zxxxx(tracers, partit, mesh)
         write(*,*) '            see in namelist.oce --> which_pgf =         '
         write(*,*) '            shchepetkin, cubicspline, easypgf                   '
         write(*,*) '________________________________________________________'
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     end if
 end subroutine pressure_force_4_zxxxx
 !
@@ -2068,6 +2267,96 @@ subroutine pressure_force_4_zxxxx_shchepetkin(partit, mesh)
 !$OMP END DO
 !$OMP END PARALLEL
 end subroutine pressure_force_4_zxxxx_shchepetkin
+#ifdef ENABLE_OPENACC
+!
+!
+!===============================================================================
+! pressure_force_4_zxxxx_shchepetkin on the device, one element per thread, same arithmetic; the surface,
+! interior and bottom stencils (kb, kb+1, kb+2) are written out per vertex. pgf_x/pgf_y stay on the device.
+subroutine pressure_force_4_zxxxx_shchepetkin_acc(partit, mesh)
+    implicit none
+    type(t_mesh),   intent(in) ,    target :: mesh
+    type(t_partit), intent(inout),  target :: partit
+    ! element mid-depths in a fixed-size work array (no per-thread device heap)
+    integer, parameter                     :: pgf_nl_max = 128
+    integer                                :: elem, n1, n2, n3, nle, ule, nlz, ni, nd, kb
+    real(kind=WP)                          :: int_dp_x, int_dp_y, drho_dx, drho_dy, dz_dx, dz_dy, aux_sum
+    real(kind=WP)                          :: dsum, zb, dx10, dx20, dx21, df10, df21, drz
+    real(kind=WP)                          :: Z_n(pgf_nl_max)
+
+    if (mesh%nl > pgf_nl_max) then
+        if (partit%mype==0) write(*,*) 'pressure_force_4_zxxxx_shchepetkin_acc: mesh%nl =', mesh%nl, ' > pgf_nl_max'
+        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
+    end if
+    ! layer thicknesses from the thickness update at the end of the previous step
+    if (.not. geom_on_device) then
+        !$ACC UPDATE DEVICE(mesh%helem)
+    end if
+
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(Z_n, n1, n2, n3, nle, ule, nlz, ni, nd, kb, int_dp_x, int_dp_y, &
+!$ACC     drho_dx, drho_dy, dz_dx, dz_dy, aux_sum, dsum, zb, dx10, dx20, dx21, df10, df21, drz)
+    do elem=1, partit%myDim_elem2D
+        nle = mesh%nlevels(elem)-1
+        ule = mesh%ulevels(elem)
+        n1  = mesh%elem2D_nodes(1,elem)
+        n2  = mesh%elem2D_nodes(2,elem)
+        n3  = mesh%elem2D_nodes(3,elem)
+        do nlz=1, mesh%nl-1
+            Z_n(nlz) = 0.0_WP
+        end do
+        zb       = mesh%zbar_e_bot(elem)
+        Z_n(nle) = zb + mesh%helem(nle,elem)*0.5_WP
+        do nlz=nle,ule+1,-1
+            zb         = zb + mesh%helem(nlz,elem)
+            Z_n(nlz-1) = zb + mesh%helem(nlz-1,elem)*0.5_WP
+        end do
+
+        int_dp_x = 0.0_WP
+        int_dp_y = 0.0_WP
+        do nlz=ule, nle
+            ! sum of the vertical density gradients at the three vertices
+            dsum = 0.0_WP
+            do ni=1,3
+                if (ni==1) nd=n1
+                if (ni==2) nd=n2
+                if (ni==3) nd=n3
+                if (nlz==ule .and. nlz==mesh%ulevels_nod2D(nd)) then
+                    kb = nlz          ! surface layer of the vertex
+                elseif (nlz==nle .and. nlz==mesh%nlevels_nod2D(nd)-1) then
+                    kb = nlz-2        ! bottom layer of the vertex
+                else
+                    kb = nlz-1
+                end if
+                dx10 = mesh%Z_3d_n(kb+1,nd)-mesh%Z_3d_n(kb  ,nd)
+                dx21 = mesh%Z_3d_n(kb+2,nd)-mesh%Z_3d_n(kb+1,nd)
+                dx20 = mesh%Z_3d_n(kb+2,nd)-mesh%Z_3d_n(kb  ,nd)
+                df10 = density_m_rho0(kb+1,nd)-density_m_rho0(kb  ,nd)
+                df21 = density_m_rho0(kb+2,nd)-density_m_rho0(kb+1,nd)
+                drz  = df10/dx10 + (dx10*df21-dx21*df10)/(dx20*dx21*dx10) &
+                       *((Z_n(nlz)-mesh%Z_3d_n(kb+1,nd)) + (Z_n(nlz)-mesh%Z_3d_n(kb,nd)))
+                dsum = dsum + drz
+            end do
+            ! zonal
+            drho_dx = mesh%gradient_sca(1,elem)*density_m_rho0(nlz,n1) + mesh%gradient_sca(2,elem)*density_m_rho0(nlz,n2) &
+                    + mesh%gradient_sca(3,elem)*density_m_rho0(nlz,n3)
+            dz_dx   = mesh%gradient_sca(1,elem)*mesh%Z_3d_n(nlz,n1) + mesh%gradient_sca(2,elem)*mesh%Z_3d_n(nlz,n2) &
+                    + mesh%gradient_sca(3,elem)*mesh%Z_3d_n(nlz,n3)
+            aux_sum = (drho_dx-dsum/3.0_WP*dz_dx)*mesh%helem(nlz,elem)*g/density_0
+            pgf_x(nlz,elem) = int_dp_x + aux_sum*0.5_WP
+            int_dp_x = int_dp_x + aux_sum
+            ! meridional
+            drho_dy = mesh%gradient_sca(4,elem)*density_m_rho0(nlz,n1) + mesh%gradient_sca(5,elem)*density_m_rho0(nlz,n2) &
+                    + mesh%gradient_sca(6,elem)*density_m_rho0(nlz,n3)
+            dz_dy   = mesh%gradient_sca(4,elem)*mesh%Z_3d_n(nlz,n1) + mesh%gradient_sca(5,elem)*mesh%Z_3d_n(nlz,n2) &
+                    + mesh%gradient_sca(6,elem)*mesh%Z_3d_n(nlz,n3)
+            aux_sum = (drho_dy-dsum/3.0_WP*dz_dy)*mesh%helem(nlz,elem)*g/density_0
+            pgf_y(nlz,elem) = int_dp_y + aux_sum*0.5_WP
+            int_dp_y = int_dp_y + aux_sum
+        end do
+    end do
+!$ACC END PARALLEL LOOP
+end subroutine pressure_force_4_zxxxx_shchepetkin_acc
+#endif
 !
 !
 !
@@ -2136,7 +2425,7 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
                     call densityJM_components(density_ref_T, density_ref_S, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2, dref_rhopot)
                 case default !unknown
                     if (partit%mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+                    call par_abort(partit%MPI_COMM_FESOM, partit%mype)
             end select
         end if
 
@@ -2192,7 +2481,7 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
                     write(*,*) ' nle = ', nle
                     write(*,*) ' ule = ', ule
                     write(*,*) ' nln = ', mesh%nlevels_nod2D(elnodes)-1
-                    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+                    call par_abort(partit%MPI_COMM_FESOM, partit%mype)
                 end if
 
                 layer_offset = 0
@@ -2248,7 +2537,7 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
                         call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni))
                     case default !unknown
                         if (partit%mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+                        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
                 end select
                 rho_at_Zn(ni, nlz) = bulk_0(ni) + Z_n(nlz) * (bulk_pz(ni) + Z_n(nlz) * bulk_pz2(ni))
                 rho_at_Zn(ni, nlz) = rho_at_Zn(ni, nlz) * rhopot(ni)                                   &
@@ -2465,6 +2754,14 @@ subroutine sw_alpha_beta(TF1,SF1, partit, mesh)
   real(kind=WP), parameter               :: p_diap_3 = p_diap*p_diap*p_diap
   real(kind=WP)                          :: a_over_b_diap, beta_diap
   real(kind=WP)                          :: TF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D),SF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+#ifdef ENABLE_OPENACC
+  ! on the device after pressure_bv_acc (full equation of state, no diapycnal diagnostic)
+  ab_on_device = pbv_on_device .and. state_equation==1 .and. .not. ldiag_diapmix
+  if (ab_on_device) then
+     call sw_alpha_beta_acc(TF1, SF1, partit, mesh)
+     return
+  end if
+#endif
 
 
   ! For state_equation==0 (linear EOS, "toy" configs) alpha/beta are constant
@@ -2619,6 +2916,13 @@ subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
   real(kind=WP),  intent(IN)             :: TF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D), SF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
   real(kind=WP)                          :: tx(mesh%nl-1), ty(mesh%nl-1), sx(mesh%nl-1), sy(mesh%nl-1), vol(mesh%nl-1), testino(2)
   integer                                :: n, nz, elnodes(3),el, k, nln, uln, nle, ule
+#ifdef ENABLE_OPENACC
+  sxy_on_device = ab_on_device
+  if (sxy_on_device) then
+     call compute_sigma_xy_acc(TF1, SF1, partit, mesh)
+     return
+  end if
+#endif
 
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(tx, ty, sx, sy, vol, testino, n, nz, elnodes, el, k, nln, uln, nle, ule)
@@ -2705,6 +3009,12 @@ subroutine compute_neutral_slope(partit, mesh)
     real(kind=WP)                          :: c, ro_z_inv, eps !PS, S_cr, S_d
     real(kind=WP)                          :: f_min=1.0e-6_WP, dep_scale, rssby
     real(kind=WP), dimension(:)            :: c1(mesh%nl-1), c2(mesh%nl-1)
+#ifdef ENABLE_OPENACC
+    if (sxy_on_device) then
+        call compute_neutral_slope_acc(partit, mesh)
+        return
+    end if
+#endif
     
 
     !if sigma_xy is not computed
@@ -2803,6 +3113,210 @@ subroutine compute_neutral_slope(partit, mesh)
     call exchange_nod(neutral_slope, partit)
     call exchange_nod(slope_tapered, partit)
 end subroutine compute_neutral_slope
+#ifdef ENABLE_OPENACC
+!
+!
+!===============================================================================
+! sw_alpha_beta on the device for the full equation of state (see sw_alpha_beta)
+subroutine sw_alpha_beta_acc(TF1, SF1, partit, mesh)
+    implicit none
+    type(t_mesh),   intent(in) ,    target :: mesh
+    type(t_partit), intent(inout),  target :: partit
+    real(kind=WP)                          :: TF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D), SF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    integer                                :: n, nz, nzmin, nzmax
+    real(kind=WP)                          :: t1, t1_2, t1_3, t1_4, p1, p1_2, p1_3, s1, s35, s35_2, a_over_b, sref
+    logical, save                          :: data_created = .false.
+
+    if (.not. data_created) then
+        !$ACC ENTER DATA CREATE(sw_alpha, sw_beta)
+        data_created = .true.
+    end if
+    sref = S_ref_anomaly
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(nz, nzmin, nzmax, t1, t1_2, t1_3, t1_4, p1, p1_2, p1_3, s1, s35, s35_2, a_over_b)
+    do n = 1,partit%myDim_nod2d
+        nzmin = mesh%ulevels_nod2d(n)
+        nzmax = mesh%nlevels_nod2d(n)
+        do nz=nzmin, nzmax-1
+            t1 = TF1(nz,n)*1.00024_WP
+            s1 = SF1(nz,n) + sref
+            p1 = abs(mesh%Z_3d_n(nz,n))
+            t1_2 = t1*t1
+            t1_3 = t1_2*t1
+            t1_4 = t1_3*t1
+            p1_2 = p1*p1
+            p1_3 = p1_2*p1
+            s35 = s1-35.0_WP
+            s35_2 = s35*s35
+            sw_beta(nz,n) = 0.785567e-3_WP - 0.301985e-5_WP*t1 &
+                 + 0.555579e-7_WP*t1_2 - 0.415613e-9_WP*t1_3 &
+                 + s35*(-0.356603e-6_WP + 0.788212e-8_WP*t1 &
+                 + 0.408195e-10_WP*p1 - 0.602281e-15_WP*p1_2) &
+                 + s35_2*(0.515032e-8_WP) &
+                 + p1*(-0.121555e-7_WP + 0.192867e-9_WP*t1 - 0.213127e-11_WP*t1_2) &
+                 + p1_2*(0.176621e-12_WP - 0.175379e-14_WP*t1) &
+                 + p1_3*(0.121551e-17_WP)
+            a_over_b = 0.665157e-1_WP + 0.170907e-1_WP*t1 &
+                 - 0.203814e-3_WP*t1_2 + 0.298357e-5_WP*t1_3 &
+                 - 0.255019e-7_WP*t1_4 &
+                 + s35*(0.378110e-2_WP - 0.846960e-4_WP*t1 &
+                 - 0.164759e-6_WP*p1 - 0.251520e-11_WP*p1_2) &
+                 + s35_2*(-0.678662e-5_WP) &
+                 + p1*(0.380374e-4_WP - 0.933746e-6_WP*t1 + 0.791325e-8_WP*t1_2) &
+                 + p1_2*t1_2*(0.512857e-12_WP) &
+                 - p1_3*(0.302285e-13_WP)
+            sw_alpha(nz,n) = a_over_b*sw_beta(nz,n)
+        end do
+    end do
+!$ACC END PARALLEL LOOP
+    call exchange_nod(sw_alpha, partit, luse_g2g=.true.)
+    call exchange_nod(sw_beta, partit, luse_g2g=.true.)
+end subroutine sw_alpha_beta_acc
+!
+!
+!===============================================================================
+! compute_sigma_xy on the device: per node and level the element sums in the same
+! element order as the host version
+subroutine compute_sigma_xy_acc(TF1, SF1, partit, mesh)
+    implicit none
+    type(t_mesh),   intent(in) ,    target :: mesh
+    type(t_partit), intent(inout),  target :: partit
+    real(kind=WP),  intent(IN)             :: TF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D), SF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP)                          :: tx, ty, sx, sy, vol
+    integer                                :: n, nz, el, k, nln, uln, nle, ule, e1, e2, e3
+    logical, save                          :: data_created = .false.
+
+    if (.not. data_created) then
+        !$ACC ENTER DATA CREATE(sigma_xy)
+        data_created = .true.
+    end if
+    ! one gang per node, the levels over the vector lanes (coalesced column access)
+!$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) PRIVATE(nln, uln) VECTOR_LENGTH(32)
+    DO n=1, partit%myDim_nod2D
+        nln = mesh%nlevels_nod2D(n)-1
+        uln = mesh%ulevels_nod2D(n)
+!$ACC LOOP VECTOR PRIVATE(tx, ty, sx, sy, vol, el, k, nle, ule, e1, e2, e3)
+        DO nz=uln, nln
+            vol = 0.0_WP
+            tx  = 0.0_WP
+            ty  = 0.0_WP
+            sx  = 0.0_WP
+            sy  = 0.0_WP
+!$ACC LOOP SEQ
+            DO k=1, mesh%nod_in_elem2D_num(n)
+                el  = mesh%nod_in_elem2D(k, n)
+                nle = mesh%nlevels(el)-1
+                ule = mesh%ulevels(el)
+                if (nz>=ule .and. nz<=nle) then
+                    e1 = mesh%elem2D_nodes(1,el)
+                    e2 = mesh%elem2D_nodes(2,el)
+                    e3 = mesh%elem2D_nodes(3,el)
+                    vol = vol+mesh%elem_area(el)
+                    tx = tx+(mesh%gradient_sca(1,el)*TF1(nz,e1) + mesh%gradient_sca(2,el)*TF1(nz,e2) &
+                           + mesh%gradient_sca(3,el)*TF1(nz,e3))*mesh%elem_area(el)
+                    ty = ty+(mesh%gradient_sca(4,el)*TF1(nz,e1) + mesh%gradient_sca(5,el)*TF1(nz,e2) &
+                           + mesh%gradient_sca(6,el)*TF1(nz,e3))*mesh%elem_area(el)
+                    sx = sx+(mesh%gradient_sca(1,el)*SF1(nz,e1) + mesh%gradient_sca(2,el)*SF1(nz,e2) &
+                           + mesh%gradient_sca(3,el)*SF1(nz,e3))*mesh%elem_area(el)
+                    sy = sy+(mesh%gradient_sca(4,el)*SF1(nz,e1) + mesh%gradient_sca(5,el)*SF1(nz,e2) &
+                           + mesh%gradient_sca(6,el)*SF1(nz,e3))*mesh%elem_area(el)
+                end if
+            END DO
+            sigma_xy(1,nz,n) = (-sw_alpha(nz,n)*tx+sw_beta(nz,n)*sx)/vol*density_0
+            sigma_xy(2,nz,n) = (-sw_alpha(nz,n)*ty+sw_beta(nz,n)*sy)/vol*density_0
+        END DO
+    END DO
+!$ACC END PARALLEL LOOP
+    call exchange_nod(sigma_xy, partit, luse_g2g=.true.)
+end subroutine compute_sigma_xy_acc
+!
+!
+!===============================================================================
+! compute_neutral_slope on the device (see compute_neutral_slope)
+subroutine compute_neutral_slope_acc(partit, mesh)
+    IMPLICIT NONE
+    type(t_mesh),   intent(in) ,    target :: mesh
+    type(t_partit), intent(inout),  target :: partit
+    integer                                :: n, nz, nl1, ul1, i
+    real(kind=WP)                          :: ro_z_inv, eps, c1, c2, dep_scale, rssby, f_min
+    real(kind=WP)                          :: scr, sd, ldd_c, ldd_min, ldd_max
+    logical                                :: odm95, ldd97, taper_k
+    logical, save                          :: data_created = .false.
+
+    if (.not. data_created) then
+        !$ACC ENTER DATA CREATE(neutral_slope)
+        if (allocated(fer_tapfac)) then
+            !$ACC ENTER DATA CREATE(fer_tapfac)
+        end if
+        data_created = .true.
+    end if
+    eps     = 5.0e-6_WP
+    f_min   = 1.0e-6_WP
+    odm95   = scaling_ODM95
+    ldd97   = scaling_LDD97
+    taper_k = Fer_GM .and. Redi .and. Redi_Ktaper
+    scr     = ODM95_Scr
+    sd      = ODM95_Sd
+    ldd_c   = LDD97_c
+    ldd_min = LDD97_rmin
+    ldd_max = LDD97_rmax
+    ! one gang per node, the levels over the vector lanes (coalesced column access)
+!$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) PRIVATE(nl1, ul1, rssby) VECTOR_LENGTH(32)
+    do n=1, partit%myDim_nod2D
+        nl1=mesh%nlevels_nod2d(n)-1
+        ul1=mesh%ulevels_nod2d(n)
+        rssby = 0._WP
+        if (ldd97) then
+            rssby = ldd_c/max(abs(mesh%coriolis_node(n)), f_min)
+            rssby = min(ldd_max, max(ldd_min, rssby))
+        end if
+!$ACC LOOP VECTOR PRIVATE(i, ro_z_inv, c1, c2, dep_scale)
+        do nz=1, size(slope_tapered,2)
+            do i=1, 3
+                slope_tapered(i, nz, n)=0._WP
+            end do
+            if (nz<ul1 .or. nz>nl1) cycle
+            ro_z_inv=2._WP*g/density_0/max(bvfreq(nz,n)+bvfreq(nz+1,n), eps**2)
+            neutral_slope(1,nz,n)=sigma_xy(1,nz,n)*ro_z_inv
+            neutral_slope(2,nz,n)=sigma_xy(2,nz,n)*ro_z_inv
+            neutral_slope(3,nz,n)=sqrt(neutral_slope(1,nz,n)**2+neutral_slope(2,nz,n)**2)
+            c1 = 1.0_WP
+            if (odm95) then
+                c1=0.5_WP*(1.0_WP + tanh((scr - neutral_slope(3,nz,n))/sd))
+                if ((bvfreq(nz,n) <= 0.0_WP) .or. (bvfreq(nz+1,n) <= 0.0_WP)) c1=0.0_WP
+            end if
+            c2 = 1.0_WP
+            if (ldd97) then
+                dep_scale = rssby*neutral_slope(3,nz,n)
+                if (abs(mesh%Z_3d_n(nz, n))< dep_scale) then
+                    c2 = 0.5_WP * (1.0_WP + sin(pi*abs(mesh%Z_3d_n(nz, n))/dep_scale - pi/2.0_WP    ))
+                end if
+            end if
+            if (taper_k) then
+                fer_tapfac(nz, n) = c1 * c2
+                do i=1, 3
+                    slope_tapered(i, nz, n)=neutral_slope(i, nz, n) * sqrt(c1 * c2)
+                end do
+            else
+                do i=1, 3
+                    slope_tapered(i, nz, n)=neutral_slope(i, nz, n) * c1 * c2
+                end do
+            end if
+        end do
+    enddo
+!$ACC END PARALLEL LOOP
+    call exchange_nod(neutral_slope, partit, luse_g2g=.true.)
+    call exchange_nod(slope_tapered, partit, luse_g2g=.true.)
+    ! the surface expansion coefficients are read on the host every step; the 3-D fields only by host
+    ! versions of KPP and GM/Redi, the toy configurations and output streams
+    !$ACC UPDATE HOST(sw_alpha(1,:), sw_beta(1,:))
+    if (slope_out_needed .or. toy_ocean .or. use_mle .or. .not. (kpp_on_device .and. redi_on_device)) then
+        !$ACC UPDATE HOST(sw_alpha, sw_beta, sigma_xy, neutral_slope, slope_tapered)
+        if (taper_k) then
+            !$ACC UPDATE HOST(fer_tapfac)
+        end if
+    end if
+end subroutine compute_neutral_slope_acc
+#endif
 !
 !
 !
@@ -2926,7 +3440,7 @@ subroutine init_ref_density(partit, mesh)
                 call densityJM_components(density_ref_T, density_ref_S, bulk_0, bulk_pz, bulk_pz2, rhopot)
             case default !unknown
                 if (partit%mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
         end select
         rho = bulk_0 + auxz*(bulk_pz + auxz*bulk_pz2)
         density_ref(nzmin, node) = rho*rhopot/(rho+0.1_WP*auxz*real(state_equation))
@@ -3002,7 +3516,7 @@ end where
                 call densityJM_components(ref_temp1D(nz), ref_salt1D(nz), bulk_0, bulk_pz, bulk_pz2, rhopot)
             case default !unknown
                 if (partit%mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+                call par_abort(partit%MPI_COMM_FESOM, partit%mype)
             end select    
             auxz=mesh%Z_3d_n(nz,node)
             rho = bulk_0   + auxz*(bulk_pz   + auxz*bulk_pz2)
@@ -3020,7 +3534,7 @@ do nz=1,68
         call densityJM_components(ref_temp1D(nz), ref_salt1D(nz), bulk_0, bulk_pz, bulk_pz2, rhopot)
     case default !unknown
         if (partit%mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     end select    
  auxz=mesh%Z(nz)
  rho = bulk_0   + auxz*(bulk_pz   + auxz*bulk_pz2)

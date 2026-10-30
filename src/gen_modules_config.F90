@@ -5,6 +5,12 @@
 ! S. Danilov, 5.04.2012
 !
 ! ======================================================================
+#if defined(_OPENACC) && !defined(ENABLE_OPENACC)
+#error OpenACC is active in the compiler but FESOM was configured without ENABLE_OPENACC
+#endif
+#if defined(ENABLE_OPENACC) && !defined(_OPENACC)
+#error ENABLE_OPENACC needs an OpenACC compiler flag (NVHPC -acc, Cray -hacc)
+#endif
 module g_config
   use o_param
   implicit none

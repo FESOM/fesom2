@@ -1157,7 +1157,7 @@ submodule (icedrv_main) icedrv_step
           use mod_ice    
           use ice_EVP_module, only: EVPdynamics
           use ice_maEVP_module, only: EVPdynamics_a, EVPdynamics_m
-          use par_support_module, only: par_ex
+          use par_support_module, only: par_abort
           implicit none
     
           integer (kind=int_kind) :: &
@@ -1283,7 +1283,7 @@ submodule (icedrv_main) icedrv_step
                    call EVPdynamics_a(ice, p_partit, mesh)
                 case default
                    if (mype==0) write(*,*) 'A non existing EVP scheme specified!'
-                   call par_ex(p_partit%MPI_COMM_FESOM, p_partit%mype)
+                   call par_abort(p_partit%MPI_COMM_FESOM, p_partit%mype)
                    stop
              end select
 

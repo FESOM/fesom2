@@ -109,6 +109,7 @@ gamma2_tra    = 0.            ! additional biharmonic diffusion coefficient [dim
 
 ! --- Vertical Diffusion and Time Stepping ---
 i_vert_diff   = .true.        ! use implicit vertical diffusion (recommended for stability)
+ltra_diag     = .false.       ! per-tracer diagnostics in the advection (extra cost)
 /
 
 ! ============================================================================

@@ -85,7 +85,8 @@ subroutine cal_shortwave_rad(ice, partit, mesh)
      nzmin=(mesh%ulevels_nod2D(n2))
      sw_3d(nzmin, n2)=swsurf
      do k=nzmin+1, nzmax
-        aux=(v1*exp(mesh%zbar_3d_n(k,n2)/sc1)+v2*exp(mesh%zbar_3d_n(k,n2)/sc2))
+        aux=v1*exp((mesh%zbar_3d_n(k,n2)-mesh%zbar_3d_n(nzmin,n2))/sc1) &
+           +v2*exp((mesh%zbar_3d_n(k,n2)-mesh%zbar_3d_n(nzmin,n2))/sc2)
         sw_3d(k, n2)=swsurf*aux
         if (aux < 1.e-5_WP .OR. k==nzmax) then 
            sw_3d(k, n2)=0.0_WP

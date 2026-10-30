@@ -256,9 +256,6 @@ contains
   
   
   subroutine read_and_scatter_variables(this)
-#ifdef ENABLE_NVHPC_WORKAROUNDS
-    use nvfortran_subarray_workaround_module
-#endif
     use io_scatter_module
     class(fesom_file_type), target :: this
     ! EO parameters
@@ -329,17 +326,6 @@ contains
         end if
         t_end = MPI_Wtime()
         total_scatter_time = total_scatter_time + (t_end - t_start)
-#ifdef ENABLE_NVHPC_WORKAROUNDS
-  if(var%varname=='u') then
-    dynamics_workaround%uv(1,lvl,:) = laux
-  else if(var%varname=='v') then
-    dynamics_workaround%uv(2,lvl,:) = laux
-  else if(var%varname=='urhs_AB') then
-    dynamics_workaround%uv_rhsAB(1,lvl,:) = laux
-  else if(var%varname=='vrhs_AB') then
-    dynamics_workaround%uv_rhsAB(2,lvl,:) = laux
-  else
-#endif
        if (var%is_icepackvar2) then 
             ! the data from our pointer is not contiguous (if it is 3D data), so we can not pass the pointer directly to MPI
             ! PS Again icepack variable demension is [nod2, ncat] thats why we need 
@@ -349,9 +335,6 @@ contains
             ! the data from our pointer is not contiguous (if it is 3D data), so we can not pass the pointer directly to MPI
             var%external_local_data_ptr(lvl,:) = laux ! todo: remove this buffer and pass the data directly to MPI (change order of data layout to be levelwise or do not gather levelwise but by columns)
        end if 
-#ifdef ENABLE_NVHPC_WORKAROUNDS
-  end if
-#endif
       end do
       deallocate(laux)
     end do
@@ -616,9 +599,6 @@ contains
   !>
   !> Non-readers never touch netCDF here; they only take part in the exchange.
   subroutine redist_and_read_variables(this)
-#ifdef ENABLE_NVHPC_WORKAROUNDS
-    use nvfortran_subarray_workaround_module
-#endif
     class(fesom_file_type), target :: this
     integer :: i, lvl, nlvl, k, ierr, nloc, last_rec_idx, nlvl_min, nlvl_max
     integer :: nvar_min, nvar_max
@@ -718,17 +698,6 @@ contains
         stop 1
       end if
 
-#ifdef ENABLE_NVHPC_WORKAROUNDS
-      if(var%varname=='u') then
-        do k = 1, nloc; dynamics_workaround%uv(1,1:nlvl,k)       = out(1:nlvl,k); end do
-      else if(var%varname=='v') then
-        do k = 1, nloc; dynamics_workaround%uv(2,1:nlvl,k)       = out(1:nlvl,k); end do
-      else if(var%varname=='urhs_AB') then
-        do k = 1, nloc; dynamics_workaround%uv_rhsAB(1,1:nlvl,k) = out(1:nlvl,k); end do
-      else if(var%varname=='vrhs_AB') then
-        do k = 1, nloc; dynamics_workaround%uv_rhsAB(2,1:nlvl,k) = out(1:nlvl,k); end do
-      else
-#endif
       if(var%is_icepackvar2) then
         do k = 1, nloc
           var%external_local_data_ptr(k, 1:nlvl) = out(1:nlvl, k)
@@ -738,9 +707,6 @@ contains
           var%external_local_data_ptr(1:nlvl, k) = out(1:nlvl, k)
         end do
       end if
-#ifdef ENABLE_NVHPC_WORKAROUNDS
-      end if
-#endif
 
       deallocate(blk, out)
     end do
@@ -833,9 +799,6 @@ contains
 
 
   subroutine read_variables_raw(this, fileunit)
-#ifdef ENABLE_NVHPC_WORKAROUNDS
-    use nvfortran_subarray_workaround_module
-#endif
     class(fesom_file_type), target :: this
     integer, intent(in) :: fileunit
     ! EO parameters
@@ -845,29 +808,12 @@ contains
     
     do i=1, this%nvar_infos
       var => this%var_infos(i)
-#ifdef ENABLE_NVHPC_WORKAROUNDS
-      if(var%varname=='u') then
-        read(fileunit) dynamics_workaround%uv(1,:,:)
-      else if(var%varname=='v') then
-        read(fileunit) dynamics_workaround%uv(2,:,:)
-      else if(var%varname=='urhs_AB') then
-        read(fileunit) dynamics_workaround%uv_rhsAB(1,:,:)
-      else if(var%varname=='vrhs_AB') then
-        read(fileunit) dynamics_workaround%uv_rhsAB(2,:,:)
-      else
-#endif
       read(fileunit) var%external_local_data_ptr ! directly use external_local_data_ptr, use the local_data_copy only when called asynchronously
-#ifdef ENABLE_NVHPC_WORKAROUNDS
-      end if
-#endif
     end do
   end subroutine
 
 
   subroutine write_variables_raw(this, fileunit)
-#ifdef ENABLE_NVHPC_WORKAROUNDS
-    use nvfortran_subarray_workaround_module
-#endif
     class(fesom_file_type), target :: this
     integer, intent(in) :: fileunit
     ! EO parameters
@@ -876,21 +822,7 @@ contains
     
     do i=1, this%nvar_infos
       var => this%var_infos(i)
-#ifdef ENABLE_NVHPC_WORKAROUNDS
-      if(var%varname=='u') then
-        write(fileunit) dynamics_workaround%uv(1,:,:)
-      else if(var%varname=='v') then
-        write(fileunit) dynamics_workaround%uv(2,:,:)
-      else if(var%varname=='urhs_AB') then
-        write(fileunit) dynamics_workaround%uv_rhsAB(1,:,:)
-      else if(var%varname=='vrhs_AB') then
-        write(fileunit) dynamics_workaround%uv_rhsAB(2,:,:)
-      else
-#endif
       write(fileunit) var%external_local_data_ptr ! directly use external_local_data_ptr, use the local_data_copy only when called asynchronously
-#ifdef ENABLE_NVHPC_WORKAROUNDS
-      end if
-#endif
     end do
   end subroutine
 
@@ -916,9 +848,6 @@ contains
 
 
   subroutine async_gather_and_write_variables(this)
-#ifdef ENABLE_NVHPC_WORKAROUNDS
-use nvfortran_subarray_workaround_module
-#endif
     class(fesom_file_type), target :: this
     ! EO parameters
     integer i
@@ -930,25 +859,11 @@ use nvfortran_subarray_workaround_module
     do i=1, this%nvar_infos
       var => this%var_infos(i)
       if(.not. allocated(var%local_data_copy)) allocate( var%local_data_copy(size(var%external_local_data_ptr,dim=1), size(var%external_local_data_ptr,dim=2)) )
-#ifdef ENABLE_NVHPC_WORKAROUNDS
-      if(var%varname=='u') then
-        var%local_data_copy = dynamics_workaround%uv(1,:,:)
-      else if(var%varname=='v') then
-        var%local_data_copy = dynamics_workaround%uv(2,:,:)
-      else if(var%varname=='urhs_AB') then
-        var%local_data_copy = dynamics_workaround%uv_rhsAB(1,:,:)
-      else if(var%varname=='vrhs_AB') then
-        var%local_data_copy = dynamics_workaround%uv_rhsAB(2,:,:)
-      else
-#endif
         if (var%is_icepackvar2) then 
             var%local_data_copy = transpose(var%external_local_data_ptr)
         else
             var%local_data_copy = var%external_local_data_ptr
         end if   
-#ifdef ENABLE_NVHPC_WORKAROUNDS
-      end if
-#endif
     end do
     
     this%gather_and_write = .true.
@@ -1025,6 +940,9 @@ use nvfortran_subarray_workaround_module
     depth_diminfo = obtain_diminfo(this, size(local_data, dim=1))
 
     call specify_variable(this, name, [level_diminfo%idx, depth_diminfo%idx, this%time_dimidx], level_diminfo%len, local_data, .false., longname, units)
+#ifdef ENABLE_NVHPC_WORKAROUNDS
+    call repoint_nvhpc_subarray(this%var_infos(this%nvar_infos))
+#endif
   end subroutine
 
 
@@ -1060,9 +978,23 @@ use nvfortran_subarray_workaround_module
     depth_diminfo = obtain_diminfo(this, size(local_data, dim=1))
     
    call specify_variable(this, name, [level_diminfo%idx, depth_diminfo%idx, this%time_dimidx], level_diminfo%len, local_data, .true., longname, units)
+#ifdef ENABLE_NVHPC_WORKAROUNDS
+    call repoint_nvhpc_subarray(this%var_infos(this%nvar_infos))
+#endif
   end subroutine
   
   
+#ifdef ENABLE_NVHPC_WORKAROUNDS
+  ! local_data may be a temporary copy of a derived-type section (see
+  ! nvfortran_subarray_workaround_module): point the variable at the real section
+  subroutine repoint_nvhpc_subarray(var)
+    use nvfortran_subarray_workaround_module
+    type(var_info), intent(inout) :: var
+    var%external_local_data_ptr => nvhpc_restart_data(var%varname, var%external_local_data_ptr)
+  end subroutine
+
+
+#endif
   function obtain_diminfo(this, len) result(info)
     type(fesom_file_type), intent(inout) :: this
     type(dim_info) info

@@ -43,7 +43,7 @@ module io_xios_module
   public :: io_xios_send_2d_r4, io_xios_send_3d_r4
   public :: io_xios_send_0d_r8, io_xios_send_0d_r4
   public :: io_xios_is_on
-  public :: io_xios_field_is_active
+  public :: io_xios_field_is_active, io_xios_field_is_used
   public :: io_xios_set_ice_conc, io_xios_is_ice_field
   public :: io_xios_apply_ice_mask_2d_r4, io_xios_apply_ice_mask_2d_r8
   public :: io_xios_apply_ice_mask_2d_elem_r4, io_xios_apply_ice_mask_2d_elem_r8
@@ -128,6 +128,24 @@ contains
        return
     end if
     r = xios_field_is_active(trim(name), .TRUE.)
+  end function
+
+
+  !> True if any enabled file of the XML uses this field at all, whatever the
+  !> cadence: xios_field_is_active with at_current_timestep=.FALSE. (see the
+  !> note above). Used to define XIOS alias streams only when the XML wants
+  !> them, so an unused alias costs no accumulator and no per-step update.
+  logical function io_xios_field_is_used(name) result(r)
+    character(len=*), intent(in) :: name
+    if (.not. xios_on) then
+       r = .false.
+       return
+    end if
+    if (.not. xios_is_valid_field(trim(name))) then
+       r = .false.
+       return
+    end if
+    r = xios_field_is_active(trim(name), .FALSE.)
   end function
 
 
@@ -808,7 +826,7 @@ contains
   implicit none
   private
   public :: io_xios_is_on
-  public :: io_xios_field_is_active
+  public :: io_xios_field_is_active, io_xios_field_is_used
   public :: io_xios_send_2d_r8, io_xios_send_3d_r8
   public :: io_xios_send_2d_r4, io_xios_send_3d_r4
   public :: io_xios_send_0d_r8, io_xios_send_0d_r4
@@ -827,6 +845,11 @@ contains
   end function
 
   logical function io_xios_field_is_active(name) result(r)
+    character(len=*), intent(in) :: name
+    r = .false.
+  end function
+
+  logical function io_xios_field_is_used(name) result(r)
     character(len=*), intent(in) :: name
     r = .false.
   end function

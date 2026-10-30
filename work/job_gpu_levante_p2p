@@ -1,0 +1,44 @@
+#!/bin/bash
+# FESOM2 OpenACC on Levante GPU nodes: one MPI rank per A100, all GPUs of the node visible to every rank
+# (CUDA IPC between ranks); gpu_bind_levante.sh selects the GPU on the rank's NUMA node.
+# Usage: sbatch --ntasks=<1|4> [--exclusive] [--export=ALL,ACCPROF=1] job_gpu_levante_p2p
+#SBATCH --job-name=fesom_gpu
+#SBATCH --partition=gpu
+#SBATCH --account=bk1415
+#SBATCH --constraint=a100_80
+#SBATCH --nodes=1
+#SBATCH --gpus-per-node=4         # all 4 GPUs visible to every rank
+#SBATCH --cpus-per-task=16
+#SBATCH --mem-per-cpu=3800       # the gpu partition caps 3940 MB/cpu; more makes Slurm raise cpus/task and srun aborts
+#SBATCH --time=00:40:00
+#SBATCH --output=%x-%j.out
+
+set -e
+source /sw/etc/profile.levante
+source ../env/levante.dkrz.de/shell.nvhpc
+export OMP_NUM_THREADS=1
+
+# UCX transports for the GPU nodes (CUDA IPC / GPUDirect between ranks)
+export UCX_TLS=cma,rc,mm,cuda_ipc,cuda_copy,gdr_copy
+export UCX_RNDV_SCHEME=put_zcopy
+export UCX_RNDV_THRESH=16384
+export UCX_MEMTYPE_CACHE=n
+
+# Open MPI/UCX of the nvhpc-25.3 stack have cuda/12.8/compat (libcuda 570.124) in their RPATH; the GPU nodes
+# run a newer driver, so that compat libcuda fails cuInit with 803 CUDA_ERROR_SYSTEM_DRIVER_MISMATCH.
+# Preload the node's own driver library so the compat copy is never used.
+SYS_LIBCUDA=$(/sbin/ldconfig -p | awk '/libcuda.so.1 .*x86-64/{print $NF; exit}')
+echo "system libcuda: $SYS_LIBCUDA"
+export LD_PRELOAD=$SYS_LIBCUDA
+[ "${ACCPROF:-0}" = 1 ] && export NVCOMPILER_ACC_TIME=1   # per-region device times (adds syncs; not for timing runs)
+
+ln -sf ../bin/fesom.x .
+ln -sf ../work/gpu_bind_levante.sh .
+for f in config forcing oce ice icepack tra io cvmix dyn; do cp -n ../config/namelist.$f .; done
+
+nvidia-smi --query-gpu=index,name,memory.total,driver_version --format=csv
+srun -l --cpu-bind=verbose,cores bash -c 'echo "rank $SLURM_PROCID on $(hostname) CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"'
+date
+srun --cpu-bind=cores ./gpu_bind_levante.sh ./fesom.x > fesom2.out 2>&1
+echo "srun exit: $?"
+date
