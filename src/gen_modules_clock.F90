@@ -74,7 +74,7 @@ contains
   subroutine clock_init(partit)
     USE MOD_PARTIT
     use g_config
-    use mod_transit, only: ti_transit, ti_start_transit
+    use mod_transit, only: ti_transit, ti_start_transit, anthro_transit, length_transit
     implicit none
     type(t_partit), intent(in), target    :: partit
     integer                               :: i, daystart
@@ -119,6 +119,15 @@ contains
 !   For simulations with transient tracer input data: the index into the input
 !   file counts from the start of the experiment, not from the start of this leg
     if (use_transit) ti_transit = yearnew - yearinit + ti_start_transit
+!   The index depends on yearnew of &clockinit: stop if it lies outside the input table
+    if (use_transit .and. anthro_transit) then
+      if (ti_transit < 1 .or. ti_transit > length_transit) then
+        write (unit=error_unit, fmt='(A,I0,A,I0,A)') &
+          '### error: ti_transit = ', ti_transit, ' is outside the input table (1..', length_transit, &
+          '), check yearnew in &clockinit and ti_start_transit'
+        call MPI_Abort(MPI_COMM_WORLD, 1, ierr)
+      end if
+    end if
 
 
     ! year as character string 
