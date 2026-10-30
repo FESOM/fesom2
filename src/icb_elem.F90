@@ -415,23 +415,28 @@ left_mype=0.0
 !for each node of the old iceberg element...
 do m=1, 3
  n2=mesh%elem2D_nodes(m,old_iceberg_elem)
- 
- if(n2 > partit%myDim_nod2D) cycle !n2 is not my node, so i cannot access all elements around it
- 
+
  !...and for each element containing this node (so we get all neighbour elements)...
+ ! nod_in_elem2D is complete for halo nodes too (it holds the eDim and eXDim
+ ! elements), so an iceberg crossing into a neighbour's element is found here
  !do idx_elem_containing_n2 = 1,  nod_in_elem2D(n2)%nmb
  do idx_elem_containing_n2 = 1,  mesh%nod_in_elem2D_num(n2)
- 
+
   !elem_containing_n2 = nod_in_elem2D(n2)%addresses(idx_elem_containing_n2)
-  elem_containing_n2 = mesh%nod_in_elem2D(idx_elem_containing_n2,n2) 
-    
+  elem_containing_n2 = mesh%nod_in_elem2D(idx_elem_containing_n2,n2)
+  if (elem_containing_n2 <= 0) cycle
+
   call locbafu_2D(mesh, partit, werte2D, elem_containing_n2, pt)
-   
+
   if (ALL(werte2D <= 1.+ 1.0e-07) .AND. ALL(werte2D >= 0.0- 1.0e-07) ) then
    old_iceberg_elem=elem_containing_n2
-   if (use_cavity) then 
+   if (use_cavity) then
       !if( reject_elem(mesh, partit, old_iceberg_elem) ) then
-      reject_tmp = all( (mesh%cavity_depth(mesh%elem2D_nodes(:,elem_containing_n2))/=0.0) .OR. (mesh%bc_index_nod2D(mesh%elem2D_nodes(:,elem_containing_n2))==0.0) )
+      if (elem_containing_n2 <= partit%myDim_elem2D) then
+         reject_tmp = all( (mesh%cavity_depth(mesh%elem2D_nodes(:,elem_containing_n2))/=0.0) .OR. (mesh%bc_index_nod2D(mesh%elem2D_nodes(:,elem_containing_n2))==0.0) )
+      else
+         reject_tmp = halo_elem_reject(elem_containing_n2)
+      end if
       if(reject_tmp) then
          left_mype=1.0
          !write(*,*) 'iceberg found in shelf region: left_mype = 1'
@@ -534,11 +539,16 @@ type(t_partit), intent(inout), target :: partit
  
   x(1)=coords(1)*rad
   x(2)=coords(2)*rad
-  do i=1,3
-     node=mesh%elem2D_nodes(i,elem)
-     local_nodes(i)=node
-     local_coords(:,i)=mesh%coord_nod2D(:,node)
-  end do
+  if (elem <= partit%myDim_elem2D) then
+     do i=1,3
+        node=mesh%elem2D_nodes(i,elem)
+        local_nodes(i)=node
+        local_coords(:,i)=mesh%coord_nod2D(:,node)
+     end do
+  else
+     ! halo element: its nodes are not all local
+     local_coords=halo_elem_xy(:,:,elem)
+  end if
 
   DO i=1, 2
      if (local_coords(1,i+1)-local_coords(1,1) > 180.*rad) then 
