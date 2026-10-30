@@ -6,6 +6,7 @@ USE MOD_READ_BINARY_ARRAYS
 USE,     intrinsic    :: ISO_FORTRAN_ENV, only : int32, real64
 IMPLICIT NONE
 SAVE
+private :: write_h_array, read_h_array
 integer, parameter    :: MAX_ADJACENT=32 ! Max allowed number of adjacent nodes
 
 TYPE SPARSE_MATRIX
@@ -136,8 +137,13 @@ integer, allocatable, dimension(:,:)          :: nn_pos
 ! Arrays added for ALE implementation:
 ! --> layer thinkness at node and depthlayer for t=n and t=n+1
 !------------------------------
-real(kind=WP), allocatable,dimension(:,:)   :: hnode
-real(kind=WP), allocatable,dimension(:,:)   :: hnode_new
+! Stored in WP_full (real64 also in a single-precision build): the thickness is
+! computed in full precision, and re-rounding it to real32 at every step is what
+! breaks the volume budget (one ulp of a 100 m layer is 8e-6 m). Readers need no
+! change, since mixed-kind arithmetic promotes; only WP-typed call arguments do.
+real(kind=WP_full), allocatable,dimension(:,:) :: hnode
+real(kind=WP_full), allocatable,dimension(:,:) :: hnode_new
+real(kind=WP), allocatable,dimension(:,:)   :: hnode_wp, hnode_new_wp   ! WP copies for output and restart (single-precision build)
 real(kind=WP), allocatable,dimension(:,:)   :: zbar_3d_n
 real(kind=WP), allocatable,dimension(:,:)   :: Z_3d_n
 ! LA 2023-01-31 add icebergs
@@ -271,8 +277,8 @@ subroutine write_t_mesh(mesh, unit, iostat, iomsg)
     write(unit, iostat=iostat, iomsg=iomsg) mesh%nn_size
     call write_bin_array(mesh%nn_num,                  unit, iostat, iomsg)
     call write_bin_array(mesh%nn_pos,                  unit, iostat, iomsg)
-    call write_bin_array(mesh%hnode,                   unit, iostat, iomsg)
-    call write_bin_array(mesh%hnode_new,               unit, iostat, iomsg)
+    call write_h_array(mesh%hnode,                     unit, iostat, iomsg)
+    call write_h_array(mesh%hnode_new,                 unit, iostat, iomsg)
     call write_bin_array(mesh%zbar_3d_n,               unit, iostat, iomsg)
     call write_bin_array(mesh%Z_3d_n,                  unit, iostat, iomsg)
     call write_bin_array(mesh%Z_3d_n_ib,               unit, iostat, iomsg)
@@ -371,8 +377,8 @@ subroutine read_t_mesh(mesh, unit, iostat, iomsg)
     read(unit, iostat=iostat, iomsg=iomsg) mesh%nn_size
     call read_bin_array(mesh%nn_num,                  unit, iostat, iomsg)
     call read_bin_array(mesh%nn_pos,                  unit, iostat, iomsg)
-    call read_bin_array(mesh%hnode,                   unit, iostat, iomsg)
-    call read_bin_array(mesh%hnode_new,               unit, iostat, iomsg)
+    call read_h_array(mesh%hnode,                     unit, iostat, iomsg)
+    call read_h_array(mesh%hnode_new,                 unit, iostat, iomsg)
     call read_bin_array(mesh%zbar_3d_n,               unit, iostat, iomsg)
     call read_bin_array(mesh%Z_3d_n,                  unit, iostat, iomsg)
     call read_bin_array(mesh%Z_3d_n_ib,               unit, iostat, iomsg)
@@ -393,5 +399,26 @@ subroutine read_t_mesh(mesh, unit, iostat, iomsg)
     call read_bin_array(mesh%coriolis_node,           unit, iostat, iomsg)
 
 end subroutine read_t_mesh
+
+! WP_full arrays go through the WP binary format
+subroutine write_h_array(arr, unit, iostat, iomsg)
+    real(kind=WP_full), intent(in), allocatable :: arr(:,:)
+    integer,         intent(in)              :: unit
+    integer,         intent(out)             :: iostat
+    character(*),    intent(inout)           :: iomsg
+    real(kind=WP),   allocatable             :: tmp(:,:)
+    if (allocated(arr)) tmp = real(arr, WP)
+    call write_bin_array(tmp, unit, iostat, iomsg)
+end subroutine write_h_array
+
+subroutine read_h_array(arr, unit, iostat, iomsg)
+    real(kind=WP_full), intent(inout), allocatable :: arr(:,:)
+    integer,         intent(in)                 :: unit
+    integer,         intent(out)                :: iostat
+    character(*),    intent(inout)              :: iomsg
+    real(kind=WP),   allocatable                :: tmp(:,:)
+    call read_bin_array(tmp, unit, iostat, iomsg)
+    if (allocated(tmp)) arr = real(tmp, WP_full)
+end subroutine read_h_array
 end module MOD_MESH
 !==========================================================

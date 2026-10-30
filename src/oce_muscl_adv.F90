@@ -305,8 +305,13 @@ type(t_partit),      intent(inout), target :: partit
 type(t_tracer_work), intent(inout), target :: twork
 	!___________________________________________________________________________
 	! loop over edge segments
+#ifndef ENABLE_OPENACC
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, n, nz, elem, k, ednodes, nzmin, nzmax, tvol, tx, ty)
 !$OMP DO
+#else
+	! OpenACC: tr_xy and edge_up_dn_grad live on the device (init_tracers_AB, advection)
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(n, nz, elem, k, ednodes, nzmin, nzmax, tvol, tx, ty)
+#endif
 	DO edge=1, partit%myDim_edge2D
 		ednodes=mesh%edges(:,edge)
 		!_______________________________________________________________________
@@ -452,8 +457,12 @@ type(t_tracer_work), intent(inout), target :: twork
 			END DO
 		end if  
 	END DO
+#ifndef ENABLE_OPENACC
 !$OMP END DO
 !$OMP END PARALLEL
+#else
+!$ACC END PARALLEL LOOP
+#endif
 END SUBROUTINE fill_up_dn_grad
 
 end module oce_muscl_adv_module

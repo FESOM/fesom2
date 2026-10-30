@@ -23,7 +23,7 @@ module diagnostics
             ldiag_forc, ldiag_salt3D, ldiag_curl_vel3, diag_list, ldiag_extflds, ldiag_ice,      &
             compute_diagnostics, rhs_diag, curl_stress_surf, curl_vel3, shear, Ri, KvdTdZ, KvdSdZ,                & 
             std_dens_min, std_dens_max, std_dens_N, std_dens, ldiag_trflx, ldiag_destine,                                       &
-            std_dens_DIV, std_dens_DIV_fer, std_dens_flux,                                                        &
+            std_dens_DIV, std_dens_DIV_fer, std_dens_flux, std_dens_H,                                            &
             dens_flux_e, zisotherm, tempzavg, saltzavg, heatcontent, vol_ice, vol_snow, compute_ice_diag, thetao,   &
             tuv, suv,                                                                                             &
             ldiag_DVD, compute_dvd, dvd_KK_tot, dvd_SD_tot, dvd_SD_chi_adv_h, dvd_SD_chi_adv_v, dvd_SD_chi_dif_he,&
@@ -69,6 +69,9 @@ module diagnostics
   real(kind=WP),  save, target                   :: std_dd(std_dens_N-1)
   real(kind=WP),  save, target                   :: std_dens_min=1030., std_dens_max=1040.
   real(kind=WP),  save, allocatable, target      :: std_dens_flux(:,:,:), std_dens_DIV(:,:), std_dens_DIV_fer(:,:)
+  ! mean layer thickness of the density classes on elements, used to remap the
+  ! dMOC back into z-coordinates (e.g. tripyview do_useZinfo='std_dens_H')
+  real(kind=WP),  save, allocatable, target      :: std_dens_H(:,:)
   real(kind=WP),  save, allocatable, target      :: dens_flux_e(:)
   real(kind=WP),  save, allocatable, target      :: thetao(:) ! sst in K
   real(kind=WP),  save, allocatable, target      :: tuv(:,:,:), suv(:,:,:)
@@ -524,6 +527,63 @@ integer function find_density_upper_bound(rho_target, std_dens_arr, n) result(id
   end do
 end function find_density_upper_bound
 
+! Bracket index of a density d in the (strictly increasing) std_dens array:
+!
+!     k = number of classes with std_dens(k) <= d     (0 <= k <= n)
+!
+!          std_dens(1)   ...  std_dens(k)  <= d <  std_dens(k+1)  ...  std_dens(n)
+!     k=0: d below the table,  k=n: d at/above the top of the table
+!
+! From k the two bounds above follow without a further search:
+!     find_density_lower_bound(d) = min(k+1, n)
+!     find_density_upper_bound(d) = max(k, 1)    if k==0 or std_dens(k) <  d
+!                                 = max(k-1, 1)  if            std_dens(k) == d
+! dens_bracket_bsearch locates k by bisection, dens_bracket_walk steps k from a
+! nearby start value (e.g. the bracket of the neighbouring interface in the same
+! column), which needs only ~1-2 comparisons when neighbouring densities fall
+! into the same or adjacent classes. It walks in either direction, so it is also
+! correct for non-monotonic (unstable) columns.
+integer function dens_bracket_bsearch(rho_target, std_dens_arr, n) result(k)
+  implicit none
+  real(kind=WP), intent(in) :: rho_target
+  real(kind=WP), intent(in) :: std_dens_arr(:)
+  integer,       intent(in) :: n
+  integer                   :: left, right, mid
+
+  left  = 1
+  right = n
+  k     = 0
+  do while (left <= right)
+     mid = (left + right)/2
+     if (std_dens_arr(mid) <= rho_target) then
+        k    = mid
+        left = mid + 1
+     else
+        right = mid - 1
+     end if
+  end do
+end function dens_bracket_bsearch
+
+integer function dens_bracket_walk(rho_target, k_start, std_dens_arr, n) result(k)
+  implicit none
+  real(kind=WP), intent(in) :: rho_target
+  integer,       intent(in) :: k_start
+  real(kind=WP), intent(in) :: std_dens_arr(:)
+  integer,       intent(in) :: n
+
+  k = k_start
+  ! step up while the next class is still <= target
+  do while (k < n)
+     if (std_dens_arr(k+1) > rho_target) exit
+     k = k + 1
+  end do
+  ! step down while the current class is above the target
+  do while (k > 0)
+     if (std_dens_arr(k) <= rho_target) exit
+     k = k - 1
+  end do
+end function dens_bracket_walk
+
 ! ==============================================================
 subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
   implicit none
@@ -538,7 +598,8 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
   real(kind=WP)                           :: div, deltaX, deltaY
   integer                                 :: jj
   real(kind=WP), save                     :: dd
-  real(kind=WP)                           :: weight, dmin, dmax, ddiff
+  real(kind=WP)                           :: weight, dmin, dmax, ddiff, hlay
+  integer                                 :: kt, kb, kmin, kmax, nlow
   real(kind=WP), save, allocatable        :: dens(:), aux(:)
   logical, save                           :: firstcall_s=.true., firstcall_e=.true.
   real(kind=WP), dimension(:,:), pointer  :: temp, salt
@@ -552,6 +613,7 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
      allocate(std_dens_DIV (  std_dens_N, partit%myDim_nod2D+partit%eDim_nod2D))
      if (Fer_GM) allocate(std_dens_DIV_fer(  std_dens_N, partit%myDim_nod2D+partit%eDim_nod2D))
      allocate(std_dens_flux(3,std_dens_N, partit%myDim_elem2D))
+     allocate(std_dens_H   (  std_dens_N, partit%myDim_elem2D))
      allocate(dens_flux_e(mesh%elem2D))
      allocate(aux  (mesh%nl-1))
      allocate(dens (mesh%nl))
@@ -560,11 +622,13 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
      std_dens_DIV =0. !meridional divergence within a density bin (for reconstruction of the diapycnal velocity) !TOP PRIORITY
      if (Fer_GM) std_dens_DIV_fer =0. !meridional divergence of bolus velocity within a density bin (for reconstruction of the diapycnal velocity) !TOP PRIORITY
      std_dens_flux=0. !bouyancy flux for computation of surface bouyancy transformations
+     std_dens_H   =0. !vertical layer thickness of the density class (for conversion dMOC <-> zMOC)
      firstcall_s=.false.
      if (mode==0) return
   end if
 
   std_dens_flux=0.
+  std_dens_H   =0.
   dens_flux_e  =0.
   std_dens_DIV =0.
   if (Fer_GM) std_dens_DIV_fer =0. !meridional divergence of bolus velocity within a density bin (for reconstruction of the diapycnal velocity) !TOP PRIORITY
@@ -611,6 +675,64 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
         dd = dd + (beta_srf(jj) * water_flux(elnodes(jj)) * salt(mesh%ulevels_nod2D(elnodes(jj)),  elnodes(jj)))
      end do
      std_dens_flux(3, is,elem)=std_dens_flux(3, is,elem)+mesh%elem_area(elem)*dd/3.
+
+     !__________________________________________________________________________
+     ! mean layer thickness of the density classes: bin the layer thickness helem
+     ! onto the std_dens classes with the same linear-in-density weights as
+     ! std_dens_DIV (the weights of one layer sum to 1, so the sum of std_dens_H
+     ! over all classes is the local water column thickness).
+     !
+     !     interface nz   : dens(nz)   --> bracket kt (walked from kb)
+     !     layer     nz   : helem(nz,elem) between dens(nz) and dens(nz+1)
+     !     interface nz+1 : dens(nz+1) --> bracket kb (from the layer below)
+     !
+     ! Each interface is located once and reused by both adjacent layers; the
+     ! resulting is/ie are identical to find_density_lower/upper_bound.
+     kb = dens_bracket_bsearch(dens(nzmax), std_dens, std_dens_N)
+     do nz=nzmax-1,nzmin,-1
+        kt   = dens_bracket_walk(dens(nz), kb, std_dens, std_dens_N)
+        hlay = mesh%helem(nz,elem)
+        if (dens(nz) < dens(nz+1)) then
+           dmin  = dens(nz)
+           dmax  = dens(nz+1)
+           ddiff = dens(nz+1) - dens(nz)
+           kmin  = kt
+           kmax  = kb
+        else
+           dmin  = dens(nz+1)
+           dmax  = dens(nz)
+           ddiff = dens(nz)   - dens(nz+1)
+           kmin  = kb
+           kmax  = kt
+        end if
+
+        ! is = first class above dmin, ie = last class below dmax (see
+        ! dens_bracket_bsearch for the bracket --> bound relation)
+        is   = min(kmin+1, std_dens_N)
+        nlow = kmax
+        if (kmax > 0) then
+           if (std_dens(kmax) == dmax) nlow = kmax-1
+        end if
+        ie   = max(nlow, 1)
+
+        if (std_dens(is)>=dmax) is=ie
+        if (std_dens(ie)<=dmin) ie=is
+        if (ie-is > 0) then
+           weight=(std_dens(is)-dmin)+std_dd(is)/2.
+           weight=max(weight, 0.)/ddiff
+           std_dens_H(is, elem)=std_dens_H(is, elem)+weight*hlay
+           do snz=is+1, ie-1
+              weight=(std_dd(snz-1) + std_dd(snz))/(2.0_WP*ddiff)
+              std_dens_H(snz, elem)=std_dens_H(snz, elem)+weight*hlay
+           end do
+           weight=(dmax-std_dens(ie))+std_dd(ie-1)/2.
+           weight=max(weight, 0.)/ddiff
+           std_dens_H(ie, elem)=std_dens_H(ie, elem)+weight*hlay
+        else
+           std_dens_H(is, elem)=std_dens_H(is, elem)+hlay
+        end if
+        kb = kt
+     end do
   end do
 
     !___________________________________________________________________________
@@ -834,7 +956,7 @@ subroutine compute_destinE(mode, dynamics, tracers, partit, mesh)
        zint=0.0_WP
        do nz=nzmin, nzmax-1
           ! zint is the top of layer nz; take the part of the layer above each target depth
-          heatcontent(n,:)=heatcontent(n,:)+temp(nz,n)*max(min(mesh%hnode(nz,n), whichdepth-zint), 0.0_WP)
+          heatcontent(n,:)=heatcontent(n,:)+temp(nz,n)*max(min(real(mesh%hnode(nz,n), WP), whichdepth-zint), 0.0_WP)
           zint=zint+mesh%hnode(nz, n)
        end do
        heatcontent(n,:)=1025.*3990.*heatcontent(n,:) 
@@ -1124,6 +1246,7 @@ subroutine compute_dvd(mode, dynamics, tracers, partit, mesh)
     type(t_mesh)  , intent(in)   ,  target    :: mesh
     integer                                   :: tr_num, node, elem
     real(kind=WP),  dimension(:,:)  , pointer :: trflx_h, trflx_v, tr, trold, Wvel, dump, fer_Wvel
+    real(kind=WP),  allocatable, target, save :: dump_ws(:,:)
     real(kind=WP),  dimension(:,:,:), pointer :: UV, fer_UV
     ! residual (resolved + bolus) velocities, so that the model velocities stay untouched
     real(kind=WP),  dimension(:,:,:), allocatable, target :: UV_res
@@ -1221,9 +1344,11 @@ subroutine compute_dvd(mode, dynamics, tracers, partit, mesh)
         ! upper lower cell prism face and for tracer^n and tracer^(n+1)
         trflx_h   => tracers%work%dvd_trflx_hor( :,:,tr_num) ! horizontal advectiv tracer flux through mid edge face using AB tracer
         trflx_v   => tracers%work%dvd_trflx_ver( :,:,tr_num) ! vertical advectiv tracer flux 
+        !$ACC UPDATE HOST(tracers%data(tr_num)%valuesold) ! AB history is kept on the device
         trold     => tracers%data(tr_num)%valuesold(1, :, :) ! tracer^n
         tr        => tracers%data(tr_num)%values(:,:)        ! tracer^(n+1)
-        dump      => tracers%work%del_ttf
+        if (.not. allocated(dump_ws)) allocate(dump_ws(size(tracers%work%del_ttf,1), size(tracers%work%del_ttf,2)))
+        dump      => dump_ws
         
         !_______________________________________________________________________
         ! need to recompute tracer gradients 
@@ -1695,9 +1820,16 @@ subroutine dvd_add_advflux_ver(do_SDdvd, tr_num, dvd_tot, trflx_v, Wvel, trstar,
             ! surface and bulk dvd, bulk xchi 
             do nz=nu1+1,nl1-1
                 
-                ! compute trstar on zlev interface
-                !PStrstar_zlev = 0.5_WP*(trstar(nz-1, node)+trstar(nz, node))
-                trstar_zlev = (trstar(nz-1, node)*mesh%hnode(nz-1, node)+trstar(nz, node)*mesh%hnode(nz, node))/(mesh%hnode(nz-1,node)+mesh%hnode(nz,node))
+                ! trstar on zlev interface: must be the SIMPLE mean, also on an
+                ! uneven vertical grid. It is not an interpolation of Tstar to the
+                ! interface but follows from the variance budget of the two cells
+                ! sharing the face (continuity term T^2*dV/dt):
+                !   Tstar_(k-1)^2 - Tstar_k^2 = (Tstar_(k-1)+Tstar_k)*(Tstar_(k-1)-Tstar_k)
+                ! --> Xchi = 2*U*(T^tilde - 0.5*(Tstar_(k-1)+Tstar_k))*(Tstar_(k-1)-Tstar_k)
+                ! (Banerjee et al. 2024). Grid spacing enters only via T^tilde.
+                ! A layer-thickness-weighted mean adds a spurious, non-dissipative
+                ! term ~ W*(Tstar_(k-1)-Tstar_k)^2*(h_(k-1)-h_k)/(h_(k-1)+h_k)
+                trstar_zlev = 0.5_WP*(trstar(nz-1, node)+trstar(nz, node))
                 
                 ! --> here we are on full depth levels eq. 26 for small dt
                 xchi(nz) = 2.0_WP*(-trflx_v(nz, node))*(trstar(nz-1, node)-trstar(nz, node))
@@ -2765,8 +2897,20 @@ subroutine dvd_add_difflux_vertimplredi(do_SDdvd, tr_num, dvd_tot, tr, trstar, K
             ! take into account isoneutral Redi diffusivity Kd*s^2 --> K_33 = Kv + Kd*s^2
             dzup     = mesh%hnode(nz-1, node)*0.5_WP
             dzdwn    = mesh%hnode(nz  , node)*0.5_WP
-            Kv_R     = dzup /(dzup + dzdwn) * slope(3, nz-1, node)**2 * Ki(nz-1,node) + &
-                       dzdwn/(dzup + dzdwn) * slope(3, nz  , node)**2 * Ki(nz  ,node)
+            ! Kd*s^2 linearly interpolated to the interface with the SAME weights as the
+            ! model in diff_ver_part_impl_ale (oce_ale_tracer.F90, since PR #944): the
+            ! upper value is weighted with the distance to the lower node and vice versa
+            !
+            !          o K(nz-1) -----+
+            !                         | dzup
+            !   ---- zbar(nz) --------+--- Kv_R = (dzdwn*K(nz-1) + dzup*K(nz))/(dzup+dzdwn)
+            !                         | dzdwn
+            !          o K(nz) -------+
+            !
+            ! The DVD must use exactly the diffusivity the model applied: K14 is a budget
+            ! residual, so any mismatch enters it amplified by ~2*T (worst for salinity).
+            Kv_R     = dzdwn/(dzup + dzdwn) * slope(3, nz-1, node)**2 * Ki(nz-1,node) + &
+                       dzup /(dzup + dzdwn) * slope(3, nz  , node)**2 * Ki(nz  ,node)
             
             ! fdiff = Kv*dT/dz = Kv (T(nz-1) - T(nz))/ ((hnode(nz-1)+hnode(nz))/2)
             ! --> Dflx is until here the diffusive volume flux on full depth levels

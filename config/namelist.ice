@@ -66,6 +66,8 @@ h_cutoff       = 3.0            ! cutoff of the thickness pdf for new_iclasses, 
 ! --- Lead Closing Parameters ---
 h0             = 0.5            ! lead closing parameter for Northern Hemisphere [m]
 h0_s           = 0.5            ! lead closing parameter for Southern Hemisphere [m]
+                                ! coupled (ice_thermo_cpl.F90): the lower bound of a thickness-dependent
+                                ! lead closing parameter, max(h0, min(1.5 m, old ice thickness))
 
 ! --- Minimum Thresholds ---
 hmin           = 0.01           ! minimum ice thickness [m]

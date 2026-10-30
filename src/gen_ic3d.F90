@@ -14,7 +14,7 @@ MODULE g_ic3d
    USE o_ARRAYS
    USE MOD_MESH
    USE MOD_PARTIT
-   use par_support_module, only: par_ex
+   use par_support_module, only: par_abort
    USE MOD_TRACER
    USE o_PARAM, only: mstep, pi
    USE g_comm_auto
@@ -574,7 +574,7 @@ CONTAINS
          elseif (current_tracer==tracers%num_tracers) then
             if (partit%mype==0) write(*,*) "idlist contains tracer which is not listed in tracer_id!"
             if (partit%mype==0) write(*,*) "check your namelists!"
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
             stop
          end if
       END DO
@@ -925,7 +925,7 @@ CONTAINS
       integer, intent(in)                    :: iost
       if (iost .ne. NF_NOERR) then
          write(*,*) 'ERROR: I/O status= "',trim(nf_strerror(iost)),'";',iost,' file= ', trim(fname)
-         call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+         call par_abort(partit%MPI_COMM_FESOM, partit%mype)
          stop
       endif
    end subroutine check_nferr

@@ -1,7 +1,7 @@
 module oce_setup_step_module
     USE MOD_MESH
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     USE MOD_TRACER
     USE MOD_DYN
     USE o_PARAM
@@ -135,8 +135,9 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
 #endif        
         case ('TOY'                   ) ; mix_scheme_nmb = 9
         case default 
-            stop "!not existing mixing scheme!"
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+            if (partit%mype==0) write(*,*) "!not existing mixing scheme!"
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
+            stop
     end select
 
     ! initialise fesom1.4 like KPP
@@ -257,7 +258,7 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
                 'SPP, cavities, icebergs, age tracer, transient tracers, ', &
                 'KPP nonlocal fluxes, 3D climatology relaxation, ', &
                 'salinity diagnostics (extflds/trflx/salt3D/DVD/cmor)'
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
         end if
     end if
     if (.not.r_restart) then
@@ -316,11 +317,11 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
     !___________________________________________________________________________
     ! define tracer namelist parameter
     integer        :: num_tracers
-    logical        :: i_vert_diff, smooth_bh_tra , ltra_diag
+    logical        :: i_vert_diff, smooth_bh_tra
+    logical        :: ltra_diag = .false. ! not set in the shipped namelist.tra; was read uninitialised
     real(kind=WP)  :: gamma0_tra, gamma1_tra, gamma2_tra
     integer        :: AB_order = 2
     namelist /tracer_listsize/ num_tracers
-    namelist /tracer_list    / nml_tracer_list
     namelist /tracer_general / smooth_bh_tra, gamma0_tra, gamma1_tra, gamma2_tra, i_vert_diff, AB_order, ltra_diag
     !___________________________________________________________________________
     ! pointer on necessary derived types
@@ -332,13 +333,15 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
         if (partit%mype==0) WRITE(*,*) '     file   : ', 'namelist.tra',' open ok'
         else
         if (partit%mype==0) WRITE(*,*) 'ERROR: --> bad opening file   : ', 'namelist.tra',' ; iostat=',iost
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
         stop
     end if
 
     READ(nm_unit, nml=tracer_listsize, iostat=iost)
+    if (iost /= 0) call check_namelist_read(nm_unit, 'tracer_listsize', 'namelist.tra', partit)
     allocate(nml_tracer_list(num_tracers))
-    READ(nm_unit, nml=tracer_list,     iostat=iost)
+    call read_tracer_list(nm_unit, num_tracers, nml_tracer_list, iost)
+    if (iost /= 0) call check_namelist_read(nm_unit, 'tracer_list', 'namelist.tra', partit)
     read(nm_unit, nml=tracer_init3d,   iostat=iost)
     READ(nm_unit, nml=tracer_general,  iostat=iost)
     close(nm_unit)
@@ -473,9 +476,13 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
     end do
     allocate(tracers%work%del_ttf(mesh%nl-1,node_size))
     allocate(tracers%work%del_ttf_advhoriz(mesh%nl-1,node_size),tracers%work%del_ttf_advvert(mesh%nl-1,node_size))
-    tracers%work%del_ttf          = 0.0_WP
-    tracers%work%del_ttf_advhoriz = 0.0_WP
-    tracers%work%del_ttf_advvert  = 0.0_WP
+    tracers%work%del_ttf          = 0.0_WP_full
+    tracers%work%del_ttf_advhoriz = 0.0_WP_full
+    tracers%work%del_ttf_advvert  = 0.0_WP_full
+    if (use_tracer_carry) then
+        allocate(tracers%work%carry(mesh%nl-1,node_size,tracers%num_tracers))
+        tracers%work%carry = 0.0_WP
+    end if
     if (ldiag_DVD) then
         allocate(tracers%work%dvd_trflx_hor(mesh%nl-1, partit%myDim_edge2D, 2))
         allocate(tracers%work%dvd_trflx_ver(mesh%nl  , partit%myDim_nod2D , 2))
@@ -497,6 +504,20 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
 
     end if
 END SUBROUTINE tracer_init
+!
+!
+!_______________________________________________________________________________
+! nvfortran reads only the first record of a namelist array of derived type when the array is
+! allocatable: read the tracer list through an automatic array of the same name
+subroutine read_tracer_list(nm_unit, num_tracers, list, iost)
+    integer,                    intent(in)  :: nm_unit, num_tracers
+    type(nml_tracer_list_type), intent(out) :: list(num_tracers)
+    integer,                    intent(out) :: iost
+    type(nml_tracer_list_type)              :: nml_tracer_list(num_tracers)
+    namelist /tracer_list/ nml_tracer_list
+    read(nm_unit, nml=tracer_list, iostat=iost)
+    list = nml_tracer_list
+end subroutine read_tracer_list
 !
 !
 !_______________________________________________________________________________
@@ -568,7 +589,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
         if (partit%mype==0) write(*,*) '     file   : ', 'namelist.dyn',' open ok'
     else
         if (partit%mype==0) write(*,*) 'ERROR: --> bad opening file   : ', 'namelist.dyn',' ; iostat=',iost
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
         stop
     end if
     ! parameters without an initial value here take the default of the derived
@@ -632,7 +653,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
             ! let rank 0 finish writing before any rank aborts
             flush(6)
             call MPI_Barrier(partit%MPI_COMM_FESOM, partit%MPIerr)
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
         end if
         if (trim(which_ALE)=='zlevel') then
             ! only the zstar thickness update is implemented, with zlevel the layer
@@ -641,7 +662,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
             ! let rank 0 finish writing before any rank aborts
             flush(6)
             call MPI_Barrier(partit%MPI_COMM_FESOM, partit%MPIerr)
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
         end if
         dynamics%se_BTsteps      = se_BTsteps
         dynamics%se_BTtheta      = se_BTtheta
@@ -1254,7 +1275,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
         end do
         if (alk_check /= 0) then
             if (partit%mype==0) write(*,*) 'not a single tracer ID = 1003 = alkalinity. this should not happen'
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
             stop
         end if
     endif ! restore_alkalinity
@@ -1601,7 +1622,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 if (partit%mype==0) write(*,*) 'invalid ID '//trim(id_string)//' specified for '//trim(i_string)//' th tracer!!!'
                 if (partit%mype==0) write(*,*) 'the model will stop!'
             end if
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
             stop
         END SELECT
     END DO

@@ -18,6 +18,8 @@
 ! Probes inside the tracer step (conservation_probe) give the thickness-weighted
 ! integral of temperature and salinity after each stage; their differences are
 ! printed as CONSP lines and attribute a residual to a stage.
+! In OpenACC builds the host copies are not current between the stages, so the probes are off
+! there (no CONSP lines); the budgets use the end-of-step state, which is on the host.
 !
 ! All sums are WP_full, in a fixed order over the owned nodes (no threads), with
 ! one MPI reduction, as in the monitor record.
@@ -27,7 +29,7 @@
 ! outside the surface-flux arrays.
 !===============================================================================
 module fesom_conservation_module
-    use o_PARAM,          only: WP, WP_full, vcpw, S_ref_anomaly, clim_relax
+    use o_PARAM,          only: WP, WP_full, vcpw, S_ref_anomaly, clim_relax, use_tracer_carry
     use o_ARRAYS,         only: heat_flux, water_flux, virtual_salt, relax_salt, &
                                 Tclim, Sclim, relax2clim, is_nonlinfs
     use g_forcing_arrays, only: sw_3d, real_salt_flux
@@ -155,7 +157,7 @@ end subroutine conservation_after_step
 !===============================================================================
 ! Global integral of tracer tr_num (1 or 2) at a named point of the tracer step.
 ! Phase 'a', before the division by the new thickness: sum areasvol*(hnode*T + del_ttf);
-! phase 'b', after it: sum areasvol*hnode_new*T.
+! phase 'b', after it: sum areasvol*hnode_new*T. Both include the carry (use_tracer_carry).
 subroutine conservation_probe(name, phase, tr_num, tracers, partit, mesh)
     character(len=*), intent(in)            :: name
     character(len=1), intent(in)            :: phase
@@ -167,6 +169,9 @@ subroutine conservation_probe(name, phase, tr_num, tracers, partit, mesh)
     integer            :: n, nz, k, ierr
 
     if (conservation_freq <= 0 .or. tr_num > 2) return
+#ifdef ENABLE_OPENACC
+    return
+#endif
     k = 0
     do n = 1, np
         if (pname(n) == name) k = n
@@ -189,6 +194,13 @@ subroutine conservation_probe(name, phase, tr_num, tracers, partit, mesh)
             end if
         end do
     end do
+    if (use_tracer_carry) then
+        do n = 1, partit%myDim_nod2D
+            do nz = mesh%ulevels_nod2D(n), mesh%nlevels_nod2D(n) - 1
+                l = l + real(mesh%areasvol(nz, n), WP_full)*real(tracers%work%carry(nz, n, tr_num), WP_full)
+            end do
+        end do
+    end if
     call MPI_Allreduce(l, g, 1, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, ierr)
     pval(k, tr_num) = g
 end subroutine conservation_probe
@@ -213,6 +225,15 @@ subroutine integrals(tracers, partit, mesh, g)
             l(3) = l(3) + w*(real(tracers%data(2)%values(nz, n), WP_full) + real(S_ref_anomaly, WP_full))
         end do
     end do
+    if (use_tracer_carry) then
+        do n = 1, partit%myDim_nod2D
+            do nz = mesh%ulevels_nod2D(n), mesh%nlevels_nod2D(n) - 1
+                w = real(mesh%areasvol(nz, n), WP_full)
+                l(2) = l(2) + w*real(tracers%work%carry(nz, n, 1), WP_full)
+                l(3) = l(3) + w*real(tracers%work%carry(nz, n, 2), WP_full)
+            end do
+        end do
+    end if
     l(2) = l(2)*real(vcpw, WP_full)
     call MPI_Allreduce(l, g, NQ, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, ierr)
 end subroutine integrals

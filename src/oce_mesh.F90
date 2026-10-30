@@ -1,10 +1,10 @@
 module oce_mesh_module
     USE MOD_MESH
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     USE g_config
     USE g_ROTATE_grid
-    USE par_support_module, only: par_ex, init_mpi_types, init_gatherLists
+    USE par_support_module, only: par_abort, init_mpi_types, init_gatherLists
     USE iso_fortran_env, only: error_unit
     USE o_PARAM
     USE o_ARRAYS
@@ -149,7 +149,7 @@ type(t_partit), intent(inout), target :: partit
   if (error_status/=0) then
      write(*,*) n
      write(*,*) 'error: NPES does not coincide with that of the mesh'
-     call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+     call par_abort(partit%MPI_COMM_FESOM, partit%mype)
   end if
   ! broadcasting partitioning vector to the other procs
   if (partit%mype/=0) then
@@ -213,7 +213,7 @@ type(t_partit), intent(inout), target :: partit
   if (error_status/=0) then
      write(*,*) n
      write(*,*) 'error: nod2D/=part(npes+1)-1'
-     call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+     call par_abort(partit%MPI_COMM_FESOM, partit%mype)
      STOP
   end if
 
@@ -312,7 +312,7 @@ type(t_partit), intent(inout), target :: partit
         write(*,*) '____________________________________________________________________'
         print *, achar(27)//'[0m'
         write(*,*)
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     !___________________________________________________________________________
     ! check if rotation needs to be applied to an unrotated mesh
     elseif ((partit%mype==0) .and. (.not. force_rotation) .and. (flag_checkmustrot==1) .and. (.not. toy_ocean)) then
@@ -333,7 +333,7 @@ type(t_partit), intent(inout), target :: partit
         write(*,*) '____________________________________________________________________'
         print *, achar(27)//'[0m'
         write(*,*)
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     end if
   
   
@@ -434,7 +434,7 @@ type(t_partit), intent(inout), target :: partit
         call MPI_BCast(mesh%nl, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
         if (mesh%nl < 3) then
             write(*,*) '!!!Number of levels is less than 3, model will stop!!!'
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
             stop
         end if
         allocate(mesh%zbar(mesh%nl))              ! allocate the array for storing the standard depths
@@ -455,7 +455,7 @@ type(t_partit), intent(inout), target :: partit
             write(*,*) '        --> model stops here'
             write(*,*) '____________________________________________________________________'
         end if
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     end if
     
  !______________________________________________________________________________
@@ -475,7 +475,7 @@ type(t_partit), intent(inout), target :: partit
         call MPI_BCast(mesh%nl, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
         if (mesh%nl < 3) then
             write(*,*) '!!!Number of levels is less than 3, model will stop!!!'
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
             stop
         end if
         allocate(mesh%zbar(mesh%nl))              ! allocate the array for storing the standard depths
@@ -498,7 +498,7 @@ type(t_partit), intent(inout), target :: partit
             write(*,*) '            use_depthfile= "aux3d" or "depth@" and your meshfolder'
             write(*,*) '        --> model stops here'
             write(*,*) '____________________________________________________________________'
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
         end if 
     end if 
     
@@ -523,7 +523,7 @@ type(t_partit), intent(inout), target :: partit
             write(*,*) '            use_depthfile= "aux3d" or "depth@" and your meshfolder '
             write(*,*) '        --> model stops here'
             write(*,*) '____________________________________________________________________'
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
         end if
     end if     
  end if 
@@ -655,7 +655,7 @@ if ((partit%mype==0) .and. (flag_wrongaux3d==1)) then
     write(*,*) '____________________________________________________________________'
     print *, achar(27)//'[0m'
     write(*,*)
-    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+    call par_abort(partit%MPI_COMM_FESOM, partit%mype)
 end if 
 
  ! ==============================
@@ -1032,7 +1032,7 @@ subroutine find_levels_cavity(partit, mesh)
             write(*,*) '____________________________________________________________________'
             print *, achar(27)//'[0m'
             write(*,*)
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
         end if 
     end if
     
@@ -1120,7 +1120,7 @@ subroutine find_levels_cavity(partit, mesh)
             write(*,*) '____________________________________________________________________'
             print *, achar(27)//'[0m'
             write(*,*)
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
         end if    
     end if
     
@@ -1285,7 +1285,7 @@ subroutine find_levels_cavity(partit, mesh)
             write(*,*) '____________________________________________________________________'
             print *, achar(27)//'[0m'
             write(*,*)
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
         end if 
     end if
     
@@ -1926,7 +1926,7 @@ DO elem=1,partit%myDim_elem2D
    END DO
    if (elem1<2) then
     write(*,*) 'Insufficient number of neighbors ', partit%myList_elem2D(elem)
-    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+    call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     STOP
    end if
 END DO
@@ -2669,7 +2669,7 @@ end do
 write(*,*) '***end level area_test***'
 end if
 
-!call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+!call par_abort(partit%MPI_COMM_FESOM, partit%mype)
 !stop
 END SUBROUTINE check_mesh_consistency
 !
@@ -2752,7 +2752,7 @@ subroutine check_cavity_mesh_conflict(partit, mesh)
             print *, achar(27)//'[0m'
             write(*,*)
         end if
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     end if
     
 end subroutine check_cavity_mesh_conflict

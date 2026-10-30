@@ -58,8 +58,9 @@ subroutine thermodynamics(ice, partit, mesh)
 
   !---- geographical coordinates
   real(kind=WP)  :: geolon, geolat
-  !---- minimum and maximum of the lead closing parameter
-  real(kind=WP)  :: h0min = 0.5, h0max = 1.5
+  !---- minimum and maximum of the lead closing parameter. The minimum is
+  !---- namelist.ice ice_therm/h0 (NH) and h0_s (SH), as in ice_thermo_oce.F90
+  real(kind=WP)  :: h0min, h0max = 1.5
 
   real(kind=WP), parameter :: Aimin = 0.001, himin = 0.005
 
@@ -150,6 +151,13 @@ subroutine thermodynamics(ice, partit, mesh)
      A       = a_ice(inod)
      h       = m_ice(inod)
      hsn     = m_snow(inod)
+
+     !---- lower bound of the lead closing parameter, per hemisphere
+     if (geo_coord_nod2D(2, inod) > 0._WP) then
+        h0min = ice%thermo%h0
+     else
+        h0min = ice%thermo%h0_s
+     end if
 
 #if defined (__oifs) || defined (__ifsinterface)
      a2ohf   = oce_heat_flux(inod) + shortwave(inod) + enthalpyoffuse(inod)

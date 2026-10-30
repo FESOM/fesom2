@@ -26,7 +26,7 @@
 
         use mod_mesh
         use io_meandata,      only: def_stream
-        use par_support_module, only: par_ex
+        use par_support_module, only: par_abort
 
         implicit none
 
@@ -99,7 +99,7 @@
             if (mype==0) write(*,*) '     file   : ', 'namelist.io',' open ok'
         else
             if (mype==0) write(*,*) 'ERROR: --> bad opening file   : ','namelist.io',' ;    iostat=',iost
-            call par_ex(p_partit%MPI_COMM_FESOM, p_partit%mype)
+            call par_abort(p_partit%MPI_COMM_FESOM, p_partit%mype)
             stop
         end if
         
@@ -115,7 +115,7 @@
             if (mype==0) write(*,*) '     file   : ', 'namelist.icepack',' open ok' 
         else
             if (mype==0) write(*,*) 'ERROR: --> bad opening file   : ','namelist.icepack',' ;    iostat=',iost
-            call par_ex(p_partit%MPI_COMM_FESOM, p_partit%mype)
+            call par_abort(p_partit%MPI_COMM_FESOM, p_partit%mype)
             stop
         end if
         
@@ -295,7 +295,7 @@
         
         use mod_mesh
         use mod_partit
-        use par_support_module, only: par_ex
+        use par_support_module, only: par_abort
         use g_config,     only: runid, ResultPath, RestartOutPath
         use io_restart,   only: icepack_files 
     

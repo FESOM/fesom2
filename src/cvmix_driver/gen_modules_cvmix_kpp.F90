@@ -29,7 +29,7 @@ module g_cvmix_kpp
     USE MOD_DYN
     USE mod_tracer
     USE MOD_PARTIT
-    use par_support_module, only: par_ex
+    use par_support_module, only: par_abort
     USE MOD_MESH
     use o_arrays
     use g_comm_auto 
@@ -697,7 +697,7 @@ module g_cvmix_kpp
                         sfc_v    = 0.0_WP
                         htot     = 0.0_WP
                         do nztmp = nun, nzsfc
-                            delh     = min( max(0.0_WP,sldepth-htot), mesh%hnode(nztmp,node) )
+                            delh     = min( max(0.0_WP,sldepth-htot), real(mesh%hnode(nztmp,node), WP) )
                             htot     = htot+delh
                             sfc_temp = sfc_temp + temp(nztmp,node)*delh
                             sfc_salt = sfc_salt + salt(nztmp,node)*delh
@@ -727,7 +727,7 @@ module g_cvmix_kpp
                         sfc_v    = 0.0_WP
                         htot     = 0.0_WP
                         do nztmp = nun, nzsfc
-                            delh     = min( max(0.0_WP,sldepth-htot), mesh%hnode(nztmp,node) )
+                            delh     = min( max(0.0_WP,sldepth-htot), real(mesh%hnode(nztmp,node), WP) )
                             htot     = htot+delh
                             sfc_temp = sfc_temp + temp(nztmp,node)*delh
                             sfc_salt = sfc_salt + salt(nztmp,node)*delh
@@ -813,7 +813,7 @@ module g_cvmix_kpp
             else
                 write(*,*) " --> Error: this kpp_internalmix scheme is not supported"
                 write(*,*) "     for the mixing below the OBL, either KPP or PP !"
-                call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+                call par_abort(partit%MPI_COMM_FESOM, partit%mype)
             end if 
             
             

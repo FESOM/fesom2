@@ -80,6 +80,7 @@ TYPE T_ICE_THERMO
     real(kind=WP) :: Sice = 4.0        ! Ice salinity 3.2--5.0 ppt.
     real(kind=WP) :: h0=0.5	           ! Lead closing parameter [m] for Nothern Hemisphere! 0.5
     real(kind=WP) :: h0_s=0.5	       ! Lead closing parameter [m] for Southern Hemisphere! 0.5
+    ! (coupled, ice_thermo_cpl.F90: h0/h0_s are the lower bound of a thickness-dependent value)
     real(kind=WP) :: emiss_ice=0.97    ! Emissivity of Snow/Ice,
     real(kind=WP) :: emiss_wat=0.97    ! Emissivity of open water
     real(kind=WP) :: albsn = 0.81      ! Albedo: frozen snow
