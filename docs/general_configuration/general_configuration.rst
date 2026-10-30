@@ -23,7 +23,7 @@ Section &timestep
 Section &clockinit
 """"""""""""""""""
 
-- **timenew=0.0**, **daynew=1**, **yearnew=1958** define the starting time stamp. If this triplet matches the first line of ``<runid>.clock`` the model performs a cold start from initial conditions; otherwise it expects restart files at ``RestartInPath`` and does a warm start. The driver resets ``timenew`` to ``0`` when it encounters ``86400`` to keep times in the ``[0,86400)`` range.
+- **timenew=0.0**, **daynew=1**, **yearnew=1958**. The start date of a run is taken from the clock file ``<runid>.clock``, not from this section: if the two lines of the clock file are identical the model performs a cold start from initial conditions; otherwise it expects restart files at ``RestartInPath`` and does a warm start. ``yearnew`` is the first year of the experiment and has to stay the same in all legs; with ``use_transit`` the input year of the transient tracers is counted from it. ``timenew`` and ``daynew`` are not used. In the clock file the day is the day of the year, and the driver resets the time to ``0`` when it encounters ``86400`` to keep times in the ``[0,86400)`` range.
 
 Section &paths
 """"""""""""""
@@ -42,6 +42,7 @@ Section &restart_log
 - **restart_length=1**, **restart_length_unit='y'** cadence for portable netCDF restarts (units: ``y``, ``m``, ``d``, ``h``, ``s``, or ``off`` to disable). When a portable restart is written, the raw/binary formats are written as well unless explicitly disabled.
 - **raw_restart_length=1**, **raw_restart_length_unit='y'** frequency of raw binary “core dump” restarts. If the unit is ``off`` only the portable restarts are produced.
 - **bin_restart_length=1**, **bin_restart_length_unit='y'** frequency of derived-type binary restarts (Fortran binary) used for fast restarts on identical hardware/compiler stacks.
+- With the unit ``'y'`` the years for restarts and output are counted from the start of the current run, i.e. of the leg in a chain of runs: ``restart_length=2`` writes a restart at the end of a two-year leg whatever the calendar year. A yearly frequency longer than the leg (for example ``restart_length=5`` with one-year legs) is therefore never reached.
 - **logfile_outfreq=960** number of model steps between status lines written to the stdout/stderr log.
 
 Section &ale_def
