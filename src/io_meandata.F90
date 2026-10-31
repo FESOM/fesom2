@@ -607,6 +607,7 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
 #endif
     use g_forcing_param, only: use_virt_salt, use_landice_water, use_age_tracer !---fwf-code, age-code
     use g_config, only : use_cavity, lwiso, use_icb_iron !---wiso-code
+    use cpl_config, only : fesom_provides_ice_surface
     use mod_transit, only : index_transit_r14c, index_transit_r39ar, index_transit_f11, index_transit_f12, index_transit_sf6
     use io_tracks_module, only: ltracks, track_files, track_vars,        &
                                 track_names, track_output_freq
@@ -2238,29 +2239,35 @@ CASE ('helem     ')
     call def_stream((/mesh%nl-1, mesh%elem2D/), (/mesh%nl-1, partit%myDim_elem2D/), 'helem'    , 'elemental layer thickness', 'm', mesh%helem(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     
 !___________________________________________________________________________________________________________________________________    
-! TODO: still compile-time. These field sets are only meaningful for the
-! IFS-family partners, and widening them would change the file layout for
-! the other partners -- decided together with the restart format.
-#if defined (__cpl_direct) || defined (__cpl_oasis50)
+! Only the partners that take the ice surface from FESOM carry these.
+#if defined (__cpl_enabled)
 CASE ('alb       ')
-  call def_stream(mesh%nod2D, partit%myDim_nod2D, 'alb',    'ice albedo',              'none',   ice%atmcoupl%ice_alb(:),               io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+  if (fesom_provides_ice_surface) &
+    call def_stream(mesh%nod2D, partit%myDim_nod2D, 'alb',    'ice albedo',              'none',   ice%atmcoupl%ice_alb(:),               io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('ist       ')
-  if (ice%ist_itracer_idx > 0) &
+  if (fesom_provides_ice_surface) &
     call def_stream(mesh%nod2D, partit%myDim_nod2D, 'ist',    'ice surface temperature', 'K',      ice%data(ice%ist_itracer_idx)%values(:),                 io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('qsi       ')
-  call def_stream(mesh%nod2D, partit%myDim_nod2D, 'qsi',    'ice heat flux',           'W/m^2',  ice%atmcoupl%ice_flx_h(:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+  if (fesom_provides_ice_surface) &
+    call def_stream(mesh%nod2D, partit%myDim_nod2D, 'qsi',    'ice heat flux',           'W/m^2',  ice%atmcoupl%ice_flx_h(:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('qso       ')
-  call def_stream(mesh%nod2D, partit%myDim_nod2D, 'qso',    'oce heat flux',           'W/m^2',  ice%atmcoupl%oce_flx_h(:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+  if (fesom_provides_ice_surface) &
+    call def_stream(mesh%nod2D, partit%myDim_nod2D, 'qso',    'oce heat flux',           'W/m^2',  ice%atmcoupl%oce_flx_h(:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('runoff_liquid  ')
-  call def_stream(mesh%nod2D, partit%myDim_nod2D, 'runoff_liquid',  'liquid water runoff',     'm/s',    ice%atmcoupl%runoff_liquid(:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+  if (fesom_provides_ice_surface) &
+    call def_stream(mesh%nod2D, partit%myDim_nod2D, 'runoff_liquid',  'liquid water runoff',     'm/s',    ice%atmcoupl%runoff_liquid(:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('runoff_solid  ')
-  call def_stream(mesh%nod2D, partit%myDim_nod2D, 'runoff_solid',  'solid water runoff',     'm/s',    ice%atmcoupl%runoff_solid(:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+  if (fesom_provides_ice_surface) &
+    call def_stream(mesh%nod2D, partit%myDim_nod2D, 'runoff_solid',  'solid water runoff',     'm/s',    ice%atmcoupl%runoff_solid(:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('enthalpy  ')
-  call def_stream(mesh%nod2D, partit%myDim_nod2D, 'enth',  'enthalpy of fusion of solid water runoff',     'W/m^2',    ice%atmcoupl%enthalpyoffuse(:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+  if (fesom_provides_ice_surface) &
+    call def_stream(mesh%nod2D, partit%myDim_nod2D, 'enth',  'enthalpy of fusion of solid water runoff',     'W/m^2',    ice%atmcoupl%enthalpyoffuse(:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('qcon      ')
-     call def_stream(mesh%nod2D, partit%myDim_nod2D, 'qcon',  'conductive heat flux',   'W/m^2',    ice%atmcoupl%flx_qcon(:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)  
+  if (fesom_provides_ice_surface) &
+    call def_stream(mesh%nod2D, partit%myDim_nod2D, 'qcon',  'conductive heat flux',   'W/m^2',    ice%atmcoupl%flx_qcon(:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('qres      ')
-     call def_stream(mesh%nod2D, partit%myDim_nod2D, 'qres',  'residual heat flux',     'W/m^2',    ice%atmcoupl%flx_qres(:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+  if (fesom_provides_ice_surface) &
+    call def_stream(mesh%nod2D, partit%myDim_nod2D, 'qres',  'residual heat flux',     'W/m^2',    ice%atmcoupl%flx_qres(:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 #endif
 
 !------------------------------------------
