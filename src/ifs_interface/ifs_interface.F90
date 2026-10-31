@@ -324,6 +324,7 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
    !USE i_arrays, ONLY : m_ice, a_ice, m_snow
    !USE i_therm_param, ONLY : tmelt
    USE g_rotate_grid, only: vector_r2g
+   use par_support_module, only: par_abort
    USE parinter
    USE scripremap
    USE interinfo
@@ -376,7 +377,20 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
    a_ice        => fesom%ice%data(1)%values(:)
    m_ice        => fesom%ice%data(2)%values(:)
    m_snow       => fesom%ice%data(3)%values(:)
-   ice_temp     => fesom%ice%data(4)%values(:)
+   ! The ice surface temperature is an optional ice tracer, so take its slot
+   ! from ist_itracer_idx. check_cpl_config only lets an IFS partner reach
+   ! this interface and that partner always carries one, but slot 0 would be
+   ! an out-of-bounds read, so report it instead.
+   if (fesom%ice%ist_itracer_idx <= 0) then
+      if (fesom%partit%mype==0) then
+         write(*,*) 'nemogcmcoup_lim2_get: no ice surface temperature ', &
+                    'tracer, which the IFS interface requires'
+         write(*,*) 'the model will stop!'
+      end if
+      call par_abort(fesom%partit%MPI_COMM_FESOM, fesom%partit%mype)
+      stop
+   end if
+   ice_temp     => fesom%ice%data(fesom%ice%ist_itracer_idx)%values(:)
    ice_alb      => fesom%ice%atmcoupl%ice_alb(:)
    tmelt        => fesom%ice%thermo%tmelt ! scalar const.
 

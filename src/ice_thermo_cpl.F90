@@ -1,4 +1,4 @@
-#if defined (__oasis) || defined (__ifsinterface) || defined (__yac)
+#if defined (__cpl_enabled)
 subroutine thermodynamics(ice, partit, mesh)
 
   !===================================================================
@@ -38,7 +38,13 @@ subroutine thermodynamics(ice, partit, mesh)
   real(kind=WP)  :: a2ohf, a2ihf, qres, qcon
   !---- tref: ist anchor the atmosphere evaluated a2ihf at, the linearization
   !---- anchor for the OpenIFS coupled-slab surface-temperature solve.
-#if defined (__oifs)
+  ! TODO: the coupled-slab surface-temperature solve in this file is still
+  ! compile-time. Unlike the ice tracer layout, it changes ice_surftemp's
+  ! signature (the tref argument) and the Qatmice convention, so following
+  ! the partner at run time is a separate change. __cpl_oasis50 stands for
+  ! OpenIFS and __cpl_direct for the in-process IFS interface, exactly as
+  ! __oifs and __ifsinterface did.
+#if defined (__cpl_oasis50)
   real(kind=WP)  :: tref
 #endif
   !---- evaporation and sublimation (provided by ECHAM)
@@ -77,13 +83,12 @@ subroutine thermodynamics(ice, partit, mesh)
   real(kind=WP), dimension(:)  , pointer :: apnd, hpnd, ipnd 
   real(kind=WP), dimension(:)  , pointer :: S_oc_array, T_oc_array, u_w, v_w
   real(kind=WP), dimension(:)  , pointer :: fresh_wa_flux, net_heat_flux
-#if defined (__oifs) || defined (__ifsinterface)
   real(kind=WP), dimension(:) , pointer  :: ice_temp, ice_alb, enthalpyoffuse, ice_heat_qres, ice_heat_qcon, runoff_liquid, runoff_solid
-#if defined (__oifs)
+#if defined (__cpl_oasis50)
   real(kind=WP), dimension(:) , pointer  :: ist_ref
 #endif
-#endif
-#if defined (__oasis) || defined (__ifsinterface) || defined (__yac)
+    logical                               :: l_ist
+#if defined (__cpl_enabled)
   real(kind=WP), dimension(:)  , pointer ::  oce_heat_flux, ice_heat_flux 
 #endif 
   real(kind=WP)                , pointer :: rhoice, rhosno, rhowat, rhofwt, Sice, cl, cc, cpice, consn, con 
@@ -109,19 +114,20 @@ subroutine thermodynamics(ice, partit, mesh)
   v_w           => ice%srfoce_v(:)
   fresh_wa_flux => ice%flx_fw(:)
   net_heat_flux => ice%flx_h(:)
-#if defined (__oifs) || defined (__ifsinterface)
-  ice_temp      => ice%data(4)%values(:)
-  ice_alb       => ice%atmcoupl%ice_alb(:)
-  enthalpyoffuse=> ice%atmcoupl%enthalpyoffuse(:)
-  runoff_liquid => ice%atmcoupl%runoff_liquid(:)
-  runoff_solid  => ice%atmcoupl%runoff_solid(:)
-  ice_heat_qres => ice%atmcoupl%flx_qres(:)
-  ice_heat_qcon => ice%atmcoupl%flx_qcon(:)
-#if defined (__oifs)
-  ist_ref       => ice%atmcoupl%ist_ref(:)
+  l_ist = ice%ist_itracer_idx > 0
+  if (l_ist) then
+     ice_temp      => ice%data(ice%ist_itracer_idx)%values(:)
+     ice_alb       => ice%atmcoupl%ice_alb(:)
+     enthalpyoffuse=> ice%atmcoupl%enthalpyoffuse(:)
+     runoff_liquid => ice%atmcoupl%runoff_liquid(:)
+     runoff_solid  => ice%atmcoupl%runoff_solid(:)
+     ice_heat_qres => ice%atmcoupl%flx_qres(:)
+     ice_heat_qcon => ice%atmcoupl%flx_qcon(:)
+#if defined (__cpl_oasis50)
+     ist_ref       => ice%atmcoupl%ist_ref(:)
 #endif
-#endif
-#if defined (__oasis) || defined (__ifsinterface) || defined (__yac)
+  end if
+#if defined (__cpl_enabled)
   oce_heat_flux => ice%atmcoupl%oce_flx_h(:)
   ice_heat_flux => ice%atmcoupl%ice_flx_h(:)
 #endif
@@ -159,11 +165,11 @@ subroutine thermodynamics(ice, partit, mesh)
         h0min = ice%thermo%h0_s
      end if
 
-#if defined (__oifs) || defined (__ifsinterface)
-     a2ohf   = oce_heat_flux(inod) + shortwave(inod) + enthalpyoffuse(inod)
-#else
-     a2ohf   = oce_heat_flux(inod) + shortwave(inod)
-#endif
+     if (l_ist) then
+        a2ohf   = oce_heat_flux(inod) + shortwave(inod) + enthalpyoffuse(inod)
+     else
+        a2ohf   = oce_heat_flux(inod) + shortwave(inod)
+     end if
      a2ihf   = ice_heat_flux(inod)
      evap    = evap_no_ifrac(inod)
      subli   = sublimation(inod)
@@ -182,41 +188,41 @@ subroutine thermodynamics(ice, partit, mesh)
         rsf     = 0._WP
      end if
 
-#if defined (__oifs) || defined (__ifsinterface)
+     if (l_ist) then
 
-     !---- For AWI-CM3 we calculate ice surface temp and albedo in fesom,
-     ! then send those to OpenIFS where they are used to calucate the 
-     ! energy fluxes ---!
-     t                   = ice_temp(inod)
-     qres     = 0.0_WP
-     qcon     = 0.0_WP
-     if(A>Aimin) then
-#if defined (__oifs)
-        if (use_atm_ice_tskin) then
-           ! Skin temperature received from the atmosphere (tsk_ico); freezing
-           ! point before the first receive.
-           tref = ist_ref(inod)
-           if (tref < 173.15_WP .or. tref > 400.0_WP) tref = 271.35_WP
-        else
-           tref = t
-        end if
-        call ice_surftemp(ice%thermo, max(h/(max(A,Aimin)),0.05), hsn/(max(A,Aimin)), a2ihf, tref, t)
+        !---- For AWI-CM3 we calculate ice surface temp and albedo in fesom,
+        ! then send those to OpenIFS where they are used to calucate the 
+        ! energy fluxes ---!
+        t                   = ice_temp(inod)
+        qres     = 0.0_WP
+        qcon     = 0.0_WP
+        if(A>Aimin) then
+#if defined (__cpl_oasis50)
+           if (use_atm_ice_tskin) then
+              ! Skin temperature received from the atmosphere (tsk_ico); freezing
+              ! point before the first receive.
+              tref = ist_ref(inod)
+              if (tref < 173.15_WP .or. tref > 400.0_WP) tref = 271.35_WP
+           else
+              tref = t
+           end if
+           call ice_surftemp(ice%thermo, max(h/(max(A,Aimin)),0.05), hsn/(max(A,Aimin)), a2ihf, tref, t)
 #else
-        ! The IFS interface does not provide the reference temperature used by
-        ! the OpenIFS coupled-slab solve. Keep its established local update
-        ! until that interface supplies a consistent temperature/flux pair.
-        call ice_surftemp(ice%thermo, max(h/(max(A,Aimin)),0.05), hsn/(max(A,Aimin)), a2ihf, t)
+           ! The IFS interface does not provide the reference temperature used by
+           ! the OpenIFS coupled-slab solve. Keep its established local update
+           ! until that interface supplies a consistent temperature/flux pair.
+           call ice_surftemp(ice%thermo, max(h/(max(A,Aimin)),0.05), hsn/(max(A,Aimin)), a2ihf, t)
 #endif
-        ice_temp(inod)  = t
-     else
-        ! Freezing temp of saltwater in K
-        ice_temp(inod) = -0.0575_WP*S_oc_array(inod) + 1.7105e-3_WP*sqrt(S_oc_array(inod)**3) -2.155e-4_WP*(S_oc_array(inod)**2)+273.15_WP        
-     endif
-     call ice_albedo(ice%thermo, h, hsn, t, apnd(inod), ipnd(inod), alb)
-     ice_alb(inod)       = alb
-     ice_heat_qres(inod) = qres
-     ice_heat_qcon(inod) = qcon
-#endif
+           ice_temp(inod)  = t
+        else
+           ! Freezing temp of saltwater in K
+           ice_temp(inod) = -0.0575_WP*S_oc_array(inod) + 1.7105e-3_WP*sqrt(S_oc_array(inod)**3) -2.155e-4_WP*(S_oc_array(inod)**2)+273.15_WP        
+        endif
+        call ice_albedo(ice%thermo, h, hsn, t, apnd(inod), ipnd(inod), alb)
+        ice_alb(inod)       = alb
+        ice_heat_qres(inod) = qres
+        ice_heat_qcon(inod) = qcon
+     end if
      call ice_growth
 
      !__________________________________________________________________________
@@ -246,7 +252,11 @@ subroutine thermodynamics(ice, partit, mesh)
      !---- total evaporation (needed in oce_salt_balance.F90) = evap+subli
      evaporation(inod)    = evap + subli
      ice_sublimation(inod)= subli
-#if defined (__oasis) || defined (__ifsinterface)
+! TODO: __cpl_yac is absent here, as in the pre-rework guard. Declaration
+! and use agree, so this is self-consistent, but YAC does not get
+! residualifwflx or the rhofwt/rhowat freshwater conversion. Widening the
+! guard changes YAC results, so it is left to a separate change.
+#if defined (__cpl_oasis) || defined (__cpl_direct)
      residualifwflx(inod) = resid
 #endif     
   enddo
@@ -320,7 +330,7 @@ contains
     ! flux drives ice growth directly. The ice model's own surface-temperature
     ! solve is internal-only (albedo/melt-pond state) and does not enter the
     ! growth budget.
-#if defined (__ifsinterface)
+#if defined (__cpl_direct)
     ! Keep the classic IFS-FESOM energy-budget convention.  Its atmospheric
     ! interface has not been converted to the OpenIFS coupled-slab contract.
     Qatmice = -qres-qcon
@@ -357,7 +367,7 @@ contains
     !---- must be area-weighted (like the heat fluxes); in contrast,
     !---- precipitation (snow and rain) and runoff are effective fluxes
 !already weighted in IFS coupling
-#if !defined (__ifsinterface)
+#if !defined (__cpl_direct)
     subli  = A*subli
     evap   = (1._WP-A)*evap
 #endif
@@ -402,21 +412,21 @@ contains
     !---- snow melt rate over sea ice (dsnow <= 0)
     !---- if there is atmospheric melting over sea ice, first melt any
     !---- snow that is present, but do not melt more snow than available
-#if defined (__oifs) || defined (__ifsinterface)
-    !---- new condition added - surface temperature must be
-    !----                       larger than 273K to melt snow
-    !---- (snowmelt_tgate=.false. drops the condition and melts snow on the
-    !----  energy budget alone, as the uncoupled branch below does)
-    if (t.gt.273_WP .or. .not. ice%thermo%snowmelt_tgate) then
-        dsnow = A*min(Qatmice-Qicecon,0._WP)
-        dsnow = max(dsnow*rhoice/rhosno,-hsn)
+    if (l_ist) then
+       !---- new condition added - surface temperature must be
+       !----                       larger than 273K to melt snow
+       !---- (snowmelt_tgate=.false. drops the condition and melts snow on the
+       !----  energy budget alone, as the uncoupled branch below does)
+       if (t.gt.273_WP .or. .not. ice%thermo%snowmelt_tgate) then
+           dsnow = A*min(Qatmice-Qicecon,0._WP)
+           dsnow = max(dsnow*rhoice/rhosno,-hsn)
+       else
+           dsnow = 0.0_WP
+       endif
     else
-        dsnow = 0.0_WP
-    endif
-#else
-    dsnow = A*min(Qatmice-Qicecon,0._WP)
-    dsnow = max(dsnow*rhoice/rhosno,-hsn)
-#endif 
+       dsnow = A*min(Qatmice-Qicecon,0._WP)
+       dsnow = max(dsnow*rhoice/rhosno,-hsn)
+    end if
 
     !---- update snow thickness after atmospheric snow melt
     hsn = hsn + dsnow
@@ -582,7 +592,7 @@ contains
     return
   end subroutine ice_growth
 
-#if defined (__oifs)
+#if defined (__cpl_oasis50)
  subroutine ice_surftemp(ithermp, h,hsn,a2ihf,tref,t)
 #else
  subroutine ice_surftemp(ithermp, h,hsn,a2ihf,t)
@@ -592,7 +602,7 @@ contains
   ! A  - Ice fraction
   ! h  - Ice thickness
   ! hsn   - Snow thickness
-#if defined (__oifs)
+#if defined (__cpl_oasis50)
   ! tref  - linearization anchor for the implicit flux term; with
   !         use_atm_ice_tskin the atmosphere's ice-tile skin temperature
 #endif
@@ -607,11 +617,11 @@ contains
   !---- ocean variables (provided by FESOM)
   real(kind=WP)  h
   real(kind=WP)  hsn
-#if defined (__oifs)
+#if defined (__cpl_oasis50)
   real(kind=WP)  tref
 #endif
   real(kind=WP)  t
-#if defined (__oifs)
+#if defined (__cpl_oasis50)
   !---- flux-linearization coefficient dQ/dT [W/m2/K]
   real(kind=WP)  zlam
   !---- bulk near-neutral turbulent flux sensitivity rho*cp*C_H*|U| [W/m2/K]
@@ -633,7 +643,7 @@ contains
   !---- freezing temperature of sea-water [K]
   real(kind=WP)  :: TFrezs
   
-#if defined (__oifs)
+#if defined (__cpl_oasis50)
   real(kind=WP), pointer :: con, consn, cpsno, rhoice, rhosno, emiss_ice, boltzmann
 #else
   real(kind=WP), pointer :: con, consn, cpsno, rhoice, rhosno
@@ -643,7 +653,7 @@ contains
   cpsno  => ice%thermo%cpsno
   rhoice => ice%thermo%rhoice
   rhosno => ice%thermo%rhosno
-#if defined (__oifs)
+#if defined (__cpl_oasis50)
   emiss_ice => ice%thermo%emiss_ice
   boltzmann => ice%thermo%boltzmann
 #endif
@@ -659,7 +669,7 @@ contains
   zcprosn=rhosno*cpsno/dt               ! Specific Energy required to change temperature of 1m snow on ice [J/(sm³K)]
   zcpdte=zcpdt !+zcprosn*hsn            ! Combined Energy required to change temperature of snow + 0.05m of upper ice
 
-#if defined (__oifs)
+#if defined (__cpl_oasis50)
   !---- Implicit (dQ/dT-linearized) atmospheric flux.
   ! a2ihf was computed by the atmosphere at tref
   ! and is held constant over the coupling interval. As the surface departs
@@ -684,7 +694,7 @@ contains
   t=(zcpdte*t+a2ihf+zicefl)/(zcpdte+con/zsniced)
 #endif
   if (t>273.15_WP) then
-#if defined (__oifs)
+#if defined (__cpl_oasis50)
      qres=(con/zsniced+zcpdte+zlam)*(t-273.15_WP)
 #else
      qres=(con/zsniced+zcpdte)*(t-273.15_WP)
