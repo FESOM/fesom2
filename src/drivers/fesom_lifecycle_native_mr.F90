@@ -94,7 +94,7 @@ program fesom_lifecycle_native_mr
     use oce_initial_state,  only: t_ic3d_config, do_ic3d
     use mod_recom4_adapter, only: recom4_adapter_init, recom4_adapter_ntr, recom4_adapter_register, &
                                   recom4_adapter_ic, recom4_adapter_initial_values, &
-                                  recom4_adapter_forcing
+                                  recom4_adapter_forcing, recom4_adapter_monthly
     use oce_muscl_adv,      only: muscl_adv_init
     use oce_ssh_rhs,        only: init_stiff_mat_ale
     use mod_step_oce,       only: step_oce
@@ -1297,6 +1297,8 @@ contains
         else
             call read_other_NetCDF(trim(sss_file), 'SALT', i, nss, .true., .true., mesh, partit)
         end if
+        ! RECOM4 (M8): dust iron, same trigger and month as FESOM2's sbc_do_recom
+        call recom4_adapter_monthly(i, nNodL, partit)
         ! Sweeney chl (production; same month index)
         if (use_sw_pene .and. use_chl_sweeney) then
             i = month; if (n > 1) i = i + 1; if (i > 12) i = 1

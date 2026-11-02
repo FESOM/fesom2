@@ -6,7 +6,8 @@
 !!
 !! Run-time variables:
 !!   FESOM3_RECOM_NML     path of namelist.recom; RECOM4 is on when it is set
-!!   FESOM3_RECOM_IC_DIR  folder with the REcoM initial-condition files
+!!   FESOM3_RECOM_IC_DIR  folder with REcoM's input files (FESOM2's ClimateDataPath):
+!!                        initial conditions and the dust climatology
 module mod_recom4_adapter
     use mod_precision,     only: WP
     use mod_mesh,          only: t_mesh
@@ -20,12 +21,13 @@ module mod_recom4_adapter
                               recom4_ndiag2d, recom4_ndiag3d, recom4_tracer_id,      &
                               recom4_initial_values
     use recom4_text_io, only: recom4_read_text
+    use netcdf
 #endif
     implicit none
     private
     public :: recom4_adapter_init, recom4_adapter_on, recom4_adapter_ntr
     public :: recom4_adapter_register, recom4_adapter_ic, recom4_adapter_initial_values
-    public :: recom4_adapter_forcing
+    public :: recom4_adapter_forcing, recom4_adapter_monthly
 
     logical :: on  = .false.
     integer :: ntr = 0
@@ -37,6 +39,7 @@ module mod_recom4_adapter
     real(WP), allocatable :: sflux(:, :)        ! (ntr, nNodL)   surface flux of the step
     real(WP), allocatable :: diag2d(:, :)       ! (ndiag2d, nNodL)
     real(WP), allocatable :: diag3d(:, :, :)    ! (nl-1, ndiag3d, nNodL)
+    real(WP), allocatable :: dust_fe(:)         ! (nNodL)  dust iron [umol/m2/s], monthly
 #endif
 
 contains
@@ -77,6 +80,8 @@ contains
         sflux  = 0.0_WP
         diag2d = 0.0_WP
         diag3d = 0.0_WP
+        allocate(dust_fe(nNodL))
+        dust_fe = 0.0_WP
         if (partit%mype == 0) write(*,'(a,i0,2a)') 'recom4_adapter: RECOM4 on, ', ntr, &
             ' tracers, ', trim(path)
 #endif
@@ -192,6 +197,56 @@ contains
         frc%f(islp)%varname   = 'psl'
 #endif
     end subroutine recom4_adapter_forcing
+
+    ! From the driver's roll_monthly_clim, with its month index: FESOM2's
+    ! sbc_do_recom updates the dust at the same steps (the first step, then
+    ! the last step of each month) with the same month (the current one at the
+    ! first step, else the next). Albani monthly climatology, given on the
+    ! CORE2 nodes [umol/m2/s], as fe_data_source = 'Albani' in the reference.
+    subroutine recom4_adapter_monthly(imonth, nNodL, partit)
+        integer,        intent(in) :: imonth, nNodL
+        type(t_partit), intent(in) :: partit
+#ifdef __RECOM4
+        character(len=*), parameter :: fname = 'DustClimMonthlyAlbani.nc'
+        character(len=*), parameter :: vname = 'DustClim'
+        character(len=1024) :: dir
+        real(WP), allocatable :: slice(:)
+        integer :: ncid, varid, dimids(2), nnod_file, len_env, ios, n, gid
+
+        if (.not. on) return
+        call get_environment_variable('FESOM3_RECOM_IC_DIR', dir, length=len_env, status=ios)
+        if (ios /= 0 .or. len_env == 0) call fail('FESOM3_RECOM_IC_DIR is not set', partit)
+
+        call nc(nf90_open(trim(dir) // '/' // fname, nf90_nowrite, ncid), 'open ' // fname, partit)
+        call nc(nf90_inq_varid(ncid, vname, varid), 'variable ' // vname, partit)
+        call nc(nf90_inquire_variable(ncid, varid, dimids=dimids), 'dimensions of ' // vname, partit)
+        call nc(nf90_inquire_dimension(ncid, dimids(1), len=nnod_file), 'nodes of ' // vname, partit)
+        allocate(slice(nnod_file))
+        call nc(nf90_get_var(ncid, varid, slice, start=[1, imonth], count=[nnod_file, 1]), &
+                'read ' // vname, partit)
+        call nc(nf90_close(ncid), 'close ' // fname, partit)
+
+        do n = 1, nNodL
+            gid = n
+            if (partit%npes > 1) gid = partit%myList_nod2D(n)
+            if (gid > nnod_file) call fail(fname // ' has fewer nodes than the mesh', partit)
+            dust_fe(n) = slice(gid)
+        end do
+        if (partit%mype == 0) write(*,'(a,i0,2a)') 'recom4_adapter: dust iron of month ', &
+            imonth, ' from ', fname
+#endif
+    end subroutine recom4_adapter_monthly
+
+#ifdef __RECOM4
+    ! Stops with a message if a netCDF call failed.
+    subroutine nc(status, what, partit)
+        integer,          intent(in) :: status
+        character(len=*), intent(in) :: what
+        type(t_partit),   intent(in) :: partit
+
+        if (status /= nf90_noerr) call fail('netCDF: ' // what // ': ' // trim(nf90_strerror(status)), partit)
+    end subroutine nc
+#endif
 
     ! Prints msg and aborts every rank (a failing rank must not leave the others
     ! waiting in a collective), as FESOM_F's own die().
