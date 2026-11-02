@@ -5,6 +5,19 @@ Forcing configuration (namelist.forcing)
 
 ``namelist.forcing`` describes how atmospheric boundary conditions are read and processed. It controls the bulk formulae, optional land-ice freshwater, the age tracer mask, and all file names/variables for surface forcing, runoff and SSS restoring.
 
+Choosing how the forcing is read
+================================
+
+Keys in ``&nam_sbc`` select how the forcing records reach the ranks and whether land cells of the forcing grid are masked before interpolation. Every combination gives the same model output to the bit; they differ in time and memory.
+
+- **Small forcing grids or few ranks** (for example CORE2 forcing, up to a few hundred ranks): the default ``forcing_distribution='bcast'`` is fine. One rank reads each field and broadcasts the whole grid.
+- **Memory per rank matters, or up to a few thousand ranks**: ``forcing_distribution='scatter'``. Each rank holds only the box of the forcing grid its interpolation needs. One rank still reads each field and the others wait for it.
+- **Many ranks, or any run with** ``use_ocean_only_forcing``: ``forcing_distribution='redist'`` with ``forcing_exchange='p2p_ahead'`` and ``n_forcing_readers=-1``. Several ranks read, each rank receives only the cells it uses, and the next record is read and sent while the model steps. ``forcing_exchange='p2p'`` is the same without the read-ahead. ``'alltoallv'`` uses one collective over all ranks and slows down past a few hundred ranks, so prefer ``'p2p'`` or ``'p2p_ahead'``.
+- **n_forcing_readers** (``'redist'`` only): ``-1`` gives each field its own reading rank, which is cheapest for files that store a record as one compressed chunk (JRA55-do); ``0`` uses one reader per node; ``n`` uses that many.
+- **use_ocean_only_forcing**: turn it on whenever the forcing comes with an ocean mask (JRA55-do, ``namelist.forcing.JRA``), so that coastal nodes do not interpolate land values. CORE2 files have no mask, so CORE2 forcing runs without it.
+
+The keys are described one by one under ``&nam_sbc`` below.
+
 Sections of the namelist
 ========================
 
@@ -52,3 +65,23 @@ Forcing file names are provided without the year suffix; the code appends ``.<ye
 - **chl_data_source='Sweeney'**, **nm_chl_data_file='<add path>'**, **chl_const=0.1** chlorophyll data for shortwave penetration (active when ``use_sw_pene`` in ``namelist.config`` is ``.true.``). Choose ``'Sweeney'`` for the supplied climatology file or ``'None'`` to use the constant value ``chl_const``.
 - **use_runoff_mapper=.false.**, **runoff_basins_file='<add path>'**, **runoff_radius=500000.** enable and configure the runoff mapper that spreads river discharge over neighbouring coastal cells using the provided basin map and radius.
 - In coupled runs the received runoff is split into liquid and solid parts, available as the output streams ``runoff_liquid`` and ``runoff_solid`` in addition to the total ``runoff``.
+
+Ocean-only forcing
+''''''''''''''''''
+
+- **use_ocean_only_forcing=.false.** take forcing values only from ocean cells of the forcing grid and fill land cells from their ocean neighbours, so that coastal model nodes do not interpolate land values. ``namelist.forcing.JRA`` turns it on.
+- **nm_ocean_mask_file**, **nm_ocean_mask_var='sftof'**, **ocean_mask_threshold=90.** file and variable with the ocean fraction in percent on the forcing grid; a cell is ocean where the fraction exceeds the threshold. All forcing fields must be on the grid of the mask.
+- The fill repeats sweeps over the grid until every land cell has a value: each sweep gives every unfilled land cell next to filled cells the mean of those neighbours. Which cells are filled in which sweep, and from which neighbours, depends only on the mask, so the model records it once at start-up and replays it for each record in one pass over the land cells. The result is the same to the bit as the sweeps; the first replay on each rank is checked against them and stops the run on any difference.
+- **ocean_fill_reference=.false.** ``.true.`` runs the original sweeps instead of the replay, for tests; not supported with ``forcing_distribution='redist'``.
+
+Distributing the forcing over the ranks
+'''''''''''''''''''''''''''''''''''''''
+
+Every rank needs the forcing only at the corners of the bilinear stencils of its own nodes. These keys choose how the records get there; all of them give the model the same numbers to the bit (the ``integration_pi_forcing_*`` tests check this).
+
+- **forcing_distribution='bcast'** one rank reads each field and broadcasts the whole grid to every rank. Simple, and fine for small grids or few ranks.
+- **forcing_distribution='scatter'** the reading rank sends each rank only the box that covers its stencils. Less traffic than ``'bcast'``, but every rank still waits for that one reader.
+- **forcing_distribution='redist'** several ranks read row blocks of the record, and a schedule built once at start-up sends each rank exactly the cells its stencils use (with ocean-only forcing, also the cells their land fill reads). This is the option that keeps the forcing cost flat as the rank count grows.
+- **n_forcing_readers=0** (``'redist'`` only) number of reading ranks: ``0`` one per node, ``n > 0`` that many, ``-1`` one per field, each field on a different rank. With files that store a record as one compressed chunk (as JRA55-do does), every reader decompresses the whole record whatever rows it needs, so ``-1`` is the cheapest: one decompression per field and record.
+- **forcing_exchange='alltoallv'** (``'redist'`` only) how the cells travel: ``'alltoallv'`` one ``MPI_Alltoallv`` over all ranks, which becomes slow at large rank counts; ``'p2p'`` messages only between the ranks that exchange cells; ``'p2p_ahead'`` as ``'p2p'``, and each refresh also reads and sends the next record, so the next refresh only receives what has already arrived. At a change of year the next record lies in the next file and is read when it is needed.
+- For large runs ``forcing_distribution='redist'``, ``forcing_exchange='p2p_ahead'``, ``n_forcing_readers=-1`` is the fastest combination measured on Levante (CORE2 mesh, JRA55-do, 640 steps): with the land mask the forcing update took 1.2 to 1.6 s at 512 to 6912 cores, against 5.8 to 8.3 s for ``'scatter'``; without it 1.2 to 1.9 s at 1728 to 13824 cores, against 5 to 10 s. With CORE2 forcing every option stays at or below about 1 s.

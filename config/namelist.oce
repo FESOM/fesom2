@@ -50,7 +50,7 @@ GMzexp_zref        = 500.0   ! reference for vertical exp GM scaling
 GMzexp_smin        = 0.6     ! minimum scaling factor
 
 ! --- Mixed Layer Eddy Restratification (Fox-Kemper et al. 2008, 2011) ---
-use_mle            = .false. ! enable MLE restratification (GM is tapered out of the mixed layer by ODM95)
+use_mle            = .false. ! enable MLE restratification (acts in the mixed layer, in addition to GM)
 mle_Ce             = 0.06    ! efficiency coefficient
 mle_Lf_min         = 1000.0  ! floor on the frontal width (m), Lf = max(N*H/f, Lf_min)
 mle_tau            = 86400.0 ! frontal lifetime (s), regularises f towards the equator

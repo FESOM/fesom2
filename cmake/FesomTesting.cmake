@@ -417,7 +417,7 @@ endfunction()
 # Function to add a FESOM integration test with custom options
 function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH RUN_LENGTH_UNIT RESTART_LENGTH RESTART_LENGTH_UNIT LOGFILE_OUTFREQ FORCE_ROTATION USE_CAVITY)
     set(options MPI_TEST)
-    set(oneValueArgs NP TIMEOUT LABEL MIX_SCHEME FORCING FORCING_YEAR LEAPYEAR USE_ICE OMP_THREADS DATA_DIR CONSERVATION_FREQ)
+    set(oneValueArgs NP TIMEOUT LABEL MIX_SCHEME FORCING FORCING_YEAR LEAPYEAR USE_ICE OMP_THREADS DATA_DIR CONSERVATION_FREQ COMPARE_TO)
     # OMP_THREADS: run with this many OpenMP threads per rank (OMP_NUM_THREADS), with
     # the passive wait policy and without MPI core binding, so that all threads of a
     # rank get to run even when the runner has fewer cores than threads.
@@ -428,7 +428,14 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
     # CONSERVATION_FREQ: run with conservation_freq set to this value and, after the
     # run checks, judge the CONS lines of the log with tools/check_conservation.py;
     # CONSERVATION_CHECK_ARGS are passed to it (e.g. --rtol-heat 1e-9).
-    set(multiValueArgs COMMAND_ARGS EXTRA_SUCCESS_MARKERS CONSERVATION_CHECK_ARGS)
+    # FORCING_SBC: namelist settings ("key=value") for &nam_sbc in namelist.forcing,
+    # e.g. "forcing_distribution='redist'"; an existing setting of the same key is
+    # removed first, so the value given here is the one fesom.x reads.
+    # COMPARE_TO: name of another test registered in the same directory; after the run
+    # checks, every NetCDF file of its results (outputs and restarts) must be identical
+    # bit for bit to this test's (tools/compare_nc_exact.py, run with FESOM_NC_PYTHON,
+    # a Python with netCDF4). The other test runs first (CTest fixture).
+    set(multiValueArgs COMMAND_ARGS EXTRA_SUCCESS_MARKERS CONSERVATION_CHECK_ARGS FORCING_SBC)
     cmake_parse_arguments(FESOM_TEST "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
     # Set defaults
@@ -512,6 +519,25 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
             message(\"\${_cons_output}\")
             if(NOT _cons_result EQUAL 0)
                 message(FATAL_ERROR \"Test ${TEST_NAME} FAILED: conservation budgets do not close (${TEST_RUN_DIR}/test_output.log)\")
+            endif()
+")
+    endif()
+
+    if(DEFINED FESOM_TEST_COMPARE_TO)
+        if(NOT FESOM_NC_PYTHON)
+            message(FATAL_ERROR "add_fesom_test_with_options(${TEST_NAME}): COMPARE_TO needs FESOM_NC_PYTHON (a Python 3 with netCDF4)")
+        endif()
+        string(REPLACE ";" "\" \"" _nc_python "${FESOM_NC_PYTHON}")
+        string(APPEND _post_checks "
+            execute_process(
+                COMMAND \"${_nc_python}\" \"${FESOM_TESTING_ROOT}/tools/compare_nc_exact.py\"
+                        \"${CMAKE_CURRENT_BINARY_DIR}/${FESOM_TEST_COMPARE_TO}/results\" \"${RESULT_DIR}\"
+                RESULT_VARIABLE _cmp_result
+                OUTPUT_VARIABLE _cmp_output
+                ERROR_VARIABLE _cmp_output)
+            message(\"\${_cmp_output}\")
+            if(NOT _cmp_result EQUAL 0)
+                message(FATAL_ERROR \"Test ${TEST_NAME} FAILED: results differ from ${FESOM_TEST_COMPARE_TO}\")
             endif()
 ")
     endif()
@@ -644,6 +670,26 @@ ${_omp_env}
         endif()
     endif()
 
+    # Optional: &nam_sbc settings (forcing distribution, exchange, readers, ocean-only
+    # forcing, ...). Each "key=value" replaces any setting of the same key and is put
+    # first in the group.
+    if(FESOM_TEST_FORCING_SBC)
+        file(READ "${TEST_RUN_DIR}/namelist.forcing" _frc_content)
+        set(_sbc_lines "")
+        foreach(_kv IN LISTS FESOM_TEST_FORCING_SBC)
+            string(REGEX MATCH "^[ \t]*([A-Za-z0-9_]+)" _key "${_kv}")
+            set(_key "${CMAKE_MATCH_1}")
+            string(REGEX REPLACE "\n[ \t]*${_key}[ \t]*=[^\n]*" "" _frc_content "${_frc_content}")
+            string(APPEND _sbc_lines "   ${_kv}\n")
+        endforeach()
+        string(REGEX REPLACE "(&nam_sbc[^\n]*\n)" "\\1${_sbc_lines}" _frc_content "${_frc_content}")
+        string(FIND "${_frc_content}" "${_sbc_lines}" _pos)
+        if(_pos EQUAL -1)
+            message(FATAL_ERROR "add_fesom_test_with_options(${TEST_NAME}): no &nam_sbc in namelist.forcing for FORCING_SBC")
+        endif()
+        file(WRITE "${TEST_RUN_DIR}/namelist.forcing" "${_frc_content}")
+    endif()
+
     # Optional: include leap years. update_namelist_config_with_options() forces
     # include_fleapyear=.false. for the (no-leap) CORE2 data; real-calendar forcing
     # such as JRA55 (gregorian time axis) needs .true. or fesom.x aborts at the
@@ -708,6 +754,12 @@ ${_omp_env}
             PROCESSORS ${FESOM_TEST_NP}
             RUN_SERIAL FALSE
         )
+    endif()
+
+    # The reference of a comparison runs first: it sets up a fixture this test requires.
+    if(DEFINED FESOM_TEST_COMPARE_TO)
+        set_tests_properties(${FESOM_TEST_COMPARE_TO} PROPERTIES FIXTURES_SETUP fx_${FESOM_TEST_COMPARE_TO})
+        set_tests_properties(${TEST_NAME} PROPERTIES FIXTURES_REQUIRED fx_${FESOM_TEST_COMPARE_TO})
     endif()
     
     message(STATUS "Added FESOM test: ${TEST_NAME} with mesh: ${MESH_NAME}, cavity: ${USE_CAVITY}")

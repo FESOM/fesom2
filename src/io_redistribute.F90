@@ -48,7 +48,8 @@ module io_redistribute
   public :: redist_build, redist_free, redist_check
   public :: redist_exchange
   public :: redist_scatter_type
-  public :: redist_build_scatter, redist_scatter, redist_scatter_free
+  public :: redist_build_scatter, redist_scatter, redist_scatter_r4, redist_scatter_p2p_r4, redist_scatter_free
+  public :: redist_p2p_xfer, redist_p2p_post, redist_p2p_complete
   public :: REDIST_MIN_BLOCK
 
   !> Move a field from the model decomposition into block order.
@@ -61,6 +62,11 @@ module io_redistribute
      module procedure redist_exchange_r4
      module procedure redist_exchange_r8
   end interface redist_exchange
+
+  interface redist_scatter
+     module procedure redist_scatter_r4
+     module procedure redist_scatter_r8
+  end interface redist_scatter
 
   !> Smallest number of entries per writer block. Guards against pathological
   !> chunk sizes: core2 (nod2D = 126858) with 1024 writers would otherwise give
@@ -131,6 +137,15 @@ module io_redistribute
      integer, allocatable :: qperm(:)           !< 1:nwant, request slot -> local position
   end type redist_scatter_type
 
+  !> One point-to-point transfer of redist_p2p_post / redist_p2p_complete. The
+  !> buffers stay allocated between transfers of the same schedule.
+  type :: redist_p2p_xfer
+     logical :: active = .false.
+     integer :: nreq   = 0
+     real(kind=4), allocatable :: sbuf(:,:), rbuf(:,:)
+     integer,      allocatable :: req(:)
+  end type redist_p2p_xfer
+
 contains
 
   !> Uniform block size. ceil(n_global / n_writers).
@@ -149,13 +164,19 @@ contains
   !>
   !> This clamp is why a node/element schedule pair must share one count: it
   !> depends on n_global, which differs between the two. See the module header.
-  pure function redist_effective_writers(n_global, n_writers_req, npes) result(nw)
+  !>
+  !> min_block replaces REDIST_MIN_BLOCK. Readers of a small input grid pass one
+  !> grid row: they read whole rows anyway, and chunk metadata is no concern there.
+  pure function redist_effective_writers(n_global, n_writers_req, npes, min_block) result(nw)
     integer, intent(in) :: n_global, n_writers_req, npes
-    integer :: nw
+    integer, intent(in), optional :: min_block
+    integer :: nw, mb
+    mb = REDIST_MIN_BLOCK
+    if (present(min_block)) mb = max(1, min_block)
     nw = n_writers_req
     if (nw <= 0)    nw = npes           ! 0 or negative means "all ranks"
     if (nw > npes)  nw = npes
-    nw = min(nw, max(1, n_global / REDIST_MIN_BLOCK))
+    nw = min(nw, max(1, n_global / mb))
     if (nw < 1) nw = 1
   end function redist_effective_writers
 
@@ -360,14 +381,17 @@ contains
   !> side gets away with the grouping shortcut because myList_nod2D(1:myDim) is
   !> sorted; append the halo tail and it is not, so the destination-sorted order
   !> is built explicitly and qperm remembers the way back.
-  subroutine redist_build_scatter(this, want, nwant, n_global, n_readers_req, comm, verbose, ierr)
+  subroutine redist_build_scatter(this, want, nwant, n_global, n_readers_req, comm, verbose, ierr, min_block, reader_shift)
     type(redist_scatter_type), intent(out) :: this
     integer, intent(in)  :: nwant, n_global, n_readers_req, comm
     integer, intent(in)  :: want(nwant)
     logical, intent(in)  :: verbose
     integer, intent(out) :: ierr
+    integer, intent(in), optional :: min_block   !< see redist_effective_writers
+    integer, intent(in), optional :: reader_shift !< move all readers this many ranks up (mod npes), so
+                                                  !< that schedules of different fields use different readers
 
-    integer :: i, w, r, mpierr, slot
+    integer :: i, w, r, mpierr, slot, shift
     integer, allocatable :: fill(:), qglob(:), sglob(:)
 
     ierr = 0
@@ -375,16 +399,18 @@ contains
     call MPI_Comm_rank(comm, this%mype, mpierr)
 
     this%n_global  = n_global
-    this%n_readers = redist_effective_writers(n_global, n_readers_req, this%npes)
+    this%n_readers = redist_effective_writers(n_global, n_readers_req, this%npes, min_block)
     this%block     = redist_block_size(n_global, this%n_readers)
     this%nwant     = nwant
+    shift = 0
+    if (present(reader_shift)) shift = reader_shift
 
     ! Reader set and block range: identical rules to the writer side, so the
     ! two agree by construction rather than by coincidence.
     this%is_reader = .false.
     this%widx      = -1
     do w = 0, this%n_readers - 1
-       if (redist_writer_rank(w, this%npes, this%n_readers) == this%mype) then
+       if (modulo(redist_writer_rank(w, this%npes, this%n_readers) + shift, this%npes) == this%mype) then
           this%is_reader = .true.
           this%widx      = w
           exit
@@ -411,7 +437,7 @@ contains
           return
        end if
        w = redist_owner_of(want(i), this%block, this%n_readers)
-       r = redist_writer_rank(w, this%npes, this%n_readers)
+       r = modulo(redist_writer_rank(w, this%npes, this%n_readers) + shift, this%npes)
        this%qcnt(r) = this%qcnt(r) + 1
     end do
 
@@ -425,7 +451,7 @@ contains
     fill = this%qdsp
     do i = 1, nwant
        w = redist_owner_of(want(i), this%block, this%n_readers)
-       r = redist_writer_rank(w, this%npes, this%n_readers)
+       r = modulo(redist_writer_rank(w, this%npes, this%n_readers) + shift, this%npes)
        fill(r) = fill(r) + 1
        slot = fill(r)
        qglob(slot)      = want(i)
@@ -474,7 +500,7 @@ contains
   !>
   !> Mirror image of redist_exchange: gather into the send buffer through sloc,
   !> one Alltoallv, then scatter through qperm.
-  subroutine redist_scatter(this, nlev, blk, out, comm, ierr)
+  subroutine redist_scatter_r8(this, nlev, blk, out, comm, ierr)
     type(redist_scatter_type), intent(in) :: this
     integer, intent(in)  :: nlev, comm
     real(kind=8), intent(in)  :: blk(nlev, *)
@@ -503,7 +529,121 @@ contains
     end do
 
     deallocate(sbuf, rbuf, sc, sd, rc, rd)
-  end subroutine redist_scatter
+  end subroutine redist_scatter_r8
+
+  !> real(4) twin of redist_scatter_r8, for single-precision input such as forcing.
+  subroutine redist_scatter_r4(this, nlev, blk, out, comm, ierr)
+    type(redist_scatter_type), intent(in) :: this
+    integer, intent(in)  :: nlev, comm
+    real(kind=4), intent(in)  :: blk(nlev, *)
+    real(kind=4), intent(out) :: out(nlev, *)
+    integer, intent(out) :: ierr
+    real(kind=4), allocatable :: sbuf(:,:), rbuf(:,:)
+    integer, allocatable :: sc(:), sd(:), rc(:), rd(:)
+    integer :: i, mpierr
+
+    ierr = 0
+    allocate(sc(0:this%npes-1), sd(0:this%npes-1), rc(0:this%npes-1), rd(0:this%npes-1))
+    sc = this%scnt * nlev ; sd = this%sdsp * nlev
+    rc = this%qcnt * nlev ; rd = this%qdsp * nlev
+
+    allocate(sbuf(nlev, max(1, this%nserve)))
+    do i = 1, this%nserve
+       sbuf(1:nlev, i) = blk(1:nlev, this%sloc(i))
+    end do
+
+    allocate(rbuf(nlev, max(1, this%nwant)))
+    call MPI_Alltoallv(sbuf, sc, sd, MPI_REAL4, rbuf, rc, rd, MPI_REAL4, comm, mpierr)
+    if (mpierr /= MPI_SUCCESS) ierr = mpierr
+
+    do i = 1, this%nwant
+       out(1:nlev, this%qperm(i)) = rbuf(1:nlev, i)
+    end do
+
+    deallocate(sbuf, rbuf, sc, sd, rc, rd)
+  end subroutine redist_scatter_r4
+
+  !> redist_scatter_r4 with messages only between ranks with a nonzero count.
+  !> Same buffer layout as the Alltoallv, so the same result bit for bit.
+  subroutine redist_scatter_p2p_r4(this, nlev, blk, out, comm, ierr)
+    type(redist_scatter_type), intent(in) :: this
+    integer, intent(in)  :: nlev, comm
+    real(kind=4), intent(in)  :: blk(nlev, *)
+    real(kind=4), intent(out) :: out(nlev, *)
+    integer, intent(out) :: ierr
+    type(redist_p2p_xfer) :: x
+    integer :: ierr2
+
+    call redist_p2p_post(this, x, nlev, blk, comm, 7301, ierr)
+    call redist_p2p_complete(this, x, nlev, ierr2, out)
+    if (ierr == 0) ierr = ierr2
+  end subroutine redist_scatter_p2p_r4
+
+  !> Post the sends and receives of one redist_scatter_p2p_r4 exchange; the
+  !> transfer stays outstanding in x until redist_p2p_complete.
+  subroutine redist_p2p_post(this, x, nlev, blk, comm, tag, ierr)
+    type(redist_scatter_type), intent(in) :: this
+    type(redist_p2p_xfer), intent(inout), asynchronous :: x
+    integer, intent(in)  :: nlev, comm, tag
+    real(kind=4), intent(in)  :: blk(nlev, *)
+    integer, intent(out) :: ierr
+    integer :: i, p, mpierr
+
+    ierr = 0
+    if (x%active) then
+       ierr = 1
+       return
+    end if
+    if (allocated(x%sbuf)) then
+       if (size(x%sbuf, 1) /= nlev) deallocate(x%sbuf, x%rbuf)
+    end if
+    if (.not. allocated(x%sbuf)) allocate(x%sbuf(nlev, max(1, this%nserve)), x%rbuf(nlev, max(1, this%nwant)))
+    if (.not. allocated(x%req)) allocate(x%req(count(this%qcnt > 0) + count(this%scnt > 0)))
+    do i = 1, this%nserve
+       x%sbuf(1:nlev, i) = blk(1:nlev, this%sloc(i))
+    end do
+
+    x%nreq = 0
+    do p = 0, this%npes-1
+       if (this%qcnt(p) > 0) then
+          x%nreq = x%nreq + 1
+          call MPI_Irecv(x%rbuf(1, this%qdsp(p)+1), this%qcnt(p)*nlev, MPI_REAL4, p, tag, comm, x%req(x%nreq), mpierr)
+          if (mpierr /= MPI_SUCCESS) ierr = mpierr
+       end if
+    end do
+    do p = 0, this%npes-1
+       if (this%scnt(p) > 0) then
+          x%nreq = x%nreq + 1
+          call MPI_Isend(x%sbuf(1, this%sdsp(p)+1), this%scnt(p)*nlev, MPI_REAL4, p, tag, comm, x%req(x%nreq), mpierr)
+          if (mpierr /= MPI_SUCCESS) ierr = mpierr
+       end if
+    end do
+    x%active = .true.
+  end subroutine redist_p2p_post
+
+  !> Complete a transfer of redist_p2p_post; unpack into out if given, else drop it.
+  subroutine redist_p2p_complete(this, x, nlev, ierr, out)
+    type(redist_scatter_type), intent(in) :: this
+    type(redist_p2p_xfer), intent(inout), asynchronous :: x
+    integer, intent(in)  :: nlev
+    integer, intent(out) :: ierr
+    real(kind=4), intent(out), optional :: out(nlev, *)
+    integer :: i, mpierr
+
+    ierr = 0
+    if (.not. x%active) then
+       ierr = 1
+       return
+    end if
+    call MPI_Waitall(x%nreq, x%req, MPI_STATUSES_IGNORE, mpierr)
+    if (mpierr /= MPI_SUCCESS) ierr = mpierr
+    x%active = .false.
+    if (present(out)) then
+       do i = 1, this%nwant
+          out(1:nlev, this%qperm(i)) = x%rbuf(1:nlev, i)
+       end do
+    end if
+  end subroutine redist_p2p_complete
 
 
   subroutine redist_scatter_free(this)

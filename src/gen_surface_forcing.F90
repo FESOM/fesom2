@@ -52,6 +52,9 @@ MODULE g_sbf
    USE g_read_other_NetCDF, only: read_other_NetCDF, read_2ddata_on_grid_netcdf
 
    USE netcdf
+   use io_redistribute, only: redist_scatter_type, redist_build_scatter, redist_scatter_r4, redist_scatter_p2p_r4, &
+                              redist_p2p_xfer, redist_p2p_post, redist_p2p_complete
+   use forcing_provider_netcdf_module, only: netcdf_reader_handle
 
    IMPLICIT NONE
    
@@ -136,6 +139,8 @@ MODULE g_sbf
    character(len=MAX_PATH), save   :: nm_ocean_mask_file     = ''
    character(len=34),       save   :: nm_ocean_mask_var      = 'sftof'
    real(wp),                save   :: ocean_mask_threshold   = 90.0_WP  ! ocean where sftof > threshold (%)
+   ! .true.: original land-fill sweeps instead of the replay (same result; reference for tests)
+   logical,                 save   :: ocean_fill_reference   = .false.
 
    real(wp), allocatable, save, dimension(:), public     :: qns   ! downward non solar heat over the ocean [W/m2]
    real(wp), allocatable, save, dimension(:), public     :: qsr   ! downward solar heat over the ocean [W/m2]
@@ -160,7 +165,15 @@ MODULE g_sbf
    integer, save  :: nm_sbc_unit     = 103       ! unit to open namelist file, skip 100-102 for cray fortran
    logical        :: ic_cyclic=.true.
   !============== namelistatmdata variables ================
-   character(len=10), save    :: forcing_distribution = 'bcast' ! 'bcast' or 'scatter' (each rank receives only its interpolation box)
+   character(len=10), save    :: forcing_distribution = 'bcast' ! 'bcast', 'scatter' (each rank receives only its interpolation box)
+                                                             ! or 'redist' (row slabs read by several ranks, a fixed schedule
+                                                             ! delivers each rank the cells its stencils use)
+   integer, save              :: n_forcing_readers = 0       ! 'redist' only: ranks reading forcing; 0 = one per node,
+                                                             ! -1 = one reader per field, each field on a different rank
+   character(len=10), save    :: forcing_exchange = 'alltoallv' ! 'redist' only: 'alltoallv' (one MPI_Alltoallv over all ranks)
+                                                             ! or 'p2p' (messages only between ranks that exchange cells)
+                                                             ! or 'p2p_ahead' ('p2p', and each refresh reads and sends the
+                                                             ! next record, which the next refresh only has to receive)
    character(len=256), save   :: nm_xwind_file = 'xwind.dat' ! name of file with winds, if netcdf file then provide only name from "nameyyyy.nc" yyyy.nc will be added by model
    character(len=256), save   :: nm_ywind_file = 'ywind.dat' ! name of file with winds, if netcdf file then provide only name from "nameyyyy.nc" yyyy.nc will be added by model
    character(len=256), save   :: nm_xstre_file = 'xstre.dat' ! name of file with stress, if netcdf file then provide only name from "nameyyyy.nc" yyyy.nc will be added by model
@@ -243,13 +256,44 @@ MODULE g_sbf
       integer,  allocatable, dimension(:)      :: scat_counts, scat_displs ! I/O rank only
       real(4),  allocatable, dimension(:)      :: scat_pack    ! I/O rank only
       real(4),  allocatable, dimension(:,:)    :: readbuf      ! full grid, I/O rank only
+      ! ========== forcing_distribution='redist': box arrays as for 'scatter', filled through a fixed schedule
+      type(redist_scatter_type)                :: rsched
+      integer,  allocatable, dimension(:,:)    :: rwant        ! (2, nwant) box cell (i, j) of each request
+      real(4),  allocatable, dimension(:)      :: rslab        ! rows this reader reads, file order
+      real(4),  allocatable, dimension(:)      :: rout         ! (nwant) received cells
+      integer                                  :: rrow0 = 0, rnrow = 0, roff = 1 ! slab rows, block offset in slab
+      type(netcdf_reader_handle)               :: rfile
+      integer                                  :: rfile_year = -1
+      ! forcing_exchange='p2p_ahead': the next record's exchange, posted at the previous refresh
+      type(redist_p2p_xfer)                    :: rx_ahead
+      real(4),  allocatable, dimension(:)      :: rslab_ahead  ! slab of that record (readers)
+      integer                                  :: rahead_index = -1, rahead_year = -1
+      ! ocean-only with 'redist': rwant/rout are the raw cells the stencil cells' fill reads;
+      ! fsrc(:,k) operands of filled cell k (>0 raw cell in rout, <0 filled cell), fout box cells
+      integer,  allocatable, dimension(:,:)    :: fsrc
+      integer,  allocatable, dimension(:)      :: fcnt
+      real(4),  allocatable, dimension(:)      :: fval
+      integer,  allocatable, dimension(:,:)    :: fout
+      integer                                  :: nfev = 0, nout = 0
       ! ========== interpolation coeficients
    end type flfi_type
    type(flfi_type), allocatable, save, target :: sbc_flfi(:)  !array for information about flux files
    integer,  allocatable, dimension(:,:)     :: bilin_indx_i ! indexs i for interpolation
    integer,  allocatable, dimension(:,:)     :: bilin_indx_j ! indexs j for interpolation
+   ! bilinear stencil of each node (sbc_geom_setup)
+   integer,  allocatable, dimension(:,:)     :: bilin_i0, bilin_i1, bilin_j0, bilin_j1, bilin_extrp
+   real(wp), allocatable, dimension(:,:)     :: bilin_x, bilin_y
+   ! last refresh's second record on the nodes, reused when the next refresh starts from it
+   real(wp), allocatable, dimension(:,:)     :: data2_node
+   integer,  allocatable, dimension(:)       :: data2_node_t_index
    ! Ocean-only forcing mask on the forcing grid (1=ocean, 0=land)
    integer,  allocatable, save, dimension(:,:) :: forcing_ocean_mask
+   ! land-fill recipe from the mask (fill_build_recipe): fill_iter = sweep filling a cell (0 ocean,
+   ! -1 never); fill_code bits 0-3 = neighbour W,E,S,N averaged, bits 4-7 = it enters filled;
+   ! fill_order = land cells by sweep
+   integer,  allocatable, save, dimension(:,:) :: fill_iter, fill_code, fill_order
+   integer,  save                              :: fill_nland = 0
+   logical,  save                              :: fill_checked = .false.
    !flip latitude from infiles (for example  NCEP-DOE Reanalysis 2 standart)
    integer, save              :: flip_lat ! 1 if we need to flip
 !============== NETCDF ==========================================
@@ -763,6 +807,7 @@ CONTAINS
 !$OMP END DO
 !$OMP END PARALLEL
          call sbc_box_setup(fld_idx, partit)
+         call sbc_geom_setup(fld_idx, partit, mesh)
       end do
       lfirst=.false.
       end if
@@ -770,6 +815,9 @@ CONTAINS
       ! Read ocean mask for ocean-only forcing (once at initialization)
       if (use_ocean_only_forcing .and. .not. allocated(forcing_ocean_mask)) then
          call read_forcing_ocean_mask(partit)
+         call fill_build_recipe(sbc_flfi(1)%nc_Nlon, sbc_flfi(1)%nc_Nlat)
+         if (partit%mype==0) write(*,*) 'Ocean-only forcing: ', fill_nland, ' land cells filled in ', &
+                                 maxval(fill_iter), ' sweeps'
       end if
 
       do fld_idx = 1, i_totfl
@@ -859,6 +907,7 @@ CONTAINS
       real(wp),  pointer   :: nc_lon(:), nc_lat(:)
       real(4), dimension(:,:), pointer :: sbcdata1, sbcdata2
       logical sbcdata1_from_cache, sbcdata2_from_cache
+      logical data1_from_node    ! first record already interpolated by the previous refresh
       integer rootrank
 
       ! fld_idx determines which ouf our forcing fields we use here
@@ -877,6 +926,8 @@ CONTAINS
         sbc_flfi(fld_idx)%read_forcing_rootrank = next_io_rank(partit%MPI_COMM_FESOM, sbc_flfi(fld_idx)%async_netcdf_allowed, partit)
         if (trim(forcing_distribution)=='scatter') then
           call sbc_box_alloc(fld_idx, partit)
+        else if (trim(forcing_distribution)=='redist') then
+          call sbc_redist_alloc(fld_idx, partit)
         else
           allocate(sbc_flfi(fld_idx)%sbcdata_a(nc_Nlon,nc_Nlat))
           allocate(sbc_flfi(fld_idx)%sbcdata_b(nc_Nlon,nc_Nlat))
@@ -994,6 +1045,8 @@ CONTAINS
           sbc_flfi(fld_idx)%sbcdata_b_t_index = t_indx_p1
       end if
       sbcdata2_from_cache = .false.         
+      ! the cached grid is the last refresh's second record, already on the nodes
+      data1_from_node = sbcdata1_from_cache .and. data2_node_t_index(fld_idx) == t_indx
 
       iost = 0
       !open file sbc_flfi
@@ -1005,8 +1058,13 @@ CONTAINS
       if (trim(forcing_distribution)=='scatter') then
         if (.not. sbcdata1_from_cache) call sbc_box_distribute(fld_idx, t_indx,    sbcdata1, partit)
         if (.not. sbcdata2_from_cache) call sbc_box_distribute(fld_idx, t_indx_p1, sbcdata2, partit)
+      else if (trim(forcing_distribution)=='redist') then
+        if (.not. sbcdata1_from_cache) call sbc_redist_distribute(fld_idx, t_indx,    sbcdata1, partit)
+        if (.not. sbcdata2_from_cache) call sbc_redist_distribute(fld_idx, t_indx_p1, sbcdata2, partit)
       else
       !read data from file
+      ! profiler sections are entered on every rank
+      if (.not. sbcdata1_from_cache) call fesom_profiler_start("sbc_ioread")
       if (partit%mype==rootrank) then
          nf_start(1)=1
          nf_edges(1)=nc_Nlon-2
@@ -1019,6 +1077,7 @@ CONTAINS
          end if
          iost = 0
       end if
+      if (.not. sbcdata1_from_cache) call fesom_profiler_end("sbc_ioread")
 
       if(partit%mype == rootrank) then
         if(.not. sbcdata1_from_cache) then
@@ -1028,10 +1087,13 @@ CONTAINS
       end if
       if(sbcdata1_from_cache) then ! use the cache instead of bcast
       else
+        call fesom_profiler_start("sbc_bcast")
         call MPI_BCast(sbcdata1(1:nc_Nlon,1:nc_Nlat), nc_Nlon*nc_Nlat, MPI_REAL, rootrank, partit%MPI_COMM_FESOM, ierror)
+        call fesom_profiler_end("sbc_bcast")
      end if
 
        ! read next time step in file (check for +1 done before)
+      if (.not. sbcdata2_from_cache) call fesom_profiler_start("sbc_ioread")
       if (partit%mype==rootrank) then
         nf_start(3)=t_indx_p1
         nf_edges(3)=1
@@ -1040,6 +1102,7 @@ CONTAINS
       end if
       iost = 0
       end if
+      if (.not. sbcdata2_from_cache) call fesom_profiler_end("sbc_ioread")
 
       if (partit%mype==rootrank) then
         if(.not. sbcdata2_from_cache) then
@@ -1050,7 +1113,9 @@ CONTAINS
      if(sbcdata2_from_cache) then ! use the cache instead of bcast
       !
      else
+       call fesom_profiler_start("sbc_bcast")
        call MPI_BCast(sbcdata2(1:nc_Nlon,1:nc_Nlat), nc_Nlon*nc_Nlat, MPI_REAL, rootrank, partit%MPI_COMM_FESOM, ierror)
+       call fesom_profiler_end("sbc_bcast")
      end if
 
 !      !flip data in case of lat from -90 to 90
@@ -1062,8 +1127,11 @@ CONTAINS
 
       ! Ocean-only forcing: fill land cells with extrapolated ocean values
       if (use_ocean_only_forcing) then
-         call fill_land_from_ocean(sbcdata1, forcing_ocean_mask, nc_Nlon, nc_Nlat)
-         call fill_land_from_ocean(sbcdata2, forcing_ocean_mask, nc_Nlon, nc_Nlat)
+         ! fresh records only: a cached grid is already filled and the fill is not idempotent
+         call fesom_profiler_start("sbc_fill_land")
+         if (.not. sbcdata1_from_cache) call fill_land(sbcdata1, nc_Nlon, nc_Nlat)
+         if (.not. sbcdata2_from_cache) call fill_land(sbcdata2, nc_Nlon, nc_Nlat)
+         call fesom_profiler_end("sbc_fill_land")
       end if
       end if
 
@@ -1073,57 +1141,42 @@ CONTAINS
       ! data is assumed to be sampled on a regular grid
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(ii, i, j, ip1, jp1, x, y, extrp, x1, x2, y1, y2, denom, data1, data2)
       do ii = 1, partit%myDim_nod2D+partit%eDim_nod2D
-         i = bilin_indx_i(fld_idx, ii)
-         j = bilin_indx_j(fld_idx, ii)
-         ip1 = i + 1
-         jp1 = j + 1
-         x  = mesh%geo_coord_nod2D(1,ii)/rad
-         if (x < 0.0_WP) x=x+360._WP
-         y  = mesh%geo_coord_nod2D(2,ii)/rad
-         extrp = 0
-         if ( i == 0 ) then
-            i   = nc_Nlon
-            ip1 = i
-            extrp = extrp + 1
-         end if
-         if ( i == -1 ) then
-            i   = 1
-            ip1 = i
-            extrp = extrp + 1
-         end if
-         if ( j == 0 ) then
-            j   = nc_Nlat
-            jp1 = j
-            extrp = extrp + 2
-         end if
-         if ( j == -1 ) then
-            j   = 1
-            jp1 = j
-            extrp = extrp + 2
-         end if
+         i     = bilin_i0(fld_idx, ii)
+         ip1   = bilin_i1(fld_idx, ii)
+         j     = bilin_j0(fld_idx, ii)
+         jp1   = bilin_j1(fld_idx, ii)
+         extrp = bilin_extrp(fld_idx, ii)
+         x     = bilin_x(fld_idx, ii)
+         y     = bilin_y(fld_idx, ii)
          x1 = nc_lon(i)
          x2 = nc_lon(ip1)
          y1 = nc_lat(j)
          y2 = nc_lat(jp1)
+         if (data1_from_node) data1 = data2_node(fld_idx, ii)
          if ( extrp == 0 ) then
          ! if point inside forcing domain
             denom = (x2 - x1)*(y2 - y1)
+            if (.not. data1_from_node) &
             data1 = ( sbcdata1(i,j)   * (x2-x)*(y2-y)   + sbcdata1(ip1,j)    * (x-x1)*(y2-y) + &
                     sbcdata1(i,jp1) * (x2-x)*(y-y1)   + sbcdata1(ip1, jp1) * (x-x1)*(y-y1)     ) / denom
             data2 = ( sbcdata2(i,j)   * (x2-x)*(y2-y)   + sbcdata2(ip1,j)    * (x-x1)*(y2-y) + &
                     sbcdata2(i,jp1) * (x2-x)*(y-y1)   + sbcdata2(ip1, jp1) * (x-x1)*(y-y1)     ) / denom
          else if ( extrp == 1 ) then !  "extrapolation" in x direction
             denom = (y2 - y1)
+            if (.not. data1_from_node) &
             data1 = ( sbcdata1(i,j)   * (y2-y)   + sbcdata1(ip1, jp1) * (y-y1) ) / denom
             data2 = ( sbcdata2(i,j)   * (y2-y)   + sbcdata2(ip1, jp1) * (y-y1) ) / denom
          else if ( extrp == 2 ) then !  "extrapolation" in y direction
             denom = (x2 - x1)
+            if (.not. data1_from_node) &
             data1 = ( sbcdata1(i,j)   * (x2-x)   + sbcdata1(ip1, jp1) * (x-x1) ) / denom
             data2 = ( sbcdata2(i,j)   * (x2-x)   + sbcdata2(ip1, jp1) * (x-x1) ) / denom
          else if ( extrp == 3 ) then !  "extrapolation" in x and y direction
+            if (.not. data1_from_node) &
             data1 = sbcdata1(i,j)
             data2 = sbcdata2(i,j)
          end if
+         data2_node(fld_idx, ii) = data2
          ! calculate new coefficients for interpolations
          ! Point-slope (offset) form: store the slope and the base VALUE data1, and
          ! evaluate later as coef_b + (rdate - time_t0)*coef_a. This keeps the huge
@@ -1134,6 +1187,7 @@ CONTAINS
 
       end do
 !$OMP END PARALLEL DO
+      data2_node_t_index(fld_idx) = t_indx_p1
       call fesom_profiler_end("sbc_interp")
    END SUBROUTINE getcoeffld
 
@@ -1154,7 +1208,7 @@ CONTAINS
 
      ! assign data from interpolation to taux and tauy
       integer            :: fld_idx, i,j,ii
-      real(wp)           :: dt_elapsed   ! elapsed time since bracket start [days], WP
+      real(wp)           :: dt_elapsed(i_totfl) ! elapsed time since bracket start [days], WP
 
       ! Accumulated over the whole run (start/end sums into the named section on
       ! every call), so the report shows total time-interpolation cost, not one step.
@@ -1168,14 +1222,17 @@ CONTAINS
          ! is tiny and exact in WP. Hoisting it out of the node loop keeps the inner
          ! loop a single fused multiply-add (coef_b + dt_elapsed*coef_a), identical in
          ! cost to the previous rdate*coef_a + coef_b.
-         dt_elapsed = real(rdate - time_t0(fld_idx), WP)
-!$OMP PARALLEL DO
-         do i = 1, partit%myDim_nod2D+partit%eDim_nod2D
-            ! store processed forcing data for fesom computation (point-slope form)
-            atmdata(fld_idx,i) = coef_b(fld_idx,i) + dt_elapsed * coef_a(fld_idx,i)
-         end do !nod2D
-!$OMP END PARALLEL DO
+         dt_elapsed(fld_idx) = real(rdate - time_t0(fld_idx), WP)
       end do
+      ! one parallel region for all fields; fields are the fast index
+!$OMP PARALLEL DO PRIVATE(i, fld_idx)
+      do i = 1, partit%myDim_nod2D+partit%eDim_nod2D
+         do fld_idx = 1, i_totfl
+            ! store processed forcing data for fesom computation (point-slope form)
+            atmdata(fld_idx,i) = coef_b(fld_idx,i) + dt_elapsed(fld_idx) * coef_a(fld_idx,i)
+         end do
+      end do !nod2D
+!$OMP END PARALLEL DO
 #ifdef FESOM_PROFILING
       call fesom_profiler_end("sbc_time_interp")
 #endif
@@ -1204,11 +1261,12 @@ CONTAINS
                         nm_mslp_file, nm_xwind_var, nm_ywind_var, nm_xstre_var, nm_ystre_var, nm_humi_var, &
                         nm_qsr_var, nm_qlw_var, nm_tair_var, nm_prec_var, nm_snow_var, &
                         nm_mslp_var, nm_cloud_var, nm_cloud_file, nm_nc_iyear, nm_nc_imm, nm_nc_idd, nm_nc_freq, nm_nc_tmid, y_perpetual, &
-                        forcing_distribution, &
+                        forcing_distribution, n_forcing_readers, forcing_exchange, &
                         l_xwind, l_ywind, l_xstre, l_ystre, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow, &
                         nm_runoff_file, runoff_data_source, runoff_climatology, nm_sss_data_file, sss_data_source, &
                         chl_data_source, nm_chl_data_file, chl_const, use_runoff_mapper, runoff_basins_file, runoff_radius, &
-                        use_ocean_only_forcing, nm_ocean_mask_file, nm_ocean_mask_var, ocean_mask_threshold
+                        use_ocean_only_forcing, nm_ocean_mask_file, nm_ocean_mask_var, ocean_mask_threshold, &
+                        ocean_fill_reference
 
 !#if defined(__recom)
 !      namelist /nam_rsbc/ fe_data_source, nm_fe_data_file, nm_aen_data_file, nm_river_data_file, nm_erosion_data_file, nm_co2_data_file
@@ -1225,6 +1283,15 @@ CONTAINS
       endif
       READ( nm_sbc_unit, nml=nam_sbc, iostat=iost )
       close( nm_sbc_unit )
+
+      if (trim(forcing_distribution)=='redist' .and. use_ocean_only_forcing .and. ocean_fill_reference) then
+         if (partit%mype==0) write(*,*) "  ocean_fill_reference needs the whole grid on one rank, not supported with 'redist'"
+         call par_abort(partit%MPI_COMM_FESOM, partit%mype)
+      end if
+      if (trim(forcing_exchange)/='alltoallv' .and. trim(forcing_exchange)/='p2p' .and. trim(forcing_exchange)/='p2p_ahead') then
+         if (partit%mype==0) write(*,*) "  forcing_exchange must be 'alltoallv', 'p2p' or 'p2p_ahead', got '", trim(forcing_exchange), "'"
+         call par_abort(partit%MPI_COMM_FESOM, partit%mype)
+      end if
       
       if (partit%mype==0) then
          write(*,*) "Start: Ocean forcing initialization."
@@ -1356,6 +1423,13 @@ CONTAINS
                    &      STAT=sbc_alloc )
       bilin_indx_i = 0.0_WP
       bilin_indx_j = 0.0_WP
+      ALLOCATE( bilin_i0(i_totfl, partit%myDim_nod2D+partit%eDim_nod2D), bilin_i1(i_totfl, partit%myDim_nod2D+partit%eDim_nod2D), &
+              & bilin_j0(i_totfl, partit%myDim_nod2D+partit%eDim_nod2D), bilin_j1(i_totfl, partit%myDim_nod2D+partit%eDim_nod2D), &
+              & bilin_extrp(i_totfl, partit%myDim_nod2D+partit%eDim_nod2D), &
+              & bilin_x(i_totfl, partit%myDim_nod2D+partit%eDim_nod2D), bilin_y(i_totfl, partit%myDim_nod2D+partit%eDim_nod2D), &
+              & data2_node(i_totfl, partit%myDim_nod2D+partit%eDim_nod2D), data2_node_t_index(i_totfl))
+      data2_node         = 0.0_WP
+      data2_node_t_index = -1
       qns          = 0.0_WP
       emp          = 0.0_WP
       qsr          = 0.0_WP
@@ -2604,6 +2678,54 @@ END SUBROUTINE sbc_do_recom
       deallocate(sftof)
    END SUBROUTINE read_forcing_ocean_mask
 
+   SUBROUTINE sbc_geom_setup(fld_idx, partit, mesh)
+      ! stencil corners, extrapolation case and node position for getcoeffld, set once
+      IMPLICIT NONE
+      integer,        intent(in)            :: fld_idx
+      type(t_partit), intent(inout), target :: partit
+      type(t_mesh),   intent(in),    target :: mesh
+      integer  :: ii, i, j, ip1, jp1, extrp, nlon, nlat
+      real(wp) :: x, y
+      nlon = sbc_flfi(fld_idx)%nc_Nlon
+      nlat = sbc_flfi(fld_idx)%nc_Nlat
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(ii, i, j, ip1, jp1, extrp, x, y)
+      do ii = 1, partit%myDim_nod2D+partit%eDim_nod2D
+         i = bilin_indx_i(fld_idx, ii)
+         j = bilin_indx_j(fld_idx, ii)
+         ip1 = i + 1
+         jp1 = j + 1
+         x  = mesh%geo_coord_nod2D(1,ii)/rad
+         if (x < 0.0_WP) x=x+360._WP
+         y  = mesh%geo_coord_nod2D(2,ii)/rad
+         extrp = 0
+         if ( i == 0 ) then
+            i   = nlon
+            ip1 = i
+            extrp = extrp + 1
+         end if
+         if ( i == -1 ) then
+            i   = 1
+            ip1 = i
+            extrp = extrp + 1
+         end if
+         if ( j == 0 ) then
+            j   = nlat
+            jp1 = j
+            extrp = extrp + 2
+         end if
+         if ( j == -1 ) then
+            j   = 1
+            jp1 = j
+            extrp = extrp + 2
+         end if
+         bilin_i0(fld_idx, ii) = i;   bilin_i1(fld_idx, ii) = ip1
+         bilin_j0(fld_idx, ii) = j;   bilin_j1(fld_idx, ii) = jp1
+         bilin_extrp(fld_idx, ii) = extrp
+         bilin_x(fld_idx, ii) = x;    bilin_y(fld_idx, ii) = y
+      end do
+!$OMP END PARALLEL DO
+   END SUBROUTINE sbc_geom_setup
+
    SUBROUTINE sbc_box_setup(fld_idx, partit)
       ! bounding box of the forcing cells the bilinear interpolation in getcoeffld touches on this rank
       IMPLICIT NONE
@@ -2677,7 +2799,12 @@ END SUBROUTINE sbc_do_recom
       if (partit%mype == flf%read_forcing_rootrank) then
          flf%readbuf(1,    1:nlat) = flf%readbuf(nlon-1, 1:nlat)
          flf%readbuf(nlon, 1:nlat) = flf%readbuf(2,      1:nlat)
-         if (use_ocean_only_forcing) call fill_land_from_ocean(flf%readbuf, forcing_ocean_mask, nlon, nlat)
+      end if
+      ! entered on every rank; only the reader fills
+      call fesom_profiler_start("sbc_fill_land")
+      if (partit%mype == flf%read_forcing_rootrank .and. use_ocean_only_forcing) call fill_land(flf%readbuf, nlon, nlat)
+      call fesom_profiler_end("sbc_fill_land")
+      if (partit%mype == flf%read_forcing_rootrank) then
          p = 0
          do r = 0, partit%npes-1
             do jj = flf%all_box(3,r), flf%all_box(4,r)
@@ -2694,6 +2821,442 @@ END SUBROUTINE sbc_do_recom
                         flf%read_forcing_rootrank, partit%MPI_COMM_FESOM, ierror)
       call fesom_profiler_end("sbc_scatterv")
    END SUBROUTINE sbc_box_distribute
+
+   SUBROUTINE sbc_redist_alloc(fld_idx, partit)
+      ! schedule, built once, that brings each rank the cells its bilinear stencils use.
+      ! Global index: file column + (row-1)*file columns; sbcdata(1) and sbcdata(nlon) are wrap columns.
+      IMPLICIT NONE
+      integer,        intent(in)            :: fld_idx
+      type(t_partit), intent(inout), target :: partit
+      type(flfi_type), pointer :: flf
+      integer :: ii, i, j, k, c, b(4), nlon, nlat, nlon_f, nwant, nreq, ierr
+      integer :: nodecomm, noderank, isroot, nnodes, shift
+      logical, allocatable :: used(:,:)
+      integer, allocatable :: gwant(:)
+      flf => sbc_flfi(fld_idx)
+      nlon = flf%nc_Nlon; nlat = flf%nc_Nlat; nlon_f = nlon - 2
+      b = flf%box
+      allocate(flf%sbcdata_a(b(1):b(2), b(3):b(4)), flf%sbcdata_b(b(1):b(2), b(3):b(4)))
+      flf%sbcdata_a = 0.0; flf%sbcdata_b = 0.0
+
+      allocate(used(b(1):b(2), b(3):b(4)))
+      used = .false.
+      do ii = 1, partit%myDim_nod2D+partit%eDim_nod2D
+         used(bilin_i0(fld_idx,ii), bilin_j0(fld_idx,ii)) = .true.
+         used(bilin_i1(fld_idx,ii), bilin_j0(fld_idx,ii)) = .true.
+         used(bilin_i0(fld_idx,ii), bilin_j1(fld_idx,ii)) = .true.
+         used(bilin_i1(fld_idx,ii), bilin_j1(fld_idx,ii)) = .true.
+      end do
+      if (use_ocean_only_forcing) then
+         call sbc_redist_fill_setup(flf, used, b, nlon, nlat, nlon_f, gwant, nwant)
+      else
+      nwant = count(used)
+      allocate(flf%rwant(2, max(1,nwant)), gwant(max(1,nwant)), flf%rout(max(1,nwant)))
+      k = 0
+      do j = b(3), b(4)
+         do i = b(1), b(2)
+            if (.not. used(i,j)) cycle
+            k = k + 1
+            c = i - 1
+            if (i == 1)    c = nlon_f
+            if (i == nlon) c = 1
+            flf%rwant(:,k) = (/i, j/)
+            gwant(k) = c + (j-1)*nlon_f
+         end do
+      end do
+      end if
+      deallocate(used)
+
+      nreq = n_forcing_readers
+      if (nreq == 0) then ! one reader per node
+         call MPI_Comm_split_type(partit%MPI_COMM_FESOM, MPI_COMM_TYPE_SHARED, 0, MPI_INFO_NULL, nodecomm, ierr)
+         call MPI_Comm_rank(nodecomm, noderank, ierr)
+         isroot = merge(1, 0, noderank == 0)
+         call MPI_Allreduce(isroot, nnodes, 1, MPI_INTEGER, MPI_SUM, partit%MPI_COMM_FESOM, ierr)
+         call MPI_Comm_free(nodecomm, ierr)
+         nreq = nnodes
+      end if
+      ! one reader per field, fields on different ranks (one decompression per reader and refresh)
+      shift = 0
+      if (n_forcing_readers == -1) then
+         nreq  = 1
+         shift = ((fld_idx-1) * partit%npes) / max(1, i_totfl)
+      end if
+      call redist_build_scatter(flf%rsched, gwant, nwant, nlon_f*nlat, nreq, partit%MPI_COMM_FESOM, flag_debug, ierr, &
+                                min_block=nlon_f, reader_shift=shift)
+      if (ierr /= 0) then
+         write(error_unit,*) 'ERROR: forcing redist schedule failed for field ', fld_idx, ' on rank ', partit%mype, ' ierr=', ierr
+         call par_abort(partit%MPI_COMM_FESOM, partit%mype)
+      end if
+      deallocate(gwant)
+
+      ! whole rows covering this reader's block [first, last]
+      if (flf%rsched%count > 0) then
+         flf%rrow0 = (flf%rsched%first - 1)/nlon_f + 1
+         flf%rnrow = (flf%rsched%last  - 1)/nlon_f + 1 - flf%rrow0 + 1
+         flf%roff  = flf%rsched%first - (flf%rrow0 - 1)*nlon_f
+      end if
+      allocate(flf%rslab(max(1, nlon_f*flf%rnrow)))
+      if (partit%mype==0) write(*,*) ' --> [forcing] redist: field ', fld_idx, ' readers ', flf%rsched%n_readers, &
+                              ' cells received on rank 0 ', nwant, ' of ', nlon_f*nlat
+   END SUBROUTINE sbc_redist_alloc
+
+   SUBROUTINE sbc_redist_distribute(fld_idx, time_index, boxdata, partit)
+      use fesom_profiler, only: fesom_profiler_start, fesom_profiler_end
+      IMPLICIT NONE
+      integer,        intent(in)            :: fld_idx, time_index
+      real(4), dimension(:,:), pointer      :: boxdata
+      type(t_partit), intent(inout), target :: partit
+      type(flfi_type), pointer :: flf
+      type(netcdf_reader_handle) :: fresh
+      integer :: k, ierr
+      logical :: ahead, hit
+      flf => sbc_flfi(fld_idx)
+      ! every rank takes the same branches: they depend on time_index, nc_Ntime and the year only
+      ahead = trim(forcing_exchange)=='p2p_ahead'
+      hit = ahead .and. flf%rx_ahead%active .and. flf%rahead_index == time_index .and. flf%rahead_year == yearnew
+      call fesom_profiler_start("sbc_ioread")
+      if (flf%rsched%count > 0) then
+         if (flf%rfile_year /= yearnew) then
+            if (flf%rfile%is_open()) then
+               call flf%rfile%finalize()
+               flf%rfile = fresh
+            end if
+            call flf%rfile%initialize(trim(flf%file_name), trim(flf%var_name))
+            flf%rfile_year = yearnew
+         end if
+         if (.not. hit) call flf%rfile%read_netcdf_rows(time_index, flf%rrow0, flf%rnrow, flf%rslab)
+      end if
+      call fesom_profiler_end("sbc_ioread")
+      call fesom_profiler_start("sbc_alltoallv")
+      if (hit) then
+         call redist_p2p_complete(flf%rsched, flf%rx_ahead, 1, ierr, flf%rout)
+      else
+         ! a record sent ahead that is not the one asked for is received and dropped
+         if (flf%rx_ahead%active) call redist_p2p_complete(flf%rsched, flf%rx_ahead, 1, ierr)
+         if (trim(forcing_exchange)=='alltoallv') then
+            call redist_scatter_r4(flf%rsched, 1, flf%rslab(flf%roff:), flf%rout, partit%MPI_COMM_FESOM, ierr)
+         else
+            call redist_scatter_p2p_r4(flf%rsched, 1, flf%rslab(flf%roff:), flf%rout, partit%MPI_COMM_FESOM, ierr)
+         end if
+      end if
+      call fesom_profiler_end("sbc_alltoallv")
+      ! boxdata is a pointer dummy, so it keeps the box bounds
+      if (use_ocean_only_forcing) then
+         call fesom_profiler_start("sbc_fill_land")
+         call sbc_redist_fill_apply(flf, boxdata)
+         call fesom_profiler_end("sbc_fill_land")
+      else
+         do k = 1, flf%rsched%nwant
+            boxdata(flf%rwant(1,k), flf%rwant(2,k)) = flf%rout(k)
+         end do
+      end if
+
+      ! read the next record of this year's file and send it now; the next refresh only receives it
+      if (ahead .and. time_index < flf%nc_Ntime) then
+         call fesom_profiler_start("sbc_ioread")
+         if (flf%rsched%count > 0) then
+            if (.not. allocated(flf%rslab_ahead)) allocate(flf%rslab_ahead(size(flf%rslab)))
+            call flf%rfile%read_netcdf_rows(time_index+1, flf%rrow0, flf%rnrow, flf%rslab_ahead)
+         end if
+         call fesom_profiler_end("sbc_ioread")
+         call fesom_profiler_start("sbc_alltoallv")
+         if (flf%rsched%count > 0) then
+            call redist_p2p_post(flf%rsched, flf%rx_ahead, 1, flf%rslab_ahead(flf%roff:), partit%MPI_COMM_FESOM, 7400+fld_idx, ierr)
+         else
+            call redist_p2p_post(flf%rsched, flf%rx_ahead, 1, flf%rout, partit%MPI_COMM_FESOM, 7400+fld_idx, ierr)
+         end if
+         call fesom_profiler_end("sbc_alltoallv")
+         flf%rahead_index = time_index + 1
+         flf%rahead_year  = yearnew
+      end if
+   END SUBROUTINE sbc_redist_distribute
+
+   SUBROUTINE fill_land(data, nlon, nlat)
+      ! replayed land fill, checked once per rank against the original sweeps
+      IMPLICIT NONE
+      integer, intent(in)    :: nlon, nlat
+      real(4), intent(inout) :: data(nlon, nlat)
+      real(4), allocatable   :: ref(:,:)
+      integer :: nbad
+      if (nlon /= size(fill_iter,1) .or. nlat /= size(fill_iter,2)) then
+         write(error_unit,*) 'ERROR: ocean-only forcing: field grid ', nlon, nlat, &
+                             ' differs from the mask grid ', size(fill_iter,1), size(fill_iter,2)
+         stop 1
+      end if
+      if (ocean_fill_reference) then
+         call fill_land_from_ocean(data, forcing_ocean_mask, nlon, nlat)
+         return
+      end if
+      if (.not. fill_checked) then
+         allocate(ref(nlon, nlat))
+         ref = data
+         call fill_land_from_ocean(ref, forcing_ocean_mask, nlon, nlat)
+      end if
+      call fill_land_fast(data, nlon, nlat)
+      if (.not. fill_checked) then
+         nbad = count(transfer(data, 1, nlon*nlat) /= transfer(ref, 1, nlon*nlat))
+         if (nbad /= 0) then
+            write(error_unit,*) 'ERROR: ocean-only forcing: replayed land fill differs from the sweep in ', &
+                                nbad, ' cells'
+            stop 1
+         end if
+         write(*,*) 'Ocean-only forcing: replayed land fill checked against the sweep, bit-identical'
+         deallocate(ref)
+         fill_checked = .true.
+      end if
+   END SUBROUTINE fill_land
+
+   SUBROUTINE fill_build_recipe(nlon, nlat)
+      ! run fill_land_from_ocean's sweeps on the mask and record which neighbours each land
+      ! cell averages, and whether each enters with its filled or its raw value
+      IMPLICIT NONE
+      integer, intent(in)  :: nlon, nlat
+      integer, allocatable :: filled(:,:), first(:)
+      integer :: iter, i, j, code, unfilled, max_iter, it, nit
+      allocate(fill_iter(nlon, nlat), fill_code(nlon, nlat), filled(nlon, nlat))
+      filled    = forcing_ocean_mask
+      fill_iter = merge(0, -1, filled == 1)
+      fill_code = 0
+      max_iter  = max(nlon, nlat)
+      do iter = 1, max_iter
+         unfilled = 0
+         do j = 1, nlat
+            do i = 1, nlon
+               if (filled(i,j) == 1) cycle
+               code = 0
+               if (i > 1    .and. filled(i-1,j) == 1) code = ior(code, nb_bits(fill_iter(i-1,j), 0))
+               if (i < nlon .and. filled(i+1,j) == 1) code = ior(code, nb_bits(fill_iter(i+1,j), 1))
+               if (j > 1    .and. filled(i,j-1) == 1) code = ior(code, nb_bits(fill_iter(i,j-1), 2))
+               if (j < nlat .and. filled(i,j+1) == 1) code = ior(code, nb_bits(fill_iter(i,j+1), 3))
+               if (code /= 0) then
+                  fill_iter(i,j) = iter
+                  fill_code(i,j) = code
+                  filled(i,j)    = 1
+               else
+                  unfilled = unfilled + 1
+               end if
+            end do
+         end do
+         if (unfilled == 0) exit
+      end do
+      ! land cells in sweep order (bucket sort by sweep)
+      nit = max(0, maxval(fill_iter))
+      fill_nland = count(fill_iter >= 1)
+      allocate(first(nit+1), fill_order(2, max(1, fill_nland)))
+      first = 0
+      do j = 1, nlat
+         do i = 1, nlon
+            if (fill_iter(i,j) >= 1) first(fill_iter(i,j)+1) = first(fill_iter(i,j)+1) + 1
+         end do
+      end do
+      first(1) = 1
+      do it = 2, nit+1
+         first(it) = first(it) + first(it-1)
+      end do
+      do j = 1, nlat
+         do i = 1, nlon
+            it = fill_iter(i,j)
+            if (it < 1) cycle
+            fill_order(:, first(it)) = (/i, j/)
+            first(it) = first(it) + 1
+         end do
+      end do
+      deallocate(filled, first)
+   CONTAINS
+      integer function nb_bits(nb_iter, k)
+         ! neighbour k is averaged; it enters filled if it was filled in an earlier sweep
+         integer, intent(in) :: nb_iter, k
+         nb_bits = ibset(0, k)
+         if (nb_iter >= 1 .and. nb_iter < iter) nb_bits = ibset(nb_bits, k+4)
+      end function nb_bits
+   END SUBROUTINE fill_build_recipe
+
+   SUBROUTINE fill_land_fast(data, nlon, nlat)
+      ! fill_land_from_ocean's result in one pass: same operands, same order
+      IMPLICIT NONE
+      integer, intent(in)    :: nlon, nlat
+      real(4), intent(inout) :: data(nlon, nlat)
+      real(4), allocatable   :: raw(:,:)
+      real(4)  :: sum_val
+      integer  :: n, i, j, code, cnt
+      allocate(raw(nlon, nlat))
+      raw = data
+      do n = 1, fill_nland
+         i = fill_order(1,n); j = fill_order(2,n); code = fill_code(i,j)
+         sum_val = 0.0
+         cnt = 0
+         if (btest(code,0)) then
+            if (btest(code,4)) then
+               sum_val = sum_val + data(i-1,j)
+            else
+               sum_val = sum_val + raw(i-1,j)
+            end if
+            cnt = cnt + 1
+         end if
+         if (btest(code,1)) then
+            if (btest(code,5)) then
+               sum_val = sum_val + data(i+1,j)
+            else
+               sum_val = sum_val + raw(i+1,j)
+            end if
+            cnt = cnt + 1
+         end if
+         if (btest(code,2)) then
+            if (btest(code,6)) then
+               sum_val = sum_val + data(i,j-1)
+            else
+               sum_val = sum_val + raw(i,j-1)
+            end if
+            cnt = cnt + 1
+         end if
+         if (btest(code,3)) then
+            if (btest(code,7)) then
+               sum_val = sum_val + data(i,j+1)
+            else
+               sum_val = sum_val + raw(i,j+1)
+            end if
+            cnt = cnt + 1
+         end if
+         data(i,j) = sum_val / real(cnt)
+      end do
+      deallocate(raw)
+   END SUBROUTINE fill_land_fast
+
+   SUBROUTINE sbc_redist_fill_setup(flf, used, b, nlon, nlat, nlon_f, gwant, nwant)
+      ! raw cells the land fill of this rank's stencil cells reads, and the replay for those cells
+      IMPLICIT NONE
+      type(flfi_type),      intent(inout) :: flf
+      integer,              intent(in)    :: b(4), nlon, nlat, nlon_f
+      logical,              intent(in)    :: used(b(1):b(2), b(3):b(4))
+      integer, allocatable, intent(out)   :: gwant(:)
+      integer,              intent(out)   :: nwant
+      logical, allocatable :: needraw(:,:)
+      integer, allocatable :: fidx(:,:), ridx(:,:), stack(:,:)
+      integer :: i, j, k, n, m, sp, code, ni, nj, c
+      integer, parameter :: di(0:3) = (/-1, 1, 0, 0/), dj(0:3) = (/0, 0, -1, 1/)
+      allocate(needraw(nlon, nlat), fidx(nlon, nlat), ridx(nlon, nlat), stack(2, max(1, fill_nland)))
+      needraw = .false.; fidx = 0; ridx = 0
+      ! closure: fidx marks land cells to fill (1 for now), needraw raw cells to receive
+      sp = 0
+      do j = b(3), b(4)
+         do i = b(1), b(2)
+            if (.not. used(i,j)) cycle
+            if (fill_iter(i,j) >= 1) then
+               if (fidx(i,j) == 0) then
+                  fidx(i,j) = 1; sp = sp + 1; stack(:,sp) = (/i, j/)
+               end if
+            else
+               needraw(i,j) = .true.
+            end if
+         end do
+      end do
+      do while (sp > 0)
+         i = stack(1,sp); j = stack(2,sp); sp = sp - 1
+         code = fill_code(i,j)
+         do k = 0, 3
+            if (.not. btest(code,k)) cycle
+            ni = i + di(k); nj = j + dj(k)
+            if (btest(code,k+4)) then
+               if (fidx(ni,nj) == 0) then
+                  fidx(ni,nj) = 1; sp = sp + 1; stack(:,sp) = (/ni, nj/)
+               end if
+            else
+               needraw(ni,nj) = .true.
+            end if
+         end do
+      end do
+      deallocate(stack)
+      ! raw cells: what this rank receives, in grid order
+      nwant = count(needraw)
+      allocate(flf%rwant(2, max(1,nwant)), gwant(max(1,nwant)), flf%rout(max(1,nwant)))
+      k = 0
+      do j = 1, nlat
+         do i = 1, nlon
+            if (.not. needraw(i,j)) cycle
+            k = k + 1
+            c = i - 1
+            if (i == 1)    c = nlon_f
+            if (i == nlon) c = 1
+            flf%rwant(:,k) = (/i, j/)
+            gwant(k) = c + (j-1)*nlon_f
+            ridx(i,j) = k
+         end do
+      end do
+      ! cells to fill, in sweep order: a filled operand always comes from an earlier sweep
+      n = 0
+      do m = 1, fill_nland
+         i = fill_order(1,m); j = fill_order(2,m)
+         if (fidx(i,j) == 0) cycle
+         n = n + 1
+         fidx(i,j) = n
+      end do
+      flf%nfev = n
+      allocate(flf%fsrc(4, max(1,n)), flf%fcnt(max(1,n)), flf%fval(max(1,n)))
+      flf%fsrc = 0
+      do m = 1, fill_nland
+         i = fill_order(1,m); j = fill_order(2,m)
+         if (fidx(i,j) == 0) cycle
+         n = fidx(i,j)
+         code = fill_code(i,j)
+         flf%fcnt(n) = 0
+         do k = 0, 3
+            if (.not. btest(code,k)) cycle
+            ni = i + di(k); nj = j + dj(k)
+            flf%fcnt(n) = flf%fcnt(n) + 1
+            if (btest(code,k+4)) then
+               flf%fsrc(flf%fcnt(n), n) = -fidx(ni,nj)
+            else
+               flf%fsrc(flf%fcnt(n), n) = ridx(ni,nj)
+            end if
+         end do
+      end do
+      ! stencil cells and where their value comes from
+      flf%nout = count(used)
+      allocate(flf%fout(3, max(1, flf%nout)))
+      m = 0
+      do j = b(3), b(4)
+         do i = b(1), b(2)
+            if (.not. used(i,j)) cycle
+            m = m + 1
+            if (fill_iter(i,j) >= 1) then
+               flf%fout(:,m) = (/i, j, -fidx(i,j)/)
+            else
+               flf%fout(:,m) = (/i, j, ridx(i,j)/)
+            end if
+         end do
+      end do
+      deallocate(needraw, fidx, ridx)
+   END SUBROUTINE sbc_redist_fill_setup
+
+   SUBROUTINE sbc_redist_fill_apply(flf, boxdata)
+      ! replay the land fill for this rank's cells from the received raw cells, as fill_land_fast
+      IMPLICIT NONE
+      type(flfi_type),                  intent(inout) :: flf
+      real(4), dimension(:,:), pointer                :: boxdata
+      real(4) :: sum_val
+      integer :: k, m, s
+      do k = 1, flf%nfev
+         sum_val = 0.0
+         do m = 1, flf%fcnt(k)
+            s = flf%fsrc(m,k)
+            if (s > 0) then
+               sum_val = sum_val + flf%rout(s)
+            else
+               sum_val = sum_val + flf%fval(-s)
+            end if
+         end do
+         flf%fval(k) = sum_val / real(flf%fcnt(k))
+      end do
+      do m = 1, flf%nout
+         s = flf%fout(3,m)
+         if (s > 0) then
+            boxdata(flf%fout(1,m), flf%fout(2,m)) = flf%rout(s)
+         else
+            boxdata(flf%fout(1,m), flf%fout(2,m)) = flf%fval(-s)
+         end if
+      end do
+   END SUBROUTINE sbc_redist_fill_apply
 
    SUBROUTINE fill_land_from_ocean(data, mask, nlon, nlat)
       !! Iteratively fill land cells with extrapolated ocean values.

@@ -2897,8 +2897,20 @@ subroutine dvd_add_difflux_vertimplredi(do_SDdvd, tr_num, dvd_tot, tr, trstar, K
             ! take into account isoneutral Redi diffusivity Kd*s^2 --> K_33 = Kv + Kd*s^2
             dzup     = mesh%hnode(nz-1, node)*0.5_WP
             dzdwn    = mesh%hnode(nz  , node)*0.5_WP
-            Kv_R     = dzup /(dzup + dzdwn) * slope(3, nz-1, node)**2 * Ki(nz-1,node) + &
-                       dzdwn/(dzup + dzdwn) * slope(3, nz  , node)**2 * Ki(nz  ,node)
+            ! Kd*s^2 linearly interpolated to the interface with the SAME weights as the
+            ! model in diff_ver_part_impl_ale (oce_ale_tracer.F90, since PR #944): the
+            ! upper value is weighted with the distance to the lower node and vice versa
+            !
+            !          o K(nz-1) -----+
+            !                         | dzup
+            !   ---- zbar(nz) --------+--- Kv_R = (dzdwn*K(nz-1) + dzup*K(nz))/(dzup+dzdwn)
+            !                         | dzdwn
+            !          o K(nz) -------+
+            !
+            ! The DVD must use exactly the diffusivity the model applied: K14 is a budget
+            ! residual, so any mismatch enters it amplified by ~2*T (worst for salinity).
+            Kv_R     = dzdwn/(dzup + dzdwn) * slope(3, nz-1, node)**2 * Ki(nz-1,node) + &
+                       dzup /(dzup + dzdwn) * slope(3, nz  , node)**2 * Ki(nz  ,node)
             
             ! fdiff = Kv*dT/dz = Kv (T(nz-1) - T(nz))/ ((hnode(nz-1)+hnode(nz))/2)
             ! --> Dflx is until here the diffusive volume flux on full depth levels

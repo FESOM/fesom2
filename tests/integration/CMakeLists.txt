@@ -227,6 +227,73 @@ if(ENABLE_MPI_TESTS AND NOT FESOM_COUPLED AND NOT OIFS_COUPLED AND NOT USE_YAC)
         set_tests_properties(integration_pi_fresh_hier_1x2_mpi2_omp2 PROPERTIES FIXTURES_REQUIRED "partition_pi_hier_1x2")
     endif()
 
+    # Forcing distribution: every way of getting the forcing to the ranks must give the
+    # model the same numbers. The pi mesh runs one day with CORE2 forcing on 8 ranks;
+    # bcast is the reference and every other mode is compared with it bit for bit
+    # (all NetCDF outputs and restarts, tools/compare_nc_exact.py). With ocean-only
+    # forcing the reference is bcast with the original land-fill sweep
+    # (ocean_fill_reference), against a synthetic land mask on the CORE2 test grid
+    # (tools/make_test_ocean_mask.py) since the test data has none. Needs a Python 3
+    # with netCDF4; `ctest -L forcing` runs this set.
+    find_package(Python3 COMPONENTS Interpreter QUIET)
+    set(FESOM_NC_PYTHON "")
+    if(Python3_Interpreter_FOUND)
+        # some sites shadow netCDF4's numpy with a user-site one; try without user site too
+        foreach(_flags "" "-s")
+            execute_process(COMMAND ${Python3_EXECUTABLE} ${_flags} -c "import netCDF4, numpy"
+                            RESULT_VARIABLE _nc_ok OUTPUT_QUIET ERROR_QUIET)
+            if(_nc_ok EQUAL 0)
+                set(FESOM_NC_PYTHON ${Python3_EXECUTABLE} ${_flags})
+                break()
+            endif()
+        endforeach()
+    endif()
+    if(FESOM_NC_PYTHON)
+        set(_ref integration_pi_forcing_bcast_mpi8)
+        add_fesom_test(${_ref} MPI_TEST NP 8 TIMEOUT ${TEST_TIMEOUT} LABEL forcing
+            FORCING_SBC "forcing_distribution='bcast'")
+        add_fesom_test(integration_pi_forcing_scatter_mpi8 MPI_TEST NP 8 TIMEOUT ${TEST_TIMEOUT} LABEL forcing
+            COMPARE_TO ${_ref}
+            FORCING_SBC "forcing_distribution='scatter'")
+        add_fesom_test(integration_pi_forcing_redist_mpi8 MPI_TEST NP 8 TIMEOUT ${TEST_TIMEOUT} LABEL forcing
+            COMPARE_TO ${_ref}
+            FORCING_SBC "forcing_distribution='redist'" "n_forcing_readers=2")
+        add_fesom_test(integration_pi_forcing_p2p_mpi8 MPI_TEST NP 8 TIMEOUT ${TEST_TIMEOUT} LABEL forcing
+            COMPARE_TO ${_ref}
+            FORCING_SBC "forcing_distribution='redist'" "forcing_exchange='p2p'" "n_forcing_readers=3")
+        add_fesom_test(integration_pi_forcing_p2p_ahead_mpi8 MPI_TEST NP 8 TIMEOUT ${TEST_TIMEOUT} LABEL forcing
+            COMPARE_TO ${_ref}
+            FORCING_SBC "forcing_distribution='redist'" "forcing_exchange='p2p_ahead'" "n_forcing_readers=-1")
+
+        # ocean-only forcing: the mask is written once, before any of these runs
+        set(_mask "${CMAKE_CURRENT_BINARY_DIR}/forcing_ocean_mask/sftof_core2_test.nc")
+        add_test(NAME forcing_ocean_mask_setup
+            COMMAND ${FESOM_NC_PYTHON} "${FESOM_TESTING_ROOT}/tools/make_test_ocean_mask.py"
+                    "${FESOM_TESTING_ROOT}/tests/data/FORCING/CORE2/t_10.1948.nc" "${_mask}")
+        set_tests_properties(forcing_ocean_mask_setup PROPERTIES FIXTURES_SETUP fx_forcing_ocean_mask LABELS "integration;forcing")
+        set(_oo "use_ocean_only_forcing=.true." "nm_ocean_mask_file='${_mask}'" "nm_ocean_mask_var='sftof'")
+        set(_ref integration_pi_forcing_oceanonly_reference_mpi8)
+        add_fesom_test(${_ref} MPI_TEST NP 8 TIMEOUT ${TEST_TIMEOUT} LABEL forcing
+            FORCING_SBC "forcing_distribution='bcast'" "ocean_fill_reference=.true." ${_oo})
+        foreach(_case
+                "bcast|forcing_distribution='bcast'"
+                "scatter|forcing_distribution='scatter'"
+                "redist|forcing_distribution='redist';n_forcing_readers=2"
+                "p2p|forcing_distribution='redist';forcing_exchange='p2p';n_forcing_readers=-1"
+                "p2p_ahead|forcing_distribution='redist';forcing_exchange='p2p_ahead';n_forcing_readers=-1")
+            string(REPLACE "|" ";" _case "${_case}")
+            list(POP_FRONT _case _name)
+            add_fesom_test(integration_pi_forcing_oceanonly_${_name}_mpi8 MPI_TEST NP 8 TIMEOUT ${TEST_TIMEOUT} LABEL forcing
+                COMPARE_TO ${_ref}
+                FORCING_SBC ${_case} ${_oo})
+            set_tests_properties(integration_pi_forcing_oceanonly_${_name}_mpi8 PROPERTIES
+                FIXTURES_REQUIRED "fx_${_ref};fx_forcing_ocean_mask")
+        endforeach()
+        set_tests_properties(${_ref} PROPERTIES FIXTURES_REQUIRED fx_forcing_ocean_mask)
+    else()
+        message(STATUS "No Python 3 with netCDF4 -- skipping the forcing distribution comparison tests (integration_pi_forcing_*)")
+    endif()
+
     # Conservation budgets: the pi set-ups rerun with conservation_freq=4, and
     # tools/check_conservation.py judges the residual of volume, heat and salt at the
     # end of the day against the integral (volume and salt 1e-12; heat 3e-10, as the
