@@ -18,6 +18,10 @@ endif()
 # Precision options (mutually exclusive; DP is default = anchor).
 option(USE_SINGLE_PRECISION "Build with single precision (WP=4)" OFF)
 option(USE_HALF_PRECISION   "Build with half precision (WP=2, FP16; NVHPC only)" OFF)
+option(USE_RECOM4 "Build with the RECOM4 biogeochemistry (git submodule lib/recom4)" OFF)
+if(USE_RECOM4 AND (USE_SINGLE_PRECISION OR USE_HALF_PRECISION))
+    message(FATAL_ERROR "USE_RECOM4: RECOM4 v1 is double precision only.")
+endif()
 if(USE_HALF_PRECISION AND USE_SINGLE_PRECISION)
     message(FATAL_ERROR "USE_HALF_PRECISION and USE_SINGLE_PRECISION are mutually exclusive.")
 endif()
@@ -101,7 +105,7 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 # rebuild without re-running cmake by hand. CMake's Fortran dependency
 # scanner orders the modules (params -> types -> infra -> ...) automatically.
 # ----------------------------------------------------------------------
-set(FESOM3_LIB_DIRS params types infra mesh oce ice forcing io step)
+set(FESOM3_LIB_DIRS params types infra mesh oce ice forcing io step recom4)
 set(fesom3_lib_sources "")
 foreach(_d ${FESOM3_LIB_DIRS})
     file(GLOB _s CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/${_d}/*.F90)
@@ -114,6 +118,15 @@ target_link_libraries(fesom3 PUBLIC MPI::MPI_Fortran fesom_netcdf)
 if(LZ4_LIB)
     target_link_libraries(fesom3 PUBLIC fesom_lz4)
     target_compile_definitions(fesom3 PRIVATE HAVE_LZ4)
+endif()
+if(USE_RECOM4)
+    # RECOM4 as a subproject: only its library and recom4_io are built here,
+    # each with RECOM4's own flags (PRIVATE per target). The adapter in
+    # src/recom4/ calls RECOM4 only inside #ifdef __RECOM4.
+    add_subdirectory(lib/recom4)
+    target_link_libraries(fesom3 PUBLIC recom4 recom4_io)
+    target_compile_definitions(fesom3 PRIVATE __RECOM4)
+    message(STATUS "FESOM3 with RECOM4 (lib/recom4)")
 endif()
 set_target_properties(fesom3 PROPERTIES LINKER_LANGUAGE Fortran)
 
