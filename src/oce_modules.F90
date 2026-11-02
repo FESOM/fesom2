@@ -301,8 +301,11 @@ real(kind=WP), allocatable :: tr_xy(:,:,:)
 real(kind=WP), allocatable :: tr_z(:,:)
 
 #if defined(__recom)
-real(kind=WP), allocatable    :: dtr_bf(:,:), str_bf(:,:)
-real(kind=WP), allocatable    :: vert_sink(:,:)
+! REcoM's loop terms (benthic return, sinking, sinking into the benthos) are computed
+! by REcoM in real64; in a single-precision build they enter the tracer step as
+! real64 content, see diff_tracers_ale
+real(kind=WP_full), allocatable :: dtr_bf(:,:), str_bf(:,:)
+real(kind=WP_full), allocatable :: vert_sink(:,:)
 #if defined(__usetp)
 integer                       :: request_count
 integer, allocatable          :: tr_arr_requests(:), tr_arr_old_requests(:)

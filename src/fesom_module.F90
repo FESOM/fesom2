@@ -85,6 +85,7 @@ use cpl_yac_driver
   use recom_init_interface
   use recom_interface
   use recom_glovar
+  use recom_views
 #endif
 
 ! Transient tracers
@@ -556,17 +557,21 @@ contains
 
         do n = 1, f%tracers%num_tracers
           tracers_info%ids(n) = f%tracers%data(n)%id
-          tracers_info%data_pointers(n)%tracer_data => f%tracers%data(n)%values
         end do
+        ! REcoM is real64: in a single-precision build it works on real64 copies (recom_views)
+        call recom_tracer_pointers(f%tracers, tracers_info)
+        call recom_views_mesh(f%mesh)
 
         f%t_recom_s=MPI_Wtime()
         call recom_init(f%mesh%nl, f%mesh%ulevels_nod2d, f%mesh%nlevels_nod2D, &
-                        f%mesh%geo_coord_nod2D, f%mesh%z_3d_n, f%partit%myDim_nod2d,      &
+                        geo_coord_nod2D_r8, z_3d_n_r8, f%partit%myDim_nod2d,              &
                         f%partit%eDim_nod2D, f%partit%mype, f%partit%MPI_COMM_FESOM,      &
                         f%partit%myDim_elem2D, f%partit%eDim_elem2D, tracers_info,        &
-                        f%tracers%num_tracers, rad, use_age_tracer, use_transit, l_sf6, l_f11, &
-                        l_f12, l_r14c, l_r39ar, f%mesh%ocean_area) ! adjust values for recom tracers (derived type "t_tracer")
+                        f%tracers%num_tracers, real(rad, WP_full), use_age_tracer, use_transit, l_sf6, l_f11, &
+                        l_f12, l_r14c, l_r39ar, real(f%mesh%ocean_area, WP_full)) ! adjust values for recom tracers (derived type "t_tracer")
         f%t_recom_e=MPI_Wtime()
+        ! initial values: rounded into the WP tracers, no carry
+        call recom_tracers_back(f%tracers, f%mesh, f%partit, carry=.false.)
 
         deallocate(tracers_info%ids)
         deallocate(tracers_info%data_pointers)
@@ -927,6 +932,8 @@ contains
 
 #if defined (__recom)
     type(tracers_info_type)               :: tracers_info
+    integer, pointer                      :: s_nod2D(:), r_nod2D(:), s_nod3D(:,:,:), r_nod3D(:,:,:)
+    real(kind=WP_full)                    :: dt_r8, kappa_r8, timenew_r8 ! recom() declares them inout
 #endif
 
     !=====================
@@ -1197,26 +1204,35 @@ contains
         do tracer_index = 1, f%tracers%num_tracers
           tracers_info%ids(tracer_index) = f%tracers%data(tracer_index)%id
           tracers_info%ltra_diag(tracer_index) = f%tracers%data(tracer_index)%ltra_diag
-          tracers_info%data_pointers(tracer_index)%tracer_data => f%tracers%data(tracer_index)%values
         end do
+        ! REcoM is real64: in a single-precision build it works on real64 copies of
+        ! the tracers and geometry and exchanges halos with real64 datatypes (recom_views)
+        call recom_tracer_pointers(f%tracers, tracers_info)
+        call recom_views_mesh(f%mesh)
+        call recom_mpitypes(f%partit, s_nod2D, r_nod2D, s_nod3D, r_nod3D)
+        dt_r8      = dt
+        kappa_r8   = kappa
+        timenew_r8 = timenew
 
         f%t_recom_s = MPI_Wtime()
-        call recom(f%ice%data(1)%values, f%mesh%nl, &
+        call recom(real(f%ice%data(1)%values, WP_full), f%mesh%nl, &
                    f%mesh%ulevels_nod2d, f%mesh%nlevels_nod2D, f%mesh%hnode,     &
-                   f%mesh%z_3d_n, f%mesh%zbar_3d_n, f%mesh%geo_coord_nod2d,      &
-                   f%mesh%ocean_area, f%mesh%areasvol, f%partit%myDim_nod2d,     &
+                   z_3d_n_r8, zbar_3d_n_r8, geo_coord_nod2D_r8,                  &
+                   real(f%mesh%ocean_area, WP_full), areasvol_r8, f%partit%myDim_nod2d, &
                    f%partit%eDim_nod2D, f%partit%mype, f%partit%MPI_COMM_FESOM,  &
                    tracers_info, f%tracers%num_tracers, f%tracers%work%tra_recom_sms, &
                    f%partit%npes, f%partit%com_nod2D%sPEnum,   &
                    f%partit%com_nod2D%rPEnum,  &
-                   f%partit%s_mpitype_nod2D, f%partit%r_mpitype_nod2D,              &
-                   f%partit%s_mpitype_nod3D, f%partit%r_mpitype_nod3D,              &
+                   s_nod2D, r_nod2D, s_nod3D, r_nod3D,                              &
                    f%partit%com_nod2D%sPE, f%partit%com_nod2D%rPE,                  &
                    f%partit%com_nod2D%req, f%partit%com_nod2D%nreq,                 &
-                   dt, daynew, month, mstep, ndpyr, yearold, timenew, rad, kappa,            &
-                   press_air, u_wind, v_wind, shortwave, use_age_tracer, use_transit, l_sf6, &
+                   dt_r8, daynew, month, mstep, ndpyr, yearold, timenew_r8, real(rad, WP_full), kappa_r8, &
+                   real(press_air, WP_full), real(u_wind, WP_full), real(v_wind, WP_full), &
+                   real(shortwave, WP_full), use_age_tracer, use_transit, l_sf6, &
                    l_f11, l_f12, l_r14c, l_r39ar)
         f%t_recom_e = MPI_Wtime()
+        ! the tracers REcoM changed, back into WP; what is below the WP resolution goes into the carry
+        call recom_tracers_back(f%tracers, f%mesh, f%partit, carry=.true.)
 
         deallocate(tracers_info%ids)
         deallocate(tracers_info%ltra_diag)
