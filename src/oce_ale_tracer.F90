@@ -411,16 +411,17 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 #endif
 
         !___________________________________________________________________________
-        ! Radioactive decay of 14C and 39Ar
-        if (tracers%data(tr_num)%ID == 14) tracers%data(tr_num)%values(:,:) = tracers%data(tr_num)%values(:,:) * exp(-decay14 * dt)
-        if (tracers%data(tr_num)%ID == 39) tracers%data(tr_num)%values(:,:) = tracers%data(tr_num)%values(:,:) * exp(-decay39 * dt)
+        ! Radioactive decay of 14C and 39Ar (decay_tracer: in single precision one
+        ! step of decay is below the real32 resolution and goes through the carry)
+        if (tracers%data(tr_num)%ID == 14) call decay_tracer(tr_num, exp(-real(decay14, WP_full) * real(dt, WP_full)), tracers, partit, mesh)
+        if (tracers%data(tr_num)%ID == 39) call decay_tracer(tr_num, exp(-real(decay39, WP_full) * real(dt, WP_full)), tracers, partit, mesh)
 
 !YY: C14 seems to be calculated both in fesom and recom
 !YY: decay differently calculated???
 #if defined(__ciso)
         ! radioactive decay of 14C
         if (ciso_14 .and. any(c14_tracer_id == tracers%data(tr_num)%ID)) then
-          tracers%data(tr_num)%values(:,:) = tracers%data(tr_num)%values(:,:) * (1 - lambda_14 * dt)
+          call decay_tracer(tr_num, real(1 - lambda_14 * dt, WP_full), tracers, partit, mesh)
         end if    ! ciso & ciso_14
 #endif
 
@@ -636,6 +637,42 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         diap_avg_count   = diap_avg_count   + 1.0_WP
     end if
 end subroutine solve_tracers_ale
+!
+!
+!===============================================================================
+! multiply tracer tr_num by the decay factor f of one time step. In double
+! precision this is values*f. In single precision (use_tracer_carry) 1 - f is
+! far below the real32 spacing for 14C (about 7e-9 per step), so values*f would
+! round back to values and nothing would decay: the product is formed in real64
+! and its remainder below WP goes into the carry, as REcoM's sources and sinks.
+! values are at hnode_new here (after the T* update and the implicit diffusion).
+subroutine decay_tracer(tr_num, f, tracers, partit, mesh)
+    implicit none
+    integer,            intent(in)            :: tr_num
+    real(kind=WP_full), intent(in)            :: f
+    type(t_tracer),     intent(inout), target :: tracers
+    type(t_partit),     intent(inout), target :: partit
+    type(t_mesh),       intent(in),    target :: mesh
+    integer            :: n, nz
+    real(kind=WP_full) :: x
+    real(kind=WP)      :: v
+
+    if (.not. use_tracer_carry) then
+        tracers%data(tr_num)%values(:,:) = tracers%data(tr_num)%values(:,:) * f
+        return
+    end if
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, x, v)
+    do n = 1, partit%myDim_nod2D
+        do nz = mesh%ulevels_nod2D(n), mesh%nlevels_nod2D(n)-1
+            x = real(tracers%data(tr_num)%values(nz,n), WP_full) * f
+            v = real(x, WP)
+            tracers%work%carry(nz,n,tr_num) = tracers%work%carry(nz,n,tr_num) &
+                + real((x - real(v, WP_full))*mesh%hnode_new(nz,n), WP)
+            tracers%data(tr_num)%values(nz,n) = v
+        end do
+    end do
+!$OMP END PARALLEL DO
+end subroutine decay_tracer
 !
 !
 !===============================================================================
