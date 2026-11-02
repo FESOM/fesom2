@@ -92,6 +92,8 @@ program fesom_lifecycle_native_mr
     use mod_forcing_bulk,   only: forcing_bulk_ncar, forcing_wind_stress, forcing_ice_stress
     use mod_forcing_other,  only: read_other_NetCDF   ! runoff + SSS climatology read
     use oce_initial_state,  only: t_ic3d_config, do_ic3d
+    use mod_recom4_adapter, only: recom4_adapter_init, recom4_adapter_ntr, recom4_adapter_register, &
+                                  recom4_adapter_ic, recom4_adapter_initial_values
     use oce_muscl_adv,      only: muscl_adv_init
     use oce_ssh_rhs,        only: init_stiff_mat_ale
     use mod_step_oce,       only: step_oce
@@ -404,11 +406,18 @@ program fesom_lifecycle_native_mr
 
     !===========================================================================
     ! 2-tracer ocean state (data(1)=T, data(2)=S; local sizes) + do_ic3d phc3.0 IC.
-    tracers%num_tracers = 2
-    allocate(tracers%data(2))
-    allocate(tracers%data(1)%values(nl-1, nNodL), tracers%data(2)%values(nl-1, nNodL))
-    tracers%data(1)%values = 0.0_WP;  tracers%data(1)%ID = 1
-    tracers%data(2)%values = 0.0_WP;  tracers%data(2)%ID = 2
+    ! RECOM4 (M8): off unless built with USE_RECOM4 and FESOM3_RECOM_NML is set;
+    ! then recom4_adapter_ntr() = 0 and this is the 2-tracer state as before.
+    call recom4_adapter_init(nl, nNodL, partit)
+    tracers%num_tracers = 2 + recom4_adapter_ntr()
+    allocate(tracers%data(tracers%num_tracers))
+    do tr_num = 1, tracers%num_tracers
+        allocate(tracers%data(tr_num)%values(nl-1, nNodL))
+        tracers%data(tr_num)%values = 0.0_WP
+    end do
+    tracers%data(1)%ID = 1
+    tracers%data(2)%ID = 2
+    call recom4_adapter_register(tracers)
     ic%n_ic3d      = 2
     ic%idlist(1:2) = [2, 1]
     ic%filelist(1) = trim(ic_file)
@@ -418,7 +427,9 @@ program fesom_lifecycle_native_mr
     ic%t_insitu    = .true.
     ic%ic_cyclic   = .true.
     ic%dummy       = 1.e10_WP
+    call recom4_adapter_ic(ic, partit)
     call do_ic3d(tracers, ic, mesh, partit)
+    call recom4_adapter_initial_values(tracers, mesh, nNodL, partit)
     if (partit%mype == 0) &
         write(*,'(a,2es12.4,a,2es12.4)') 'fesom_lifecycle_native_mr: IC(rank0 owned) T=', &
             minval(tracers%data(1)%values(:,1:nNodO)), maxval(tracers%data(1)%values(:,1:nNodO)), &
@@ -426,7 +437,7 @@ program fesom_lifecycle_native_mr
 
     !===========================================================================
     ! tracer advection machinery (cold start = values; local sizes; adv_flux_hor owned edges).
-    do tr_num = 1, 2
+    do tr_num = 1, tracers%num_tracers
         allocate(tracers%data(tr_num)%valuesAB(nl-1, nNodL))
         allocate(tracers%data(tr_num)%valuesold(2, nl-1, nNodL))
         tracers%data(tr_num)%AB_order   = 2
