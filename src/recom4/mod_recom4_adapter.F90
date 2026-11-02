@@ -1,13 +1,17 @@
-!> FESOM_F adapter for RECOM4 (RECOM4 M8, #46, #47): the only FESOM_F code that
-!! talks to RECOM4. RECOM4 is on only when FESOM_F is built with USE_RECOM4
+!> FESOM_F adapter for RECOM4 (RECOM4 M8, #46, #47, #48): the only FESOM_F code
+!! that talks to RECOM4. RECOM4 is on only when FESOM_F is built with USE_RECOM4
 !! (which defines __RECOM4) and FESOM3_RECOM_NML is set at run time.
 !! Otherwise every routine returns at once and recom4_adapter_ntr() = 0, so
 !! FESOM_F runs exactly as without RECOM4.
 !!
 !! Run-time variables:
-!!   FESOM3_RECOM_NML     path of namelist.recom; RECOM4 is on when it is set
-!!   FESOM3_RECOM_IC_DIR  folder with REcoM's input files (FESOM2's ClimateDataPath):
-!!                        initial conditions and the dust climatology
+!!   FESOM3_RECOM_NML          path of namelist.recom; RECOM4 is on when it is set
+!!   FESOM3_RECOM_IC_DIR       folder with REcoM's input files (FESOM2's ClimateDataPath):
+!!                             initial conditions and the dust climatology
+!!   FESOM3_RECOM_DUMP_DIR     column dumps for gate item 1 (#48) into this folder
+!!   FESOM3_RECOM_DUMP_POINTS  name:lon:lat[,name:lon:lat ...], degrees; the nearest
+!!                             open-ocean node to each point is dumped
+!!   FESOM3_RECOM_DUMP_STEPS   number of steps dumped (default 11)
 module mod_recom4_adapter
     use mod_precision,     only: WP
     use mod_mesh,          only: t_mesh
@@ -20,8 +24,18 @@ module mod_recom4_adapter
     use recom4_api,     only: recom4_state, recom4_init, recom4_ntr, recom4_ncol,    &
                               recom4_ndiag2d, recom4_ndiag3d, recom4_tracer_id,      &
                               recom4_initial_values, recom4_step, recom4_transport,  &
-                              recom4_host_settings, recom4_get_host_settings
+                              recom4_host_settings, recom4_get_host_settings,        &
+                              recom4_col_profile, recom4_col_benthos, recom4_col_decay, &
+                              RECOM4_D3_PAR, RECOM4_D3_GPP_PHY, RECOM4_D3_NPP_PHY,   &
+                              RECOM4_D3_GPP_DIA, RECOM4_D3_NPP_DIA,                  &
+                              RECOM4_D3_VERT_SINK, RECOM4_D3_DTR_BF, RECOM4_D3_STR_BF, &
+                              RECOM4_D2_CO2FLUX, RECOM4_D2_CO2FLUX_DAY, RECOM4_D2_O2FLUX, &
+                              RECOM4_D2_O2FLUX_DAY, RECOM4_D2_PCO2SURF, RECOM4_D2_DPCO2SURF, &
+                              RECOM4_D2_PH_SURF, RECOM4_D2_K0, RECOM4_D2_KW660,       &
+                              RECOM4_D2_DECAY_BEN_N
     use recom4_text_io, only: recom4_read_text
+    use recom4_dump_io, only: dump_open_write, dump_write, dump_close
+    use iso_fortran_env, only: real64
     use netcdf
     use mod_halo,       only: exchange_nod
     use mod_clock,      only: daynew, ndpyr
@@ -51,6 +65,16 @@ module mod_recom4_adapter
     real(WP) :: ocean_area = 0.0_WP             ! open-ocean area, cavities excluded [m2]
     real(WP), allocatable :: alk_surf(:)        ! (nNodL) initial surface alkalinity
     real(WP), allocatable :: relax_alk(:)       ! (nNodL) alkalinity restoring of the step
+
+    ! Column dumps for gate item 1 (#48): off unless FESOM3_RECOM_DUMP_DIR is set
+    integer, parameter :: NDUMP_MAX = 4
+    integer :: ndump = 0, dump_nsteps = 0, cur_step = 0
+    integer :: dump_node(NDUMP_MAX) = 0
+    character(len=32) :: dump_name(NDUMP_MAX) = ''
+    integer :: u_step(NDUMP_MAX), u_surf(NDUMP_MAX), u_surfo(NDUMP_MAX), u_tran(NDUMP_MAX)
+    ! the carbonate profiles of col, in RECOM4's order (recom4_col_profile)
+    character(len=8), parameter :: carb_names(8) = [character(len=8) ::                &
+        'co2', 'ph', 'pco2', 'hco3', 'co3', 'omegac', 'kspc', 'rhosw']
 #endif
 
 contains
@@ -220,6 +244,8 @@ contains
                     recom4_tracer_id(state, i), vmin(i), vmax(i)
             end do
         end if
+
+        call setup_dumps(mesh, partit)
 #endif
     end subroutine recom4_adapter_initial_values
 
@@ -296,9 +322,10 @@ contains
         real(WP), allocatable :: tr(:, :), zero(:), rflux(:)
         character(len=512) :: errmsg
         real(WP) :: wind10
-        integer  :: n, i, nzmin, nzmax, nz, ierr
+        integer  :: n, i, nzmin, nzmax, nz, ierr, kd
 
         if (.not. on) return
+        cur_step = mstep
         if (hs%restore_alkalinity) call alkalinity_restoring(tracers, mesh, partit)
 
         allocate(tr(mesh%nl - 1, ntr), zero(ntr), rflux(ntr))
@@ -313,6 +340,12 @@ contains
             rflux = 0.0_WP
             if (hs%restore_alkalinity) rflux(ialk) = relax_alk(n)
             wind10 = sqrt(u_wind(n)**2 + v_wind(n)**2)
+
+            kd = dump_index(n)
+            if (kd > 0) call dump_step_in(kd, n, nzmin, nzmax, nz, mstep, dt, mesh, tracers, &
+                                          shortwave(n), ice_frac(n), frc%atmdata(islp, n), &
+                                          wind10, tr(1:nz, :))
+
             call recom4_step(state, nz, mesh%hnode(nzmin:nzmax, n),                       &
                              mesh%zbar_3d_n(nzmin:nzmax + 1, n), mesh%Z_3d_n(nzmin:nzmax, n), &
                              tracers%data(1)%values(nzmin:nzmax, n),                    &
@@ -325,6 +358,9 @@ contains
                              tr(1:nz, :), col(:, n), sflux(:, n), diag2d(:, n),         &
                              diag3d(1:nz, :, n), ierr, errmsg)
             if (ierr /= 0) call fail('recom4_step: ' // trim(errmsg), partit)
+
+            if (kd > 0) call dump_step_out(kd, n, nz, mstep, tr(1:nz, :), rflux)
+
             do i = 1, ntr
                 tracers%data(2 + i)%values(nzmin:nzmax, n) = tr(1:nz, i)
             end do
@@ -371,7 +407,7 @@ contains
 #ifdef __RECOM4
         real(WP), allocatable :: tr(:, :), area_i(:), avol(:), seafl(:)
         character(len=512) :: errmsg
-        integer :: n, i, itr, nzmin, nzmax, nz, ierr
+        integer :: n, i, itr, nzmin, nzmax, nz, ierr, kd
 
         if (.not. on) return
         if (tr_num <= 2) return
@@ -388,6 +424,11 @@ contains
             avol(1:nz)       = mesh%areasvol(n)
             seafl(1:nz)      = 0.0_WP
             seafl(nz)        = mesh%area(n)
+
+            kd = dump_index(n)
+            if (kd > 0) call dump_transport_in(kd, n, nzmin, nzmax, nz, itr, dt, mesh, tracers, &
+                                               area_i(1:nz + 1), avol(1:nz), seafl(1:nz), tr(1:nz, :))
+
             call recom4_transport(state, itr, nz, mesh%hnode(nzmin:nzmax, n),               &
                                   mesh%hnode_new(nzmin:nzmax, n),                           &
                                   mesh%zbar_3d_n(nzmin:nzmax + 1, n), mesh%Z_3d_n(nzmin:nzmax, n), &
@@ -400,6 +441,9 @@ contains
                 if (present(partit)) call fail('recom4_transport: ' // trim(errmsg), partit)
                 error stop 'recom4_adapter: recom4_transport failed'
             end if
+
+            if (kd > 0) call dump_transport_out(kd, n, nz, itr, tr(1:nz, :))
+
             tracers%data(tr_num)%values(nzmin:nzmax, n) = tr(1:nz, itr)
         end do
 #endif
@@ -433,6 +477,277 @@ contains
             if (mesh%ulevels_nod2D(n) == 1) relax_alk(n) = relax_alk(n) - net / ocean_area
         end do
     end subroutine alkalinity_restoring
+
+    ! ---------------------------------------------------------------- column dumps
+    ! The nearest open-ocean node to each point of FESOM3_RECOM_DUMP_POINTS, over
+    ! all ranks (as the FESOM2-REcoM reference dumps chose their columns, see
+    ! tools/ref/SOURCE); the owning rank opens the four dump files of the column.
+    subroutine setup_dumps(mesh, partit)
+        type(t_mesh),   intent(in) :: mesh
+        type(t_partit), intent(in) :: partit
+        character(len=1024) :: dir, pts, env
+        character(len=256)  :: item
+        character(len=512)  :: errmsg
+        real(WP) :: plon, plat, d, deg, best(2), gbest(2)
+        integer  :: len_env, ios, i0, i1, c1, c2, n, nbest, ierr
+
+        call get_environment_variable('FESOM3_RECOM_DUMP_DIR', dir, length=len_env, status=ios)
+        if (ios /= 0 .or. len_env == 0) return
+        call get_environment_variable('FESOM3_RECOM_DUMP_POINTS', pts, length=len_env, status=ios)
+        if (ios /= 0 .or. len_env == 0) &
+            call fail('FESOM3_RECOM_DUMP_DIR is set, but FESOM3_RECOM_DUMP_POINTS is not', partit)
+        dump_nsteps = 11
+        call get_environment_variable('FESOM3_RECOM_DUMP_STEPS', env, length=len_env, status=ios)
+        if (ios == 0 .and. len_env > 0) read(env, *) dump_nsteps
+
+        deg = acos(-1.0_WP) / 180.0_WP
+        i0 = 1
+        do while (i0 <= len_trim(pts))
+            i1 = index(pts(i0:), ',')
+            if (i1 == 0) then
+                item = pts(i0:len_trim(pts))
+                i0   = len_trim(pts) + 1
+            else
+                item = pts(i0:i0 + i1 - 2)
+                i0   = i0 + i1
+            end if
+            c1 = index(item, ':')
+            c2 = index(item, ':', back=.true.)
+            if (c1 == 0 .or. c2 == c1) &
+                call fail('FESOM3_RECOM_DUMP_POINTS: expected name:lon:lat, got ' // trim(item), partit)
+            read(item(c1 + 1:c2 - 1), *) plon
+            read(item(c2 + 1:), *) plat
+
+            best  = [huge(1.0_WP), real(partit%mype, WP)]
+            nbest = 0
+            do n = 1, partit%myDim_nod2D
+                if (mesh%ulevels_nod2D(n) /= 1) cycle
+                d = gc_angle(plon * deg, plat * deg, mesh%geo_coord_nod2D(1, n), mesh%geo_coord_nod2D(2, n))
+                if (d < best(1)) then
+                    best(1) = d
+                    nbest   = n
+                end if
+            end do
+            call MPI_Allreduce(best, gbest, 1, MPI_2DOUBLE_PRECISION, MPI_MINLOC, &
+                               partit%MPI_COMM_FESOM, ierr)
+            if (nint(gbest(2)) /= partit%mype) cycle
+
+            if (ndump == NDUMP_MAX) call fail('more than 4 dump columns on one rank', partit)
+            ndump = ndump + 1
+            dump_node(ndump) = nbest
+            dump_name(ndump) = item(1:c1 - 1)
+            call open_dump(trim(dir) // '/' // trim(dump_name(ndump)) // '_step.bin',        u_step(ndump),  partit)
+            call open_dump(trim(dir) // '/' // trim(dump_name(ndump)) // '_surface.bin',     u_surf(ndump),  partit)
+            call open_dump(trim(dir) // '/' // trim(dump_name(ndump)) // '_surface_out.bin', u_surfo(ndump), partit)
+            call open_dump(trim(dir) // '/' // trim(dump_name(ndump)) // '_transport.bin',   u_tran(ndump),  partit)
+            write(*,'(3a,i0,a,i0,a,f10.4,a,f10.4,a,i0,a)') 'recom4_adapter: dump column ',     &
+                trim(dump_name(ndump)), ': rank ', partit%mype, ', local node ', nbest,        &
+                ', lon ', mesh%geo_coord_nod2D(1, nbest) / deg, ', lat ',                      &
+                mesh%geo_coord_nod2D(2, nbest) / deg, ', ',                                    &
+                mesh%nlevels_nod2D(nbest) - mesh%ulevels_nod2D(nbest), ' levels'
+        end do
+    end subroutine setup_dumps
+
+    subroutine open_dump(path, u, partit)
+        character(len=*), intent(in)  :: path
+        integer,          intent(out) :: u
+        type(t_partit),   intent(in)  :: partit
+        character(len=512) :: errmsg
+        integer :: ierr
+
+        call dump_open_write(path, u, ierr, errmsg)
+        if (ierr /= 0) call fail('opening ' // path // ': ' // trim(errmsg), partit)
+    end subroutine open_dump
+
+    ! Index of node n among this rank's dump columns, 0 if none or past the dump steps
+    integer function dump_index(n)
+        integer, intent(in) :: n
+        integer :: k
+
+        dump_index = 0
+        if (cur_step < 1 .or. cur_step > dump_nsteps) return
+        do k = 1, ndump
+            if (dump_node(k) == n) dump_index = k
+        end do
+    end function dump_index
+
+    ! Hook 1, before recom4_step: what the column driver reads (drivers/recom4_column.F90)
+    subroutine dump_step_in(k, n, nzmin, nzmax, nz, m, dt, mesh, tracers, sw, ice, slp, wind10, tr)
+        integer,        intent(in) :: k, n, nzmin, nzmax, nz, m
+        real(WP),       intent(in) :: dt, sw, ice, slp, wind10, tr(:, :)
+        type(t_mesh),   intent(in) :: mesh
+        type(t_tracer), intent(in) :: tracers
+        integer :: u, j, i
+
+        u = u_step(k)
+        call w0(u, 'in_nzmin',  m, real(nzmin, WP))
+        call w0(u, 'in_nzmax',  m, real(nzmax, WP))
+        call w0(u, 'in_mstep',  m, real(m, WP))
+        call w0(u, 'in_daynew', m, real(daynew, WP))
+        call w0(u, 'in_ndpyr',  m, real(ndpyr, WP))
+        call w0(u, 'in_dt',     m, dt)
+        call w0(u, 'in_lon',    m, mesh%geo_coord_nod2D(1, n))
+        call w0(u, 'in_lat',    m, mesh%geo_coord_nod2D(2, n))
+        call w1(u, 'in_hnode',  m, mesh%hnode(nzmin:nzmax, n))
+        call w1(u, 'in_zbar',   m, mesh%zbar_3d_n(nzmin:nzmax + 1, n))
+        call w1(u, 'in_zmid',   m, mesh%Z_3d_n(nzmin:nzmax, n))
+        call w1(u, 'in_temp',   m, tracers%data(1)%values(nzmin:nzmax, n))
+        call w1(u, 'in_salt',   m, tracers%data(2)%values(nzmin:nzmax, n))
+        call w0(u, 'in_shortwave_raw', m, sw)
+        call w0(u, 'in_ice_frac',      m, ice)
+        call w0(u, 'in_press_air',     m, slp)
+        call w0(u, 'in_wind10',        m, wind10)
+        call w0(u, 'in_atm_co2',       m, hs%CO2_for_spinup)
+        call w0(u, 'in_dust_fe_raw',   m, dust_fe(n))
+        call w0(u, 'in_dust_n_raw',    m, 0.0_WP)
+        do i = 1, size(carb_names)
+            j = recom4_col_profile(state, i)
+            call w1(u, 'in_' // trim(carb_names(i)), m, col(j:j + nz - 1, n))
+        end do
+        call w1(u, 'in_benthos', m, col(recom4_col_benthos(state, 1):recom4_col_benthos(state, 4), n))
+        call w2(u, 'in_tr', m, tr)
+    end subroutine dump_step_in
+
+    ! Hook 1, after recom4_step: its results, and the surface terms
+    subroutine dump_step_out(k, n, nz, m, tr, rflux)
+        integer,  intent(in) :: k, n, nz, m
+        real(WP), intent(in) :: tr(:, :), rflux(:)
+        character(len=16) :: id
+        integer :: u, i, j
+
+        u = u_step(k)
+        call w2(u, 'out_tr',      m, tr)
+        call w1(u, 'out_par',     m, diag3d(1:nz, RECOM4_D3_PAR, n))
+        call w1(u, 'out_npp_phy', m, diag3d(1:nz, RECOM4_D3_NPP_PHY, n))
+        call w1(u, 'out_gpp_phy', m, diag3d(1:nz, RECOM4_D3_GPP_PHY, n))
+        call w1(u, 'out_npp_dia', m, diag3d(1:nz, RECOM4_D3_NPP_DIA, n))
+        call w1(u, 'out_gpp_dia', m, diag3d(1:nz, RECOM4_D3_GPP_DIA, n))
+        ! the air-sea gas exchange, one value per column (as drivers/recom4_column.F90)
+        call w0(u, 'out_co2flux',     m, diag2d(RECOM4_D2_CO2FLUX, n))
+        call w0(u, 'out_co2flux_day', m, diag2d(RECOM4_D2_CO2FLUX_DAY, n))
+        call w0(u, 'out_o2flux',      m, diag2d(RECOM4_D2_O2FLUX, n))
+        call w0(u, 'out_o2flux_day',  m, diag2d(RECOM4_D2_O2FLUX_DAY, n))
+        call w0(u, 'out_pco2surf',    m, diag2d(RECOM4_D2_PCO2SURF, n))
+        call w0(u, 'out_dpco2surf',   m, diag2d(RECOM4_D2_DPCO2SURF, n))
+        call w0(u, 'out_ph_surf',     m, diag2d(RECOM4_D2_PH_SURF, n))
+        call w0(u, 'out_k0',          m, diag2d(RECOM4_D2_K0, n))
+        call w0(u, 'out_kw660',       m, diag2d(RECOM4_D2_KW660, n))
+        ! the benthic pools after the step, and their decay per day from diag2d
+        call w1(u, 'out_benthos',       m, col(recom4_col_benthos(state, 1):recom4_col_benthos(state, 4), n))
+        call w1(u, 'out_decay_benthos', m, diag2d(RECOM4_D2_DECAY_BEN_N:RECOM4_D2_DECAY_BEN_N + 3, n))
+        do i = 1, size(carb_names)
+            j = recom4_col_profile(state, i)
+            call w1(u, 'out_' // trim(carb_names(i)), m, col(j:j + nz - 1, n))
+        end do
+        ! surf_<ID>: the replay reads terms 2-5 (virtual, restoring, river, erosion);
+        ! RECOM4 does not return its own term separately, so term 1 is 0 here and
+        ! the total, for the comparison, goes to _surface_out.bin
+        do i = 1, ntr
+            write(id, '(i0)') recom4_tracer_id(state, i)
+            call w1(u_surf(k), 'surf_' // trim(id), m, &
+                    [0.0_WP, 0.0_WP, rflux(i), 0.0_WP, 0.0_WP, sflux(i, n)])
+            call w0(u_surfo(k), 'out_surf_' // trim(id), m, sflux(i, n))
+        end do
+    end subroutine dump_step_out
+
+    ! Hook 2, before recom4_transport; the column's inputs once per step, at the
+    ! first REcoM tracer, then the tracer itself
+    subroutine dump_transport_in(k, n, nzmin, nzmax, nz, itr, dt, mesh, tracers, area_i, avol, seafl, tr)
+        integer,        intent(in) :: k, n, nzmin, nzmax, nz, itr
+        real(WP),       intent(in) :: dt, area_i(:), avol(:), seafl(:), tr(:, :)
+        type(t_mesh),   intent(in) :: mesh
+        type(t_tracer), intent(in) :: tracers
+        character(len=16) :: id
+        integer :: u, m
+
+        u = u_tran(k)
+        m = cur_step
+        if (itr == 1) then
+            call w0(u, 'in_nzmin',     m, real(nzmin, WP))
+            call w0(u, 'in_nzmax',     m, real(nzmax, WP))
+            call w0(u, 'in_mstep',     m, real(m, WP))
+            call w0(u, 'in_dt',        m, dt)
+            call w0(u, 'in_lat',       m, mesh%geo_coord_nod2D(2, n))
+            call w1(u, 'in_hnode',     m, mesh%hnode(nzmin:nzmax, n))
+            call w1(u, 'in_hnode_new', m, mesh%hnode_new(nzmin:nzmax, n))
+            call w1(u, 'in_zbar',      m, mesh%zbar_3d_n(nzmin:nzmax + 1, n))
+            call w1(u, 'in_zmid',      m, mesh%Z_3d_n(nzmin:nzmax, n))
+            call w1(u, 'in_area',      m, area_i)
+            call w1(u, 'in_areasvol',  m, avol)
+            call w1(u, 'in_seafloor',  m, seafl)
+            call w1(u, 'in_temp',      m, tracers%data(1)%values(nzmin:nzmax, n))
+            call w1(u, 'in_salt',      m, tracers%data(2)%values(nzmin:nzmax, n))
+            call w1(u, 'in_benthos',       m, col(recom4_col_benthos(state, 1):recom4_col_benthos(state, 4), n))
+            call w1(u, 'in_decay_benthos', m, col(recom4_col_decay(state, 1):recom4_col_decay(state, 4), n))
+        end if
+        write(id, '(i0)') recom4_tracer_id(state, itr)
+        call w1(u, 'in_tr_' // trim(id), m, tr(1:nz, itr))
+    end subroutine dump_transport_in
+
+    ! Hook 2, after recom4_transport; closes the files after the last dumped step
+    subroutine dump_transport_out(k, n, nz, itr, tr)
+        integer,  intent(in) :: k, n, nz, itr
+        real(WP), intent(in) :: tr(:, :)
+        character(len=16) :: id
+        integer :: u, m
+
+        u = u_tran(k)
+        m = cur_step
+        write(id, '(i0)') recom4_tracer_id(state, itr)
+        call w1(u, 'out_vert_sink_' // trim(id), m, diag3d(1:nz, RECOM4_D3_VERT_SINK, n))
+        call w1(u, 'out_dtr_bf_'    // trim(id), m, diag3d(1:nz, RECOM4_D3_DTR_BF, n))
+        call w1(u, 'out_str_bf_'    // trim(id), m, diag3d(1:nz, RECOM4_D3_STR_BF, n))
+        call w1(u, 'out_tr_sink_'   // trim(id), m, tr(1:nz, itr))
+        if (itr == ntr .and. m == dump_nsteps) then
+            call dump_close(u_step(k))
+            call dump_close(u_surf(k))
+            call dump_close(u_surfo(k))
+            call dump_close(u_tran(k))
+        end if
+    end subroutine dump_transport_out
+
+    subroutine w0(u, name, m, x)
+        integer,          intent(in) :: u, m
+        character(len=*), intent(in) :: name
+        real(WP),         intent(in) :: x
+        character(len=256) :: errmsg
+        integer :: ierr
+
+        call dump_write(u, name, m, real(x, real64), ierr, errmsg)
+        if (ierr /= 0) error stop 'recom4_adapter: writing a column dump failed'
+    end subroutine w0
+
+    subroutine w1(u, name, m, v)
+        integer,          intent(in) :: u, m
+        character(len=*), intent(in) :: name
+        real(WP),         intent(in) :: v(:)
+        character(len=256) :: errmsg
+        integer :: ierr
+
+        call dump_write(u, name, m, real(v, real64), ierr, errmsg)
+        if (ierr /= 0) error stop 'recom4_adapter: writing a column dump failed'
+    end subroutine w1
+
+    subroutine w2(u, name, m, a)
+        integer,          intent(in) :: u, m
+        character(len=*), intent(in) :: name
+        real(WP),         intent(in) :: a(:, :)
+        character(len=256) :: errmsg
+        integer :: ierr
+
+        call dump_write(u, name, m, real(a, real64), ierr, errmsg)
+        if (ierr /= 0) error stop 'recom4_adapter: writing a column dump failed'
+    end subroutine w2
+
+    ! Great-circle angle between two points (radians), haversine form
+    pure real(WP) function gc_angle(lon1, lat1, lon2, lat2)
+        real(WP), intent(in) :: lon1, lat1, lon2, lat2
+        real(WP) :: s1, s2
+
+        s1 = sin(0.5_WP * (lat2 - lat1))
+        s2 = sin(0.5_WP * (lon2 - lon1))
+        gc_angle = 2.0_WP * asin(min(1.0_WP, sqrt(s1 * s1 + cos(lat1) * cos(lat2) * s2 * s2)))
+    end function gc_angle
 
     ! Stops with a message if a netCDF call failed.
     subroutine nc(status, what, partit)
