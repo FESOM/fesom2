@@ -93,7 +93,8 @@ program fesom_lifecycle_native_mr
     use mod_forcing_other,  only: read_other_NetCDF   ! runoff + SSS climatology read
     use oce_initial_state,  only: t_ic3d_config, do_ic3d
     use mod_recom4_adapter, only: recom4_adapter_init, recom4_adapter_ntr, recom4_adapter_register, &
-                                  recom4_adapter_ic, recom4_adapter_initial_values
+                                  recom4_adapter_ic, recom4_adapter_initial_values, &
+                                  recom4_adapter_forcing
     use oce_muscl_adv,      only: muscl_adv_init
     use oce_ssh_rhs,        only: init_stiff_mat_ale
     use mod_step_oce,       only: step_oce
@@ -781,6 +782,7 @@ program fesom_lifecycle_native_mr
         frc%f(7)%file_base = trim(forcing_dir)//'/ncar_precip.'; frc%f(7)%varname = 'RAIN'
         frc%f(8)%file_base = trim(forcing_dir)//'/ncar_precip.'; frc%f(8)%varname = 'SNOW'
     end if
+    call recom4_adapter_forcing(frc, forcing_dir, forc_set, partit)
     rdate_cold = real(forcing_julday(yearnew,1,1,forc_calendar),WP) &  ! cold-start rdate, NO half-step
                + real(daynew-1,WP) + timenew/86400._WP                 ! (FESOM2 nc_sbc_ini:643-644)
     call forcing_alloc(frc)

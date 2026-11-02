@@ -14,6 +14,7 @@ module mod_recom4_adapter
     use mod_tracer,        only: t_tracer
     use mod_partitioning,  only: par_ex
     use oce_initial_state, only: t_ic3d_config
+    use mod_forcing_read,  only: t_atm_forcing
 #ifdef __RECOM4
     use recom4_api,     only: recom4_state, recom4_init, recom4_ntr, recom4_ncol,    &
                               recom4_ndiag2d, recom4_ndiag3d, recom4_tracer_id,      &
@@ -24,9 +25,11 @@ module mod_recom4_adapter
     private
     public :: recom4_adapter_init, recom4_adapter_on, recom4_adapter_ntr
     public :: recom4_adapter_register, recom4_adapter_ic, recom4_adapter_initial_values
+    public :: recom4_adapter_forcing
 
     logical :: on  = .false.
     integer :: ntr = 0
+    integer :: islp = 0      ! field number of sea-level pressure in FESOM_F's forcing
 #ifdef __RECOM4
     type(recom4_state) :: state
     ! Per-node arrays of the host (IMPLEMENTATION.md section 1), all local nodes
@@ -171,6 +174,24 @@ contains
         end if
 #endif
     end subroutine recom4_adapter_initial_values
+
+    ! After FESOM_F has filled its forcing table: sea-level pressure as one more
+    ! field, only with RECOM4 on. FESOM_F's bulk formulae do not use it; REcoM's
+    ! gas exchange does. JRA55-do psl is in Pa, REcoM's unit.
+    subroutine recom4_adapter_forcing(frc, forcing_dir, forc_set, partit)
+        type(t_atm_forcing), intent(inout) :: frc
+        character(len=*),    intent(in)    :: forcing_dir, forc_set
+        type(t_partit),      intent(in)    :: partit
+#ifdef __RECOM4
+        if (.not. on) return
+        if (trim(forc_set) /= 'JRA55') &
+            call fail('RECOM4 needs FESOM3_FORCING=JRA55 (sea-level pressure psl)', partit)
+        frc%nfld = frc%nfld + 1
+        islp     = frc%nfld
+        frc%f(islp)%file_base = trim(forcing_dir) // '/psl.'
+        frc%f(islp)%varname   = 'psl'
+#endif
+    end subroutine recom4_adapter_forcing
 
     ! Prints msg and aborts every rank (a failing rank must not leave the others
     ! waiting in a collective), as FESOM_F's own die().
