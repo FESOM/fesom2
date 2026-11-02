@@ -94,7 +94,7 @@ program fesom_lifecycle_native_mr
     use oce_initial_state,  only: t_ic3d_config, do_ic3d
     use mod_recom4_adapter, only: recom4_adapter_init, recom4_adapter_ntr, recom4_adapter_register, &
                                   recom4_adapter_ic, recom4_adapter_initial_values, &
-                                  recom4_adapter_forcing, recom4_adapter_monthly
+                                  recom4_adapter_forcing, recom4_adapter_monthly, recom4_adapter_step
     use oce_muscl_adv,      only: muscl_adv_init
     use oce_ssh_rhs,        only: init_stiff_mat_ale
     use mod_step_oce,       only: step_oce
@@ -969,6 +969,10 @@ program fesom_lifecycle_native_mr
         if (use_sw_pene) call cal_shortwave_rad(.true., ice%thermo%albw, atm%shortwave, chl, &
                               ice%data(1)%values(1:nNodL), atm%heat_flux, dyn%work%sw_3d, mesh, partit)
         call timer_stop(TMR_FLUXES)
+        ! RECOM4 (M8, hook 1): sources minus sinks, chemistry and surface fluxes
+        ! of every owned column, after the ice and the surface fluxes
+        call recom4_adapter_step(n, dt, tracers, mesh, partit, ice%data(1)%values, &
+                                 atm%shortwave, atm%u_wind, atm%v_wind, frc)
         ! M5d: stress_node_surf=atm%stress_node_surf (oce_fluxes_mom) feeds KPP ustar (PP ignores it).
         call timer_start(TMR_STEP_OCE)
         ! Restart Stage 5 (Task 5.2): first-resumed-step AB guard. lfirst = (n==1) .and. .not. r_restart

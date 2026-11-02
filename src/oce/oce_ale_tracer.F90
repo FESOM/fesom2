@@ -40,6 +40,7 @@ module oce_ale_tracer
     use oce_tracer_mod,     only: init_tracers_AB
     use oce_tracer_grad,    only: tracer_gradient_z
     use oce_adv_tra_driver, only: do_oce_adv_tra
+    use mod_recom4_adapter, only: recom4_adapter_bc_surface
     implicit none
     private
     public :: adv_tracers_ale, advect_tracer, diff_tracers_ale, diff_ver_part_impl_ale
@@ -692,10 +693,15 @@ contains
                 end do
             end if
             !___________________________________________________________________
-            ! surface boundary flux (heat / virtual-salt / relaxation)
-            tr(nzmin) = tr(nzmin) + bc_surface(id, trarr(nzmin,n), dt, heat_flux(n), &
-                            water_flux(n), virtual_salt(n), relax_salt(n), &
-                            real_salt_flux(n), is_nonlinfs)
+            ! surface boundary flux (heat / virtual-salt / relaxation); REcoM tracers
+            ! (ID > 1000): dt * surface_flux from RECOM4 (M8, hook 3)
+            if (id > 1000) then
+                tr(nzmin) = tr(nzmin) + recom4_adapter_bc_surface(id, n, dt)
+            else
+                tr(nzmin) = tr(nzmin) + bc_surface(id, trarr(nzmin,n), dt, heat_flux(n), &
+                                water_flux(n), virtual_salt(n), relax_salt(n), &
+                                real_salt_flux(n), is_nonlinfs)
+            end if
             !___________________________________________________________________
             ! Thomas algorithm: forward elimination then back substitution
             cp(nzmin) = c(nzmin)/b(nzmin)
