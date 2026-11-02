@@ -40,7 +40,7 @@ module oce_ale_tracer
     use oce_tracer_mod,     only: init_tracers_AB
     use oce_tracer_grad,    only: tracer_gradient_z
     use oce_adv_tra_driver, only: do_oce_adv_tra
-    use mod_recom4_adapter, only: recom4_adapter_bc_surface
+    use mod_recom4_adapter, only: recom4_adapter_bc_surface, recom4_adapter_transport
     implicit none
     private
     public :: adv_tracers_ale, advect_tracer, diff_tracers_ale, diff_ver_part_impl_ale
@@ -228,6 +228,11 @@ contains
         ! explicit vertical diffusion (diff_ver_part_expl_ale) is skipped: i_vert_diff=.true.
         ! M4d Redi explicit vertical projection K31/K32 (FESOM2 diff_tracers_ale:394, if(Redi))
         if (Redi) call diff_ver_part_redi_expl(dt, dynamics, tracers, mesh, tr_xy, partit)
+
+        ! RECOM4 (M8, hook 2): benthic return, sinking and deposition of REcoM tracer
+        ! tr_num, before the reconstruct (FESOM2-REcoM's block in diff_tracers_ale);
+        ! a no-op for T and S and with RECOM4 off
+        call recom4_adapter_transport(tr_num, dt, nNodO, tracers, mesh, partit)
 
         !_______________________________________________________________________
         ! ALE tracer reconstruct: T* = (dt*R_T^n + h^{n-0.5}*T^{n-0.5})/h^{n+0.5}

@@ -1,4 +1,4 @@
-!> FESOM_F adapter for RECOM4 (RECOM4 M8, #46): the only FESOM_F code that
+!> FESOM_F adapter for RECOM4 (RECOM4 M8, #46, #47): the only FESOM_F code that
 !! talks to RECOM4. RECOM4 is on only when FESOM_F is built with USE_RECOM4
 !! (which defines __RECOM4) and FESOM3_RECOM_NML is set at run time.
 !! Otherwise every routine returns at once and recom4_adapter_ntr() = 0, so
@@ -19,23 +19,23 @@ module mod_recom4_adapter
 #ifdef __RECOM4
     use recom4_api,     only: recom4_state, recom4_init, recom4_ntr, recom4_ncol,    &
                               recom4_ndiag2d, recom4_ndiag3d, recom4_tracer_id,      &
-                              recom4_initial_values, recom4_step,                    &
+                              recom4_initial_values, recom4_step, recom4_transport,  &
                               recom4_host_settings, recom4_get_host_settings
+    use recom4_text_io, only: recom4_read_text
+    use netcdf
     use mod_halo,       only: exchange_nod
     use mod_clock,      only: daynew, ndpyr
     use mpi
-    use recom4_text_io, only: recom4_read_text
-    use netcdf
 #endif
     implicit none
     private
     public :: recom4_adapter_init, recom4_adapter_on, recom4_adapter_ntr
     public :: recom4_adapter_register, recom4_adapter_ic, recom4_adapter_initial_values
     public :: recom4_adapter_forcing, recom4_adapter_monthly
-    public :: recom4_adapter_step, recom4_adapter_bc_surface
+    public :: recom4_adapter_step, recom4_adapter_bc_surface, recom4_adapter_transport
 
-    logical :: on  = .false.
-    integer :: ntr = 0
+    logical :: on   = .false.
+    integer :: ntr  = 0
     integer :: islp = 0      ! field number of sea-level pressure in FESOM_F's forcing
 #ifdef __RECOM4
     type(recom4_state) :: state
@@ -173,10 +173,10 @@ contains
         type(t_partit), intent(in)    :: partit
 #ifdef __RECOM4
         real(WP), allocatable :: tr(:, :)
+        real(WP), allocatable :: vmin(:), vmax(:)
         character(len=512) :: errmsg
         integer :: n, i, nzmin, nzmax, nz, ierr
         real(WP) :: lval
-        real(WP), allocatable :: vmin(:), vmax(:)
 
         if (.not. on) return
         allocate(tr(mesh%nl - 1, ntr))
@@ -200,6 +200,7 @@ contains
                 vmax(i) = max(vmax(i), maxval(tr(1:nz, i)))
             end do
         end do
+
         ! Alkalinity restoring (REcoM bio_fluxes): FESOM2 keeps the initial surface
         ! alkalinity, level 1, of every local node (oce_setup_step.F90), and the open-
         ! ocean area. At the first step Alk_surf - Alk = 0, so the restoring starts at 0.
@@ -279,17 +280,6 @@ contains
 #endif
     end subroutine recom4_adapter_monthly
 
-#ifdef __RECOM4
-    ! Stops with a message if a netCDF call failed.
-    subroutine nc(status, what, partit)
-        integer,          intent(in) :: status
-        character(len=*), intent(in) :: what
-        type(t_partit),   intent(in) :: partit
-
-        if (status /= nf90_noerr) call fail('netCDF: ' // what // ': ' // trim(nf90_strerror(status)), partit)
-    end subroutine nc
-#endif
-
     ! Hook 1, after oce_fluxes and the shortwave penetration, before step_oce:
     ! recom4_step for every owned column, as REcoM's recom() loop
     ! (recom_main.F90 at 6e0b28aa), then the halo of the REcoM tracers.
@@ -365,6 +355,56 @@ contains
 #endif
     end function recom4_adapter_bc_surface
 
+    ! Hook 2, in diff_tracers_ale before the ALE reconstruct, for tracer tr_num:
+    ! recom4_transport for every owned column (benthic return, sinking,
+    ! deposition), as REcoM's block in FESOM2's diff_tracers_ale. tr holds the
+    ! current values of all REcoM tracers (those earlier in this tracer loop at
+    ! their end-of-step state); only tr(:, itr) changes. FESOM_F's tracer cells
+    ! are straight prisms: area and areasvol are the same at every level, and the
+    ! whole seafloor lies under the bottom layer. A no-op for T and S.
+    subroutine recom4_adapter_transport(tr_num, dt, nNodO, tracers, mesh, partit)
+        integer,        intent(in)           :: tr_num, nNodO
+        real(WP),       intent(in)           :: dt
+        type(t_tracer), intent(inout)        :: tracers
+        type(t_mesh),   intent(in)           :: mesh
+        type(t_partit), intent(in), optional :: partit
+#ifdef __RECOM4
+        real(WP), allocatable :: tr(:, :), area_i(:), avol(:), seafl(:)
+        character(len=512) :: errmsg
+        integer :: n, i, itr, nzmin, nzmax, nz, ierr
+
+        if (.not. on) return
+        if (tr_num <= 2) return
+        itr = tr_num - 2
+        allocate(tr(mesh%nl - 1, ntr), area_i(mesh%nl), avol(mesh%nl - 1), seafl(mesh%nl - 1))
+        do n = 1, nNodO
+            nzmin = mesh%ulevels_nod2D(n)
+            nzmax = mesh%nlevels_nod2D(n) - 1
+            nz    = nzmax - nzmin + 1
+            do i = 1, ntr
+                tr(1:nz, i) = tracers%data(2 + i)%values(nzmin:nzmax, n)
+            end do
+            area_i(1:nz + 1) = mesh%area(n)
+            avol(1:nz)       = mesh%areasvol(n)
+            seafl(1:nz)      = 0.0_WP
+            seafl(nz)        = mesh%area(n)
+            call recom4_transport(state, itr, nz, mesh%hnode(nzmin:nzmax, n),               &
+                                  mesh%hnode_new(nzmin:nzmax, n),                           &
+                                  mesh%zbar_3d_n(nzmin:nzmax + 1, n), mesh%Z_3d_n(nzmin:nzmax, n), &
+                                  area_i(1:nz + 1), avol(1:nz), seafl(1:nz),                &
+                                  tracers%data(1)%values(nzmin:nzmax, n),                   &
+                                  tracers%data(2)%values(nzmin:nzmax, n),                   &
+                                  mesh%geo_coord_nod2D(1, n), mesh%geo_coord_nod2D(2, n),   &
+                                  dt, tr(1:nz, :), col(:, n), diag3d(1:nz, :, n), ierr, errmsg)
+            if (ierr /= 0) then
+                if (present(partit)) call fail('recom4_transport: ' // trim(errmsg), partit)
+                error stop 'recom4_adapter: recom4_transport failed'
+            end if
+            tracers%data(tr_num)%values(nzmin:nzmax, n) = tr(1:nz, itr)
+        end do
+#endif
+    end subroutine recom4_adapter_transport
+
 #ifdef __RECOM4
     ! REcoM's bio_fluxes (recom_main.F90 at 6e0b28aa): relaxation of the surface
     ! alkalinity (level 1) toward its initial value at open-ocean nodes, minus its
@@ -393,6 +433,15 @@ contains
             if (mesh%ulevels_nod2D(n) == 1) relax_alk(n) = relax_alk(n) - net / ocean_area
         end do
     end subroutine alkalinity_restoring
+
+    ! Stops with a message if a netCDF call failed.
+    subroutine nc(status, what, partit)
+        integer,          intent(in) :: status
+        character(len=*), intent(in) :: what
+        type(t_partit),   intent(in) :: partit
+
+        if (status /= nf90_noerr) call fail('netCDF: ' // what // ': ' // trim(nf90_strerror(status)), partit)
+    end subroutine nc
 #endif
 
     ! Prints msg and aborts every rank (a failing rank must not leave the others
