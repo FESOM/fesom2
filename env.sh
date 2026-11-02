@@ -41,8 +41,12 @@ if [[ "$_host" =~ ^levante ]] || [[ "$_host" =~ \.lvt\.dkrz\.de$ ]]; then
     # byte-identical and only marginally slower. Verified: with this set the CORE2 multi-rank
     # lifecycle is byte-exact vs FESOM2; without it the tr_xy halo drifts at step 2.
     export OMPI_MCA_btl_vader_single_copy_mechanism=none
+elif [[ "$_host" =~ ^albedo[0-9]$ ]] || [[ "$_host" =~ ^prod-[0-9]+$ ]]; then
+    # albedo (AWI): login nodes albedoN, compute nodes prod-NNN. Intel MPI, so the
+    # Levante OpenMPI vader workaround above does not apply.
+    export FESOM_PLATFORM_STRATEGY="albedo"
 else
-    echo "env.sh: unknown host '$_host'; only levante.dkrz.de is configured." >&2
+    echo "env.sh: unknown host '$_host'; only levante.dkrz.de and albedo are configured." >&2
     return 1 2>/dev/null || exit 1
 fi
 
