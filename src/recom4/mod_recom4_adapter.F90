@@ -12,6 +12,7 @@
 !!   FESOM3_RECOM_DUMP_POINTS  name:lon:lat[,name:lon:lat ...], degrees; the nearest
 !!                             open-ocean node to each point is dumped
 !!   FESOM3_RECOM_DUMP_STEPS   number of steps dumped (default 11)
+!!   FESOM3_RECOM_CHECK        gate items 3 and 4 (#48): total N and the DICremin reset
 module mod_recom4_adapter
     use mod_precision,     only: WP
     use mod_mesh,          only: t_mesh
@@ -75,6 +76,12 @@ module mod_recom4_adapter
     ! the carbonate profiles of col, in RECOM4's order (recom4_col_profile)
     character(len=8), parameter :: carb_names(8) = [character(len=8) ::                &
         'co2', 'ph', 'pco2', 'hco3', 'co3', 'omegac', 'kspc', 'rhosw']
+
+    ! Gate items 3 and 4 (#48): off unless FESOM3_RECOM_CHECK is set
+    logical  :: check_on = .false.
+    real(WP) :: total_n0 = 0.0_WP              ! total N at the first check [mmol]
+    integer, parameter :: NIDS_N = 9          ! the N tracers (2p3z2d; missing ones skipped)
+    integer, parameter :: ids_n(NIDS_N) = [1001, 1004, 1007, 1009, 1011, 1013, 1023, 1025, 1029]
 #endif
 
 contains
@@ -136,6 +143,11 @@ contains
         dust_fe = 0.0_WP
         if (partit%mype == 0) write(*,'(a,i0,2a)') 'recom4_adapter: RECOM4 on, ', ntr, &
             ' tracers, ', trim(path)
+
+        call get_environment_variable('FESOM3_RECOM_CHECK', path, length=len_env, status=ios)
+        check_on = (ios == 0 .and. len_env > 0)
+        if (check_on .and. partit%mype == 0) write(*,'(a)') &
+            'recom4_adapter: checks of total N and the DICremin reset on'
 #endif
     end subroutine recom4_adapter_init
 
@@ -326,6 +338,7 @@ contains
 
         if (.not. on) return
         cur_step = mstep
+        if (check_on) call check_total_n(mstep, tracers, mesh, partit)
         if (hs%restore_alkalinity) call alkalinity_restoring(tracers, mesh, partit)
 
         allocate(tr(mesh%nl - 1, ntr), zero(ntr), rflux(ntr))
@@ -366,6 +379,9 @@ contains
             end do
         end do
 
+        if (check_on) call check_total_n(-mstep, tracers, mesh, partit)
+        if (check_on) call check_dicremin_top(mstep, tracers, mesh, partit)
+
         ! REcoM's loop covers owned nodes only and "needs exchange_nod in the end"
         if (partit%npes > 1) then
             do i = 1, ntr
@@ -396,8 +412,9 @@ contains
     ! deposition), as REcoM's block in FESOM2's diff_tracers_ale. tr holds the
     ! current values of all REcoM tracers (those earlier in this tracer loop at
     ! their end-of-step state); only tr(:, itr) changes. FESOM_F's tracer cells
-    ! are straight prisms: area and areasvol are the same at every level, and the
-    ! whole seafloor lies under the bottom layer. A no-op for T and S.
+    ! are straight prisms: area and areasvol are the same at every level, the
+    ! interface below the deepest layer has area 0 (as in FESOM2), and the whole
+    ! seafloor lies under the bottom layer. A no-op for T and S.
     subroutine recom4_adapter_transport(tr_num, dt, nNodO, tracers, mesh, partit)
         integer,        intent(in)           :: tr_num, nNodO
         real(WP),       intent(in)           :: dt
@@ -421,6 +438,7 @@ contains
                 tr(1:nz, i) = tracers%data(2 + i)%values(nzmin:nzmax, n)
             end do
             area_i(1:nz + 1) = mesh%area(n)
+            area_i(nz + 1)   = 0.0_WP      ! no water below the deepest layer (FESOM2: in_area ends in 0)
             avol(1:nz)       = mesh%areasvol(n)
             seafl(1:nz)      = 0.0_WP
             seafl(nz)        = mesh%area(n)
@@ -478,6 +496,60 @@ contains
         end do
     end subroutine alkalinity_restoring
 
+    ! Gate item 3: the ocean's total nitrogen at the start of hook 1 [mmol], the N
+    ! tracers of every owned wet cell (concentration * hnode * area) plus the
+    ! benthic N pool (mmol/m2 * area), and its relative change since the first call.
+    ! Printed on rank 0 in FESOM_F's format for global sums (es).
+    subroutine check_total_n(mstep, tracers, mesh, partit)
+        integer,        intent(in) :: mstep
+        type(t_tracer), intent(in) :: tracers
+        type(t_mesh),   intent(in) :: mesh
+        type(t_partit), intent(in) :: partit
+        real(WP) :: lval(2), tot(2)
+        integer  :: n, j, i, nzmin, nzmax, ierr
+
+        lval = 0.0_WP
+        do n = 1, partit%myDim_nod2D
+            nzmin = mesh%ulevels_nod2D(n)
+            nzmax = mesh%nlevels_nod2D(n) - 1
+            do j = 1, NIDS_N
+                i = itr_of_id(ids_n(j))
+                if (i == 0) cycle
+                lval(1) = lval(1) + sum(tracers%data(2 + i)%values(nzmin:nzmax, n) &
+                                        * mesh%hnode(nzmin:nzmax, n)) * mesh%area(n)
+            end do
+            lval(2) = lval(2) + col(recom4_col_benthos(state, 1), n) * mesh%area(n)
+        end do
+        call MPI_Allreduce(lval, tot, 2, MPI_DOUBLE_PRECISION, MPI_SUM, partit%MPI_COMM_FESOM, ierr)
+        if (total_n0 == 0.0_WP) total_n0 = tot(1) + tot(2)
+        if (partit%mype == 0) write(*,'(a,i0,a,es23.16,a,es23.16,a,es23.16,a,es10.3)')       &
+            'recom4_adapter: step ', mstep, '  water N ', tot(1), '  benthic N ', tot(2),    &
+            '  total N ', tot(1) + tot(2), '  rel. change ', (tot(1) + tot(2) - total_n0) / total_n0
+    end subroutine check_total_n
+    ! Gate item 4: after hook 1, the largest DICremin at the top wet level, which
+    ! REcoM resets to 0 before its sources minus sinks, next to the largest at any level.
+    subroutine check_dicremin_top(mstep, tracers, mesh, partit)
+        integer,        intent(in) :: mstep
+        type(t_tracer), intent(in) :: tracers
+        type(t_mesh),   intent(in) :: mesh
+        type(t_partit), intent(in) :: partit
+        real(WP) :: lmax(2), gmax(2)
+        integer  :: n, i, nzmin, nzmax, ierr
+
+        i = itr_of_id(1037)
+        if (i == 0) return
+        lmax = 0.0_WP
+        do n = 1, partit%myDim_nod2D
+            nzmin = mesh%ulevels_nod2D(n)
+            nzmax = mesh%nlevels_nod2D(n) - 1
+            lmax(1) = max(lmax(1), abs(tracers%data(2 + i)%values(nzmin, n)))
+            lmax(2) = max(lmax(2), maxval(abs(tracers%data(2 + i)%values(nzmin:nzmax, n))))
+        end do
+        call MPI_Allreduce(lmax, gmax, 2, MPI_DOUBLE_PRECISION, MPI_MAX, partit%MPI_COMM_FESOM, ierr)
+        if (partit%mype == 0) write(*,'(a,i0,a,es10.3,a,es10.3)') 'recom4_adapter: step ', &
+            mstep, '  DICremin max, top wet level ', gmax(1), ', any level ', gmax(2)
+    end subroutine check_dicremin_top
+
     ! ---------------------------------------------------------------- column dumps
     ! The nearest open-ocean node to each point of FESOM3_RECOM_DUMP_POINTS, over
     ! all ranks (as the FESOM2-REcoM reference dumps chose their columns, see
@@ -487,7 +559,6 @@ contains
         type(t_partit), intent(in) :: partit
         character(len=1024) :: dir, pts, env
         character(len=256)  :: item
-        character(len=512)  :: errmsg
         real(WP) :: plon, plat, d, deg, best(2), gbest(2)
         integer  :: len_env, ios, i0, i1, c1, c2, n, nbest, ierr
 
