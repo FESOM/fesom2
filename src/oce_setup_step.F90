@@ -1155,12 +1155,6 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
     if (mype==0) write(*,*) 'tracer IDs are: ', tracers%data(1:tracers%num_tracers)%ID
     !
 #if defined(__recom)
-    ! read preindustrial DIC
-    if(DIC_PI) then
-        filelist(5) = 'GLODAPv2.2016b.PI_TCO2_fesom2_mmol_fix_z_Fillvalue.nc'
-        varlist(5)  = 'PI_TCO2_mmol'
-    end if
-
     if (mype==0) then
 #if defined(__usetp)
         if (partit%my_fesom_group==0) then
@@ -1173,9 +1167,6 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
             else
                 print *, achar(27)//'[36m'//' --> CISO OFF'//achar(27)//'[0m'
             endif
-            if(DIC_PI) then
-                print *, achar(27)//'[36m'// ' --> Preindustrial DIC will be used'//achar(27)//'[0m'
-            end if
             if (restore_alkalinity)  then
                print *, achar(27)//'[36m'//' --> Alkalinity restoring = .true.'//achar(27)//'[0m'
             endif
