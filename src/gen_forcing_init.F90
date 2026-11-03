@@ -219,6 +219,34 @@ subroutine forcing_array_setup(partit, mesh)
     hf_Qswr   = 0.0_WP
     hf_Qlwr   = 0.0_WP
     hf_Qlwrout= 0.0_WP
+    ! sea-ice mass budget diagnostics [kg m-2 s-1], output only (see ice_thermo_cpl.F90, ice_timestep)
+    allocate(sidm_dyn(n2), sidm_cut(n2), sidm_gwat(n2), sidm_gbot(n2))
+    allocate(sidm_mtop(n2), sidm_mbot(n2), sidm_subl(n2), sidm_si(n2), sidm_th(n2))
+    allocate(sidm_mpre(n2))
+    sidm_dyn=0.0_WP
+    sidm_cut=0.0_WP
+    sidm_gwat=0.0_WP
+    sidm_gbot=0.0_WP
+    sidm_mtop=0.0_WP
+    sidm_mbot=0.0_WP
+    sidm_subl=0.0_WP
+    sidm_si=0.0_WP
+    sidm_th=0.0_WP
+    sidm_mpre=0.0_WP
+    allocate(sisn_dyn(n2), sisn_cut(n2), sisn_snf(n2), sisn_sbl(n2), sisn_mlt(n2), sisn_si(n2), sisn_th(n2), sisn_spre(n2))
+    sisn_dyn=0.0_WP
+    sisn_cut=0.0_WP
+    sisn_snf=0.0_WP
+    sisn_sbl=0.0_WP
+    sisn_mlt=0.0_WP
+    sisn_si=0.0_WP
+    sisn_th=0.0_WP
+    sisn_spre=0.0_WP
+    allocate(sidc_dyn(n2), sidc_cut(n2), sidc_th(n2), sidc_apre(n2))
+    sidc_dyn=0.0_WP
+    sidc_cut=0.0_WP
+    sidc_th=0.0_WP
+    sidc_apre=0.0_WP
   endif 
 
   ! drag coefficient and transfer coefficients for latent and sensible heat

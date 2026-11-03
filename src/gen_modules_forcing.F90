@@ -105,6 +105,13 @@ use o_param
 !   real(kind=WP), allocatable, dimension(:)         :: thdgr, thdgrsn
   real(kind=WP), allocatable, dimension(:)         :: flice
   real(kind=WP), allocatable, dimension(:)         :: hf_Qlat, hf_Qsen, hf_Qradtot, hf_Qswr, hf_Qlwr, hf_Qlwrout
+  ! sea-ice mass budget diagnostics [kg m-2 s-1], output only (see ice_thermo_cpl.F90, ice_timestep)
+  real(kind=WP), allocatable, target, dimension(:) :: sidm_dyn, sidm_cut, sidm_gwat, sidm_gbot, sidm_mtop
+  real(kind=WP), allocatable, target, dimension(:) :: sidm_mbot, sidm_subl, sidm_si, sidm_th, sidm_mpre
+  ! snow mass budget diagnostics (output only), kg m-2 s-1, grid-cell mean
+  ! sea-ice concentration tendency diagnostics (output only), 1/s (area fraction per second)
+  real(kind=WP), allocatable, target, dimension(:) :: sidc_dyn, sidc_cut, sidc_th, sidc_apre
+  real(kind=WP), allocatable, target, dimension(:) :: sisn_dyn, sisn_cut, sisn_snf, sisn_sbl, sisn_mlt, sisn_si, sisn_th, sisn_spre
   real(kind=WP), allocatable, dimension(:)         :: real_salt_flux !PS
 
   ! drag coefficient Cd_atm_oce and transfer coefficients for evaporation
