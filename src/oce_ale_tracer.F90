@@ -641,7 +641,7 @@ if (any(recom_remin_tracer_id == tracers%data(tr_num)%ID)) then
                                mesh%ulevels_nod2D, mesh%nlevels_nod2D, &
                                mesh%nod_in_elem2D_num, &
                                mesh%nod_in_elem2D, mesh%nlevels,       &
-                               mesh%area, mesh%areasvol, mesh%hnode_new, &
+                               mesh%elem_area, mesh%area, mesh%areasvol, mesh%hnode_new, &
                                tracers%data(tr_num)%ID,  &
                                partit%myDim_nod2D, partit%eDim_nod2D, &
                                partit%mype, partit%MPI_COMM_FESOM, dtr_bf, dt)  !--- str_bf ---
@@ -709,7 +709,7 @@ if (any(recom_sinking_tracer_id == tracers%data(tr_num)%ID)) then
                                        mesh%ulevels_nod2D, mesh%nlevels_nod2D, &
                                        mesh%zbar_3d_n, mesh%nod_in_elem2D_num, &
                                        mesh%nod_in_elem2D, mesh%nlevels,       &
-                                       mesh%area, mesh%areasvol, tracers%data(tr_num)%ID, &
+                                       mesh%elem_area, mesh%area, mesh%areasvol, tracers%data(tr_num)%ID, &
                                        tracers%data(tr_num)%values(:,:),       &
                                        partit%myDim_nod2D, str_bf,             &
                                        partit%mype, partit%MPI_COMM_FESOM,   &
