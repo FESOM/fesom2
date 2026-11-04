@@ -847,7 +847,7 @@ if (any(recom_sinking_tracer_id == tracers%data(tr_num)%ID)) then
         end do
         call recom4_dump_transport_sink(tracers%data(tr_num)%ID, mstep, &
                 mesh%ulevels_nod2D, mesh%nlevels_nod2D, vert_sink, str_bf, &
-                tracers%data(tr_num)%values)
+                tracers%data(tr_num)%values, tr_num)
 endif
 #endif
     !___________________________________________________________________________
