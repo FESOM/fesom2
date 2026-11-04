@@ -18,7 +18,7 @@ enable_coccos = .false.
 use_REcoM             =.true.
 REcoM_restart         =.true.
 
-bgc_num               = 22 !33 !24 !38
+bgc_num               = 38 !33 !24 !38
 diags3d_num           = 2           ! Number of diagnostic 3d tracers to be saved
 bgc_base_num          = 22          ! standard tracers
 VDet                  = 20.d0       ! Sinking velocity, constant through the water column and positive downwards
@@ -42,12 +42,7 @@ OmegaC_diss           = .false.    ! DISS Use OmegaC from Mocsy to compute calci
 CO2lim                = .false.    ! CO2 dependence of growth and calcification
 Diags                 = .true.
 constant_CO2          = .true.
-UseFeDust             = .true.      ! Turns dust input of iron off when set to.false.
-UseDustClim           = .true.
-UseDustClimAlbani     = .true.     ! Use Albani dustclim field (If it is false Mahowald will be used)
 use_photodamage       = .true.      ! use Alvarez et al (2018) for chlorophyll degradation
-HetRespFlux_plus      = .true.      !MB More stable computation of zooplankton respiration fluxes adding a small number to HetN
-REcoMDataPath         = '/home/a/a270105/initial_files/pi_init/dust_coremesh/DustClimMonthlyAlbani.nc'
 restore_alkalinity    = .true.
 useRivers             = .false.
 useRivFe              = .true.      ! When set to true, riverine Fe source is activated
@@ -58,14 +53,14 @@ firstyearoffesomcycle = 1958        ! The first year of the actual physical forc
 lastyearoffesomcycle  = 2022        ! Last year of the actual physical forcing used
 numofCO2cycles        = 1           ! Number of cycles of the forcing planned 
 currentCO2cycle       = 1           ! Which CO2 cycle we are currently running
-DIC_PI                = .false.
 Nmocsy                = 1           ! Length of the vector that is passed to mocsy (always one for recom)
 recom_debug           =.false.
-ciso                  =.false.     ! Main switch to enable/disable carbon isotopes (13|14C)
-benthos_num           = 4          ! number of benthic BGC tracers -> 8 if (ciso == .true.) otherwise -> 4
+ciso                  =.true.     ! Main switch to enable/disable carbon isotopes (13|14C)
+benthos_num           = 8          ! number of benthic BGC tracers -> 8 if (ciso == .true.) otherwise -> 4
 use_MEDUSA            = .false.      ! Main switch for the sediment model MEDUSA
+use_DICremin          = .false.
 sedflx_num            = 0           ! if 0: no file from MEDUSA is read but default sediment
-bottflx_num           = 4           ! if ciso&ciso_14: =8; if .not.ciso_14: =6; no ciso: =4
+bottflx_num           = 8           ! if ciso&ciso_14: =8; if .not.ciso_14: =6; no ciso: =4
 use_atbox             = .true.
 add_loopback          = .false.     ! add loopback fluxes through rivers to the surface
 lb_tscale             = 1.0         ! /year: fraction of loopback fluxes yearly added to the surface
@@ -76,11 +71,6 @@ Vdet_a                = 0.0288      ! [1/day]
 Vcalc                 = 0.0072       ! [1/day]
 /
 
-&painitialization_N
-cPhyN                 = 0.2d0
-cHetN                 = 0.2d0
-cZoo2N                = 0.2d0
-/
 
 &paArrhenius
 recom_Tref            = 288.15d0    ! [K]
@@ -103,7 +93,6 @@ k_Fe_c		      = 0.09d0      ! NEW
 k_si                  = 4.d0
 P_cm                  = 3.0d0       ! [1/day]            Rate of C-specific photosynthesis 
 P_cm_d                = 3.5d0
-P_cm_c		      = 2.8d0	    ! NEW
 /
 
 &palight_calculations
@@ -297,8 +286,10 @@ d_co2_calc     = 1.343e+07   ! [kg/mol]
 &pairon
 Fe2N                  = 0.033d0     ! Fe2C * 6.625
 Fe2N_benthos          = 0.15d0      ! test, default was 0.14 Fe2C_benthos * 6.625 - will have to be tuned. [umol/m2/day]
-kScavFe               = 0.752d0     ! 0.0156 (original with 1nM L))
-kScavFe2              = 0.0156d0    ! Background scavenging loss, particle-independent [day-1]
+kScavFe               = 0.752d0     ! 0.07 with 1 nM fixed ligand
+kScavFe_calc          = 0.d0        ! default: 0
+kScavFe_si            = 0.d0        ! default: 0
+kScavFe2              = 0.d0        ! default: 0 (background scavenging loss, particle-independent [day-1])
 dust_sol              = 0.02d0      ! Dissolution of Dust for bioavaliable
 RiverFeConc           = 100
 /
@@ -348,15 +339,15 @@ max_sinking_velocity = 250.d0    ! d-1; for numerical stability, set a maximum p
 /
 
 &paciso
-ciso_init         = .false.     ! initial fractionation of bulk organic matter
-ciso_14           = .false.      ! include inorganic radiocarbon
-ciso_organic_14   = .false.     ! include organic radiocarbon
+ciso_init         = .true.     ! initial fractionation of bulk organic matter
+ciso_14           = .true.      ! include inorganic radiocarbon
+ciso_organic_14   = .true.     ! include organic radiocarbon
 lambda_14         = 3.8561e-12  ! corresponding to 1 year = 365.00 days
 delta_CO2_13      = -6.61       ! atmospheric d13C (permil), global-mean value
 big_delta_CO2_14(1)  = 0. ! atmospheric D14C (permil), northern hemisphere polewards of 30°N
 big_delta_CO2_14(2)  = 0. ! atmospheric D14C (permil), (sub) tropical zone 30°N - 30°S
 big_delta_CO2_14(3)  = 0. ! atmospheric D14C (permil), southern hemisphere polewards of 30°S
-atbox_spinup      = .false.
+atbox_spinup      = .true.
 cosmic_14_init    = 2.0
 /
 
