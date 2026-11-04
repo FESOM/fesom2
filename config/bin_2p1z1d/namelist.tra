@@ -55,7 +55,23 @@ nml_tracer_list =
 1019,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
 1020,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
 1021,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
-1022,  'MFCT',       'QR4C',       'FCT ',        0.,          1.
+1022,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1302, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
+1305, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
+1308, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
+1310, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
+1312, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
+1314, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
+1320, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
+1321, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
+1402, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
+1405, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
+1408, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
+1410, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
+1412, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
+1414, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
+1420, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
+1421, 'MFCT', 'QR4C', 'FCT ', 0., 1.
 !101, 'UPW1', 'UPW1', 'NON ', 0., 0.
 /
 
@@ -95,7 +111,7 @@ gamma2_tra    = 0.            ! additional biharmonic diffusion coefficient [dim
 ! --- Vertical Diffusion and Time Stepping ---
 i_vert_diff   = .true.        ! use implicit vertical diffusion (recommended for stability)
 AB_order      = 2             ! Adams-Bashforth time stepping order (2 or 3)
-ltra_diag     = .true.
+ltra_diag     = .false.
 /
 
 ! ============================================================================
