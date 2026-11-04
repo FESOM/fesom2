@@ -300,6 +300,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     end if
     ! the geometry REcoM's sinking reads in the tracer loop (real64 views)
     call recom_views_mesh(mesh)
+    if (use_ballasting) call recom_ballasting(tracers, partit, mesh)
 #endif
 
 #if defined(__recom) && defined(__usetp)
@@ -676,6 +677,54 @@ end subroutine decay_tracer
 !
 !
 !===============================================================================
+! REcoM ballasting: seawater viscosity, particle density and the scaling of the
+! sinking speeds. They do not depend on the sinking tracer, so they are computed
+! once per step, before the tracer loop, from the tracers at the start of the step.
+#if defined(__recom)
+subroutine recom_ballasting(tracers, partit, mesh)
+    implicit none
+    type(t_tracer), intent(inout), target :: tracers
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh),   intent(in),    target :: mesh
+    type(tracers_info_type)               :: tracers_info
+    integer                               :: n, tr_num
+
+    tr_num = 1
+    ! seawater_visc_3D
+    call get_seawater_viscosity(tr_num, partit%myDim_nod2D, &
+                                mesh%ulevels_nod2D, mesh%nlevels_nod2D, &
+                                recom_tracer_r8(tracers, 1), recom_tracer_r8(tracers, 2)) ! seawater_visc_3D
+
+    allocate(tracers_info%ids(tracers%num_tracers))
+    allocate(tracers_info%data_pointers(tracers%num_tracers))
+
+    do n = 1, tracers%num_tracers
+      tracers_info%ids(n) = tracers%data(n)%id
+    end do
+    ! the particle density reads the detritus classes only
+    call recom_tracer_pointers(tracers, tracers_info, only=[ &
+        tracer_ids%detrital_carbon, tracer_ids%detrital_nitrogen, &
+        tracer_ids%detrital_silica, tracer_ids%detrital_calcite, &
+        tracer_ids%macrozooplankton_detrital_carbon, tracer_ids%macrozooplankton_detrital_nitrogen, &
+        tracer_ids%macrozooplankton_detrital_silica, tracer_ids%macrozooplankton_detrital_calcite])
+
+    ! rho_particle1 and rho_particle2
+    call get_particle_density(tracers%num_tracers, partit%myDim_nod2D, partit%eDim_nod2D, &
+                              mesh%nl, mesh%ulevels_nod2D, mesh%nlevels_nod2D, &
+                              tracers_info) ! rho_particle = density of particle class 1 and 2
+
+    deallocate(tracers_info%ids)
+    deallocate(tracers_info%data_pointers)
+
+    ! scaling_visc_3D, scaling_density1_3D, scaling_density2_3D
+    call ballast(partit%myDim_nod2D, mesh%ulevels_nod2D, &
+                 mesh%nlevels_nod2D, geo_coord_nod2D_r8, z_3d_n_r8,                     &
+                 recom_tracer_r8(tracers, 1), recom_tracer_r8(tracers, 2), real(rad, WP_full))
+end subroutine recom_ballasting
+#endif
+!
+!
+!===============================================================================
 subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
 
     implicit none
@@ -690,7 +739,6 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     real(kind=WP)                         :: ttf_rhs_bak (mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
     integer                               :: nz, nu1, nl1
 #if defined(__recom)
-    type(tracers_info_type)               :: tracers_info
     integer, pointer                      :: s_nod2D(:), r_nod2D(:), s_nod3D(:,:,:), r_nod3D(:,:,:)
 #endif
     !___________________________________________________________________________
@@ -824,44 +872,6 @@ end if
 !YY: recom_sinking_tracer_id in recom_modules extended for 2. zooplankton
 ! but not for the combination ciso + 2. zoo!
 if (any(recom_sinking_tracer_id == tracers%data(tr_num)%ID)) then
-
-!< activate Ballasting
-!< .OG. 04.11.2022
-
-         if (use_ballasting) then
-!< get seawater viscosity, seawater_visc_3D
-              call get_seawater_viscosity(tr_num, partit%myDim_nod2D, &
-                                          mesh%ulevels_nod2D, mesh%nlevels_nod2D, &
-                                          recom_tracer_r8(tracers, 1), recom_tracer_r8(tracers, 2)) ! seawater_visc_3D
-
-              allocate(tracers_info%ids(tracers%num_tracers))
-              allocate(tracers_info%data_pointers(tracers%num_tracers))
-
-              do n = 1, tracers%num_tracers
-                tracers_info%ids(n) = tracers%data(n)%id
-              end do
-              ! the particle density reads the detritus classes only
-              call recom_tracer_pointers(tracers, tracers_info, only=[ &
-                  tracer_ids%detrital_carbon, tracer_ids%detrital_nitrogen, &
-                  tracer_ids%detrital_silica, tracer_ids%detrital_calcite, &
-                  tracer_ids%macrozooplankton_detrital_carbon, tracer_ids%macrozooplankton_detrital_nitrogen, &
-                  tracer_ids%macrozooplankton_detrital_silica, tracer_ids%macrozooplankton_detrital_calcite])
-
-!< get particle density of class 1 and 2 !rho_particle1 and rho_particle2
-              call get_particle_density(tracers%num_tracers, partit%myDim_nod2D, partit%eDim_nod2D, &
-                                        mesh%nl, mesh%ulevels_nod2D, mesh%nlevels_nod2D, &
-                                        tracers_info) ! rho_particle = density of particle class 1 and 2
-
-              deallocate(tracers_info%ids)
-              deallocate(tracers_info%data_pointers)
-
-!< calculate scaling factors
-!< scaling_visc_3D
-!< scaling_density1_3D, scaling_density2_3D
-              call ballast(partit%myDim_nod2D, mesh%ulevels_nod2D, &
-                           mesh%nlevels_nod2D, geo_coord_nod2D_r8, z_3d_n_r8,                     &
-                           recom_tracer_r8(tracers, 1), recom_tracer_r8(tracers, 2), real(rad, WP_full))
-        end if
 
 ! sinking
         call ver_sinking_recom(tr_num, mesh%nl, &  !--- vert_sink ---
