@@ -915,7 +915,11 @@ include "node_contour_boundary.h"
     call oasis_put(send_id(ind), seconds_til_now, exfld, info)
     ! Fields put before the last one of a coupling group return OASIS_Waitgroup;
     ! they are buffered and transmitted together with the last one.
+#if defined(__oasis_waitgroup)
     action=(info==OASIS_Sent .OR. info==OASIS_SentOut .OR. info==OASIS_Waitgroup)
+#else
+    action=(info==OASIS_Sent .OR. info==OASIS_SentOut)
+#endif
     if (action) then
        if (ind==nsend) then
           cplsnd=0.
