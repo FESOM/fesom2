@@ -18,7 +18,7 @@ enable_coccos = .false.
 use_REcoM             =.true.
 REcoM_restart         =.true.
 
-bgc_num               = 38 !33 !24 !38
+bgc_num               = 22 !33 !24 !38
 diags3d_num           = 2           ! Number of diagnostic 3d tracers to be saved
 bgc_base_num          = 22          ! standard tracers
 VDet                  = 20.d0       ! Sinking velocity, constant through the water column and positive downwards
@@ -55,12 +55,12 @@ numofCO2cycles        = 1           ! Number of cycles of the forcing planned
 currentCO2cycle       = 1           ! Which CO2 cycle we are currently running
 Nmocsy                = 1           ! Length of the vector that is passed to mocsy (always one for recom)
 recom_debug           =.false.
-ciso                  =.true.     ! Main switch to enable/disable carbon isotopes (13|14C)
-benthos_num           = 8          ! number of benthic BGC tracers -> 8 if (ciso == .true.) otherwise -> 4
+ciso                  =.false.     ! Main switch to enable/disable carbon isotopes (13|14C)
+benthos_num           = 4          ! number of benthic BGC tracers -> 8 if (ciso == .true.) otherwise -> 4
 use_MEDUSA            = .false.      ! Main switch for the sediment model MEDUSA
 use_DICremin          = .false.
 sedflx_num            = 0           ! if 0: no file from MEDUSA is read but default sediment
-bottflx_num           = 8           ! if ciso&ciso_14: =8; if .not.ciso_14: =6; no ciso: =4
+bottflx_num           = 4           ! if ciso&ciso_14: =8; if .not.ciso_14: =6; no ciso: =4
 use_atbox             = .true.
 add_loopback          = .false.     ! add loopback fluxes through rivers to the surface
 lb_tscale             = 1.0         ! /year: fraction of loopback fluxes yearly added to the surface
@@ -339,15 +339,15 @@ max_sinking_velocity = 250.d0    ! d-1; for numerical stability, set a maximum p
 /
 
 &paciso
-ciso_init         = .true.     ! initial fractionation of bulk organic matter
-ciso_14           = .true.      ! include inorganic radiocarbon
-ciso_organic_14   = .true.     ! include organic radiocarbon
+ciso_init         = .false.     ! initial fractionation of bulk organic matter
+ciso_14           = .false.      ! include inorganic radiocarbon
+ciso_organic_14   = .false.     ! include organic radiocarbon
 lambda_14         = 3.8561e-12  ! corresponding to 1 year = 365.00 days
 delta_CO2_13      = -6.61       ! atmospheric d13C (permil), global-mean value
 big_delta_CO2_14(1)  = 0. ! atmospheric D14C (permil), northern hemisphere polewards of 30°N
 big_delta_CO2_14(2)  = 0. ! atmospheric D14C (permil), (sub) tropical zone 30°N - 30°S
 big_delta_CO2_14(3)  = 0. ! atmospheric D14C (permil), southern hemisphere polewards of 30°S
-atbox_spinup      = .true.
+atbox_spinup      = .false.
 cosmic_14_init    = 2.0
 /
 
