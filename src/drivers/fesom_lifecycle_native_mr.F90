@@ -94,7 +94,8 @@ program fesom_lifecycle_native_mr
     use oce_initial_state,  only: t_ic3d_config, do_ic3d
     use mod_recom4_adapter, only: recom4_adapter_init, recom4_adapter_ntr, recom4_adapter_register, &
                                   recom4_adapter_ic, recom4_adapter_initial_values, &
-                                  recom4_adapter_forcing, recom4_adapter_monthly, recom4_adapter_step
+                                  recom4_adapter_forcing, recom4_adapter_monthly, recom4_adapter_step, &
+                                  recom4_adapter_register_output, recom4_adapter_accumulate
     use oce_muscl_adv,      only: muscl_adv_init
     use oce_ssh_rhs,        only: init_stiff_mat_ale
     use mod_step_oce,       only: step_oce
@@ -1006,6 +1007,8 @@ program fesom_lifecycle_native_mr
             if (means_has(oio,'Av'))     call means_accumulate(oio,'Av',     dyn%work%Av(1:nl, 1:nElemO))
             if (means_has(oio,'bolus_u')) call means_accumulate(oio,'bolus_u', dyn%fer_uv(1, 1:nl-1, 1:nElemO))
             if (means_has(oio,'bolus_v')) call means_accumulate(oio,'bolus_v', dyn%fer_uv(2, 1:nl-1, 1:nElemO))
+            ! RECOM4's requested fields (RECOM4 #53); nothing if none or RECOM4 off
+            call recom4_adapter_accumulate(oio, nNodO, mesh, tracers)
             oclk%year = yearnew; oclk%yearstart = yearstart; oclk%daynew = daynew; oclk%ndpyr = ndpyr
             oclk%month = month;  oclk%day_in_month = day_in_month
             oclk%ndim_month = num_day_in_month(fleapyear, month); oclk%timenew = real(timenew, real64)
@@ -1208,8 +1211,13 @@ contains
         case ('bolus_v')
             continue   ! registered together with 'bolus_u'
         case default
-            if (partit%mype == 0) &
-                write(*,'(a)') 'M9 WARNING: unknown output var "'//trim(e%id)//'" (skipped)'
+            ! RECOM4's diagnostics, tracers and inputs (RECOM4 #53); warn only
+            ! if RECOM4 does not know the name either
+            if (.not. recom4_adapter_register_output(io, trim(e%id), prec, ismean, fr, un, &
+                                                     partit%mype == 0)) then
+                if (partit%mype == 0) &
+                    write(*,'(a)') 'M9 WARNING: unknown output var "'//trim(e%id)//'" (skipped)'
+            end if
         end select
     end subroutine register_output_var
 

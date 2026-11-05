@@ -21,6 +21,8 @@ module mod_recom4_adapter
     use mod_partitioning,  only: par_ex
     use oce_initial_state, only: t_ic3d_config
     use mod_forcing_read,  only: t_atm_forcing
+    use mod_io_means,      only: t_io_means, means_define_node2d, means_define_node3d, &
+                                 means_accumulate, means_has
 #ifdef __RECOM4
     use recom4_api,     only: recom4_state, recom4_init, recom4_ntr, recom4_ncol,    &
                               recom4_ndiag2d, recom4_ndiag3d, recom4_ndiag3dw, recom4_tracer_id, &
@@ -33,7 +35,10 @@ module mod_recom4_adapter
                               RECOM4_D2_CO2FLUX, RECOM4_D2_CO2FLUX_DAY, RECOM4_D2_O2FLUX, &
                               RECOM4_D2_O2FLUX_DAY, RECOM4_D2_PCO2SURF, RECOM4_D2_DPCO2SURF, &
                               RECOM4_D2_PH_SURF, RECOM4_D2_K0, RECOM4_D2_KW660,       &
-                              RECOM4_D2_DECAY_BEN_N, RECOM4_D3W_WSINK_DET1, RECOM4_D3W_WSINK_DET2
+                              RECOM4_D2_DECAY_BEN_N, RECOM4_D3W_WSINK_DET1, RECOM4_D3W_WSINK_DET2, &
+                              recom4_diag_index, recom4_diag_info, recom4_tracer_name, &
+                              RECOM4_KIND_2D, RECOM4_KIND_3D, RECOM4_KIND_3DW, RECOM4_KIND_COL, &
+                              RECOM4_DIAG_NAME_LEN, RECOM4_DIAG_LONG_LEN, RECOM4_DIAG_UNITS_LEN
     use recom4_text_io, only: recom4_read_text
     use recom4_dump_io, only: dump_open_write, dump_write, dump_close
     use iso_fortran_env, only: real64
@@ -48,6 +53,7 @@ module mod_recom4_adapter
     public :: recom4_adapter_register, recom4_adapter_ic, recom4_adapter_initial_values
     public :: recom4_adapter_forcing, recom4_adapter_monthly
     public :: recom4_adapter_step, recom4_adapter_bc_surface, recom4_adapter_transport
+    public :: recom4_adapter_register_output, recom4_adapter_accumulate
 
     logical :: on   = .false.
     integer :: ntr  = 0
@@ -84,6 +90,13 @@ module mod_recom4_adapter
     real(WP) :: total_n0 = 0.0_WP              ! total N at the first check [mmol]
     integer, parameter :: NIDS_N = 9          ! the N tracers (2p3z2d; missing ones skipped)
     integer, parameter :: ids_n(NIDS_N) = [1001, 1004, 1007, 1009, 1011, 1013, 1023, 1025, 1029]
+
+    ! Output (RECOM4 #53): the RECOM4 fields namelist.io asks for, in order
+    integer, parameter :: NREQ_MAX = 128
+    integer, parameter :: REQ_DIAG = 1, REQ_TRACER = 2, REQ_XCO2 = 3, REQ_AFE = 4, REQ_AN = 5
+    integer :: nreq = 0
+    character(len=32) :: req_name(NREQ_MAX) = ''
+    integer :: req_src(NREQ_MAX) = 0, req_kind(NREQ_MAX) = 0, req_slot(NREQ_MAX) = 0
 #endif
 
 contains
@@ -482,6 +495,164 @@ contains
         end do
 #endif
     end subroutine recom4_adapter_transport
+
+    ! Output (RECOM4 #53): defines the RECOM4 field that a namelist.io row asks
+    ! for, with RECOM4's name, long name and units, and returns .true.; .false.
+    ! if RECOM4 is off or does not know the name. Looks in this order: a named
+    ! diagnostic (recom4_diag), a tracer (recom4_tracer_name), and the inputs
+    ! the adapter passes in: xCO2atm, aFe, aN.
+    logical function recom4_adapter_register_output(io, id, prec, ismean, fr, un, root)
+        type(t_io_means), intent(inout) :: io
+        character(len=*), intent(in)    :: id, prec, un
+        logical,          intent(in)    :: ismean, root
+        integer,          intent(in)    :: fr
+#ifdef __RECOM4
+        character(len=RECOM4_DIAG_NAME_LEN)  :: dname
+        character(len=RECOM4_DIAG_LONG_LEN)  :: dlong
+        character(len=RECOM4_DIAG_UNITS_LEN) :: dunits
+        character(len=32) :: tname, tunits
+        character(len=64) :: tlong
+        integer :: i, dkind, slot
+#endif
+
+        recom4_adapter_register_output = .false.
+#ifdef __RECOM4
+        if (.not. on) return
+        if (nreq >= NREQ_MAX) then
+            if (root) write(*,'(a)') 'RECOM4: too many output fields, "' // trim(id) // '" skipped'
+            return
+        end if
+
+        ! 1) a named diagnostic
+        i = recom4_diag_index(state, id)
+        if (i > 0) then
+            call recom4_diag_info(state, i, dname, dlong, dunits, dkind, slot)
+            select case (dkind)
+            case (RECOM4_KIND_2D, RECOM4_KIND_COL)
+                call means_define_node2d(io, trim(dname), trim(dlong), trim(dunits), &
+                     precision=prec, mean=ismean, freq=fr, unit=un)
+            case (RECOM4_KIND_3D)
+                call means_define_node3d(io, trim(dname), trim(dlong), trim(dunits), &
+                     on_full_levels=.false., precision=prec, mean=ismean, freq=fr, unit=un)
+            case (RECOM4_KIND_3DW)
+                call means_define_node3d(io, trim(dname), trim(dlong), trim(dunits), &
+                     on_full_levels=.true., precision=prec, mean=ismean, freq=fr, unit=un)
+            case default
+                return
+            end select
+            call add_req(dname, REQ_DIAG, dkind, slot)
+        end if
+
+        ! 2) a tracer
+        if (.not. recom4_adapter_register_output) then
+            do i = 1, ntr
+                call recom4_tracer_name(state, i, tname, tlong, tunits)
+                if (len_trim(tname) > 0 .and. trim(tname) == trim(id)) then
+                    call means_define_node3d(io, trim(tname), trim(tlong), trim(tunits), &
+                         on_full_levels=.false., precision=prec, mean=ismean, freq=fr, unit=un)
+                    call add_req(tname, REQ_TRACER, RECOM4_KIND_3D, i)
+                    exit
+                end if
+            end do
+        end if
+
+        ! 3) the inputs the adapter passes to recom4_step
+        if (.not. recom4_adapter_register_output) then
+            select case (trim(id))
+            case ('xCO2atm')
+                call means_define_node2d(io, 'xCO2atm', 'atmospheric CO2 mole fraction', 'ppm', &
+                     precision=prec, mean=ismean, freq=fr, unit=un)
+                call add_req('xCO2atm', REQ_XCO2, RECOM4_KIND_2D, 0)
+            case ('aFe')
+                call means_define_node2d(io, 'aFe', 'atmospheric soluble iron input, ice-masked', &
+                     'umol m-2 s-1', precision=prec, mean=ismean, freq=fr, unit=un)
+                call add_req('aFe', REQ_AFE, RECOM4_KIND_2D, 0)
+            case ('aN')
+                call means_define_node2d(io, 'aN', 'atmospheric nitrogen input', &
+                     'mmol m-2 s-1', precision=prec, mean=ismean, freq=fr, unit=un)
+                call add_req('aN', REQ_AN, RECOM4_KIND_2D, 0)
+            end select
+        end if
+
+        if (recom4_adapter_register_output .and. root) &
+            write(*,'(a)') 'RECOM4: output field ' // trim(id)
+
+    contains
+
+        subroutine add_req(nm, src, kd, sl)
+            character(len=*), intent(in) :: nm
+            integer,          intent(in) :: src, kd, sl
+            nreq = nreq + 1
+            req_name(nreq) = nm
+            req_src(nreq)  = src
+            req_kind(nreq) = kd
+            req_slot(nreq) = sl
+            recom4_adapter_register_output = .true.
+        end subroutine add_req
+#endif
+    end function recom4_adapter_register_output
+
+    ! Output (RECOM4 #53): accumulates every requested RECOM4 field, at the
+    ! end of the step (after hook 1, the transport and the deposition). 3-D
+    ! diagnostics are placed at FESOM_F's levels nzmin:nzmax, 0 elsewhere.
+    ! Nothing happens if RECOM4 is off or no RECOM4 field is requested.
+    subroutine recom4_adapter_accumulate(io, nNodO, mesh, tracers)
+        type(t_io_means), intent(inout) :: io
+        integer,          intent(in)    :: nNodO
+        type(t_mesh),     intent(in)    :: mesh
+        type(t_tracer),   intent(in)    :: tracers
+#ifdef __RECOM4
+        real(WP), allocatable :: b2(:), b3(:, :)
+        character(len=32) :: nm
+        integer :: k, n, nzmin, nzmax, nz
+
+        if (.not. on .or. nreq == 0) return
+        allocate(b2(nNodO), b3(mesh%nl, nNodO))
+        do k = 1, nreq
+            nm = req_name(k)
+            if (.not. means_has(io, trim(nm))) cycle
+            select case (req_src(k))
+            case (REQ_DIAG)
+                select case (req_kind(k))
+                case (RECOM4_KIND_2D)
+                    b2 = diag2d(req_slot(k), 1:nNodO)
+                    call means_accumulate(io, trim(nm), b2)
+                case (RECOM4_KIND_COL)
+                    do n = 1, nNodO
+                        b2(n) = col(recom4_col_benthos(state, req_slot(k)), n)
+                    end do
+                    call means_accumulate(io, trim(nm), b2)
+                case (RECOM4_KIND_3D)
+                    b3 = 0.0_WP
+                    do n = 1, nNodO
+                        nzmin = mesh%ulevels_nod2D(n)
+                        nzmax = mesh%nlevels_nod2D(n) - 1
+                        nz    = nzmax - nzmin + 1
+                        b3(nzmin:nzmax, n) = diag3d(1:nz, req_slot(k), n)
+                    end do
+                    call means_accumulate(io, trim(nm), b3(1:mesh%nl - 1, :))
+                case (RECOM4_KIND_3DW)
+                    b3 = diag3dw(:, req_slot(k), 1:nNodO)
+                    call means_accumulate(io, trim(nm), b3)
+                end select
+            case (REQ_TRACER)
+                call means_accumulate(io, trim(nm), &
+                     tracers%data(2 + req_slot(k))%values(1:mesh%nl - 1, 1:nNodO))
+            case (REQ_XCO2)
+                b2 = hs%CO2_for_spinup              ! the constant atm_co2 of recom4_step
+                call means_accumulate(io, trim(nm), b2)
+            case (REQ_AFE)
+                ! RECOM4's own Fe surface term (dust_fe * (1 - ice_frac)) * dust_sol,
+                ! FESOM2-REcoM's FeDust; the host's Fe terms are 0 (rivers off)
+                b2 = sflux(itr_of_id(1019), 1:nNodO)
+                call means_accumulate(io, trim(nm), b2)
+            case (REQ_AN)
+                b2 = 0.0_WP                         ! useAeolianN is rejected in v1
+                call means_accumulate(io, trim(nm), b2)
+            end select
+        end do
+#endif
+    end subroutine recom4_adapter_accumulate
 
 #ifdef __RECOM4
     ! REcoM's bio_fluxes (recom_main.F90 at 6e0b28aa): relaxation of the surface
