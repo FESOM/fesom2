@@ -21,6 +21,7 @@ set(OPENMP_REPRODUCIBLE OFF CACHE BOOL "serialize OpenMP loops that are critical
 set(RECOM_COUPLED       ON CACHE BOOL "compile fesom including biogeochemistry, REcoM3")
 set(USE_MULTIO          OFF CACHE BOOL "Use MULTIO for IO, either grib or binary for now. This also means path to MULTIO installation has to provided using env MULTIO_INSTALL_PATH='..' and multio configuration yamls must be present to run the model with MULTIO")
 set(OASIS_WITH_YAC      OFF CACHE BOOL "Useing a version of OASIS compiled with YAC instead of SCRIP for interpolation?")
+set(OASIS_WAITGROUP     ON  CACHE BOOL "OASIS provides OASIS_Waitgroup (coupling groups); switch off for older OASIS3-MCT versions")
 set(ASYNC_ICEBERGS      ON  CACHE BOOL "compile fesom with or without support for asynchronous iceberg computations")
 set(VERBOSE             OFF CACHE BOOL "toggle debug output")
 set(FESOM_PROFILING     ON CACHE BOOL "Enable enhanced profiling system")
