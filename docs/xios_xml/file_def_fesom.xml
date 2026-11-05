@@ -9,8 +9,8 @@
 
   <!-- ================= 3-hourly ================= -->
   <file_group id="fesom_3h" output_freq="3h" split_freq="1y" enabled="true">
-    <file id="f_tx_sur" name="tx_sur.fesom" par_access="independent"><field field_ref="tx_sur"/></file>
-    <file id="f_ty_sur" name="ty_sur.fesom" par_access="independent"><field field_ref="ty_sur"/></file>
+    <file id="f_tx_sur" name="tx_sur.fesom"><field field_ref="tx_sur"/></file>
+    <file id="f_ty_sur" name="ty_sur.fesom"><field field_ref="ty_sur"/></file>
   </file_group>
 
   <!-- ================= Daily ================= -->
@@ -70,10 +70,10 @@
     <file id="f_osaltdiff"       name="osaltdiff.fesom"      ><field field_ref="osaltdiff"      /></file>
 
     <!-- 2D elements -->
-    <file id="f_strength_ice" name="strength_ice.fesom" par_access="independent"><field field_ref="strength_ice"/></file>
-    <file id="f_sgm11"        name="sgm11.fesom"        par_access="independent"><field field_ref="sgm11"       /></file>
-    <file id="f_sgm12"        name="sgm12.fesom"        par_access="independent"><field field_ref="sgm12"       /></file>
-    <file id="f_sgm22"        name="sgm22.fesom"        par_access="independent"><field field_ref="sgm22"       /></file>
+    <file id="f_strength_ice" name="strength_ice.fesom"><field field_ref="strength_ice"/></file>
+    <file id="f_sgm11"        name="sgm11.fesom"><field field_ref="sgm11"       /></file>
+    <file id="f_sgm12"        name="sgm12.fesom"><field field_ref="sgm12"       /></file>
+    <file id="f_sgm22"        name="sgm22.fesom"><field field_ref="sgm22"       /></file>
 
     <!-- 3D nodes, cell-center -->
     <file id="f_temp"       name="temp.fesom"      ><field field_ref="temp"      /></file>
@@ -88,13 +88,13 @@
     <file id="f_Kv"      name="Kv.fesom"     ><field field_ref="Kv"     /></file>
 
     <!-- 3D elements, cell-center -->
-    <file id="f_u"       name="u.fesom"       par_access="independent"><field field_ref="u"      /></file>
-    <file id="f_v"       name="v.fesom"       par_access="independent"><field field_ref="v"      /></file>
-    <file id="f_bolus_u" name="bolus_u.fesom" par_access="independent"><field field_ref="bolus_u"/></file>
-    <file id="f_bolus_v" name="bolus_v.fesom" par_access="independent"><field field_ref="bolus_v"/></file>
+    <file id="f_u"       name="u.fesom"><field field_ref="u"      /></file>
+    <file id="f_v"       name="v.fesom"><field field_ref="v"      /></file>
+    <file id="f_bolus_u" name="bolus_u.fesom"><field field_ref="bolus_u"/></file>
+    <file id="f_bolus_v" name="bolus_v.fesom"><field field_ref="bolus_v"/></file>
 
     <!-- 3D elements, interface levels -->
-    <file id="f_Av" name="Av.fesom" par_access="independent"><field field_ref="Av"/></file>
+    <file id="f_Av" name="Av.fesom"><field field_ref="Av"/></file>
 
   </file_group>
 

@@ -1,49 +1,39 @@
-module forcing_array_setup_interfaces
-  interface
-    subroutine forcing_array_setup(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(in),    target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine forcing_array_setup
-  end interface
-end module forcing_array_setup_interfaces
+module gen_forcing_init_module
+    USE g_CONFIG
+    USE g_sbf, only: sbc_ini, l_mslp, l_cloud
+    USE mod_mesh
+    USE MOD_PARTIT
+    USE g_forcing_arrays
+    USE o_param
+    USE g_forcing_param
+#if defined(__recom)
+use g_sbf, only: sbc_ini_recom
+#endif
+#if defined (__oasis)
+  use cpl_driver, only : nrecv
+#elif defined(__yac)
+  use cpl_yac_driver, only : nrecv
+#endif
 
+    implicit none
 
-module forcing_array_setup_dbgyre_interfaces
-  interface
-    subroutine forcing_array_setup_dbgyre(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(in),    target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine forcing_array_setup_dbgyre
-  end interface
-end module forcing_array_setup_dbgyre_interfaces
+    private
+    public :: forcing_setup, forcing_array_setup_dbgyre, &
+              forcing_array_setup
+
+contains
 
 ! Adapted from FESOM code by Q. Wang. 
 ! Added the driving routine forcing_setup.
 ! S.D 05.04.12
 ! ==========================================================
 subroutine forcing_setup(partit, mesh)
-use g_CONFIG
-use g_sbf, only: sbc_ini
-#if defined(__recom)
-use g_sbf, only: sbc_ini_recom
-#endif
-use mod_mesh
-USE MOD_PARTIT
-USE MOD_PARSUP
-use forcing_array_setup_interfaces
-use forcing_array_setup_dbgyre_interfaces
 implicit none
 type(t_mesh),   intent(in),    target :: mesh
 type(t_partit), intent(inout), target :: partit
 
   if (partit%mype==0) write(*,*) '****************************************************'
-  if (use_ice) then
+  if (use_ice .or. .not. toy_ocean) then
      call forcing_array_setup(partit, mesh)
 #if defined(__recom)
      call sbc_ini_recom(partit)         ! initialize forcing fields
@@ -59,23 +49,16 @@ end subroutine forcing_setup
 
 ! ==========================================================
 subroutine forcing_array_setup_dbgyre(partit, mesh)
-  use g_forcing_arrays
-  use mod_mesh
-  USE MOD_PARTIT
   implicit none
   type(t_mesh),   intent(in),    target :: mesh
   type(t_partit), intent(inout), target :: partit
   integer    :: n2
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
-  n2=myDim_nod2D+eDim_nod2D 
+  n2=partit%myDim_nod2D+partit%eDim_nod2D 
 
   allocate(chl(n2))
-  allocate(sw_3d(nl,n2))
+  allocate(sw_3d(mesh%nl,n2))
   chl=0.1_WP
 
 end subroutine forcing_array_setup_dbgyre
@@ -83,19 +66,6 @@ end subroutine forcing_array_setup_dbgyre
 ! ==========================================================
 subroutine forcing_array_setup(partit, mesh)
   !inializing forcing fields 
-  use o_param
-  use mod_mesh
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  use g_forcing_arrays
-  use g_forcing_param
-  use g_config
-  use g_sbf, only: l_mslp, l_cloud
-#if defined (__oasis)
-  use cpl_driver, only : nrecv
-#elif defined(__yac)
-  use cpl_yac_driver, only : nrecv
-#endif
   implicit none
   type(t_mesh),   intent(in),    target :: mesh
   type(t_partit), intent(inout), target :: partit
@@ -104,11 +74,7 @@ subroutine forcing_array_setup(partit, mesh)
 ! kh 19.02.21  
   integer    :: i
    
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
-  n2=myDim_nod2D+eDim_nod2D      
+  n2=partit%myDim_nod2D+partit%eDim_nod2D      
   ! Allocate memory for atmospheric forcing 
   allocate(shortwave(n2), longwave(n2))
   shortwave=0.0_WP
@@ -238,7 +204,7 @@ subroutine forcing_array_setup(partit, mesh)
   ! shortwave penetration
   if(use_sw_pene) then
     allocate(chl(n2))
-    allocate(sw_3d(nl,n2))
+    allocate(sw_3d(mesh%nl,n2))
     chl=0.1_WP
   endif
 
@@ -253,6 +219,34 @@ subroutine forcing_array_setup(partit, mesh)
     hf_Qswr   = 0.0_WP
     hf_Qlwr   = 0.0_WP
     hf_Qlwrout= 0.0_WP
+    ! sea-ice mass budget diagnostics [kg m-2 s-1], output only (see ice_thermo_cpl.F90, ice_timestep)
+    allocate(sidm_dyn(n2), sidm_cut(n2), sidm_gwat(n2), sidm_gbot(n2))
+    allocate(sidm_mtop(n2), sidm_mbot(n2), sidm_subl(n2), sidm_si(n2), sidm_th(n2))
+    allocate(sidm_mpre(n2))
+    sidm_dyn=0.0_WP
+    sidm_cut=0.0_WP
+    sidm_gwat=0.0_WP
+    sidm_gbot=0.0_WP
+    sidm_mtop=0.0_WP
+    sidm_mbot=0.0_WP
+    sidm_subl=0.0_WP
+    sidm_si=0.0_WP
+    sidm_th=0.0_WP
+    sidm_mpre=0.0_WP
+    allocate(sisn_dyn(n2), sisn_cut(n2), sisn_snf(n2), sisn_sbl(n2), sisn_mlt(n2), sisn_si(n2), sisn_th(n2), sisn_spre(n2))
+    sisn_dyn=0.0_WP
+    sisn_cut=0.0_WP
+    sisn_snf=0.0_WP
+    sisn_sbl=0.0_WP
+    sisn_mlt=0.0_WP
+    sisn_si=0.0_WP
+    sisn_th=0.0_WP
+    sisn_spre=0.0_WP
+    allocate(sidc_dyn(n2), sidc_cut(n2), sidc_th(n2), sidc_apre(n2))
+    sidc_dyn=0.0_WP
+    sidc_cut=0.0_WP
+    sidc_th=0.0_WP
+    sidc_apre=0.0_WP
   endif 
 
   ! drag coefficient and transfer coefficients for latent and sensible heat
@@ -266,8 +260,10 @@ subroutine forcing_array_setup(partit, mesh)
     allocate(Cd_atm_ice_arr(n2)) 
     Cd_atm_ice_arr=Cd_atm_ice   
   endif
-  if(mype==0) write(*,*) 'forcing arrays have been set up'  
+  if(partit%mype==0) write(*,*) 'forcing arrays have been set up'  
 end subroutine forcing_array_setup
 !
 !----------------------------------------------------------------------
 !
+
+end module gen_forcing_init_module

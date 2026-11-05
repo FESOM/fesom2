@@ -1,0 +1,42 @@
+name: FESOM2 OpenMP thread invariance (long)
+
+# The pull-request workflows run the pi thread-invariance tests for one day
+# (ctest -L openmp). This workflow runs the same tests for longer, on demand:
+# pi, 2 MPI ranks x 1, 4, 8 threads and a repeated 8-thread run, all outputs
+# bit-identical. About 25 s per model day per run on a hosted runner.
+on:
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'Run length in days'
+        required: false
+        default: '10'
+      reproducible:
+        description: 'Build with OPENMP_REPRODUCIBLE=ON'
+        type: boolean
+        required: false
+        default: false
+
+jobs:
+  openmp_invariance_long:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    container: ghcr.io/fesom/fesom2_docker:fesom2_test_refactoring-master
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Git safe directory
+      run: |
+        git config --global --add safe.directory ${PWD}
+
+    - name: Compile model with OpenMP
+      run: |
+        bash -l configure.sh ubuntu -DENABLE_OPENMP=ON -DBUILD_TESTING=ON \
+          -DOPENMP_REPRODUCIBLE=${{ inputs.reproducible && 'ON' || 'OFF' }} \
+          -DFESOM_OPENMP_TEST_DAYS=${{ inputs.days }}
+
+    - name: Run OpenMP thread-invariance tests
+      run: |
+        cd build
+        ctest -L openmp --output-on-failure

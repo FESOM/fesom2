@@ -64,7 +64,7 @@ namelist.recom:
     pavariables:
         use_REcoM: True
         REcoM_restart: False
-        bgc_num: 30
+        bgc_num: 31
         diags3d_num: 28
         bgc_base_num: 22
         biostep: 1
@@ -96,7 +96,6 @@ namelist.recom:
         lastyearoffesomcycle: 1948
         numofCO2cycles: 1
         currentCO2cycle: 1
-        DIC_PI: True
         Nmocsy: 1
         recom_debug: False
         ciso: False
@@ -141,12 +140,12 @@ namelist.io:
                 prec: 8
 
 fcheck:
-    a_ice: 0.27413687643432083
-    salt: 34.731586801891005
-    sst: 8.590368406433162
-    temp: 2.4706636640552633
-    u: -0.0015759958055845944
-    v: 2.4677118266468275e-05
-    DIN: 20.25074905235452
-    DIC: 2197.0612317018063
+    a_ice: 0.27415502672599823
+    salt: 34.73039581196767
+    sst: 8.684897117345226
+    temp: 2.4736059914360355
+    u: -0.0015858196499287873
+    v: 5.530180094804525e-05
+    DIN: 20.249130134399252
+    DIC: 2197.0425508149888
 

@@ -95,7 +95,7 @@ end subroutine step_event
 !
 subroutine handle_err(errcode, partit)
   USE MOD_PARTIT
-  USE MOD_PARSUP
+  use par_support_module, only: par_abort
   implicit none
   
 #include "netcdf.inc" 
@@ -103,7 +103,7 @@ subroutine handle_err(errcode, partit)
   integer                       :: errcode
   
   write(*,*) 'Error: ', nf_strerror(errcode)
-  call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+  call par_abort(partit%MPI_COMM_FESOM, partit%mype)
   stop
 end subroutine handle_err
 !

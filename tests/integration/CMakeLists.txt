@@ -47,6 +47,299 @@ if(ENABLE_MPI_TESTS AND NOT FESOM_COUPLED AND NOT OIFS_COUPLED AND NOT USE_YAC)
         TIMEOUT ${TEST_TIMEOUT}
     )
     
+    # CVMix vertical mixing: run the pi mesh with CVMix schemes so the CVMix code
+    # path is exercised end to end. NOTE: the stock namelist.oce ships
+    # mix_scheme='KPP' -- FESOM's native (non-CVMix) KPP -- so a CVMix-enabled
+    # build (CVMIX=ON) never runs CVMix by default; the scheme must be selected
+    # explicitly. These tests do that via MIX_SCHEME.
+    #
+    # CVMix is a fixed double-precision library (kind cvmix_r8 = real64) built
+    # into FESOM's tree; the FESOM-side WP<->cvmix_r8 conversion is what differs
+    # between builds. So each test covers the previously-untested FESOM-DP+CVMix
+    # path in a DP build and the FESOM-SP+CVMix path (the conversion shims) in an
+    # SP build. Registered only when CVMix is compiled in (CVMIX=ON, the default).
+    # Pass/fail is the clean run + artifacts: a wrong scheme string or missing
+    # CVMix aborts at setup.
+    if(CVMIX)
+        add_fesom_test(integration_pi_cvmix_tke_mpi2
+            MPI_TEST
+            NP 2
+            TIMEOUT ${TEST_TIMEOUT}
+            LABEL cvmix
+            MIX_SCHEME "cvmix_TKE"
+        )
+        add_fesom_test(integration_pi_cvmix_kpp_mpi2
+            MPI_TEST
+            NP 2
+            TIMEOUT ${TEST_TIMEOUT}
+            LABEL cvmix
+            MIX_SCHEME "cvmix_KPP"
+        )
+    endif()
+
+    # JRA55 atmospheric forcing: run the pi mesh for one day driven by a JRA55-do
+    # dataset (tests/data/FORCING/JRA55, year 1958, 3-hourly) instead of the default
+    # CORE2 forcing. This exercises the JRA55 namelist wiring end to end:
+    #   * FORCING JRA        -> namelist.forcing from config/namelist.forcing.JRA,
+    #                           pool paths rewired to that tree (CMOR var names
+    #                           uas/tas/prra/..., relative to ClimateDataPath)
+    #   * FORCING_YEAR 1958  -> fesom.clock start year, per-year forcing file, and
+    #                           the required output artifact sst.fesom.1958.nc
+    #   * LEAPYEAR .true.    -> include_fleapyear=.true., mandatory for JRA55's
+    #                           gregorian time axis (fesom.x aborts otherwise; see
+    #                           the calendar-consistency check in gen_surface_forcing.F90)
+    # NOTE: passes in BOTH double- and single-precision builds (verified on pi/1-day).
+    # The JRA55 SP-NaN concern is specific to large meshes (e.g. ng5), not the finer
+    # sub-daily cadence itself, so it does not surface on the small pi mesh here.
+    #
+    # The dataset itself is NOT bundled: 13 files / ~120 MB is too much to carry in the
+    # repository, and it would land in git history permanently. It will be provided as a
+    # downloadable dataset instead, like the meshes the remote_ tests fetch.
+    #
+    # Until then this test is simply not registered. All of the harness wiring for it --
+    # FORCING/FORCING_YEAR/LEAPYEAR in add_fesom_test, configure_fesom_namelists_with_options
+    # selecting config/namelist.forcing.JRA, and the pool-path rewriting in
+    # cmake/FesomTesting.cmake -- is kept and unchanged, so dropping the data into
+    # tests/data/FORCING/JRA55/ (or having a fetch step put it there) re-enables the test
+    # with no further edits.
+    if(EXISTS "${TEST_DATA_DIR}/FORCING/JRA55")
+        add_fesom_test(integration_pi_jra_mpi2
+            MPI_TEST
+            NP 2
+            TIMEOUT ${TEST_TIMEOUT}
+            LABEL jra
+            FORCING "JRA"
+            FORCING_YEAR "1958"
+            LEAPYEAR ".true."
+        )
+    else()
+        message(STATUS "JRA55 forcing data not present (${TEST_DATA_DIR}/FORCING/JRA55) -- skipping integration_pi_jra_mpi2. Harness support for FORCING=JRA is unchanged; add the dataset to enable it.")
+    endif()
+
+    # Note: there is no separate "SP" integration test. Precision is a property of
+    # the build, not the test -- in a USE_SINGLE_PRECISION build every test above runs
+    # single precision, and each fesom.x test auto-asserts the build's precision banner
+    # (see add_fesom_test_with_options in cmake/FesomTesting.cmake). Run the suite in an
+    # SP build dir to get SP coverage of everything, including the CVMix schemes.
+
+    # Regression test for ghost output records on time-step change
+    add_fesom_output_restamp_test(integration_pi_output_restamp
+        NP 2
+        TIMEOUT ${TEST_TIMEOUT}
+    )
+
+    # Idealized (toy_ocean) configurations. They supply their own forcing and
+    # read only a mesh, so they need none of the bundled forcing or climatology
+    # data; the meshes are used in place from test/meshes/ via MESH_DIR. Values
+    # follow setups/test_souf and setups/test_neverworld2, i.e. what CI runs.
+    #
+    # Pass/fail is the clean run plus the sst artifact, so these show the
+    # configurations still start and complete. They do not compare answers: a
+    # numerical drift would go unnoticed. Adding that is designed in
+    # docs/pr/PLAN-ctest-coverage.md.
+    include(${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/FesomToyTest.cmake)
+
+    add_fesom_toy_test(integration_toy_soufflet_mpi8
+        WHICH_TOY "soufflet"
+        MESH_DIR "${FESOM_TESTING_ROOT}/test/meshes/soufflet"
+        CYCLIC_LENGTH "4.5"
+        NP 8
+        TIMEOUT ${TEST_TIMEOUT}
+    )
+
+    add_fesom_toy_test(integration_toy_neverworld2_mpi8
+        WHICH_TOY "neverworld2"
+        MESH_DIR "${FESOM_TESTING_ROOT}/test/meshes/neverworld2"
+        CYCLIC_LENGTH "60.0"
+        NP 8
+        TIMEOUT ${TEST_TIMEOUT}
+    )
+
+    # Ocean-only run: the pi mesh with the sea-ice model switched off, otherwise
+    # identical to integration_pi_mpi2 (CORE2 forcing, WOA18 initial state, 1 day).
+    # This is the only ice-free configuration in the suite that is not a toy_ocean
+    # setup, so it is the only one exercising the ocean-side setup and forcing paths
+    # with use_ice=.false.
+    #
+    # Pass/fail is the clean run plus the sst artifact. That detects a crash or an
+    # abort in the ice-free path; it does NOT detect an ice-free run that completes
+    # while the ocean receives no surface forcing at all. Checking for that needs a
+    # non-zero assertion on the forcing diagnostics (tx_sur/fh/fw) and an ice-on
+    # control run to keep the ice-output absence checks meaningful; see
+    # docs/pr/PLAN-ctest-coverage.md.
+    add_fesom_test(integration_pi_ice_free_mpi2
+        MPI_TEST
+        NP 2
+        TIMEOUT ${TEST_TIMEOUT}
+        LABEL ice_free
+        USE_ICE ".false."
+    )
+
+    if(BUILD_MESHPARTITIONER)
+        set(FRESH_DATA_DIR "${CMAKE_BINARY_DIR}/tests/fresh_data")
+        file(MAKE_DIRECTORY "${FRESH_DATA_DIR}/MESHES")
+        file(GLOB DATA_ENTRIES LIST_DIRECTORIES true "${TEST_DATA_DIR}/*")
+        foreach(DATA_ENTRY IN LISTS DATA_ENTRIES)
+            get_filename_component(DATA_NAME "${DATA_ENTRY}" NAME)
+            if(NOT DATA_NAME STREQUAL "MESHES" AND IS_DIRECTORY "${DATA_ENTRY}" AND NOT EXISTS "${FRESH_DATA_DIR}/${DATA_NAME}")
+                file(CREATE_LINK "${DATA_ENTRY}" "${FRESH_DATA_DIR}/${DATA_NAME}" SYMBOLIC)
+            endif()
+        endforeach()
+        foreach(PARTITION_NAME flat_1 hier_1x1 hier_1x2)
+            set(PARTITION_MESH_DIR "${CMAKE_BINARY_DIR}/tests/meshpartitioner/meshes/pi_${PARTITION_NAME}")
+            if(NOT EXISTS "${PARTITION_MESH_DIR}")
+                file(MAKE_DIRECTORY "${PARTITION_MESH_DIR}")
+            endif()
+            if(NOT EXISTS "${FRESH_DATA_DIR}/MESHES/pi_${PARTITION_NAME}")
+                file(CREATE_LINK "${PARTITION_MESH_DIR}" "${FRESH_DATA_DIR}/MESHES/pi_${PARTITION_NAME}" SYMBOLIC)
+            endif()
+        endforeach()
+
+        add_fesom_test_with_options(integration_pi_fresh_flat_1_mpi1_omp2
+            "pi_flat_1" "96" "1" "d" "1" "d" "10" ".true." ".false."
+            NP 1
+            OMP_THREADS 2
+            TIMEOUT ${TEST_TIMEOUT}
+            LABEL fresh_partition
+            DATA_DIR "${FRESH_DATA_DIR}"
+        )
+        set_tests_properties(integration_pi_fresh_flat_1_mpi1_omp2 PROPERTIES FIXTURES_REQUIRED "partition_pi_flat_1")
+
+        add_fesom_test_with_options(integration_pi_fresh_hier_1x1_mpi1_omp2
+            "pi_hier_1x1" "96" "1" "d" "1" "d" "10" ".true." ".false."
+            NP 1
+            OMP_THREADS 2
+            TIMEOUT ${TEST_TIMEOUT}
+            LABEL fresh_partition
+            DATA_DIR "${FRESH_DATA_DIR}"
+        )
+        set_tests_properties(integration_pi_fresh_hier_1x1_mpi1_omp2 PROPERTIES FIXTURES_REQUIRED "partition_pi_hier_1x1")
+
+        add_fesom_test_with_options(integration_pi_fresh_hier_1x2_mpi2_omp2
+            "pi_hier_1x2" "96" "1" "d" "1" "d" "10" ".true." ".false."
+            MPI_TEST
+            NP 2
+            OMP_THREADS 2
+            TIMEOUT ${TEST_TIMEOUT}
+            LABEL fresh_partition
+            DATA_DIR "${FRESH_DATA_DIR}"
+        )
+        set_tests_properties(integration_pi_fresh_hier_1x2_mpi2_omp2 PROPERTIES FIXTURES_REQUIRED "partition_pi_hier_1x2")
+    endif()
+
+    # Forcing distribution: every way of getting the forcing to the ranks must give the
+    # model the same numbers. The pi mesh runs one day with CORE2 forcing on 8 ranks;
+    # bcast is the reference and every other mode is compared with it bit for bit
+    # (all NetCDF outputs and restarts, tools/compare_nc_exact.py). With ocean-only
+    # forcing the reference is bcast with the original land-fill sweep
+    # (ocean_fill_reference), against a synthetic land mask on the CORE2 test grid
+    # (tools/make_test_ocean_mask.py) since the test data has none. Needs a Python 3
+    # with netCDF4; `ctest -L forcing` runs this set.
+    find_package(Python3 COMPONENTS Interpreter QUIET)
+    set(FESOM_NC_PYTHON "")
+    if(Python3_Interpreter_FOUND)
+        # some sites shadow netCDF4's numpy with a user-site one; try without user site too
+        foreach(_flags "" "-s")
+            execute_process(COMMAND ${Python3_EXECUTABLE} ${_flags} -c "import netCDF4, numpy"
+                            RESULT_VARIABLE _nc_ok OUTPUT_QUIET ERROR_QUIET)
+            if(_nc_ok EQUAL 0)
+                set(FESOM_NC_PYTHON ${Python3_EXECUTABLE} ${_flags})
+                break()
+            endif()
+        endforeach()
+    endif()
+    if(FESOM_NC_PYTHON)
+        set(_ref integration_pi_forcing_bcast_mpi8)
+        add_fesom_test(${_ref} MPI_TEST NP 8 TIMEOUT ${TEST_TIMEOUT} LABEL forcing
+            FORCING_SBC "forcing_distribution='bcast'")
+        add_fesom_test(integration_pi_forcing_scatter_mpi8 MPI_TEST NP 8 TIMEOUT ${TEST_TIMEOUT} LABEL forcing
+            COMPARE_TO ${_ref}
+            FORCING_SBC "forcing_distribution='scatter'")
+        add_fesom_test(integration_pi_forcing_redist_mpi8 MPI_TEST NP 8 TIMEOUT ${TEST_TIMEOUT} LABEL forcing
+            COMPARE_TO ${_ref}
+            FORCING_SBC "forcing_distribution='redist'" "n_forcing_readers=2")
+        add_fesom_test(integration_pi_forcing_p2p_mpi8 MPI_TEST NP 8 TIMEOUT ${TEST_TIMEOUT} LABEL forcing
+            COMPARE_TO ${_ref}
+            FORCING_SBC "forcing_distribution='redist'" "forcing_exchange='p2p'" "n_forcing_readers=3")
+        add_fesom_test(integration_pi_forcing_p2p_ahead_mpi8 MPI_TEST NP 8 TIMEOUT ${TEST_TIMEOUT} LABEL forcing
+            COMPARE_TO ${_ref}
+            FORCING_SBC "forcing_distribution='redist'" "forcing_exchange='p2p_ahead'" "n_forcing_readers=-1")
+
+        # ocean-only forcing: the mask is written once, before any of these runs
+        set(_mask "${CMAKE_CURRENT_BINARY_DIR}/forcing_ocean_mask/sftof_core2_test.nc")
+        add_test(NAME forcing_ocean_mask_setup
+            COMMAND ${FESOM_NC_PYTHON} "${FESOM_TESTING_ROOT}/tools/make_test_ocean_mask.py"
+                    "${FESOM_TESTING_ROOT}/tests/data/FORCING/CORE2/t_10.1948.nc" "${_mask}")
+        set_tests_properties(forcing_ocean_mask_setup PROPERTIES FIXTURES_SETUP fx_forcing_ocean_mask LABELS "integration;forcing")
+        set(_oo "use_ocean_only_forcing=.true." "nm_ocean_mask_file='${_mask}'" "nm_ocean_mask_var='sftof'")
+        set(_ref integration_pi_forcing_oceanonly_reference_mpi8)
+        add_fesom_test(${_ref} MPI_TEST NP 8 TIMEOUT ${TEST_TIMEOUT} LABEL forcing
+            FORCING_SBC "forcing_distribution='bcast'" "ocean_fill_reference=.true." ${_oo})
+        foreach(_case
+                "bcast|forcing_distribution='bcast'"
+                "scatter|forcing_distribution='scatter'"
+                "redist|forcing_distribution='redist';n_forcing_readers=2"
+                "p2p|forcing_distribution='redist';forcing_exchange='p2p';n_forcing_readers=-1"
+                "p2p_ahead|forcing_distribution='redist';forcing_exchange='p2p_ahead';n_forcing_readers=-1")
+            string(REPLACE "|" ";" _case "${_case}")
+            list(POP_FRONT _case _name)
+            add_fesom_test(integration_pi_forcing_oceanonly_${_name}_mpi8 MPI_TEST NP 8 TIMEOUT ${TEST_TIMEOUT} LABEL forcing
+                COMPARE_TO ${_ref}
+                FORCING_SBC ${_case} ${_oo})
+            set_tests_properties(integration_pi_forcing_oceanonly_${_name}_mpi8 PROPERTIES
+                FIXTURES_REQUIRED "fx_${_ref};fx_forcing_ocean_mask")
+        endforeach()
+        set_tests_properties(${_ref} PROPERTIES FIXTURES_REQUIRED fx_forcing_ocean_mask)
+    else()
+        message(STATUS "No Python 3 with netCDF4 -- skipping the forcing distribution comparison tests (integration_pi_forcing_*)")
+    endif()
+
+    # Conservation budgets: the pi set-ups rerun with conservation_freq=4, and
+    # tools/check_conservation.py judges the residual of volume, heat and salt at the
+    # end of the day against the integral (volume and salt 1e-12; heat 3e-10, as the
+    # implicit vertical mixing leaves up to ~8e-11 per day). A single-precision build
+    # closes the budgets at the same level (real64 tracer accumulators, the tracer
+    # carry and real64 layer thicknesses), so it is held to the same tolerances.
+    # Registered only with ENABLE_CONSERVATION_TESTS=ON.
+    if(ENABLE_CONSERVATION_TESTS)
+        find_package(Python3 COMPONENTS Interpreter QUIET)
+    endif()
+    if(ENABLE_CONSERVATION_TESTS AND Python3_Interpreter_FOUND)
+        set(_cons_args --rtol-heat 3e-10)
+        set(_cons_args_cavity --rtol-volume 3e-8 --rtol-heat 3e-9 --rtol-salt 3e-9)
+        add_fesom_test(conservation_pi_mpi2
+            MPI_TEST
+            NP 2
+            TIMEOUT ${TEST_TIMEOUT}
+            LABEL conservation
+            CONSERVATION_FREQ 4
+            CONSERVATION_CHECK_ARGS ${_cons_args}
+        )
+        add_fesom_test(conservation_pi_ice_free_mpi2
+            MPI_TEST
+            NP 2
+            TIMEOUT ${TEST_TIMEOUT}
+            LABEL conservation
+            USE_ICE ".false."
+            CONSERVATION_FREQ 4
+            CONSERVATION_CHECK_ARGS ${_cons_args}
+        )
+        # The cavity set-up does not close in double precision either: it loses ~8e-9 of
+        # the volume and ~1e-9 of heat and salt per day under the ice shelf. These
+        # tolerances record that state so that a change is noticed.
+        add_fesom_test_with_options(conservation_pi_cavity_mpi2
+            "pi_cavity" "96" "1" "d" "1" "d" "10" ".true." ".true."
+            MPI_TEST
+            NP 2
+            TIMEOUT ${TEST_TIMEOUT}
+            LABEL conservation
+            CONSERVATION_FREQ 4
+            CONSERVATION_CHECK_ARGS ${_cons_args_cavity}
+        )
+    elseif(ENABLE_CONSERVATION_TESTS)
+        message(STATUS "Python 3 not found -- skipping the conservation_* tests.")
+    endif()
+
     # Additional MPI test configurations can be added here
     # For example, testing different domain decompositions
 elseif(NOT ENABLE_MPI_TESTS)

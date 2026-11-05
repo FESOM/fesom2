@@ -46,6 +46,8 @@ idlist   = 2, 1                                    ! tracer IDs to initialize (1
 filelist = 'phc3.0_winter.nc', 'phc3.0_winter.nc'  ! netCDF files in ClimateDataPath (one per tracer)
 varlist  = 'salt', 'temp'                          ! variable names in the netCDF files
 t_insitu = .true.                                  ! if true, convert in-situ temperature to potential temperature
+ic_extrap_det = .false.                            ! deterministic decomposition-independent hole filling (default: historical fill, bit-for-bit)
+ic_extrap_tol = 1.e-3                              ! relaxation tolerance of the deterministic fill (used only with ic_extrap_det=.true.)
 /
 
 ! ============================================================================
@@ -73,6 +75,7 @@ gamma2_tra    = 0.            ! additional biharmonic diffusion coefficient [dim
 ! --- Vertical Diffusion and Time Stepping ---
 i_vert_diff   = .true.        ! use implicit vertical diffusion (recommended for stability)
 AB_order      = 2             ! Adams-Bashforth time stepping order (2 or 3)
+ltra_diag     = .false.       ! per-tracer diagnostics in the advection (extra cost)
 /
 
 ! ============================================================================
@@ -107,7 +110,7 @@ double_diffusion   = .false.           ! enable double diffusion parameterizatio
 ! --- Surface Restoring ---
 surf_relax_T       = 0.0               ! surface temperature restoring coefficient [m/s] (0 = disabled)
 surf_relax_S       = 1.929e-06         ! surface salinity restoring coefficient [m/s]
-balance_salt_water = .true.            ! balance virtual salt flux with freshwater flux
+balance_salt_water = .true.            ! currently not used: the fluxes are always balanced globally
 
 ! --- Climatology Restoring ---
 clim_relax         = 0.0               ! 3D climatology restoring coefficient [1/s] (0 = disabled)
