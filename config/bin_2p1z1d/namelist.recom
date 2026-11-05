@@ -40,7 +40,7 @@ nm_co2_data_file      = '/albedo/work/projects/MarESys/ogurses/input/mesh_CORE2_
 ! bgc_num in &pavariables is checked against these switches at startup.
 ! ============================================================================
 &parecomsetup
-enable_3zoo2det       = .false.   ! three zooplankton groups and two detritus classes instead of one each
+enable_3zoo2det       = .false.     ! three zooplankton groups and two detritus classes instead of one each
 enable_coccos         = .false.     ! coccolithophore and Phaeocystis tracers
 /
 
@@ -56,7 +56,7 @@ Diags                 = .true.      ! compute REcoM diagnostics
 
 ! --- Tracer Counts ---
 bgc_num               = 22          ! number of REcoM tracers, checked at startup against enable_3zoo2det and enable_coccos
-diags3d_num           = 2   ! number of 3D diagnostic tracers to be saved
+diags3d_num           = 2           ! number of 3D diagnostic tracers to be saved
 bgc_base_num          = 22          ! number of standard (base) BGC tracers
 benthos_num           = 4           ! number of benthic BGC tracers: 8 with ciso = .true., otherwise 4
 Nmocsy                = 1           ! length of the vector passed to mocsy (always 1 for REcoM)
@@ -73,23 +73,23 @@ allow_var_sinking     = .true.      ! detritus sinking speed increases with dept
 ! --- Process Options ---
 REcoM_Geider_limiter  = .false.     ! selects the routine that calculates the limiters in the sources-minus-sinks
 REcoM_Grazing_Variable_Preference = .false.   ! grazing preferences weighted by prey abundance
-Grazing_detritus      = .false.   ! zooplankton also graze on detritus
-het_resp_noredfield   = .false.   ! respiration formulation of the first zooplankton (copepods)
-diatom_mucus          = .false.   ! nutrient limitation enhances diatom aggregation
-O2dep_remin           = .false.   ! oxygen-dependent remineralization of organic matter (k_o2_remin)
+Grazing_detritus      = .false.     ! zooplankton also graze on detritus
+het_resp_noredfield   = .false.     ! respiration formulation of the first zooplankton (copepods)
+diatom_mucus          = .false.     ! nutrient limitation enhances diatom aggregation
+O2dep_remin           = .false.     ! oxygen-dependent remineralization of organic matter (k_o2_remin)
 use_photodamage       = .true.      ! light-dependent chlorophyll degradation after Alvarez et al. (2018)
-CO2lim                = .false.   ! CO2 dependence of growth and calcification (&paco2lim)
+CO2lim                = .false.     ! CO2 dependence of growth and calcification (&paco2lim)
 OmegaC_diss           = .false.     ! calcite dissolution from the mocsy saturation state OmegaC
                                     ! (Aumont et al. 2015, Gehlen et al. 2007); set calc_diss_guts = 0 when .false.
 
 ! --- Ballasting ---
-use_ballasting        = .false.   ! mineral ballasting of detritus sinking (&paballasting)
-use_density_scaling   = .false.   ! scale sinking with seawater density (ballasting)
-use_viscosity_scaling = .false.   ! scale sinking with seawater viscosity (ballasting)
+use_ballasting        = .false.     ! mineral ballasting of detritus sinking (&paballasting)
+use_density_scaling   = .false.     ! scale sinking with seawater density (ballasting)
+use_viscosity_scaling = .false.     ! scale sinking with seawater viscosity (ballasting)
 
 ! --- External Sources ---
 useRivers             = .false.     ! riverine nutrient input (nm_river_data_file)
-useRivFe              = .true.   ! riverine iron source
+useRivFe              = .true.      ! riverine iron source
 useErosion            = .false.     ! input from erosion (nm_erosion_data_file)
 NitrogenSS            = .false.     ! external nitrogen sources and sinks (riverine, aeolian and denitrification)
 useAeolianN           = .false.     ! aeolian nitrogen deposition (nm_aen_data_file)
@@ -97,10 +97,10 @@ useAeolianN           = .false.     ! aeolian nitrogen deposition (nm_aen_data_f
 ! --- Carbon Chemistry and Atmospheric CO2 ---
 constant_CO2          = .true.      ! use CO2_for_spinup instead of the time series in nm_co2_data_file
 restore_alkalinity    = .true.      ! restore surface alkalinity (surf_relax_Alk)
-use_atbox             = .true.   ! atmospheric box model for CO2
-use_virt_tracers      = .true.      ! globally balanced virtual freshwater bgc fluxes (as virtual_salt); only active if which_ALE='linfs' (use_virt_salt=.true.); with zstar the real volume change dilutes the tracers
+use_atbox             = .true.      ! atmospheric box model for CO2
+use_virt_tracers      = .false.     ! globally balanced virtual freshwater bgc fluxes (as virtual_salt); only active if which_ALE='linfs' (use_virt_salt=.true.); with zstar the real volume change dilutes the tracers
 firstyearoffesomcycle = 1958        ! first year of the physical forcing used (e.g. JRA55)
-lastyearoffesomcycle  = 2022   ! last year of the physical forcing used
+lastyearoffesomcycle  = 2022        ! last year of the physical forcing used
 numofCO2cycles        = 1           ! number of forcing cycles planned
 currentCO2cycle       = 1           ! forcing cycle currently running
 
@@ -120,7 +120,7 @@ use_DICremin          = .false.
 ! ============================================================================
 &pasinking
 Vdet_a                = 0.0288      ! increase of detritus sinking speed with depth [1/day] (allow_var_sinking)
-Vcalc                 = 0.0072   ! depth dependence of calcite dissolution [1/day]
+Vcalc                 = 0.0072      ! depth dependence of calcite dissolution [1/day]
 /
 
 ! ============================================================================
@@ -241,7 +241,7 @@ pzDia                 = 0.5d0       ! maximum diatom preference
 sDiaNsq               = 0.d0        ! not used by the current code
 pzPhy                 = 1.0d0       ! maximum small phytoplankton preference
 sPhyNsq               = 0.d0        ! not used by the current code
-pzCocco               = 0.666d0   ! maximum coccolithophore preference
+pzCocco               = 0.666d0     ! maximum coccolithophore preference
 sCoccoNsq             = 0.d0        ! not used by the current code
 pzMicZoo              = 1.0d0       ! maximum microzooplankton preference
 sMicZooNsq            = 0.d0        ! not used by the current code
@@ -263,16 +263,14 @@ fecal_rate_n_mes      = 0.25d0      ! as fecal_rate_n, for the first zooplankton
 fecal_rate_c_mes      = 0.32d0      ! as fecal_rate_c, for the first zooplankton (mesozooplankton)
 
 ! --- Prey Preferences ---
-pzDia2                = 1.5d0   ! maximum diatom preference
+pzDia2                = 1.5d0       ! maximum diatom preference
 sDiaNsq2              = 0.d0        ! not used by the current code
-pzPhy2                = 0.5d0   ! maximum small phytoplankton preference
+pzPhy2                = 0.5d0       ! maximum small phytoplankton preference
 sPhyNsq2              = 0.d0        ! not used by the current code
-pzCocco2              = 0.5d0   ! maximum coccolithophore preference
+pzCocco2              = 0.5d0       ! maximum coccolithophore preference
 sCoccoNsq2            = 0.d0        ! not used by the current code
 pzHet                 = 1.5d0       ! maximum preference for the first zooplankton
 sHetNsq               = 0.d0        ! not used by the current code
-pzMicZoo2             = 1.0d0       ! maximum microzooplankton preference
-sMicZooNsq2           = 0.d0        ! not used by the current code
 
 ! --- Temperature Function (Krill) ---
 t1_zoo2               = 28145.d0    ! krill temperature function constant 1
@@ -291,11 +289,11 @@ loss_miczoo           = 0.01d0      ! temperature-dependent N degradation of ext
 res_miczoo            = 0.01d0      ! respiration and mortality (loss to detritus) [1/day]
 
 ! --- Prey Preferences ---
-pzDia3                = 0.5d0   ! maximum diatom preference
+pzDia3                = 0.5d0       ! maximum diatom preference
 sDiaNsq3              = 0.d0        ! not used by the current code
-pzPhy3                = 1.0d0   ! maximum small phytoplankton preference
+pzPhy3                = 1.0d0       ! maximum small phytoplankton preference
 sPhyNsq3              = 0.d0        ! not used by the current code
-pzCocco3              = 0.d0   ! maximum coccolithophore preference (still to be tuned)
+pzCocco3              = 0.d0        ! maximum coccolithophore preference (still to be tuned)
 sCoccoNsq3            = 0.d0        ! not used by the current code
 /
 
@@ -348,16 +346,16 @@ lossC_c               = 0.10d0      ! loss of carbon, coccolithophores [1/day]
 /
 
 &paphytoplankton_ChlA
-deg_Chl               = 0.25d0   ! chlorophyll degradation rate, small phytoplankton [1/day]
-deg_Chl_d             = 0.15d0   ! chlorophyll degradation rate, diatoms [1/day]
-deg_Chl_c             = 0.2d0   ! chlorophyll degradation rate, coccolithophores [1/day]
+deg_Chl               = 0.25d0      ! chlorophyll degradation rate, small phytoplankton [1/day]
+deg_Chl_d             = 0.15d0      ! chlorophyll degradation rate, diatoms [1/day]
+deg_Chl_c             = 0.2d0       ! chlorophyll degradation rate, coccolithophores [1/day]
 /
 
 ! ============================================================================
 ! DETRITUS
 ! ============================================================================
 &padetritus_N
-gfin                  = 0.4d0   ! grazing efficiency of the first zooplankton (fraction of the grazing flux it retains)
+gfin                  = 0.4d0       ! grazing efficiency of the first zooplankton (fraction of the grazing flux it retains)
 grazEff2              = 0.8d0       ! grazing efficiency of the second zooplankton
 grazEff3              = 0.8d0       ! grazing efficiency of the microzooplankton
 reminN                = 0.165d0     ! temperature-dependent remineralization rate of detrital N [1/day]
@@ -418,7 +416,7 @@ d_co2_calc     = 1.343e+07   ! H+ inhibition coefficient d, calcification [kg/mo
 &pairon
 Fe2N                  = 0.033d0     ! Fe:N ratio of organic matter (Fe2C * 6.625)
 Fe2N_benthos          = 0.15d0      ! Fe:N ratio of the benthic iron release (Fe2C_benthos * 6.625; was 0.14, still to be tuned)
-kScavFe               = 0.752d0   ! scavenging rate of free iron onto detritus
+kScavFe               = 0.752d0     ! scavenging rate of free iron onto detritus
 dust_sol              = 0.02d0      ! soluble (bioavailable) fraction of dust iron
 RiverFeConc           = 100         ! mean dissolved iron concentration in rivers (useRivFe)
 kScavFe_calc          = 0.d0        ! default: 0
@@ -478,7 +476,7 @@ rho_opal             = 2090.d0   ! density of opal [kg/m3] (Cram et al. 2018, Ta
 rho_ref_part         = 1230.d0   ! reference particle density [kg/m3]
 rho_ref_water        = 1027.d0   ! reference seawater density [kg/m3]
 visc_ref_water       = 0.00158d0 ! reference seawater viscosity at 4 degC [kg/(m s)]
-w_ref1               = 10.d0   ! reference sinking velocity of small detritus [m/day]
+w_ref1               = 10.d0     ! reference sinking velocity of small detritus [m/day]
 w_ref2               = 200.d0    ! reference sinking velocity of large detritus [m/day]
 depth_scaling1       = 0.015d0   ! increase of small detritus sinking speed with depth [1/day], 0 = off
 depth_scaling2       = 0.d0      ! increase of large detritus sinking speed with depth [1/day], 0 = off
