@@ -1214,8 +1214,8 @@ contains
                    f%partit%com_nod2D%sPE, f%partit%com_nod2D%rPE,                  &
                    f%partit%com_nod2D%req, f%partit%com_nod2D%nreq,                 &
                    dt, daynew, month, mstep, ndpyr, yearold, timenew, rad, kappa,            &
-                   press_air, u_wind, v_wind, shortwave, use_age_tracer, use_transit, l_sf6, &
-                   l_f11, l_f12, l_r14c, l_r39ar)
+                   press_air, u_wind, v_wind, stress_atmoce_x, stress_atmoce_y, shortwave,   &
+                   use_age_tracer, use_transit, l_sf6, l_f11, l_f12, l_r14c, l_r39ar)
         f%t_recom_e = MPI_Wtime()
 
         deallocate(tracers_info%ids)
