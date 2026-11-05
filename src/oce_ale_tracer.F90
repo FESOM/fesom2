@@ -529,8 +529,6 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
                 SinkFlx = SinkFlx + SinkFlx_tr(:, :, tr_num)
             endif
             Benthos = Benthos + Benthos_tr(:, :, tr_num)
-!            Sinkingvel1(:,:) = Sinkingvel1(:,:) + Sinkvel1_tr(:, :, tr_num)
-!            Sinkingvel2(:,:) = Sinkingvel2(:,:) + Sinkvel2_tr(:, :, tr_num)
         end do
 
 ! Each tracer is stepped in one FESOM group only, so the sinking diagnostics hold the
@@ -541,6 +539,19 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
             call MPI_Allreduce(MPI_IN_PLACE, BotFlux, size(BotFlux), MPI_WP, MPI_SUM, &
                                partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%MPIerr)
         end if
+#endif
+#if defined(__recom)
+    ! sinking speeds of the two detritus classes for output, set per tracer in ver_sinking_recom
+    Sinkingvel1(:,:) = sum(Sinkvel1_tr, dim=3)
+    Sinkingvel2(:,:) = sum(Sinkvel2_tr, dim=3)
+#if defined(__usetp)
+    if (num_fesom_groups > 1) then
+        call MPI_Allreduce(MPI_IN_PLACE, Sinkingvel1, size(Sinkingvel1), MPI_WP_FULL, MPI_SUM, &
+                           partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%MPIerr)
+        call MPI_Allreduce(MPI_IN_PLACE, Sinkingvel2, size(Sinkingvel2), MPI_WP_FULL, MPI_SUM, &
+                           partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%MPIerr)
+    end if
+#endif
 #endif
 
     !___________________________________________________________________________
