@@ -57,6 +57,9 @@ module fesom_main_storage_module
   use write_step_info_module, only: plot_fesomlogo, write_step_info, write_enegry_info, check_blowup
   use fesom_monitor_module, only: t_monitor, monitor_fill_ocean
   use fesom_conservation_module, only: conservation_before_step, conservation_after_step
+#if defined(__recom)
+  use fesom_conservation_module, only: conservation_recom
+#endif
   use, intrinsic :: iso_fortran_env, only : real32
   use g_forcing_param, only: use_landice_water, use_age_tracer
   use oce_landice_water_module, only: landice_water_init
@@ -1210,6 +1213,7 @@ contains
         kappa_r8   = kappa
         timenew_r8 = timenew
 
+        if (conservation_freq > 0) call conservation_recom('before', tracers_info, f%tracers, f%partit, f%mesh)
         f%t_recom_s = MPI_Wtime()
         call recom(real(f%ice%data(1)%values, WP_full), f%mesh%nl, &
                    f%mesh%ulevels_nod2d, f%mesh%nlevels_nod2D, f%mesh%hnode,     &
@@ -1227,6 +1231,7 @@ contains
                    real(shortwave, WP_full), use_age_tracer, use_transit, l_sf6, &
                    l_f11, l_f12, l_r14c, l_r39ar)
         f%t_recom_e = MPI_Wtime()
+        if (conservation_freq > 0) call conservation_recom('after', tracers_info, f%tracers, f%partit, f%mesh)
         ! the tracers REcoM changed, back into WP; what is below the WP resolution goes into the carry
         call recom_tracers_back(f%tracers, f%mesh, f%partit, carry=.true.)
 

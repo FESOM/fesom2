@@ -16,6 +16,9 @@ module oce_ale_tracer_module
     USE g_forcing_arrays
     USE oce_adv_tra_driver_module, only: do_oce_adv_tra
     USE fesom_conservation_module, only: conservation_probe
+#if defined(__recom)
+    USE fesom_conservation_module, only: conservation_bgc_column, conservation_bgc_bc
+#endif
     USE oce_dyn_module, only: mom_on_device
 #if defined (FESOM_PROFILING)
     use fesom_profiler
@@ -857,6 +860,7 @@ if (any(recom_remin_tracer_id == tracers%data(tr_num)%ID)) then
                                tracers%data(tr_num)%ID,  &
                                partit%myDim_nod2D, partit%eDim_nod2D, &
                                partit%mype, partit%MPI_COMM_FESOM, dtr_bf, real(dt, WP_full))  !--- str_bf ---
+    if (conservation_freq > 0) call conservation_bgc_column('return', tr_num, dtr_bf, partit, mesh)
 ! update tracer fields
     if (.not. use_tracer_carry) then
         do n=1, partit%myDim_nod2D
@@ -898,6 +902,10 @@ if (any(recom_sinking_tracer_id == tracers%data(tr_num)%ID)) then
                                        s_nod2D, r_nod2D, s_nod3D, r_nod3D,     &
                                        partit%com_nod2D%sPE, partit%com_nod2D%rPE,                  &
                                        partit%com_nod2D%req, partit%com_nod2D%nreq, real(dt, WP_full))  !--- str_bf ---
+        if (conservation_freq > 0) then
+            call conservation_bgc_column('sinking',  tr_num, vert_sink, partit, mesh)
+            call conservation_bgc_column('seafloor', tr_num, str_bf,    partit, mesh)
+        end if
 
 ! update tracer fields
     if (.not. use_tracer_carry) then
@@ -1238,6 +1246,9 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
             nzmin=mesh%ulevels_nod2D(n)
             impl_bc(n)=bc_surface(n, tr_id, trarr(nzmin,n), nzmin, partit, mesh, sst(nzmin,n), sss(nzmin,n), a_ice(n))
         end do
+#if defined(__recom)
+        if (conservation_freq > 0) call conservation_bgc_bc(tr_num, impl_bc, partit, mesh)
+#endif
     end if
     
     ! solve equation diffusion equation implicite part:
