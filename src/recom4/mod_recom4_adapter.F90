@@ -38,7 +38,15 @@ module mod_recom4_adapter
                               RECOM4_D2_DECAY_BEN_N, RECOM4_D3W_WSINK_DET1, RECOM4_D3W_WSINK_DET2, &
                               recom4_diag_index, recom4_diag_info, recom4_tracer_name, &
                               RECOM4_KIND_2D, RECOM4_KIND_3D, RECOM4_KIND_3DW, RECOM4_KIND_COL, &
-                              RECOM4_DIAG_NAME_LEN, RECOM4_DIAG_LONG_LEN, RECOM4_DIAG_UNITS_LEN
+                              RECOM4_DIAG_NAME_LEN, RECOM4_DIAG_LONG_LEN, RECOM4_DIAG_UNITS_LEN, &
+                              RECOM4_D3_NNA_PHY, RECOM4_D3_NNA_DIA, RECOM4_D3_CHLDEG_PHY,    &
+                              RECOM4_D3_CHLDEG_DIA, RECOM4_D3_RESP_PHY, RECOM4_D3_RESP_DIA,  &
+                              RECOM4_D3_RESP_MESO, RECOM4_D3_RESP_MACRO, RECOM4_D3_RESP_MICRO, &
+                              RECOM4_D3_AGG_PHY, RECOM4_D3_AGG_DIA, RECOM4_D3_DOCEX_PHY,     &
+                              RECOM4_D3_DOCEX_DIA, RECOM4_D3_CALCIF, RECOM4_D3_CALCDISS,     &
+                              RECOM4_D2_NPP_PHY, RECOM4_D2_NPP_DIA, RECOM4_D2_GPP_PHY,       &
+                              RECOM4_D2_GPP_DIA, RECOM4_D2_NNA_PHY, RECOM4_D2_NNA_DIA,       &
+                              RECOM4_D2_CHLDEG_PHY, RECOM4_D2_CHLDEG_DIA
     use recom4_text_io, only: recom4_read_text
     use recom4_dump_io, only: dump_open_write, dump_write, dump_close
     use iso_fortran_env, only: real64
@@ -97,6 +105,25 @@ module mod_recom4_adapter
     integer :: nreq = 0
     character(len=32) :: req_name(NREQ_MAX) = ''
     integer :: req_src(NREQ_MAX) = 0, req_kind(NREQ_MAX) = 0, req_slot(NREQ_MAX) = 0
+
+    ! Column dumps (RECOM4 #53): the M9 records, named as tools/ref (dump step 5)
+    character(len=20), parameter :: m9_vnames(15) = [character(len=20) ::          &
+        'out_nna_phy', 'out_nna_dia', 'out_chldeg_phy', 'out_chldeg_dia',          &
+        'out_resp_phy', 'out_resp_dia', 'out_resp_meso', 'out_resp_macro',         &
+        'out_resp_micro', 'out_agg_phy', 'out_agg_dia', 'out_docex_phy',           &
+        'out_docex_dia', 'out_calcif', 'out_calcdiss']
+    integer, parameter :: m9_vcols(15) = [                                         &
+        RECOM4_D3_NNA_PHY, RECOM4_D3_NNA_DIA, RECOM4_D3_CHLDEG_PHY,                &
+        RECOM4_D3_CHLDEG_DIA, RECOM4_D3_RESP_PHY, RECOM4_D3_RESP_DIA,              &
+        RECOM4_D3_RESP_MESO, RECOM4_D3_RESP_MACRO, RECOM4_D3_RESP_MICRO,           &
+        RECOM4_D3_AGG_PHY, RECOM4_D3_AGG_DIA, RECOM4_D3_DOCEX_PHY,                 &
+        RECOM4_D3_DOCEX_DIA, RECOM4_D3_CALCIF, RECOM4_D3_CALCDISS]
+    character(len=20), parameter :: m9_cnames(8) = [character(len=20) ::           &
+        'out_npp_phy_col', 'out_npp_dia_col', 'out_gpp_phy_col', 'out_gpp_dia_col', &
+        'out_nna_phy_col', 'out_nna_dia_col', 'out_chldeg_phy_col', 'out_chldeg_dia_col']
+    integer, parameter :: m9_ccols(8) = [                                          &
+        RECOM4_D2_NPP_PHY, RECOM4_D2_NPP_DIA, RECOM4_D2_GPP_PHY, RECOM4_D2_GPP_DIA, &
+        RECOM4_D2_NNA_PHY, RECOM4_D2_NNA_DIA, RECOM4_D2_CHLDEG_PHY, RECOM4_D2_CHLDEG_DIA]
 #endif
 
 contains
@@ -489,7 +516,7 @@ contains
             if (itr == itr_of_id(1028)) diag3dw(nzmin:nzmax + 1, RECOM4_D3W_WSINK_DET2, n) = &
                 d3wt(1:nz + 1, RECOM4_D3W_WSINK_DET2)
 
-            if (kd > 0) call dump_transport_out(kd, n, nz, itr, tr(1:nz, :))
+            if (kd > 0) call dump_transport_out(kd, n, nzmin, nz, itr, tr(1:nz, :))
 
             tracers%data(tr_num)%values(nzmin:nzmax, n) = tr(1:nz, itr)
         end do
@@ -880,6 +907,16 @@ contains
         call w1(u, 'out_gpp_phy', m, diag3d(1:nz, RECOM4_D3_GPP_PHY, n))
         call w1(u, 'out_npp_dia', m, diag3d(1:nz, RECOM4_D3_NPP_DIA, n))
         call w1(u, 'out_gpp_dia', m, diag3d(1:nz, RECOM4_D3_GPP_DIA, n))
+        ! M9: the other per-level diagnostics and the column sums, named as
+        ! tools/ref; respmacro / respmicro only with 3zoo2det (2p1z1d has none)
+        do i = 1, size(m9_vnames)
+            if ((m9_vcols(i) == RECOM4_D3_RESP_MACRO .or. m9_vcols(i) == RECOM4_D3_RESP_MICRO) &
+                .and. recom4_diag_index(state, 'respmacro') == 0) cycle
+            call w1(u, trim(m9_vnames(i)), m, diag3d(1:nz, m9_vcols(i), n))
+        end do
+        do i = 1, size(m9_cnames)
+            call w0(u, trim(m9_cnames(i)), m, diag2d(m9_ccols(i), n))
+        end do
         ! the air-sea gas exchange, one value per column (as drivers/recom4_column.F90)
         call w0(u, 'out_co2flux',     m, diag2d(RECOM4_D2_CO2FLUX, n))
         call w0(u, 'out_co2flux_day', m, diag2d(RECOM4_D2_CO2FLUX_DAY, n))
@@ -943,8 +980,8 @@ contains
     end subroutine dump_transport_in
 
     ! Hook 2, after recom4_transport; closes the files after the last dumped step
-    subroutine dump_transport_out(k, n, nz, itr, tr)
-        integer,  intent(in) :: k, n, nz, itr
+    subroutine dump_transport_out(k, n, nzmin, nz, itr, tr)
+        integer,  intent(in) :: k, n, nzmin, nz, itr
         real(WP), intent(in) :: tr(:, :)
         character(len=16) :: id
         integer :: u, m
@@ -956,6 +993,11 @@ contains
         call w1(u, 'out_dtr_bf_'    // trim(id), m, diag3d(1:nz, RECOM4_D3_DTR_BF, n))
         call w1(u, 'out_str_bf_'    // trim(id), m, diag3d(1:nz, RECOM4_D3_STR_BF, n))
         call w1(u, 'out_tr_sink_'   // trim(id), m, tr(1:nz, itr))
+        ! M9: the final sinking speed of the detritus class, nz + 1 values
+        if (itr == itr_of_id(1021)) call w1(u, 'out_wsink_' // trim(id), m, &
+                diag3dw(nzmin:nzmin + nz, RECOM4_D3W_WSINK_DET1, n))
+        if (itr == itr_of_id(1028)) call w1(u, 'out_wsink_' // trim(id), m, &
+                diag3dw(nzmin:nzmin + nz, RECOM4_D3W_WSINK_DET2, n))
         if (itr == ntr .and. m == dump_nsteps) then
             call dump_close(u_step(k))
             call dump_close(u_surf(k))
