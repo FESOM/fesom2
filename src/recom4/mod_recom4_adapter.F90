@@ -23,7 +23,7 @@ module mod_recom4_adapter
     use mod_forcing_read,  only: t_atm_forcing
 #ifdef __RECOM4
     use recom4_api,     only: recom4_state, recom4_init, recom4_ntr, recom4_ncol,    &
-                              recom4_ndiag2d, recom4_ndiag3d, recom4_tracer_id,      &
+                              recom4_ndiag2d, recom4_ndiag3d, recom4_ndiag3dw, recom4_tracer_id, &
                               recom4_initial_values, recom4_step, recom4_transport,  &
                               recom4_host_settings, recom4_get_host_settings,        &
                               recom4_col_profile, recom4_col_benthos, recom4_col_decay, &
@@ -33,7 +33,7 @@ module mod_recom4_adapter
                               RECOM4_D2_CO2FLUX, RECOM4_D2_CO2FLUX_DAY, RECOM4_D2_O2FLUX, &
                               RECOM4_D2_O2FLUX_DAY, RECOM4_D2_PCO2SURF, RECOM4_D2_DPCO2SURF, &
                               RECOM4_D2_PH_SURF, RECOM4_D2_K0, RECOM4_D2_KW660,       &
-                              RECOM4_D2_DECAY_BEN_N
+                              RECOM4_D2_DECAY_BEN_N, RECOM4_D3W_WSINK_DET1, RECOM4_D3W_WSINK_DET2
     use recom4_text_io, only: recom4_read_text
     use recom4_dump_io, only: dump_open_write, dump_write, dump_close
     use iso_fortran_env, only: real64
@@ -59,6 +59,8 @@ module mod_recom4_adapter
     real(WP), allocatable :: sflux(:, :)        ! (ntr, nNodL)   surface flux of the step
     real(WP), allocatable :: diag2d(:, :)       ! (ndiag2d, nNodL)
     real(WP), allocatable :: diag3d(:, :, :)    ! (nl-1, ndiag3d, nNodL)
+    real(WP), allocatable :: diag3dw(:, :, :)   ! (nl, ndiag3dw, nNodL), absolute levels:
+                                                ! wsink_det1/2 from their transport calls (M9)
     real(WP), allocatable :: dust_fe(:)         ! (nNodL)  dust iron [umol/m2/s], monthly
     type(recom4_host_settings) :: hs
     integer  :: ialk = 0                        ! RECOM4 index of alkalinity (ID 1003)
@@ -135,6 +137,8 @@ contains
         allocate(col(recom4_ncol(state), nNodL), sflux(ntr, nNodL))
         allocate(diag2d(recom4_ndiag2d(state), nNodL))
         allocate(diag3d(nl - 1, recom4_ndiag3d(state), nNodL))
+        allocate(diag3dw(nl, recom4_ndiag3dw(state), nNodL))
+        diag3dw = 0.0_WP
         col    = 0.0_WP
         sflux  = 0.0_WP
         diag2d = 0.0_WP
@@ -422,7 +426,7 @@ contains
         type(t_mesh),   intent(in)           :: mesh
         type(t_partit), intent(in), optional :: partit
 #ifdef __RECOM4
-        real(WP), allocatable :: tr(:, :), area_i(:), avol(:), seafl(:)
+        real(WP), allocatable :: tr(:, :), area_i(:), avol(:), seafl(:), d3t(:, :), d3wt(:, :)
         character(len=512) :: errmsg
         integer :: n, i, itr, nzmin, nzmax, nz, ierr, kd
 
@@ -430,6 +434,9 @@ contains
         if (tr_num <= 2) return
         itr = tr_num - 2
         allocate(tr(mesh%nl - 1, ntr), area_i(mesh%nl), avol(mesh%nl - 1), seafl(mesh%nl - 1))
+        ! recom4_transport sets its whole diag3d / diag3dw to 0 at every call;
+        ! scratch arrays keep the step's diagnostics in diag3d (M9)
+        allocate(d3t(mesh%nl - 1, recom4_ndiag3d(state)), d3wt(mesh%nl, recom4_ndiag3dw(state)))
         do n = 1, nNodO
             nzmin = mesh%ulevels_nod2D(n)
             nzmax = mesh%nlevels_nod2D(n) - 1
@@ -454,11 +461,20 @@ contains
                                   tracers%data(1)%values(nzmin:nzmax, n),                   &
                                   tracers%data(2)%values(nzmin:nzmax, n),                   &
                                   mesh%geo_coord_nod2D(1, n), mesh%geo_coord_nod2D(2, n),   &
-                                  dt, tr(1:nz, :), col(:, n), diag3d(1:nz, :, n), ierr, errmsg)
+                                  dt, tr(1:nz, :), col(:, n), d3t(1:nz, :), d3wt(1:nz + 1, :), ierr, errmsg)
             if (ierr /= 0) then
                 if (present(partit)) call fail('recom4_transport: ' // trim(errmsg), partit)
                 error stop 'recom4_adapter: recom4_transport failed'
             end if
+
+            ! the transport's own columns (6-8, column dumps), and the sinking
+            ! speeds of the two detritus classes, only from their own calls
+            diag3d(1:nz, RECOM4_D3_VERT_SINK:RECOM4_D3_STR_BF, n) = &
+                d3t(1:nz, RECOM4_D3_VERT_SINK:RECOM4_D3_STR_BF)
+            if (itr == itr_of_id(1021)) diag3dw(nzmin:nzmax + 1, RECOM4_D3W_WSINK_DET1, n) = &
+                d3wt(1:nz + 1, RECOM4_D3W_WSINK_DET1)
+            if (itr == itr_of_id(1028)) diag3dw(nzmin:nzmax + 1, RECOM4_D3W_WSINK_DET2, n) = &
+                d3wt(1:nz + 1, RECOM4_D3W_WSINK_DET2)
 
             if (kd > 0) call dump_transport_out(kd, n, nz, itr, tr(1:nz, :))
 
