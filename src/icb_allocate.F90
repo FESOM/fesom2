@@ -1,37 +1,25 @@
-module allocate_icb_interface
-  interface
-     subroutine allocate_icb(partit, mesh)
-        use iceberg_params
-        use g_config
-        use g_comm
-        use g_comm_auto
-        use o_param
-        use MOD_PARTIT
-        use MOD_MESH
-        implicit none
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh),   intent(in)   , target :: mesh
-     end subroutine allocate_icb
-  end interface
-end module allocate_icb_interface
+module icb_allocate_module
+    USE iceberg_params
+    USE g_config
+    USE g_comm
+    USE g_comm_auto
+    USE o_param
+    USE MOD_PARTIT
+    USE MOD_MESH
+
+    implicit none
+
+    private
+    public :: allocate_icb
+
+contains
 
 subroutine allocate_icb(partit, mesh)
-  use iceberg_params
-  use g_config
-  use g_comm
-  use g_comm_auto
-  use o_param
-  use MOD_PARTIT
-  use MOD_MESH
 
   integer       :: n2
 type(t_partit), intent(inout), target :: partit
 type(t_mesh), intent(in), target :: mesh
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
-  n2=myDim_nod2D+eDim_nod2D
+  n2=partit%myDim_nod2D+partit%eDim_nod2D
   icb_outfreq = step_per_day / steps_per_ib_step
 
   allocate(ibhf(n2), ibfwb(n2), ibfwl(n2), ibfwe(n2), ibfwbv(n2))
@@ -40,10 +28,12 @@ type(t_mesh), intent(in), target :: mesh
   ibfwl     = 0.0
   ibfwe     = 0.0
   ibfwbv    = 0.0
+  allocate(ibiron(n2))
+  ibiron    = 0.0
   allocate(ibhf_n(mesh%nl, n2))
   ibhf_n    = 0.0_WP
 
-  allocate(wave_erosion_potential(elem2D), linit_wave_erosion_pot(elem2D))
+  allocate(wave_erosion_potential(mesh%elem2D), linit_wave_erosion_pot(mesh%elem2D))
   wave_erosion_potential = 0.0
   linit_wave_erosion_pot = .true.
 
@@ -114,6 +104,8 @@ type(t_mesh), intent(in), target :: mesh
   allocate(fwl_flux_ib(ib_num))
   allocate(fwb_flux_ib(ib_num))
   allocate(fwbv_flux_ib(ib_num))
+  allocate(iron_conc_ib(ib_num))
+  allocate(iron_flux_ib(ib_num))
   allocate(hfe_flux_ib(ib_num))
   allocate(hfl_flux_ib(ib_num,mesh%nl))
   allocate(hfb_flux_ib(ib_num))
@@ -123,6 +115,8 @@ type(t_mesh), intent(in), target :: mesh
   fwl_flux_ib = 0.0
   fwb_flux_ib = 0.0
   fwbv_flux_ib = 0.0
+  iron_conc_ib = icb_iron_const   ! overwritten by icb_iron.dat / the iron restart
+  iron_flux_ib = 0.0
   hfe_flux_ib = 0.0
   hfl_flux_ib = 0.0
   hfb_flux_ib = 0.0
@@ -132,10 +126,11 @@ type(t_mesh), intent(in), target :: mesh
   allocate(elem_block(ib_num))
   allocate(pe_block(ib_num))
 
-  allocate(elem_area_glob(elem2D))
+  allocate(elem_area_glob(mesh%elem2D))
   elem_area_glob=0.0
-  call gather_elem(elem_area(1:myDim_elem2D), elem_area_glob, partit)
-  call MPI_Bcast(elem_area_glob, elem2D, MPI_DOUBLE, 0, MPI_COMM_FESOM, MPIERR)
+  call gather_elem(mesh%elem_area(1:partit%myDim_elem2D), elem_area_glob, partit)
+  call MPI_Bcast(elem_area_glob, mesh%elem2D, MPI_WP, 0, partit%MPI_COMM_FESOM, partit%MPIERR)
+  call init_halo_elems(partit, mesh)
 
   allocate(vl_block(4*ib_num))
   allocate(buoy_props(ib_num,14))
@@ -147,3 +142,43 @@ type(t_mesh), intent(in), target :: mesh
   allocate(scaling(ib_num))
   scaling = 1
 end subroutine allocate_icb
+
+! Corners and cavity rejection of every halo element (eDim and eXDim), filled
+! once through the full element halo exchange: the owners compute them for
+! their own elements, whose nodes they hold.
+subroutine init_halo_elems(partit, mesh)
+
+type(t_partit), intent(inout), target :: partit
+type(t_mesh), intent(in), target :: mesh
+  real(kind=WP), allocatable :: aux(:,:)
+  integer       :: n_my, n_all, n, i, k
+  integer       :: elnodes(3)
+
+  n_my  = partit%myDim_elem2D
+  n_all = n_my + partit%eDim_elem2D + partit%eXDim_elem2D
+  allocate(aux(n_all, 7))
+  aux = 0.0_WP
+  do n = 1, n_my
+     elnodes = mesh%elem2D_nodes(:,n)
+     do i = 1, 3
+        aux(n, 2*i-1) = mesh%coord_nod2D(1, elnodes(i))
+        aux(n, 2*i)   = mesh%coord_nod2D(2, elnodes(i))
+     end do
+     if (use_cavity) then
+        if (all((mesh%cavity_depth(elnodes)/=0.0) .or. (mesh%bc_index_nod2D(elnodes)==0.0))) aux(n, 7) = 1.0_WP
+     end if
+  end do
+  do k = 1, 7
+     call exchange_elem(aux(:,k), partit)
+  end do
+
+  allocate(halo_elem_xy(2, 3, n_my+1:n_all), halo_elem_reject(n_my+1:n_all))
+  do n = n_my+1, n_all
+     halo_elem_xy(1,:,n) = aux(n, 1:5:2)
+     halo_elem_xy(2,:,n) = aux(n, 2:6:2)
+     halo_elem_reject(n) = aux(n, 7) > 0.5_WP
+  end do
+  deallocate(aux)
+end subroutine init_halo_elems
+
+end module icb_allocate_module

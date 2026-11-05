@@ -112,7 +112,7 @@ else
 end if
 
 if (present(tau_h)) then
-  if(tau_h.lt. 0.01*864000. .or. tau_h .gt. 100.*86400.) then
+  if(tau_h.lt. 0.01*86400. .or. tau_h .gt. 100.*86400.) then
     print*, "ERROR:tau_h can only be allowed_range"
     stop 1
   end if

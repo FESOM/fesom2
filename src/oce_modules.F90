@@ -12,18 +12,40 @@ use, intrinsic :: iso_fortran_env, only: real32, real64
 private :: real32, real64
 ! Kind numbers come from iso_fortran_env rather than being spelled as the byte
 ! size. The standard does not require kind numbers to equal storage size (NAG,
-! for one, numbers real kinds 1,2,3), so WP=8 is only accidentally correct.
-! On GNU/Intel real64==8, making this a numerical no-op.
-integer, parameter            :: WP=real64   ! Working precision
+! for one, numbers real kinds 1,2,3), so WP=4/WP=8 is only accidentally correct.
+! Working precision is a build dimension, selected with -DUSE_SINGLE_PRECISION.
+#if defined(USE_SINGLE_PRECISION)
+integer, parameter            :: WP=real32   ! Working precision (single)
+#else
+integer, parameter            :: WP=real64   ! Working precision (double, default)
+#endif
 ! Always-double precision, independent of WP. Use for quantities that must not
 ! degrade if WP is ever narrowed (time axes, external double APIs, global
 ! reduction accumulators).
 integer, parameter            :: WP_full=real64
+! Tracer carry: in a single-precision build each write of the tracer state keeps
+! the rounding residual (thickness-weighted) in tracers%work%carry and feeds it
+! into the next write, so the content stays exact to real64 while the state is
+! real32. A derived constant, not a switch: false whenever WP is already full
+! precision, so the carry loops are dead code in a double-precision build.
+logical, parameter            :: use_tracer_carry=(WP /= WP_full)
 integer, parameter            :: MAX_PATH=4096 ! Maximum file path length
 integer		                  :: mstep
 real(kind=WP), parameter      :: pi=3.141592653589793238462643383279502884_WP
 real(kind=WP), parameter      :: rad=pi/180.0_WP
 real(kind=WP), parameter      :: density_0=1030.0_WP
+! use_salt_anomaly (namelist &oce_dyn): store the salinity state as the anomaly
+! S - S_ref_anomaly, so the float32 spacing at typical open-ocean values
+! (|S-35| < ~2) is 30-250x finer than at S~35 (ulp 1.9e-6 psu). S_ref_anomaly is
+! DERIVED in ocean_setup: 35.0 when the toggle is on, else 0.0 -- so every
+! absolute-salinity consumer can add it back unconditionally (`+ 0.0` is a
+! bit-identical no-op when the feature is off). See the S_ref_anomaly sites.
+! NOTE: enabling it is NOT exactly DP-neutral -- FESOM's free-surface advection
+! is not perfectly constancy-preserving, leaving a small (~8e-6/step, surface,
+! freshwater-driven) residual; see the note at the salinity surface BC in
+! oce_ale_tracer.F90 (and the PR description).
+logical                       :: use_salt_anomaly = .false.
+real(kind=WP)                 :: S_ref_anomaly = 0.0_WP
 real(kind=WP), parameter      :: density_0_r=1.0_WP/density_0 ! [m^3/kg]
 real(kind=WP), parameter      :: g=9.81_WP
 real(kind=WP), parameter      :: r_earth=6367500.0_WP
@@ -42,7 +64,7 @@ real(kind=WP)                 :: K_ver=0.00001_WP
 real(kind=WP)                 :: scale_area=2.0e8_WP
 real(kind=WP)                 :: surf_relax_T= 0.0_WP
 real(kind=WP)                 :: surf_relax_S= 10.0_WP/(60*3600.0_WP*24)
-logical                       :: balance_salt_water =.true.
+logical                       :: balance_salt_water =.true. ! currently not used
 real(kind=WP)                 :: clim_relax= 1.0_WP/(10*3600.0_WP*24)
 real(kind=WP)                 :: clim_decay, clim_growth
                                  ! set to 0.0 if no relaxation
@@ -50,6 +72,8 @@ logical                       :: ref_sss_local=.false.
 real(kind=WP)                 :: ref_sss=34.7_WP
 logical                       :: Fer_GM =.false.  !flag for Ferrari et al. (2010) GM scheme
 real(kind=WP)                 :: K_GM_max = 3000._WP
+real(kind=WP)                 :: K_GM_max_NH = -1.0_WP  ! K_GM_max north of the transition; <0: same as K_GM_max
+real(kind=WP)                 :: K_GM_hemi_trans = 10.0_WP ! width [deg] of the linear SH->NH transition centred on the equator
 real(kind=WP)                 :: K_GM_min = 2.0_WP
 integer                       :: K_GM_bvref = 2 ! 0...surface, 1...bottom mixlay, 2...mean over mixlay
 real(kind=WP)                 :: K_GM_resscalorder = 2.0_WP
@@ -77,6 +101,15 @@ logical                       :: Redi_Ktaper = .false.
 real(kind=WP)                 :: Redi_Kmax   = 3000.0_WP
 real(kind=WP)                 :: Redi_Kmin   = 2.0_WP
 
+!___mixed layer eddy restratification (Fox-Kemper et al. 2008, 2011, see oce_mle.F90)___
+logical                       :: use_mle = .false.        ! enable MLE restratification
+real(kind=WP)                 :: mle_Ce  = 0.06_WP        ! efficiency coefficient
+real(kind=WP)                 :: mle_Lf_min = 1000.0_WP   ! floor on the frontal width Lf = max(N*H/f, Lf_min)
+real(kind=WP)                 :: mle_tau = 86400.0_WP     ! frontal lifetime, regularises f towards the equator
+real(kind=WP)                 :: mle_hmax = 500.0_WP      ! max. mixed layer depth used, Psi scales with H^2
+real(kind=WP)                 :: mle_resscale_max = 20.0_WP ! max. resolution factor ds/Lf
+real(kind=WP)                 :: mle_ustar_max = 0.05_WP  ! max. induced bolus velocity
+real(kind=WP)                 :: mle_mld_decay_time = 0.0_WP ! running-mean decay time for H, 0 = off
 logical                       :: scaling_ODM95 =.true.    ! tapering based on critical slope
 real(kind=WP)                 :: ODM95_Scr = 1.0e-2_WP   ! Critical slope for tapering
 real(kind=WP)                 :: ODM95_Sd = 1.0e-3_WP   ! slope width of tapering smoothing zone
@@ -207,13 +240,16 @@ character(20)                  :: which_pgf='shchepetkin'
                     SPP, SPP_dep_N, SPP_dep_S, SPP_drhodz_cr_N, SPP_drhodz_cr_S, SPP_expon,  &
                     N2smth_v, N2smth_h, N2smth_hidx, &
                     visc_sh_limit, mix_scheme, Ricr, concv, which_pgf, alpha, theta, use_density_ref, &
-                    Fer_GM, K_GM_max, K_GM_min, K_GM_bvref, K_GM_resscalorder, K_GM_rampmax, K_GM_rampmin, K_GM_cm, K_GM_cmin, K_GM_Ktaper, &
+                    Fer_GM, K_GM_max, K_GM_max_NH, K_GM_hemi_trans, K_GM_min, K_GM_bvref, K_GM_resscalorder, K_GM_rampmax, K_GM_rampmin, K_GM_cm, K_GM_cmin, K_GM_Ktaper, &
                     Redi, Redi_Ktaper, Redi_Kmax, Redi_Kmin, use_global_tides, &
                     scaling_Ferreira, scaling_Rossby, scaling_resolution, scaling_FESOM14, &
                     scaling_ODM95, ODM95_Scr, ODM95_Sd, &
                     scaling_LDD97, LDD97_c, LDD97_rmin, LDD97_rmax, &
                     scaling_GINsea, GINsea_fac, GMzexp_smin, &
-                    scaling_GMzexp, GMzexp_zref
+                    scaling_GMzexp, GMzexp_zref, &
+                    use_mle, mle_Ce, mle_Lf_min, mle_tau, mle_hmax, mle_resscale_max, &
+                    mle_ustar_max, mle_mld_decay_time, &
+                    use_salt_anomaly
 
  NAMELIST /tracer_phys/ diff_sh_limit, Kv0_const, double_diffusion, K_ver, K_hor, surf_relax_T, surf_relax_S, &
             balance_salt_water, clim_relax, ref_sss_local, ref_sss, &
@@ -255,7 +291,9 @@ real(kind=WP), allocatable    :: tau_x_t(:,:), tau_y_t(:,:)
 real(kind=WP), allocatable    :: heat_flux_t(:,:), heat_rel_t(:,:), heat_rel(:)
 !!PS real(kind=WP), allocatable    :: coriolis(:), coriolis_node(:)
 real(kind=WP), allocatable    :: relax2clim(:)
-real(kind=WP), allocatable    :: MLD1(:), MLD2(:), MLD3(:)
+real(kind=WP), allocatable    :: MLD1(:), MLD2(:), MLD3(:), MLD4(:)
+real(kind=WP), allocatable    :: mle_psi(:,:)   ! Fox-Kemper MLE streamfunction magnitude [m2/s]
+real(kind=WP), allocatable    :: mle_hbar(:)    ! running-mean mixed layer depth used by MLE [m]
 integer,       allocatable    :: MLD1_ind(:), MLD2_ind(:), MLD3_ind(:)
 real(kind=WP), allocatable    :: ssh_gp(:)
 !Tracer gradients&RHS
@@ -303,6 +341,26 @@ real(kind=WP), allocatable,dimension(:,:)   :: density_m_rho0_slev
 real(kind=WP), allocatable,dimension(:,:)   :: density_ref
 real(kind=WP), allocatable,dimension(:,:)   :: density_dmoc
 real(kind=WP), allocatable,dimension(:,:)   :: pgf_x, pgf_y
+! OpenACC: pgf_x/pgf_y of this step were computed on the device (host copy not current)
+logical                                     :: pgf_on_device = .false.
+! OpenACC: vert_vel_ale ran on the device in this step (w, w_e, UV, helem, zbar_3d_n,
+! hnode_new current there); Ki and slope_tapered computed on the device (GM/Redi)
+logical                                     :: vv_on_device = .false., redi_on_device = .false.
+! OpenACC: temperature and salinity on the device equal the host copies after the tracer step
+logical                                     :: ts_on_device = .false.
+! OpenACC: the layer geometry (hnode, hnode_new, helem, zbar_3d_n, Z_3d_n) on the device is
+! current (zstar thickness update on the device); its uploads are skipped
+logical                                     :: geom_on_device = .false.
+! an output stream reads sigma_xy, neutral_slope, slope_tapered or fer_tapfac on the host
+logical                                     :: slope_out_needed = .false.
+! OpenACC: UV on the device equals the host copy (velocity update on the device; host
+! writes to UV clear it); GM bolus velocity computed on the device in this step;
+! an output stream reads uv_rhs on the host
+logical                                     :: uv_dev_current = .false., gmvel_on_device = .false.
+logical                                     :: uvrhs_out_needed = .false.
+! UVnode computed on the device (compute_vel_nodes); the host copy is refreshed only
+! where the host reads it (monitor, restart, output)
+logical                                     :: uvnode_on_device = .false.
 
 !_______________________________________________________________________________
 !!PS ! dummy arrays

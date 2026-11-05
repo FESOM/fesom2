@@ -1,4 +1,23 @@
-&env_nml                    ! In the original release these variables are defined in the icepack.settings
+! ============================================================================
+! =============== Namelist file for FESOM2 Icepack sea ice ===================
+! ============================================================================
+! This file contains configuration for the Icepack column physics package,
+! used when FESOM2 is built with Icepack (see docs/icepack_in_fesom.rst):
+! - Tracer array sizes and switches
+! - Ice thickness distribution and thermodynamics
+! - Shortwave radiation and albedo
+! - Melt ponds
+! - Surface forcing options
+! - Ridging and ice strength
+! - Icepack output variables
+! ============================================================================
+
+! ============================================================================
+! ENVIRONMENT (ARRAY SIZES)
+! ============================================================================
+! In the original Icepack release these are set in icepack.settings.
+! ============================================================================
+&env_nml
     nicecat   = 5           ! number of ice thickness categories
     nfsdcat   = 1           ! number of floe size categories
     nicelyr   = 4           ! number of vertical layers in the ice
@@ -6,108 +25,156 @@
     ntraero   = 0           ! number of aerosol tracers (up to max_aero in ice_domain_size.F90)
     trzaero   = 0           ! number of z aerosol tracers (up to max_aero = 6)
     tralg     = 0           ! number of algal tracers (up to max_algae = 3)
-    trdoc     = 0           ! number of dissolve organic carbon (up to max_doc = 3)
-    trdic     = 0           ! number of dissolve inorganic carbon (up to max_dic = 1)
-    trdon     = 0           ! number of dissolve organic nitrogen (up to max_don = 1)
-    trfed     = 0           ! number of dissolved iron tracers (up to max_fe  = 2)
-    trfep     = 0           ! number of particulate iron tracers (up to max_fe  = 2)
+    trdoc     = 0           ! number of dissolved organic carbon tracers (up to max_doc = 3)
+    trdic     = 0           ! number of dissolved inorganic carbon tracers (up to max_dic = 1)
+    trdon     = 0           ! number of dissolved organic nitrogen tracers (up to max_don = 1)
+    trfed     = 0           ! number of dissolved iron tracers (up to max_fe = 2)
+    trfep     = 0           ! number of particulate iron tracers (up to max_fe = 2)
     nbgclyr   = 0           ! number of zbgc layers
-    trbgcz    = 0           ! set to 1 for zbgc tracers (needs TRBGCS = 0 and TRBRI = 1)
-    trzs      = 0           ! set to 1 for zsalinity tracer (needs TRBRI = 1)
+    trbgcz    = 0           ! set to 1 for zbgc tracers (needs trbgcs = 0 and trbri = 1)
+    trzs      = 0           ! set to 1 for zsalinity tracer (needs trbri = 1)
     trbri     = 0           ! set to 1 for brine height tracer
     trage     = 0           ! set to 1 for ice age tracer
     trfy      = 0           ! set to 1 for first-year ice area tracer
     trlvl     = 0           ! set to 1 for level and deformed ice tracers
     trpnd     = 1           ! set to 1 for melt pond tracers
-    trbgcs    = 0           ! set to 1 for skeletal layer tracers (needs TRBGCZ = 0)
+    trbgcs    = 0           ! set to 1 for skeletal layer tracers (needs trbgcz = 0)
     ndtd      = 1           ! dynamic time steps per thermodynamic time step
 /
 
+! ============================================================================
+! ICE THICKNESS CATEGORIES
+! ============================================================================
 &grid_nml
-    kcatbound    = 1
+    kcatbound    = 1        ! category boundary formula:
+                            !   -1 = single category (column configurations, nicecat = 1)
+                            !    0 = old formula, 1 = new formula with round numbers
+                            !    2 = WMO standard categories (nicecat = 5, 6 or 7 only)
+                            !    3 = asymptotic scheme
 /
 
+! ============================================================================
+! TRACER SWITCHES
+! ============================================================================
+! Any melt pond scheme with calc_Tsfc = .true. needs shortwave = 'dEdd'.
+! ============================================================================
 &tracer_nml
-    tr_iage      = .false.
-    tr_FY        = .false.
-    tr_lvl       = .false.
-    tr_pond_cesm = .true.
-    tr_pond_topo = .false.
-    tr_pond_lvl  = .false.
-    tr_aero      = .false.
-    tr_fsd       = .false.
+    tr_iage      = .false.  ! ice age tracer
+    tr_FY        = .false.  ! first-year ice area tracer
+    tr_lvl       = .false.  ! level (undeformed) ice area and volume tracers
+    tr_pond_cesm = .true.   ! CESM melt pond scheme
+    tr_pond_topo = .false.  ! topographic melt pond scheme
+    tr_pond_lvl  = .false.  ! level-ice melt pond scheme (needs tr_lvl, forces hs0 = 0)
+    tr_aero      = .false.  ! aerosol tracers (needs shortwave = 'dEdd')
+    tr_fsd       = .false.  ! floe size distribution
 /
 
+! ============================================================================
+! THERMODYNAMICS
+! ============================================================================
 &thermo_nml
-    kitd              = 1
-    ktherm            = 1
-    conduct           = 'bubbly'
-    a_rapid_mode      =  0.5e-3
-    Rac_rapid_mode    =    10.0
-    aspect_rapid_mode =     1.0
-    dSdt_slow_mode    = -5.0e-8
-    phi_c_slow_mode   =    0.05
-    phi_i_mushy       =    0.85
+! --- Thickness Distribution and Thermodynamics Scheme ---
+    kitd              = 1           ! ice thickness distribution: 0 = delta function, 1 = linear remapping
+    ktherm            = 1           ! thermodynamics: 1 = Bitz & Lipscomb (1999), 2 = mushy layer
+                                    ! ktherm = 1 expects tfrz_option = 'linear_salt',
+                                    ! ktherm = 2 expects tfrz_option = 'mushy' and calc_Tsfc = .true.
+    conduct           = 'bubbly'    ! ice thermal conductivity (ktherm = 1):
+                                    !   'MU71' = Maykut & Untersteiner (1971), 'bubbly' = Pringle et al. (2007)
+
+! --- Mushy Layer Brine Drainage (ktherm = 2) ---
+    a_rapid_mode      =  0.5e-3     ! brine channel diameter [m]
+    Rac_rapid_mode    =    10.0     ! critical Rayleigh number for rapid drainage
+    aspect_rapid_mode =     1.0     ! brine convection aspect ratio
+    dSdt_slow_mode    = -5.0e-8     ! slow drainage strength parameter [m/(s K)]
+    phi_c_slow_mode   =    0.05     ! critical liquid fraction for slow drainage
+    phi_i_mushy       =    0.85     ! solid fraction at the lower ice boundary
 /
 
+! ============================================================================
+! SHORTWAVE RADIATION AND ALBEDO
+! ============================================================================
 &shortwave_nml
-    shortwave       = 'dEdd'
-    albedo_type     = 'ccsm3'
-    albicev         = 0.78
-    albicei         = 0.36
-    albsnowv        = 0.98
-    albsnowi        = 0.70
-    ahmax           = 0.3
-    R_ice           = 0.
-    R_pnd           = 0.
-    R_snw           = 1.5
-    dT_mlt          = 1.5
-    rsnw_mlt        = 1500.
-    kalg            = 0.6
+! --- Scheme Selection ---
+    shortwave       = 'dEdd'    ! shortwave scheme: 'ccsm3' (bulk albedo) or 'dEdd' (Delta-Eddington)
+    albedo_type     = 'ccsm3'   ! albedo parameterization with shortwave = 'ccsm3': 'ccsm3' or 'constant'
+
+! --- Bulk Albedos (shortwave = 'ccsm3') ---
+    albicev         = 0.78      ! visible albedo of thick bare ice
+    albicei         = 0.36      ! near-infrared albedo of thick bare ice
+    albsnowv        = 0.98      ! visible albedo of cold snow
+    albsnowi        = 0.70      ! near-infrared albedo of cold snow
+    ahmax           = 0.3       ! ice thickness above which the albedo is constant [m]
+
+! --- Delta-Eddington Tuning (shortwave = 'dEdd') ---
+    R_ice           = 0.        ! sea ice albedo tuning [standard deviations]
+    R_pnd           = 0.        ! melt pond albedo tuning [standard deviations]
+    R_snw           = 1.5       ! snow grain radius tuning [standard deviations]
+    dT_mlt          = 1.5       ! temperature change that gives rsnw_mlt [deg C]
+    rsnw_mlt        = 1500.     ! maximum melting snow grain radius [micrometres]
+    kalg            = 0.6       ! absorption coefficient for algae
 /
 
+! ============================================================================
+! MELT PONDS
+! ============================================================================
 &ponds_nml
-    hp1             = 0.01
-    hs0             = 0.
-    hs1             = 0.03
-    dpscale         = 1.e-3
-    frzpnd          = 'hlid'
-    rfracmin        = 0.15
-    rfracmax        = 1.
-    pndaspect       = 0.8
+    hp1             = 0.01      ! critical parameter for pond ice thickness [m]
+    hs0             = 0.        ! snow depth for transition to bare sea ice [m]
+    hs1             = 0.03      ! snow depth for transition to pond ice [m] (tr_pond_lvl)
+    dpscale         = 1.e-3     ! time scale for flushing in permeable ice (not used with tr_pond_cesm)
+    frzpnd          = 'hlid'    ! pond refreezing: 'cesm' or 'hlid' (Stefan refreezing with a pond ice lid)
+    rfracmin        = 0.15      ! minimum fraction of melt water added to ponds
+    rfracmax        = 1.        ! maximum fraction of melt water added to ponds
+    pndaspect       = 0.8       ! aspect ratio of pond changes (depth:area)
 /
 
+! ============================================================================
+! SURFACE FORCING OPTIONS
+! ============================================================================
 &forcing_nml
-    formdrag        = .false.
-    atmbndy         = 'default'
-    calc_strair     = .true.
-    calc_Tsfc       = .true.
-    highfreq        = .false.
-    natmiter        = 5
-    ustar_min       = 0.0005
-    emissivity      = 0.95
-    fbot_xfer_type  = 'constant'
-    update_ocn_f    = .true.
-    l_mpond_fresh   = .false.
-    tfrz_option     = 'linear_salt'
-    oceanmixed_ice  = .true.
-    wave_spec_type  = 'none'
+! --- Atmosphere-Ice Exchange ---
+    formdrag        = .false.       ! calculate form drag (needs calc_strair and tr_lvl, not atmbndy = 'constant')
+    atmbndy         = 'default'     ! atmospheric boundary layer: 'default' (stability dependent) or 'constant'
+    calc_strair     = .true.        ! calculate the wind stress in Icepack instead of reading it
+    calc_Tsfc       = .true.        ! calculate the surface temperature in Icepack instead of reading it
+    highfreq        = .false.       ! high-frequency atmosphere-ice coupling (Roberts et al. 2015)
+    natmiter        = 5             ! number of iterations for the atmospheric boundary layer fluxes
+    emissivity      = 0.95          ! emissivity of snow and ice
+
+! --- Ice-Ocean Exchange ---
+    ustar_min       = 0.0005        ! minimum friction velocity for the ice-ocean heat flux [m/s]
+    fbot_xfer_type  = 'constant'    ! ice-ocean heat transfer coefficient: 'constant' or 'Cdn_ocn' (needs formdrag)
+    update_ocn_f    = .true.        ! include frazil ice fluxes in the ocean flux fields
+    l_mpond_fresh   = .false.       ! retain (topo) pond water until the ponds drain
+    tfrz_option     = 'linear_salt' ! seawater freezing temperature: 'minus1p8', 'linear_salt' or 'mushy'
+    oceanmixed_ice  = .true.        ! active ocean mixed layer calculation in Icepack
+
+! --- Waves ---
+    wave_spec_type  = 'none'        ! wave spectrum for the floe size distribution: 'none', 'constant' or 'random'
 /
 
+! ============================================================================
+! RIDGING AND ICE STRENGTH
+! ============================================================================
 &dynamics_nml
-    kstrength       = 1
-    krdg_partic     = 1
-    krdg_redist     = 1
-    mu_rdg          = 3
-    Cf              = 17.
-    P_star          = 27000.
-    C_star          = 20.
+    kstrength       = 1         ! ice strength formulation: 0 = Hibler (1979), 1 = Rothrock (1975)
+    krdg_partic     = 1         ! ridging participation function: 0 = Thorndike et al. (1975), 1 = exponential
+    krdg_redist     = 1         ! ridging redistribution function: 0 = Hibler (1980), 1 = exponential
+    mu_rdg          = 3         ! e-folding scale of ridged ice [m^0.5] (krdg_redist = 1)
+    Cf              = 17.       ! ratio of ridging work to change in potential energy (kstrength = 1)
+    P_star          = 27000.    ! ice strength parameter [N/m²] (kstrength = 0)
+    C_star          = 20.       ! ice strength decay constant [dimensionless] (kstrength = 0)
 /
 
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!!!!!!!!!!                Icepack output namelist                    !!!!!!!!!!
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
+! ============================================================================
+! ICEPACK OUTPUT VARIABLES
+! ============================================================================
+! Format: 'variable_id', frequency, unit, precision
+!   frequency  = output frequency (integer)
+!   unit       = 'y' (yearly), 'm' (monthly), 'd' (daily), 'h' (hourly), 's' (steps)
+!   precision  = 4 (single precision) or 8 (double precision)
+! Remove the leading '!' to enable a variable.
+! ============================================================================
 &nml_list_icepack
 io_list_icepack =  'aicen     ',1, 'm', 4, ! Sea ice concentration
                    'vicen     ',1, 'm', 4, ! Volume per unit area of ice

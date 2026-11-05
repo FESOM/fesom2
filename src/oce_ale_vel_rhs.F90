@@ -1,52 +1,33 @@
+module oce_ale_vel_rhs_module
+    USE MOD_ICE
+    USE MOD_DYN
+    USE MOD_PARTIT
+    use par_support_module, only: par_abort
+    USE MOD_MESH
+    USE o_ARRAYS, only: ssh_gp, pgf_x, pgf_y, pgf_on_device, geom_on_device, uv_dev_current, vv_on_device
+    USE o_PARAM
+    USE g_CONFIG
+    USE g_forcing_param, only: use_virt_salt
+    USE g_forcing_arrays, only: press_air
+    USE g_comm_auto
+    USE g_sbf, only: l_mslp
+    use oce_ale_ssh_splitexpl_subcycl_module, only: momentum_adv_scalar_transpv
+    use oce_dyn_module, only: viscosity_filter, mom_on_device
 
-module compute_vel_rhs_interface
-    interface
-        subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
-        USE MOD_ICE
-        USE MOD_DYN
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        type(t_ice)   , intent(inout), target :: ice
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine compute_vel_rhs
-    end interface
-end module compute_vel_rhs_interface
+    implicit none
 
-module momentum_adv_scalar_interface
-    interface
-        subroutine momentum_adv_scalar(dynamics, partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_DYN
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine momentum_adv_scalar
-    end interface
-end module momentum_adv_scalar_interface
+    private
+    public :: compute_vel_rhs, momentum_adv_scalar
+    ! column work arrays of momentum_adv_scalar have this fixed size (private arrays of
+    ! run-time size would come from the per-thread device heap)
+    integer, parameter :: mom_nl_max = 128
+
+contains
 
 !
 !
 !_______________________________________________________________________________
 subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
-    USE MOD_ICE
-    USE MOD_DYN
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
-    use o_ARRAYS, only: ssh_gp, pgf_x, pgf_y
-    use o_PARAM
-    use g_CONFIG
-    use g_forcing_param, only: use_virt_salt
-    use g_forcing_arrays, only: press_air
-    use g_comm_auto
-    use g_sbf, only: l_mslp
-    use momentum_adv_scalar_interface
-    use momentum_adv_scalar_transpv_interface
     implicit none 
     type(t_ice)   , intent(inout), target :: ice
     type(t_dyn)   , intent(inout), target :: dynamics
@@ -59,6 +40,7 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
     logical, save            :: lfirst=.true.
     real(kind=WP)            :: p_ice(3), p_air(3), p_eta(3)
     integer                  :: use_pice
+    integer                  :: ab_ord
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:),   pointer :: UV, UV_rhs
@@ -69,10 +51,6 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
     real(kind=WP)                              :: ab1, ab2, ab3 !Adams-Bashforth coefficients
     real(kind=WP), dimension(:,:,:),   pointer :: UVh
     real(kind=WP), dimension(:,:)  ,   pointer :: UVBT_4AB
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     UV        => dynamics%uv(:,:,:)
     UV_rhs    => dynamics%uv_rhs(:,:,:)
     UV_rhsAB  => dynamics%uv_rhsAB(:,:,:,:)
@@ -104,14 +82,76 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
             ab3= 23.0_WP/12.0_WP
     ELSE 
        write(*,*) 'unsuppported AB scheme for momentum, use 2 or 3'
-       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+       call par_abort(partit%MPI_COMM_FESOM, partit%mype)
        stop
     END IF 
 
+#ifdef ENABLE_OPENACC
+    ! the device path covers the standard configuration: no kinetic-energy diagnostic,
+    ! no split-explicit subcycling, no ice/air pressure loading, no tides
+    mom_on_device = .not. (dynamics%ldiag_ke .or. dynamics%use_ssh_se_subcycl .or. use_pice>0 &
+                           .or. l_mslp .or. use_global_tides .or. dynamics%momadv_opt/=2)
+    if (mom_on_device) then
+        ! computed on the host earlier in the step (velocity update, pressure, ALE);
+        ! w_e is current on the device after vert_vel_ale_acc of the previous step
+        !$ACC UPDATE DEVICE(eta_n)
+        if (.not. vv_on_device) then
+            !$ACC UPDATE DEVICE(dynamics%w_e)
+        end if
+        if (.not. uv_dev_current) then
+            !$ACC UPDATE DEVICE(UV)
+        end if
+        if (.not. geom_on_device) then
+            !$ACC UPDATE DEVICE(mesh%hnode)
+        end if
+        if (.not. pgf_on_device) then
+            !$ACC UPDATE DEVICE(pgf_x, pgf_y)
+        end if
+    else
+        ! UV_rhsAB lives on the device; the host path below needs it
+        !$ACC UPDATE HOST(UV_rhsAB)
+    end if
+#endif
+    ab_ord = dynamics%AB_order
+    if (mom_on_device) then
+    ! the same as the host loop below for this configuration (p_ice = p_air = 0); the two
+    ! level loops are merged, which keeps the arithmetic per element
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(nz, nzmin, nzmax, elnodes, ff, Fx, Fy, pre)
+    do elem=1, partit%myDim_elem2D
+        nzmax = mesh%nlevels(elem)
+        nzmin = mesh%ulevels(elem)
+        elnodes=mesh%elem2D_nodes(:,elem)
+        pre = -(g*eta_n(elnodes))
+        ff  = mesh%coriolis(elem)*mesh%elem_area(elem)
+        Fx  = sum(mesh%gradient_sca(1:3, elem)*pre)
+        Fy  = sum(mesh%gradient_sca(4:6, elem)*pre)
+        do nz=nzmin, nzmax-1
+            if (ab_ord==2) then
+                UV_rhs(1,nz,elem)=ab1*UV_rhsAB(1,1,nz,elem)
+                UV_rhs(2,nz,elem)=ab1*UV_rhsAB(1,2,nz,elem)
+            else
+                UV_rhs(1,nz,elem)=ab1*UV_rhsAB(2,1,nz,elem)+ab2*UV_rhsAB(1,1,nz,elem)
+                UV_rhs(2,nz,elem)=ab1*UV_rhsAB(2,2,nz,elem)+ab2*UV_rhsAB(1,2,nz,elem)
+            end if
+            UV_rhs(1, nz, elem) = UV_rhs(1, nz, elem) + (Fx-pgf_x(nz, elem))*mesh%elem_area(elem)
+            UV_rhs(2, nz, elem) = UV_rhs(2, nz, elem) + (Fy-pgf_y(nz, elem))*mesh%elem_area(elem)
+            if (ab_ord==2) then
+                UV_rhsAB(1,1,nz,elem) = UV(2,nz,elem)*ff
+                UV_rhsAB(1,2,nz,elem) =-UV(1,nz,elem)*ff
+            else
+                UV_rhsAB(2,1,nz,elem) = UV_rhsAB(1,1,nz,elem)
+                UV_rhsAB(2,2,nz,elem) = UV_rhsAB(1,2,nz,elem)
+                UV_rhsAB(1,1,nz,elem) = UV(2,nz,elem)*ff
+                UV_rhsAB(1,2,nz,elem) =-UV(1,nz,elem)*ff
+            end if
+        end do
+    end do
+!$ACC END PARALLEL LOOP
+    else
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax, elnodes, ff, mm, Fx, Fy, pre, p_ice, p_air, p_eta)
-    do elem=1, myDim_elem2D
-        nzmax = nlevels(elem)
-        nzmin = ulevels(elem)
+    do elem=1, partit%myDim_elem2D
+        nzmax = mesh%nlevels(elem)
+        nzmin = mesh%ulevels(elem)
         !_______________________________________________________________________
         ! Take care of the AB part
         ! 2nd order Adams-Bashfort
@@ -149,12 +189,12 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
         !_______________________________________________________________________
         ! Sea level and pressure contribution   -\nabla(\eta +hpressure/rho_0)
         ! and the Coriolis force + metric terms
-        elnodes=elem2D_nodes(:,elem)
+        elnodes=mesh%elem2D_nodes(:,elem)
         
         !  p_eta=g*eta_n(elnodes)*(1-theta)        !! this place needs update (1-theta)!!!
         p_eta = g*eta_n(elnodes)   
         
-        ff    = mesh%coriolis(elem)*elem_area(elem)
+        ff    = mesh%coriolis(elem)*mesh%elem_area(elem)
         !mm=metric_factor(elem)*elem_area(elem)
         
         !_______________________________________________________________________
@@ -185,8 +225,8 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
         if (use_global_tides) then
            pre=pre-ssh_gp(elnodes)+0.1*p_eta
         end if
-        Fx  = sum(gradient_sca(1:3, elem)*pre)
-        Fy  = sum(gradient_sca(4:6, elem)*pre)
+        Fx  = sum(mesh%gradient_sca(1:3, elem)*pre)
+        Fy  = sum(mesh%gradient_sca(4:6, elem)*pre)
         
         !_______________________________________________________________________
         ! when ssh split-explicite subcycling method is setted use transport velocities
@@ -194,8 +234,8 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
         if (.not. dynamics%use_ssh_se_subcycl) then
             do nz=nzmin, nzmax-1
                 ! add pressure gradient terms
-                UV_rhs(  1, nz, elem) = UV_rhs(1, nz, elem) + (Fx-pgf_x(nz, elem))*elem_area(elem) 
-                UV_rhs(  2, nz, elem) = UV_rhs(2, nz, elem) + (Fy-pgf_y(nz, elem))*elem_area(elem)
+                UV_rhs(  1, nz, elem) = UV_rhs(1, nz, elem) + (Fx-pgf_x(nz, elem))*mesh%elem_area(elem) 
+                UV_rhs(  2, nz, elem) = UV_rhs(2, nz, elem) + (Fy-pgf_y(nz, elem))*mesh%elem_area(elem)
                 
                 ! add coriolis force, initialise AB2 array of actual timestep 
                 ! with coriolis term
@@ -213,8 +253,8 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
             UVBT_4AB(1:2, elem) = 0.0_WP
             do nz=nzmin, nzmax-1
                 ! add pressure gradient terms
-                UV_rhs(  1, nz, elem) = UV_rhs(1, nz, elem) + (Fx-pgf_x(nz, elem))*elem_area(elem)*helem(nz,elem)
-                UV_rhs(  2, nz, elem) = UV_rhs(2, nz, elem) + (Fy-pgf_y(nz, elem))*elem_area(elem)*helem(nz,elem)
+                UV_rhs(  1, nz, elem) = UV_rhs(1, nz, elem) + (Fx-pgf_x(nz, elem))*mesh%elem_area(elem)*mesh%helem(nz,elem)
+                UV_rhs(  2, nz, elem) = UV_rhs(2, nz, elem) + (Fy-pgf_y(nz, elem))*mesh%elem_area(elem)*mesh%helem(nz,elem)
                 
                 ! add coriolis force, initialise AB2 array of actual timestep 
                 ! with coriolis term
@@ -261,19 +301,23 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
 
     end do
 !$OMP END PARALLEL DO
+    end if ! mom_on_device
     
     !___________________________________________________________________________
     ! advection --> add momentum advection to actual timerstep adams-bashfort 
     ! array UV_rhsAB
     if (dynamics%momadv_opt==1) then
-       if (mype==0) write(*,*) 'in moment not adapted mom_adv advection typ for ALE, check your namelist'
-       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+       if (partit%mype==0) write(*,*) 'in moment not adapted mom_adv advection typ for ALE, check your namelist'
+       call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     elseif (dynamics%momadv_opt==2) then
         if (.not. dynamics%use_ssh_se_subcycl) then
             call momentum_adv_scalar(dynamics, partit, mesh)
         else
             call momentum_adv_scalar_transpv(dynamics, partit, mesh)
         end if     
+    else
+       if (partit%mype==0) write(*,*) 'ERROR: unknown momadv_opt=', dynamics%momadv_opt, ', check your namelist.dyn'
+       call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     end if
     
     !___________________________________________________________________________
@@ -288,13 +332,17 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
         ff=1.0_WP
         lfirst=.false.
     end if
+#ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax)
-    do elem=1, myDim_elem2D
-        nzmin = ulevels(elem)
-        nzmax = nlevels(elem)
+#else
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) IF(mom_on_device) PRIVATE(nz, nzmin, nzmax)
+#endif
+    do elem=1, partit%myDim_elem2D
+        nzmin = mesh%ulevels(elem)
+        nzmax = mesh%nlevels(elem)
         do nz=nzmin,nzmax-1
-            UV_rhs(1,nz,elem)=dt*(UV_rhs(1,nz,elem)+UV_rhsAB(1,1,nz,elem)*ff)/elem_area(elem)
-            UV_rhs(2,nz,elem)=dt*(UV_rhs(2,nz,elem)+UV_rhsAB(1,2,nz,elem)*ff)/elem_area(elem)
+            UV_rhs(1,nz,elem)=dt*(UV_rhs(1,nz,elem)+UV_rhsAB(1,1,nz,elem)*ff)/mesh%elem_area(elem)
+            UV_rhs(2,nz,elem)=dt*(UV_rhs(2,nz,elem)+UV_rhsAB(1,2,nz,elem)*ff)/mesh%elem_area(elem)
             !                       |                   |
             !                       V                   V
             !        fAB = (f_pgf - 1/2*fab_n-1)    +3/2*fab_n
@@ -306,17 +354,25 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
             !     call impl_vert_visc_ale      
         end do
     end do
+#ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
+#else
+!$ACC END PARALLEL LOOP
+    ! on the device path UV_rhs stays on the device for the viscosity filter
+    if (.not. mom_on_device) then
+        !$ACC UPDATE DEVICE(UV_rhsAB)
+    end if
+#endif
 
     !___________________________________________________________________________
     if (dynamics%ldiag_ke) then
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax)
-        do elem=1, myDim_elem2D
-            nzmin = ulevels(elem)
-            nzmax = nlevels(elem)
+        do elem=1, partit%myDim_elem2D
+            nzmin = mesh%ulevels(elem)
+            nzmax = mesh%nlevels(elem)
             do nz=nzmin,nzmax-1
-                dynamics%ke_adv(:,nz,elem)=dt*(dynamics%ke_adv(:,nz,elem)+dynamics%ke_adv_AB(1,:,nz,elem)*ff)/elem_area(elem)
-                dynamics%ke_cor(:,nz,elem)=dt*(dynamics%ke_cor(:,nz,elem)+dynamics%ke_cor_AB(1,:,nz,elem)*ff)/elem_area(elem)
+                dynamics%ke_adv(:,nz,elem)=dt*(dynamics%ke_adv(:,nz,elem)+dynamics%ke_adv_AB(1,:,nz,elem)*ff)/mesh%elem_area(elem)
+                dynamics%ke_cor(:,nz,elem)=dt*(dynamics%ke_cor(:,nz,elem)+dynamics%ke_cor_AB(1,:,nz,elem)*ff)/mesh%elem_area(elem)
             end do
         end do
 !$OMP END PARALLEL DO
@@ -333,12 +389,6 @@ END SUBROUTINE compute_vel_rhs
 ! Momentum advection on scalar control volumes with ALE adaption--> exchange zinv(nz)
 ! against hnode(nz,node)
 subroutine momentum_adv_scalar(dynamics, partit, mesh)
-    USE MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use MOD_DYN
-    USE o_PARAM
-    use g_comm_auto
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -346,17 +396,13 @@ subroutine momentum_adv_scalar(dynamics, partit, mesh)
     !___________________________________________________________________________
     integer                  :: n, nz, el1, el2
     integer                  :: nl1, nl2, ul1, ul2, nod(2), el, ed, k, nle, ule
-    real(kind=WP)            :: un1(1:mesh%nl-1), un2(1:mesh%nl-1)
-    real(kind=WP)            :: wu(1:mesh%nl), wv(1:mesh%nl)
+    real(kind=WP)            :: un1(mom_nl_max), un2(mom_nl_max)
+    real(kind=WP)            :: wu(mom_nl_max), wv(mom_nl_max)
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:),   pointer :: UV, UVnode_rhs
     real(kind=WP), dimension(:,:,:,:), pointer :: UV_rhsAB
     real(kind=WP), dimension(:,:)    , pointer :: Wvel_e
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     UV        =>dynamics%uv(:,:,:)
     UV_rhsAB  =>dynamics%uv_rhsAB(:,:,:,:)
     UVnode_rhs=>dynamics%work%uvnode_rhs(:,:,:)
@@ -364,21 +410,29 @@ subroutine momentum_adv_scalar(dynamics, partit, mesh)
 
     !___________________________________________________________________________
     ! 1st. compute vertical momentum advection component: w * du/dz, w*dv/dz
+    if (mesh%nl > mom_nl_max) then
+        if (partit%mype==0) write(*,*) 'momentum_adv_scalar: mesh%nl =', mesh%nl, ' > mom_nl_max =', mom_nl_max
+        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
+    end if
+#ifndef ENABLE_OPENACC
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, el1, el2, nl1, nl2, ul1, ul2, nod, el, ed, k, nle, ule, un1, un2, wu, wv)
 !$OMP DO
-    do n=1,myDim_nod2d
-        nl1 = nlevels_nod2D(n)-1
-        ul1 = ulevels_nod2D(n)
+#else
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) IF(mom_on_device) PRIVATE(nz, nl1, ul1, el, k, nle, ule, wu, wv)
+#endif
+    do n=1,partit%myDim_nod2d
+        nl1 = mesh%nlevels_nod2D(n)-1
+        ul1 = mesh%ulevels_nod2D(n)
         wu(1:nl1+1) = 0._WP
         wv(1:nl1+1) = 0._WP
         
         !_______________________________________________________________________
         ! loop over adjacent elements of vertice n 
-        do k=1,nod_in_elem2D_num(n)
-            el = nod_in_elem2D(k,n)
+        do k=1,mesh%nod_in_elem2D_num(n)
+            el = mesh%nod_in_elem2D(k,n)
             !___________________________________________________________________
-            nle = nlevels(el)-1
-            ule = ulevels(el)
+            nle = mesh%nlevels(el)-1
+            ule = mesh%ulevels(el)
             
             !___________________________________________________________________
             ! accumulate horizontal velocities at full depth levels (top and 
@@ -387,15 +441,15 @@ subroutine momentum_adv_scalar(dynamics, partit, mesh)
             ! horizontal velocity at cavity-ocean interce ule (if ule>1) must be  
             ! zero ???
             if (ule==1) then
-                wu(ule) = wu(ule) + UV(1,ule,el)*elem_area(el)
-                wv(ule) = wv(ule) + UV(2,ule,el)*elem_area(el)
+                wu(ule) = wu(ule) + UV(1,ule,el)*mesh%elem_area(el)
+                wv(ule) = wv(ule) + UV(2,ule,el)*mesh%elem_area(el)
             end if 
             
             ! interpolate horizontal velocity from mid-depth levels to full
             ! depth levels of upper and lower prism faces and average over adjacent
             ! elements of vertice n
-            wu(ule+1:nle) = wu(ule+1:nle) + 0.5_WP*(UV(1,ule+1:nle,el)+UV(1,ule:nle-1,el))*elem_area(el)
-            wv(ule+1:nle) = wv(ule+1:nle) + 0.5_WP*(UV(2,ule+1:nle,el)+UV(2,ule:nle-1,el))*elem_area(el)
+            wu(ule+1:nle) = wu(ule+1:nle) + 0.5_WP*(UV(1,ule+1:nle,el)+UV(1,ule:nle-1,el))*mesh%elem_area(el)
+            wv(ule+1:nle) = wv(ule+1:nle) + 0.5_WP*(UV(2,ule+1:nle,el)+UV(2,ule:nle-1,el))*mesh%elem_area(el)
         enddo
         
         !_______________________________________________________________________
@@ -408,180 +462,174 @@ subroutine momentum_adv_scalar(dynamics, partit, mesh)
         do nz=ul1,nl1
             ! Here 1/3 because 1/3 of the area is related to the node --> comes from
             ! averaging the elemental velocities
-            UVnode_rhs(1,nz,n) = - (wu(nz) - wu(nz+1) ) / (3._WP*hnode(nz,n)) 
-            UVnode_rhs(2,nz,n) = - (wv(nz) - wv(nz+1) ) / (3._WP*hnode(nz,n)) 
+            UVnode_rhs(1,nz,n) = - (wu(nz) - wu(nz+1) ) / (3._WP*mesh%hnode(nz,n)) 
+            UVnode_rhs(2,nz,n) = - (wv(nz) - wv(nz+1) ) / (3._WP*mesh%hnode(nz,n)) 
             
         enddo
         
         !_______________________________________________________________________
         ! To get a clean checksum, set the remaining values to zero
-        UVnode_rhs(1:2,nl1+1:nl-1,n) = 0._WP
+        UVnode_rhs(1:2,nl1+1:mesh%nl-1,n) = 0._WP
         UVnode_rhs(1:2,1:ul1-1   ,n) = 0._WP
     end do
+#ifndef ENABLE_OPENACC
 !$OMP END DO
+#else
+!$ACC END PARALLEL LOOP
+#endif
 
     !___________________________________________________________________________
     ! 2nd. compute horizontal advection component: u*du/dx, u*dv/dx & v*du/dy, v*dv/dy
     ! loop over triangle edges
+    ! Each owned node gathers the normal-velocity fluxes of its incident edges
+    ! (mesh%nod_in_edge2D, ascending edge order), with the sign of the edge
+    ! orientation. No thread writes a node it does not own, and the sum is
+    ! independent of the number of threads.
+#ifndef ENABLE_OPENACC
 !$OMP DO
-    do ed=1, myDim_edge2D
-        nod = edges(:,ed)   
-        el1 = edge_tri(1,ed)   
-        el2 = edge_tri(2,ed)
-        nl1 = nlevels(el1)-1
-        ul1 = ulevels(el1)
-        
-        !_______________________________________________________________________
-        ! compute horizontal normal velocity with respect to the edge from triangle 
-        ! centroid towards triangel edge mid-pointe for element el1
-        !                     .o.    
-        !                   ./   \.                
-        !                 ./  el1  \.   
-        !               ./     x     \. 
-        !             ./       |-------\.-----------------edge_cross_dxdy(1:2,ed) --> (dx,dy)
-        !            /         |->n_vec  \
-        !    nod(1) o----------O----------o nod(2)   
-        !            \.        |->n_vec ./
-        !              \.      |------./------------------edge_cross_dxdy(3:4,ed) --> (dx,dy)
-        !                \.    x    ./
-        !                  \. el2 ./
-        !                    \. ./  
-        !                      °
-        un1(ul1:nl1) =   UV(2,ul1:nl1,el1)*edge_cross_dxdy(1,ed)   &
-                       - UV(1,ul1:nl1,el1)*edge_cross_dxdy(2,ed)  
-                       
-        !_______________________________________________________________________
-        ! compute horizontal normal velocity with respect to the edge from triangle 
-        ! centroid towards triangel edge mid-pointe for element el2 when it is valid
-        ! --> if its a boundary triangle el2 will be not valid
-        if (el2>0) then ! --> el2 is valid element
-            nl2 = nlevels(el2)-1
-            ul2 = ulevels(el2)
-            
-            un2(ul2:nl2) = - UV(2,ul2:nl2,el2)*edge_cross_dxdy(3,ed) &
-                           + UV(1,ul2:nl2,el2)*edge_cross_dxdy(4,ed)
-            
-            ! fill with zeros to combine the loops
-            ! Usually, no or only a very few levels have to be filled. In this case, 
-            ! computing "zeros" is cheaper than the loop overhead.
-            un1(nl1+1:max(nl1,nl2)) = 0._WP
-            un2(nl2+1:max(nl1,nl2)) = 0._WP
-            un1(1:ul1-1)            = 0._WP
-            un2(1:ul2-1)            = 0._WP
+#else
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) IF(mom_on_device) PRIVATE(k, ed, el1, el2, nl1, nl2, ul1, ul2, nz, un1, un2)
+#endif
+    do n=1, partit%myDim_nod2D
+        do k=1, mesh%nod_in_edge2D_num(n)
+            ed  = mesh%nod_in_edge2D(k,n)
+            el1 = mesh%edge_tri(1,ed)
+            el2 = mesh%edge_tri(2,ed)
+            nl1 = mesh%nlevels(el1)-1
+            ul1 = mesh%ulevels(el1)
 
-#if defined(__openmp_reproducible)
-!$OMP ORDERED
-#endif
-            
-            ! first edge node
-            ! Do not calculate on Halo nodes, as the result will not be used. 
-            ! The "if" is cheaper than the avoided computiations.
-            if (nod(1) <= myDim_nod2d) then
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-       call omp_set_lock(partit%plock(nod(1)))
-#endif
-                do nz=min(ul1,ul2), max(nl1,nl2)
-                    ! add w*du/dz+(u*du/dx+v*du/dy) & w*dv/dz+(u*dv/dx+v*dv/dy)
-                    UVnode_rhs(1,nz,nod(1)) = UVnode_rhs(1,nz,nod(1)) + un1(nz)*UV(1,nz,el1) + un2(nz)*UV(1,nz,el2) 
-                    UVnode_rhs(2,nz,nod(1)) = UVnode_rhs(2,nz,nod(1)) + un1(nz)*UV(2,nz,el1) + un2(nz)*UV(2,nz,el2)
-                end do
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-       call omp_unset_lock(partit%plock(nod(1)))
-#endif
-            endif
-            
-            ! second edge node
-            if (nod(2) <= myDim_nod2d) then
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-       call omp_set_lock(partit%plock(nod(2)))
-#endif
-                do nz=min(ul1,ul2), max(nl1,nl2)
-                    ! add w*du/dz+(u*du/dx+v*du/dy) & w*dv/dz+(u*dv/dx+v*dv/dy)
-                    UVnode_rhs(1,nz,nod(2)) = UVnode_rhs(1,nz,nod(2)) - un1(nz)*UV(1,nz,el1) - un2(nz)*UV(1,nz,el2)
-                    UVnode_rhs(2,nz,nod(2)) = UVnode_rhs(2,nz,nod(2)) - un1(nz)*UV(2,nz,el1) - un2(nz)*UV(2,nz,el2)
-                end do
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-       call omp_unset_lock(partit%plock(nod(2)))
-#endif
-            endif
-            
-        else  ! el2 is not a valid element --> ed is a boundary edge, there is only the contribution from el1
-            ! first edge node
-            if (nod(1) <= myDim_nod2d) then
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-       call omp_set_lock(partit%plock(nod(1)))
-#endif
-                do nz=ul1, nl1
-                    ! add w*du/dz+(u*du/dx+v*du/dy) & w*dv/dz+(u*dv/dx+v*dv/dy)
-                    UVnode_rhs(1,nz,nod(1)) = UVnode_rhs(1,nz,nod(1)) + un1(nz)*UV(1,nz,el1)
-                    UVnode_rhs(2,nz,nod(1)) = UVnode_rhs(2,nz,nod(1)) + un1(nz)*UV(2,nz,el1)
-                end do ! --> do nz=ul1, nl1
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-       call omp_unset_lock(partit%plock(nod(1)))
-#endif
-            endif 
-            
-            ! second edge node
-            if  (nod(2) <= myDim_nod2d) then
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-       call omp_set_lock(partit%plock(nod(2)))
-#endif
-                do nz=ul1, nl1
-                    ! add w*du/dz+(u*du/dx+v*du/dy) & w*dv/dz+(u*dv/dx+v*dv/dy)
-                    UVnode_rhs(1,nz,nod(2)) = UVnode_rhs(1,nz,nod(2)) - un1(nz)*UV(1,nz,el1)
-                    UVnode_rhs(2,nz,nod(2)) = UVnode_rhs(2,nz,nod(2)) - un1(nz)*UV(2,nz,el1)
-                end do ! --> do nz=ul1, nl1
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-       call omp_unset_lock(partit%plock(nod(2)))
-#endif
-            endif
-        endif ! --> if (el2>0) then
+            !___________________________________________________________________
+            ! compute horizontal normal velocity with respect to the edge from triangle
+            ! centroid towards triangel edge mid-pointe for element el1
+            !                     .o.
+            !                   ./   \.
+            !                 ./  el1  \.
+            !               ./     x     \.
+            !             ./       |-------\.-----------------edge_cross_dxdy(1:2,ed) --> (dx,dy)
+            !            /         |->n_vec  \
+            !    nod(1) o----------O----------o nod(2)
+            !            \.        |->n_vec ./
+            !              \.      |------./------------------edge_cross_dxdy(3:4,ed) --> (dx,dy)
+            !                \.    x    ./
+            !                  \. el2 ./
+            !                    \. ./
+            !                      °
+            un1(ul1:nl1) =   UV(2,ul1:nl1,el1)*mesh%edge_cross_dxdy(1,ed)   &
+                           - UV(1,ul1:nl1,el1)*mesh%edge_cross_dxdy(2,ed)
 
-#if defined(__openmp_reproducible)
-!$OMP END ORDERED
-#endif
+            if (el2>0) then ! --> el2 is valid element
+                nl2 = mesh%nlevels(el2)-1
+                ul2 = mesh%ulevels(el2)
 
-    end do ! --> do ed=1, myDim_edge2D
+                un2(ul2:nl2) = - UV(2,ul2:nl2,el2)*mesh%edge_cross_dxdy(3,ed) &
+                               + UV(1,ul2:nl2,el2)*mesh%edge_cross_dxdy(4,ed)
+
+                ! fill with zeros to combine the loops
+                ! Usually, no or only a very few levels have to be filled. In this case,
+                ! computing "zeros" is cheaper than the loop overhead.
+                un1(nl1+1:max(nl1,nl2)) = 0._WP
+                un2(nl2+1:max(nl1,nl2)) = 0._WP
+                un1(1:ul1-1)            = 0._WP
+                un2(1:ul2-1)            = 0._WP
+
+                if (mesh%nod_in_edge2D_sgn(k,n) > 0) then ! n is the first edge node
+                    do nz=min(ul1,ul2), max(nl1,nl2)
+                        ! add w*du/dz+(u*du/dx+v*du/dy) & w*dv/dz+(u*dv/dx+v*dv/dy)
+                        UVnode_rhs(1,nz,n) = UVnode_rhs(1,nz,n) + un1(nz)*UV(1,nz,el1) + un2(nz)*UV(1,nz,el2)
+                        UVnode_rhs(2,nz,n) = UVnode_rhs(2,nz,n) + un1(nz)*UV(2,nz,el1) + un2(nz)*UV(2,nz,el2)
+                    end do
+                else                                       ! n is the second edge node
+                    do nz=min(ul1,ul2), max(nl1,nl2)
+                        UVnode_rhs(1,nz,n) = UVnode_rhs(1,nz,n) - un1(nz)*UV(1,nz,el1) - un2(nz)*UV(1,nz,el2)
+                        UVnode_rhs(2,nz,n) = UVnode_rhs(2,nz,n) - un1(nz)*UV(2,nz,el1) - un2(nz)*UV(2,nz,el2)
+                    end do
+                end if
+
+            else  ! el2 is not a valid element --> ed is a boundary edge, there is only the contribution from el1
+                if (mesh%nod_in_edge2D_sgn(k,n) > 0) then
+                    do nz=ul1, nl1
+                        UVnode_rhs(1,nz,n) = UVnode_rhs(1,nz,n) + un1(nz)*UV(1,nz,el1)
+                        UVnode_rhs(2,nz,n) = UVnode_rhs(2,nz,n) + un1(nz)*UV(2,nz,el1)
+                    end do ! --> do nz=ul1, nl1
+                else
+                    do nz=ul1, nl1
+                        UVnode_rhs(1,nz,n) = UVnode_rhs(1,nz,n) - un1(nz)*UV(1,nz,el1)
+                        UVnode_rhs(2,nz,n) = UVnode_rhs(2,nz,n) - un1(nz)*UV(2,nz,el1)
+                    end do ! --> do nz=ul1, nl1
+                end if
+            endif ! --> if (el2>0) then
+        end do ! --> do k=1, mesh%nod_in_edge2D_num(n)
+    end do ! --> do n=1, myDim_nod2D
+#ifndef ENABLE_OPENACC
 !$OMP END DO
+#else
+!$ACC END PARALLEL LOOP
+#endif
 
     !___________________________________________________________________________
     ! divide total nodal advection by scalar area
+#ifndef ENABLE_OPENACC
 !$OMP DO
-    do n=1,myDim_nod2d
-        nl1 = nlevels_nod2D(n)-1
-        ul1 = ulevels_nod2D(n)
-        UVnode_rhs(1,ul1:nl1,n) = UVnode_rhs(1,ul1:nl1,n) *areasvol_inv(ul1:nl1,n)
-        UVnode_rhs(2,ul1:nl1,n) = UVnode_rhs(2,ul1:nl1,n) *areasvol_inv(ul1:nl1,n)
+#else
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) IF(mom_on_device) PRIVATE(nl1, ul1)
+#endif
+    do n=1,partit%myDim_nod2d
+        nl1 = mesh%nlevels_nod2D(n)-1
+        ul1 = mesh%ulevels_nod2D(n)
+        UVnode_rhs(1,ul1:nl1,n) = UVnode_rhs(1,ul1:nl1,n) *mesh%areasvol_inv(ul1:nl1,n)
+        UVnode_rhs(2,ul1:nl1,n) = UVnode_rhs(2,ul1:nl1,n) *mesh%areasvol_inv(ul1:nl1,n)
     end do !-->do n=1,myDim_nod2d
+#ifndef ENABLE_OPENACC
 !$OMP END DO
+#else
+!$ACC END PARALLEL LOOP
+#endif
     !___________________________________________________________________________
 !$OMP MASTER
-    call exchange_nod(UVnode_rhs, partit)
+    if (mom_on_device) then
+        call exchange_nod(UVnode_rhs, partit, luse_g2g=.true.)
+    else
+        call exchange_nod(UVnode_rhs, partit)
+    end if
 !$OMP END MASTER
 !$OMP BARRIER
     !___________________________________________________________________________
     ! convert total nodal advection from vertice --> elements
+#ifndef ENABLE_OPENACC
 !$OMP DO
-    do el=1, myDim_elem2D
-        nl1 = nlevels(el)-1
-        ul1 = ulevels(el)
-        UV_rhsAB(1,1:2,ul1:nl1,el) = UV_rhsAB(1,1:2,ul1:nl1,el) &
-                + elem_area(el)*(UVnode_rhs(1:2,ul1:nl1,elem2D_nodes(1,el)) &
-                + UVnode_rhs(1:2,ul1:nl1,elem2D_nodes(2,el)) & 
-                + UVnode_rhs(1:2,ul1:nl1,elem2D_nodes(3,el))) / 3.0_WP     
+#else
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) IF(mom_on_device) PRIVATE(nl1, ul1, nz, k)
+#endif
+    do el=1, partit%myDim_elem2D
+        nl1 = mesh%nlevels(el)-1
+        ul1 = mesh%ulevels(el)
+        ! explicit loops (same arithmetic as the array expression; the array sections
+        ! became temporaries on the per-thread device heap)
+        do nz=ul1, nl1
+            do k=1, 2
+                UV_rhsAB(1,k,nz,el) = UV_rhsAB(1,k,nz,el) &
+                    + mesh%elem_area(el)*(UVnode_rhs(k,nz,mesh%elem2D_nodes(1,el)) &
+                    + UVnode_rhs(k,nz,mesh%elem2D_nodes(2,el)) &
+                    + UVnode_rhs(k,nz,mesh%elem2D_nodes(3,el))) / 3.0_WP
+            end do
+        end do
     
     end do ! --> do el=1, myDim_elem2D
+#ifndef ENABLE_OPENACC
 !$OMP END DO
+#else
+!$ACC END PARALLEL LOOP
+#endif
 
     if (dynamics%ldiag_ke) then !we repeat the computation here and there are multiple ways to speed it up
 !$OMP DO
-       do el=1, myDim_elem2D
-          nl1 = nlevels(el)-1
-          ul1 = ulevels(el)
+       do el=1, partit%myDim_elem2D
+          nl1 = mesh%nlevels(el)-1
+          ul1 = mesh%ulevels(el)
           dynamics%ke_adv_AB(1,1:2,ul1:nl1,el) = dynamics%ke_adv_AB(1,1:2,ul1:nl1,el) &
-                + elem_area(el)*(UVnode_rhs(1:2,ul1:nl1,elem2D_nodes(1,el)) &
-                + UVnode_rhs(1:2,ul1:nl1,elem2D_nodes(2,el)) & 
-                + UVnode_rhs(1:2,ul1:nl1,elem2D_nodes(3,el))) / 3.0_WP     
+                + mesh%elem_area(el)*(UVnode_rhs(1:2,ul1:nl1,mesh%elem2D_nodes(1,el)) &
+                + UVnode_rhs(1:2,ul1:nl1,mesh%elem2D_nodes(2,el)) & 
+                + UVnode_rhs(1:2,ul1:nl1,mesh%elem2D_nodes(3,el))) / 3.0_WP     
        end do
 !$OMP END DO
     end if
@@ -591,3 +639,4 @@ end subroutine momentum_adv_scalar
 
 ! ===================================================================
 
+end module oce_ale_vel_rhs_module

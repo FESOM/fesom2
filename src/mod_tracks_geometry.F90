@@ -9,13 +9,11 @@ module mod_tracks_geometry
   !
   ! All inputs are GLOBAL mesh arrays — caller must gather/broadcast them.
   use, intrinsic :: ieee_arithmetic, only: ieee_value, ieee_quiet_nan
-  use o_param, only: pi, rad, r_earth
+  use o_param, only: pi, rad, r_earth, WP_full
   implicit none
   private
 
-  integer, parameter, public :: TG_WP = selected_real_kind(13)
-
-  real(TG_WP), parameter :: R_EARTH_KM = real(r_earth, TG_WP)/1000.0_TG_WP
+  real(WP_full), parameter :: R_EARTH_KM = real(r_earth, WP_full)/1000.0_WP_full
 
   type, public :: transect_t
     character(len=64)         :: name = ''
@@ -25,22 +23,22 @@ module mod_tracks_geometry
 
     integer,     allocatable  :: edge_cut_i   (:)        ! (M) global edge id (-1 = inserted land slot)
     integer,     allocatable  :: edge_cut_ni  (:, :)     ! (2, M) global node ids
-    real(TG_WP), allocatable  :: edge_cut_lint(:)        ! (M)
-    real(TG_WP), allocatable  :: edge_cut_P   (:, :)     ! (2, M) lon, lat (degrees)
-    real(TG_WP), allocatable  :: edge_cut_midP(:, :)     ! (2, M) lon, lat (degrees)
-    real(TG_WP), allocatable  :: edge_cut_evec(:, :)     ! (2, M) edge along-vector (degrees)
-    real(TG_WP), allocatable  :: edge_cut_dist(:)        ! (M) km from start
+    real(WP_full), allocatable  :: edge_cut_lint(:)        ! (M)
+    real(WP_full), allocatable  :: edge_cut_P   (:, :)     ! (2, M) lon, lat (degrees)
+    real(WP_full), allocatable  :: edge_cut_midP(:, :)     ! (2, M) lon, lat (degrees)
+    real(WP_full), allocatable  :: edge_cut_evec(:, :)     ! (2, M) edge along-vector (degrees)
+    real(WP_full), allocatable  :: edge_cut_dist(:)        ! (M) km from start
 
     integer,     allocatable  :: path_ei         (:)     ! (P) global elem id, -1 = land slot
     integer,     allocatable  :: path_ni         (:, :)  ! (3, P) global node ids
     integer,     allocatable  :: path_cut_ni     (:, :)  ! (2, P) global node ids of entering edge
-    real(TG_WP), allocatable  :: path_dx         (:)     ! (P) midpoint→centroid x (metres)
-    real(TG_WP), allocatable  :: path_dy         (:)     ! (P) midpoint→centroid y (metres)
-    real(TG_WP), allocatable  :: path_nvec_cs    (:, :)  ! (2, P) section-normal direction
-    real(TG_WP), allocatable  :: path_centroid_xy(:, :)  ! (2, P) lon, lat of path centroid
+    real(WP_full), allocatable  :: path_dx         (:)     ! (P) midpoint→centroid x (metres)
+    real(WP_full), allocatable  :: path_dy         (:)     ! (P) midpoint→centroid y (metres)
+    real(WP_full), allocatable  :: path_nvec_cs    (:, :)  ! (2, P) section-normal direction
+    real(WP_full), allocatable  :: path_centroid_xy(:, :)  ! (2, P) lon, lat of path centroid
 
-    real(TG_WP), allocatable  :: path_xy   (:, :)        ! (2, Pxy) alternating midP/centroid
-    real(TG_WP), allocatable  :: path_dist (:)           ! (Pxy) km from start
+    real(WP_full), allocatable  :: path_xy   (:, :)        ! (2, Pxy) alternating midP/centroid
+    real(WP_full), allocatable  :: path_dist (:)           ! (Pxy) km from start
   end type transect_t
 
   public :: analyse_transect
@@ -51,24 +49,24 @@ module mod_tracks_geometry
     integer                   :: ncut = 0
     integer,     allocatable  :: edge_cut_i   (:)
     integer,     allocatable  :: edge_cut_ni  (:, :)
-    real(TG_WP), allocatable  :: edge_cut_lint(:)
-    real(TG_WP), allocatable  :: edge_cut_P   (:, :)
-    real(TG_WP), allocatable  :: edge_cut_midP(:, :)
-    real(TG_WP), allocatable  :: edge_cut_evec(:, :)
-    real(TG_WP)               :: e_vec(2)   = 0.0_TG_WP
-    real(TG_WP)               :: n_vec(2)   = 0.0_TG_WP
-    real(TG_WP)               :: alpha      = 0.0_TG_WP
+    real(WP_full), allocatable  :: edge_cut_lint(:)
+    real(WP_full), allocatable  :: edge_cut_P   (:, :)
+    real(WP_full), allocatable  :: edge_cut_midP(:, :)
+    real(WP_full), allocatable  :: edge_cut_evec(:, :)
+    real(WP_full)               :: e_vec(2)   = 0.0_WP_full
+    real(WP_full)               :: n_vec(2)   = 0.0_WP_full
+    real(WP_full)               :: alpha      = 0.0_WP_full
 
     integer                   :: P    = 0
     integer                   :: Pxy  = 0
     integer,     allocatable  :: path_ei         (:)
     integer,     allocatable  :: path_ni         (:, :)
     integer,     allocatable  :: path_cut_ni     (:, :)
-    real(TG_WP), allocatable  :: path_dx         (:)
-    real(TG_WP), allocatable  :: path_dy         (:)
-    real(TG_WP), allocatable  :: path_nvec_cs    (:, :)   ! (2, P) per-sub-segment n_vec
-    real(TG_WP), allocatable  :: path_centroid_xy(:, :)
-    real(TG_WP), allocatable  :: path_xy         (:, :)
+    real(WP_full), allocatable  :: path_dx         (:)
+    real(WP_full), allocatable  :: path_dy         (:)
+    real(WP_full), allocatable  :: path_nvec_cs    (:, :)   ! (2, P) per-sub-segment n_vec
+    real(WP_full), allocatable  :: path_centroid_xy(:, :)
+    real(WP_full), allocatable  :: path_xy         (:, :)
   end type subseg_t
 
 contains
@@ -96,22 +94,22 @@ contains
                               n_csi, csi_lon, csi_lat, name, &
                               transect)
     integer,          intent(in)    :: n_nod, n_edge, n_elem, n_csi
-    real(TG_WP),      intent(in)    :: lon_nod(n_nod), lat_nod(n_nod)        ! degrees, geographic
+    real(WP_full),      intent(in)    :: lon_nod(n_nod), lat_nod(n_nod)        ! degrees, geographic
     integer,          intent(in)    :: edge(2, n_edge)                       ! global node ids (1-based)
     integer,          intent(in)    :: edge_tri(2, n_edge)                   ! global elem ids (1-based, -1 = boundary)
-    real(TG_WP),      intent(in)    :: edge_cross_dxdy(4, n_edge)            ! 1:2 LEFT, 3:4 RIGHT (metres)
+    real(WP_full),      intent(in)    :: edge_cross_dxdy(4, n_edge)            ! 1:2 LEFT, 3:4 RIGHT (metres)
     integer,          intent(in)    :: elem_nodes(3, n_elem)                 ! global node ids (1-based)
-    real(TG_WP),      intent(in)    :: csi_lon(n_csi), csi_lat(n_csi)        ! degrees
+    real(WP_full),      intent(in)    :: csi_lon(n_csi), csi_lat(n_csi)        ! degrees
     character(len=*), intent(in)    :: name
     type(transect_t), intent(out)   :: transect
 
     type(subseg_t), allocatable :: segs(:)
-    real(TG_WP)                 :: poly_lon(n_csi), poly_lat(n_csi)
-    real(TG_WP)                 :: auxx, auxy, auxn, alpha_tot
-    real(TG_WP)                 :: n_vec_tot(2)
+    real(WP_full)                 :: poly_lon(n_csi), poly_lat(n_csi)
+    real(WP_full)                 :: auxx, auxy, auxn, alpha_tot
+    real(WP_full)                 :: n_vec_tot(2)
     integer                     :: ii, n_segs
     logical                     :: crosses_dl
-    real(TG_WP)                 :: px0, px1
+    real(WP_full)                 :: px0, px1
 
     transect%name = name
 
@@ -120,17 +118,17 @@ contains
     poly_lat = csi_lat
     auxx = poly_lon(n_csi) - poly_lon(1)
     auxy = poly_lat(n_csi) - poly_lat(1)
-    if (auxx >  180.0_TG_WP) auxx = auxx - 360.0_TG_WP
-    if (auxx < -180.0_TG_WP) auxx = auxx + 360.0_TG_WP
+    if (auxx >  180.0_WP_full) auxx = auxx - 360.0_WP_full
+    if (auxx < -180.0_WP_full) auxx = auxx + 360.0_WP_full
     auxn = sqrt(auxx*auxx + auxy*auxy)
-    if (auxn > 0.0_TG_WP) then
+    if (auxn > 0.0_WP_full) then
       auxx = auxx / auxn
       auxy = auxy / auxn
     end if
-    alpha_tot = atan2(auxy, auxx) * 180.0_TG_WP / real(pi, TG_WP)
+    alpha_tot = atan2(auxy, auxx) * 180.0_WP_full / real(pi, WP_full)
 
     ! tripyview flips the polyline if total bearing falls in [-180, -90]
-    if (alpha_tot >= -180.0_TG_WP .and. alpha_tot <= -90.0_TG_WP) then
+    if (alpha_tot >= -180.0_WP_full .and. alpha_tot <= -90.0_WP_full) then
       poly_lon = poly_lon(n_csi:1:-1)
       poly_lat = poly_lat(n_csi:1:-1)
       auxx = -auxx
@@ -144,10 +142,10 @@ contains
     do ii = 1, n_csi - 1
       px0 = poly_lon(ii)
       px1 = poly_lon(ii + 1)
-      crosses_dl = abs(px1 - px0) > 180.0_TG_WP
+      crosses_dl = abs(px1 - px0) > 180.0_WP_full
       if (crosses_dl) then
-        if (px0 < 0.0_TG_WP) px0 = px0 + 360.0_TG_WP
-        if (px1 < 0.0_TG_WP) px1 = px1 + 360.0_TG_WP
+        if (px0 < 0.0_WP_full) px0 = px0 + 360.0_WP_full
+        if (px1 < 0.0_WP_full) px1 = px1 + 360.0_WP_full
       end if
 
       call calc_csect_vec(px0, px1, poly_lat(ii), poly_lat(ii + 1), segs(ii))
@@ -158,10 +156,10 @@ contains
 
       ! shift edge_cut_P back to [-180,180] for downstream concat/plotting
       if (crosses_dl .and. segs(ii)%ncut > 0) then
-        where (segs(ii)%edge_cut_P   (1, :) > 180.0_TG_WP) &
-          segs(ii)%edge_cut_P   (1, :) = segs(ii)%edge_cut_P   (1, :) - 360.0_TG_WP
-        where (segs(ii)%edge_cut_midP(1, :) > 180.0_TG_WP) &
-          segs(ii)%edge_cut_midP(1, :) = segs(ii)%edge_cut_midP(1, :) - 360.0_TG_WP
+        where (segs(ii)%edge_cut_P   (1, :) > 180.0_WP_full) &
+          segs(ii)%edge_cut_P   (1, :) = segs(ii)%edge_cut_P   (1, :) - 360.0_WP_full
+        where (segs(ii)%edge_cut_midP(1, :) > 180.0_WP_full) &
+          segs(ii)%edge_cut_midP(1, :) = segs(ii)%edge_cut_midP(1, :) - 360.0_WP_full
       end if
 
       if (segs(ii)%ncut == 0) cycle    ! no crossings — skip this sub-segment
@@ -182,7 +180,7 @@ contains
     ! path_nvec_cs is left as-is from concat_subtransects: each path step
     ! carries its sub-segment's own n_vec (tripyview's _do_build_path:855).
     if (transect%P > 0) then
-      if (n_vec_tot(1) < 0.0_TG_WP .or. n_vec_tot(2) < 0.0_TG_WP) then
+      if (n_vec_tot(1) < 0.0_WP_full .or. n_vec_tot(2) < 0.0_WP_full) then
         transect%path_dx = -transect%path_dx
         transect%path_dy = -transect%path_dy
       end if
@@ -227,26 +225,26 @@ contains
 !> tripyview's _do_calc_csect_vec.
 ! -----------------------------------------------------------------------------
   subroutine calc_csect_vec(x0, x1, y0, y1, seg)
-    real(TG_WP),     intent(in)    :: x0, x1, y0, y1
+    real(WP_full),     intent(in)    :: x0, x1, y0, y1
     type(subseg_t),  intent(inout) :: seg
-    real(TG_WP) :: dx, dy, dn
+    real(WP_full) :: dx, dy, dn
 
     dx = x1 - x0
     dy = y1 - y0
     dn = sqrt(dx*dx + dy*dy)
-    if (dn > 0.0_TG_WP) then
+    if (dn > 0.0_WP_full) then
       seg%e_vec = (/  dx/dn,  dy/dn /)
       ! Per-sub-segment normal with tripyview's conditional flip:
       ! going N (dy > 0) or W (dx < 0) -> clockwise rotation;
       ! otherwise counter-clockwise. Matches sub_transect.py:437-440.
-      if (dy > 0.0_TG_WP .or. dx < 0.0_TG_WP) then
+      if (dy > 0.0_WP_full .or. dx < 0.0_WP_full) then
         seg%n_vec = (/  dy/dn, -dx/dn /)
       else
         seg%n_vec = (/ -dy/dn,  dx/dn /)
       end if
     else
-      seg%e_vec = 0.0_TG_WP
-      seg%n_vec = 0.0_TG_WP
+      seg%e_vec = 0.0_WP_full
+      seg%n_vec = 0.0_WP_full
     end if
     seg%alpha = atan2(seg%e_vec(2), seg%e_vec(1))   ! radians
   end subroutine calc_csect_vec
@@ -266,32 +264,32 @@ contains
   subroutine find_intersected_edges(n_nod, lon_nod, lat_nod, n_edge, edge, &
                                     x0, x1, y0, y1, crosses_dl, seg)
     integer,         intent(in)    :: n_nod, n_edge
-    real(TG_WP),     intent(in)    :: lon_nod(n_nod), lat_nod(n_nod)
+    real(WP_full),     intent(in)    :: lon_nod(n_nod), lat_nod(n_nod)
     integer,         intent(in)    :: edge(2, n_edge)
-    real(TG_WP),     intent(in)    :: x0, x1, y0, y1
+    real(WP_full),     intent(in)    :: x0, x1, y0, y1
     logical,         intent(in)    :: crosses_dl
     type(subseg_t),  intent(inout) :: seg
 
     ! Bounding box (with polar widening)
-    real(TG_WP) :: Pxmin, Pxmax, Pymin, Pymax, Pdx, Pdy
-    real(TG_WP) :: a, b, c, dx10, dy10, dd10
+    real(WP_full) :: Pxmin, Pxmax, Pymin, Pymax, Pdx, Pdy
+    real(WP_full) :: a, b, c, dx10, dy10, dd10
     integer     :: n_cand, n_hit
     integer,     allocatable :: cand_idx(:), hit_idx(:), srt(:)
-    real(TG_WP), allocatable :: x0e(:), y0e(:), x1e(:), y1e(:), dxe(:), dye(:)
-    real(TG_WP), allocatable :: s0(:), s1(:), tparam(:), xi(:), yi(:), fac(:)
-    real(TG_WP), allocatable :: emin_lon(:), emax_lon(:), emin_lat(:), emax_lat(:)
-    real(TG_WP), allocatable :: fac_hit(:)
+    real(WP_full), allocatable :: x0e(:), y0e(:), x1e(:), y1e(:), dxe(:), dye(:)
+    real(WP_full), allocatable :: s0(:), s1(:), tparam(:), xi(:), yi(:), fac(:)
+    real(WP_full), allocatable :: emin_lon(:), emax_lon(:), emin_lat(:), emax_lat(:)
+    real(WP_full), allocatable :: fac_hit(:)
     integer     :: e, j, k
-    real(TG_WP) :: lon_a, lon_b
+    real(WP_full) :: lon_a, lon_b
 
-    Pdx = 10.0_TG_WP   ! tripyview default
-    Pdy = 10.0_TG_WP
+    Pdx = 10.0_WP_full   ! tripyview default
+    Pdy = 10.0_WP_full
     Pxmin = min(x0, x1)
     Pxmax = max(x0, x1)
     Pymin = min(y0, y1)
     Pymax = max(y0, y1)
     ! polar latitude widening (tripyview: Pymin<-70 or Pymax>80 -> Pdx=180)
-    if (Pymin < -70.0_TG_WP .or. Pymax > 80.0_TG_WP) Pdx = 180.0_TG_WP
+    if (Pymin < -70.0_WP_full .or. Pymax > 80.0_WP_full) Pdx = 180.0_WP_full
     Pxmin = Pxmin - Pdx;  Pxmax = Pxmax + Pdx
     Pymin = Pymin - Pdy;  Pymax = Pymax + Pdy
 
@@ -302,8 +300,8 @@ contains
       lon_a = lon_nod(edge(1, e))
       lon_b = lon_nod(edge(2, e))
       if (crosses_dl) then
-        if (lon_a < 0.0_TG_WP) lon_a = lon_a + 360.0_TG_WP
-        if (lon_b < 0.0_TG_WP) lon_b = lon_b + 360.0_TG_WP
+        if (lon_a < 0.0_WP_full) lon_a = lon_a + 360.0_WP_full
+        if (lon_b < 0.0_WP_full) lon_b = lon_b + 360.0_WP_full
       end if
       emin_lon(e) = min(lon_a, lon_b)
       emax_lon(e) = max(lon_a, lon_b)
@@ -350,8 +348,8 @@ contains
       x1e(j) = lon_nod(edge(2, e))
       y1e(j) = lat_nod(edge(2, e))
       if (crosses_dl) then
-        if (x0e(j) < 0.0_TG_WP) x0e(j) = x0e(j) + 360.0_TG_WP
-        if (x1e(j) < 0.0_TG_WP) x1e(j) = x1e(j) + 360.0_TG_WP
+        if (x0e(j) < 0.0_WP_full) x0e(j) = x0e(j) + 360.0_WP_full
+        if (x1e(j) < 0.0_WP_full) x1e(j) = x1e(j) + 360.0_WP_full
       end if
       dxe(j) = x1e(j) - x0e(j)
       dye(j) = y1e(j) - y0e(j)
@@ -362,12 +360,12 @@ contains
     n_hit = 0
     allocate(hit_idx(n_cand), fac_hit(n_cand))
     do j = 1, n_cand
-      if ((s1(j) - s0(j)) == 0.0_TG_WP) cycle    ! parallel — no isolated crossing
+      if ((s1(j) - s0(j)) == 0.0_WP_full) cycle    ! parallel — no isolated crossing
       tparam(j) = s0(j) / (s0(j) - s1(j))
       xi(j) = x0e(j) + tparam(j) * dxe(j)
       yi(j) = y0e(j) + tparam(j) * dye(j)
       fac(j) = ( (xi(j) - x0)*dx10 + (yi(j) - y0)*dy10 ) / dd10
-      if (s0(j)*s1(j) < 0.0_TG_WP .and. fac(j) >= 0.0_TG_WP .and. fac(j) <= 1.0_TG_WP) then
+      if (s0(j)*s1(j) < 0.0_WP_full .and. fac(j) >= 0.0_WP_full .and. fac(j) <= 1.0_WP_full) then
         n_hit = n_hit + 1
         hit_idx(n_hit) = j
         fac_hit(n_hit) = fac(j)
@@ -402,8 +400,8 @@ contains
       seg%edge_cut_lint(k)    = tparam(j)
       seg%edge_cut_P   (1, k) = xi(j)
       seg%edge_cut_P   (2, k) = yi(j)
-      seg%edge_cut_midP(1, k) = x0e(j) + 0.5_TG_WP * dxe(j)
-      seg%edge_cut_midP(2, k) = y0e(j) + 0.5_TG_WP * dye(j)
+      seg%edge_cut_midP(1, k) = x0e(j) + 0.5_WP_full * dxe(j)
+      seg%edge_cut_midP(2, k) = y0e(j) + 0.5_WP_full * dye(j)
       seg%edge_cut_evec(1, k) = dxe(j)
       seg%edge_cut_evec(2, k) = dye(j)
     end do
@@ -430,18 +428,18 @@ contains
   subroutine build_path(n_nod, lon_nod, lat_nod, n_elem, elem_nodes, &
                         edge_tri, edge_cross_dxdy, ncsi, ncs, seg)
     integer,        intent(in)    :: n_nod, n_elem
-    real(TG_WP),    intent(in)    :: lon_nod(n_nod), lat_nod(n_nod)
+    real(WP_full),    intent(in)    :: lon_nod(n_nod), lat_nod(n_nod)
     integer,        intent(in)    :: elem_nodes(3, n_elem)
     integer,        intent(in)    :: edge_tri(2, *)
-    real(TG_WP),    intent(in)    :: edge_cross_dxdy(4, *)
+    real(WP_full),    intent(in)    :: edge_cross_dxdy(4, *)
     integer,        intent(in)    :: ncsi, ncs              ! 1-based sub-seg id, # sub-segs
     type(subseg_t), intent(inout) :: seg
 
     integer  :: edi, nced, eg, el(2)
-    real(TG_WP) :: alpha, ca, sa, theta, auxx, auxy
+    real(WP_full) :: alpha, ca, sa, theta, auxx, auxy
 
     integer,     allocatable :: bei(:), bni(:, :), bcni(:, :)
-    real(TG_WP), allocatable :: bdx(:), bdy(:), bcen(:, :), bxy(:, :)
+    real(WP_full), allocatable :: bdx(:), bdy(:), bcen(:, :), bxy(:, :)
     integer :: pcap, pxycap, pp, pxy_p
 
     nced = seg%ncut
@@ -533,19 +531,19 @@ contains
                            pp, pxy_p, pcap, pxycap, &
                            bei, bni, bcni, bdx, bdy, bcen, bxy)
     integer,        intent(in)    :: edi, nced, ncsi, ncs
-    real(TG_WP),    intent(in)    :: theta
+    real(WP_full),    intent(in)    :: theta
     integer,        intent(in)    :: el(2), eg
     integer,        intent(in)    :: n_nod, n_elem
-    real(TG_WP),    intent(in)    :: lon_nod(n_nod), lat_nod(n_nod)
+    real(WP_full),    intent(in)    :: lon_nod(n_nod), lat_nod(n_nod)
     integer,        intent(in)    :: elem_nodes(3, n_elem)
-    real(TG_WP),    intent(in)    :: edge_cross_dxdy(4, *)
+    real(WP_full),    intent(in)    :: edge_cross_dxdy(4, *)
     type(subseg_t), intent(in)    :: seg
     integer,        intent(inout) :: pp, pxy_p, pcap, pxycap
     integer,        allocatable, intent(inout) :: bei(:), bni(:, :), bcni(:, :)
-    real(TG_WP),    allocatable, intent(inout) :: bdx(:), bdy(:), bcen(:, :), bxy(:, :)
-    real(TG_WP) :: cx, cy
+    real(WP_full),    allocatable, intent(inout) :: bdx(:), bdy(:), bcen(:, :), bxy(:, :)
+    real(WP_full) :: cx, cy
 
-    if (theta >= 0.0_TG_WP) then
+    if (theta >= 0.0_WP_full) then
       ! upsection = LEFT triangle (el(1)), always interior because el(1) > 0
       if (edi == 1) then
         call elem_centroid(el(1), n_nod, lon_nod, lat_nod, n_elem, elem_nodes, cx, cy)
@@ -618,19 +616,19 @@ contains
                              pp, pxy_p, pcap, pxycap, &
                              bei, bni, bcni, bdx, bdy, bcen, bxy)
     integer,        intent(in)    :: edi, nced
-    real(TG_WP),    intent(in)    :: theta
+    real(WP_full),    intent(in)    :: theta
     integer,        intent(in)    :: el(2), eg
     integer,        intent(in)    :: n_nod, n_elem
-    real(TG_WP),    intent(in)    :: lon_nod(n_nod), lat_nod(n_nod)
+    real(WP_full),    intent(in)    :: lon_nod(n_nod), lat_nod(n_nod)
     integer,        intent(in)    :: elem_nodes(3, n_elem)
-    real(TG_WP),    intent(in)    :: edge_cross_dxdy(4, *)
+    real(WP_full),    intent(in)    :: edge_cross_dxdy(4, *)
     type(subseg_t), intent(in)    :: seg
     integer,        intent(inout) :: pp, pxy_p, pcap, pxycap
     integer,        allocatable, intent(inout) :: bei(:), bni(:, :), bcni(:, :)
-    real(TG_WP),    allocatable, intent(inout) :: bdx(:), bdy(:), bcen(:, :), bxy(:, :)
-    real(TG_WP) :: cx, cy
+    real(WP_full),    allocatable, intent(inout) :: bdx(:), bdy(:), bcen(:, :), bxy(:, :)
+    real(WP_full) :: cx, cy
 
-    if (theta >= 0.0_TG_WP) then
+    if (theta >= 0.0_WP_full) then
       ! downsection = RIGHT triangle (el(2)); may be -1 for boundary
       if (el(2) > 0) then
         call elem_centroid(el(2), n_nod, lon_nod, lat_nod, n_elem, elem_nodes, cx, cy)
@@ -676,10 +674,10 @@ contains
   !> boundary edge has no far-side triangle.
   subroutine push_ghost(bei, bni, bcni, bdx, bdy, bcen, pcap, pp)
     integer,     allocatable, intent(inout) :: bei(:), bni(:, :), bcni(:, :)
-    real(TG_WP), allocatable, intent(inout) :: bdx(:), bdy(:), bcen(:, :)
+    real(WP_full), allocatable, intent(inout) :: bdx(:), bdy(:), bcen(:, :)
     integer,                  intent(inout) :: pcap, pp
-    real(TG_WP) :: nan
-    nan = ieee_value(0.0_TG_WP, ieee_quiet_nan)
+    real(WP_full) :: nan
+    nan = ieee_value(0.0_WP_full, ieee_quiet_nan)
     call grow_p(bei, bni, bcni, bdx, bdy, bcen, pcap, pp + 1)
     pp = pp + 1
     bei(pp)     = -1
@@ -765,8 +763,8 @@ contains
 ! -----------------------------------------------------------------------------
   subroutine compute_distance_from_startpoint(t)
     type(transect_t), intent(inout) :: t
-    real(TG_WP), allocatable :: xx(:), yy(:), zz(:), seg(:)
-    real(TG_WP) :: dot, cum
+    real(WP_full), allocatable :: xx(:), yy(:), zz(:), seg(:)
+    real(WP_full) :: dot, cum
     integer :: i
 
     if (t%Pxy > 0) then
@@ -778,12 +776,12 @@ contains
       allocate(seg(t%Pxy - 1))
       do i = 1, t%Pxy - 1
         dot = xx(i)*xx(i+1) + yy(i)*yy(i+1) + zz(i)*zz(i+1)
-        if (dot > 1.0_TG_WP) dot = 1.0_TG_WP
-        if (dot < -1.0_TG_WP) dot = -1.0_TG_WP
+        if (dot > 1.0_WP_full) dot = 1.0_WP_full
+        if (dot < -1.0_WP_full) dot = -1.0_WP_full
         seg(i) = acos(dot) * R_EARTH_KM
       end do
-      cum = 0.0_TG_WP
-      t%path_dist(1) = 0.0_TG_WP
+      cum = 0.0_WP_full
+      t%path_dist(1) = 0.0_WP_full
       do i = 1, t%Pxy - 1
         cum = cum + seg(i)
         t%path_dist(i + 1) = cum
@@ -798,12 +796,12 @@ contains
         call lonlat_to_cart3d(t%edge_cut_midP(1, i), t%edge_cut_midP(2, i), &
                               xx(i), yy(i), zz(i))
       end do
-      t%edge_cut_dist(1) = 0.0_TG_WP
-      cum = 0.0_TG_WP
+      t%edge_cut_dist(1) = 0.0_WP_full
+      cum = 0.0_WP_full
       do i = 1, t%M - 1
         dot = xx(i)*xx(i+1) + yy(i)*yy(i+1) + zz(i)*zz(i+1)
-        if (dot > 1.0_TG_WP) dot = 1.0_TG_WP
-        if (dot < -1.0_TG_WP) dot = -1.0_TG_WP
+        if (dot > 1.0_WP_full) dot = 1.0_WP_full
+        if (dot < -1.0_WP_full) dot = -1.0_WP_full
         cum = cum + acos(dot) * R_EARTH_KM
         t%edge_cut_dist(i + 1) = cum
       end do
@@ -817,11 +815,11 @@ contains
 
   !> Project (lon, lat) in degrees onto the unit sphere.
   subroutine lonlat_to_cart3d(lon_deg, lat_deg, x, y, z)
-    real(TG_WP), intent(in)  :: lon_deg, lat_deg
-    real(TG_WP), intent(out) :: x, y, z
-    real(TG_WP) :: lon, lat, clat
-    lon = lon_deg * real(rad, TG_WP)
-    lat = lat_deg * real(rad, TG_WP)
+    real(WP_full), intent(in)  :: lon_deg, lat_deg
+    real(WP_full), intent(out) :: x, y, z
+    real(WP_full) :: lon, lat, clat
+    lon = lon_deg * real(rad, WP_full)
+    lat = lat_deg * real(rad, WP_full)
     clat = cos(lat)
     x = clat * cos(lon)
     y = clat * sin(lon)
@@ -832,31 +830,31 @@ contains
   !> with a [-180, 180] wrap when the element straddles the dateline.
   subroutine elem_centroid(eid, n_nod, lon_nod, lat_nod, n_elem, elem_nodes, cx, cy)
     integer,     intent(in)  :: eid, n_nod, n_elem
-    real(TG_WP), intent(in)  :: lon_nod(n_nod), lat_nod(n_nod)
+    real(WP_full), intent(in)  :: lon_nod(n_nod), lat_nod(n_nod)
     integer,     intent(in)  :: elem_nodes(3, n_elem)
-    real(TG_WP), intent(out) :: cx, cy
-    real(TG_WP) :: xv(3), yv(3)
+    real(WP_full), intent(out) :: cx, cy
+    real(WP_full) :: xv(3), yv(3)
     integer :: i
     do i = 1, 3
       xv(i) = lon_nod(elem_nodes(i, eid))
       yv(i) = lat_nod(elem_nodes(i, eid))
     end do
     ! periodic boundary shift if the triangle straddles the dateline
-    if (maxval(xv) - minval(xv) > 180.0_TG_WP) then
-      if (count(xv > 0.0_TG_WP) > count(xv < 0.0_TG_WP)) then
-        where (xv < 0.0_TG_WP) xv = xv + 360.0_TG_WP
+    if (maxval(xv) - minval(xv) > 180.0_WP_full) then
+      if (count(xv > 0.0_WP_full) > count(xv < 0.0_WP_full)) then
+        where (xv < 0.0_WP_full) xv = xv + 360.0_WP_full
       else
-        where (xv > 0.0_TG_WP) xv = xv - 360.0_TG_WP
+        where (xv > 0.0_WP_full) xv = xv - 360.0_WP_full
       end if
     end if
-    cx = sum(xv) / 3.0_TG_WP
-    cy = sum(yv) / 3.0_TG_WP
+    cx = sum(xv) / 3.0_WP_full
+    cy = sum(yv) / 3.0_WP_full
   end subroutine elem_centroid
 
   !> Insertion-sort permutation: idx is filled such that arr(idx(i))
   !> is non-decreasing. O(n^2); fine for the few-hundred-crossings size.
   subroutine argsort_real(arr, idx)
-    real(TG_WP), intent(in)  :: arr(:)
+    real(WP_full), intent(in)  :: arr(:)
     integer,     intent(out) :: idx(size(arr))
     integer :: i, j, tmp
     do i = 1, size(arr)
@@ -877,10 +875,10 @@ contains
   !> Geometric-growth resize of a 2 x cap buffer so it can hold at least
   !> `want` entries along its second axis. No-op when cap is large enough.
   subroutine grow_xy(buf, cap, want)
-    real(TG_WP), allocatable, intent(inout) :: buf(:, :)
+    real(WP_full), allocatable, intent(inout) :: buf(:, :)
     integer,                  intent(inout) :: cap
     integer,                  intent(in)    :: want
-    real(TG_WP), allocatable :: tmp(:, :)
+    real(WP_full), allocatable :: tmp(:, :)
     integer :: ncap
     if (want <= cap) return
     ncap = max(want, 2*cap)
@@ -895,11 +893,11 @@ contains
   !> large enough.
   subroutine grow_p(bei, bni, bcni, bdx, bdy, bcen, cap, want)
     integer,     allocatable, intent(inout) :: bei(:), bni(:, :), bcni(:, :)
-    real(TG_WP), allocatable, intent(inout) :: bdx(:), bdy(:), bcen(:, :)
+    real(WP_full), allocatable, intent(inout) :: bdx(:), bdy(:), bcen(:, :)
     integer,                  intent(inout) :: cap
     integer,                  intent(in)    :: want
     integer,     allocatable :: tei(:), tni(:, :), tcni(:, :)
-    real(TG_WP), allocatable :: tdx(:), tdy(:), tcen(:, :)
+    real(WP_full), allocatable :: tdx(:), tdy(:), tcen(:, :)
     integer :: ncap
     if (want <= cap) return
     ncap = max(want, 2*cap)

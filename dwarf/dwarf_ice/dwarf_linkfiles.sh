@@ -25,11 +25,7 @@ export which_path="../../../src/"
 # export which_path=https://raw.githubusercontent.com/FESOM/fesom2/${which_branch}/src
 
 #_______________________________________________________________________________
-export which_files="associate_mesh_def.h 
-                    associate_mesh_ass.h 
-                    associate_part_def.h 
-                    associate_part_ass.h
-                    MOD_MESH.F90
+export which_files="MOD_MESH.F90
                     MOD_PARTIT.F90  
                     MOD_TRACER.F90
                     MOD_DYN.F90

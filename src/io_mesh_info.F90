@@ -1,10 +1,11 @@
 module io_mesh_info
 USE MOD_MESH
 USE MOD_PARTIT
-USE MOD_PARSUP
 use g_config
 use g_comm_auto
 use o_PARAM
+use g_cvmix_idemix2, only: iwe2_refl_bin, iwe2_refl_sgn, iwe2_refl_node, iwe2_coast_node, &
+                           idemix2_enable_M2, idemix2_enable_niw
 
 use netcdf
 implicit none
@@ -46,6 +47,7 @@ implicit none
   integer                    :: lon_id, lat_id
   ! UGRID NAMES START HERE
   integer                    :: face_node_id, edge_nodes_id, face_edges_id, face_links_id, edge_face_links_id
+  integer                    :: iwe2_refl_bin_id, iwe2_refl_sgn_id, iwe2_refl_node_id, iwe2_coast_node_id
   character(100)             :: longname
   character(2000)            :: filename
   real(kind=WP), allocatable :: rbuffer(:), lrbuffer(:)
@@ -54,13 +56,9 @@ implicit none
   integer                    :: vtype
   integer, pointer           :: pid
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
 
-  call MPI_AllREDUCE(maxval(nod_in_elem2D_num), N_max, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+  call MPI_AllREDUCE(maxval(mesh%nod_in_elem2D_num), N_max, 1, MPI_INTEGER, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
 
   filename=trim(ResultPath)//trim(runid)//'.mesh.diag.nc'
   call my_create(filename, IOR(NF90_CLOBBER,IOR(NF90_NETCDF4,NF90_CLASSIC_MODEL)), ncid, partit)
@@ -69,11 +67,11 @@ implicit none
   ! https://tinyurl.com/43z4m6cd
   !
   ! Define the dimensions
-  call my_def_dim(ncid, 'nod2', nod2D,  nod_n_id,  partit)
-  call my_def_dim(ncid, 'edg_n', edge2D, edge_n_id, partit)
-  call my_def_dim(ncid, 'elem', elem2D, elem_n_id, partit)
-  call my_def_dim(ncid, 'nz',    nl,     nl_id,     partit)
-  call my_def_dim(ncid, 'nz1',   nl-1,   nl1_id,    partit)
+  call my_def_dim(ncid, 'nod2', mesh%nod2D,  nod_n_id,  partit)
+  call my_def_dim(ncid, 'edg_n', mesh%edge2D, edge_n_id, partit)
+  call my_def_dim(ncid, 'elem', mesh%elem2D, elem_n_id, partit)
+  call my_def_dim(ncid, 'nz',    mesh%nl,     nl_id,     partit)
+  call my_def_dim(ncid, 'nz1',   mesh%nl-1,   nl1_id,    partit)
   call my_def_dim(ncid, 'n2',    2,      id_2,      partit)
   call my_def_dim(ncid, 'n3',    3,      id_3,      partit)
   call my_def_dim(ncid, 'n4',    4,      id_4,      partit)
@@ -327,269 +325,294 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
   call my_def_var(ncid, 'gradient_sca_y',    NF90_DOUBLE, 2, (/elem_n_id, id_3/), gradient_sca_y_id,  'y component of a gradient at nodes of an element', partit)
   call my_def_var(ncid, 'gradient_vec_x',    NF90_DOUBLE, 2, (/elem_n_id, id_3/), gradient_vec_x_id,  'x component of a gradient at elements of an element', partit)
   call my_def_var(ncid, 'gradient_vec_y',    NF90_DOUBLE, 2, (/elem_n_id, id_3/), gradient_vec_y_id,  'y component of a gradient at elements of an element', partit)
+  if (mod(mix_scheme_nmb,10)==7 .and. (idemix2_enable_M2 .or. idemix2_enable_niw)) then
+    call my_def_var(ncid, 'iwe2_refl_bin',   NF90_INT, 1, (/edge_n_id/), iwe2_refl_bin_id,   'IDEMIX2 reflect BC: mirror spectral bin per coast edge (0=interior)', partit)
+    call my_def_var(ncid, 'iwe2_refl_sgn',   NF90_INT, 1, (/edge_n_id/), iwe2_refl_sgn_id,   'IDEMIX2 reflect BC: coast-node sign per edge (+1 node1 coast, -1 node2 coast)', partit)
+    call my_def_var(ncid, 'iwe2_refl_node',  NF90_INT, 1, (/nod_n_id/),  iwe2_refl_node_id,  'IDEMIX2 reflect BC: coast-adjacent interior node mask (0/1)', partit)
+    call my_def_var(ncid, 'iwe2_coast_node', NF90_INT, 1, (/nod_n_id/),  iwe2_coast_node_id, 'IDEMIX2 reflect BC: coast node mask after MPI halo exchange (0/1)', partit)
+  end if
   call my_nf90_enddef(ncid, partit)
 
   ! NOTE(PG): Same order as definition!
   ! NOTE(PG): We invert the sign of ``zbar`` here to conform with CF-Conventions
   ! https://cfconventions.org/cf-conventions/cf-conventions.html#vertical-coordinate
   ! Mid and full levels
-  call my_put_vara(ncid, zbar_id, 1, nl, -zbar, partit)
-  call my_put_vara(ncid, z_id, 1, nl-1, -Z, partit)
+  call my_put_vara(ncid, zbar_id, 1, mesh%nl, -mesh%zbar, partit)
+  call my_put_vara(ncid, z_id, 1, mesh%nl-1, -mesh%Z, partit)
 
   ! nodal areas
-  allocate(rbuffer(nod2D))
-  do k=1, nl
+  allocate(rbuffer(mesh%nod2D))
+  do k=1, mesh%nl
      ! area     ...area of prism top face
      ! areasvol ...area of scalar volume cell
      ! better write areasvol to meshdiag, without cavity area==areasvol but with
      ! cavity area!=areasvol, at least where is cavity
      !!PS      call gather_nod(area(k, :), rbuffer, partit)
-     call gather_nod(areasvol(k, :), rbuffer, partit)
-     call my_put_vara(ncid, nod_area_id, (/1, k/), (/nod2D, 1/), rbuffer, partit)
+     call gather_nod(mesh%areasvol(k, :), rbuffer, partit)
+     call my_put_vara(ncid, nod_area_id, (/1, k/), (/mesh%nod2D, 1/), rbuffer, partit)
   end do
   deallocate(rbuffer)
 
   ! WRITE(*,*) "elem_area"
-  allocate(rbuffer(elem2D))
-  call gather_elem(elem_area(1:myDim_elem2D), rbuffer, partit)
-  call my_put_vara(ncid, elem_area_id, 1, elem2D, rbuffer, partit)
+  allocate(rbuffer(mesh%elem2D))
+  call gather_elem(mesh%elem_area(1:partit%myDim_elem2D), rbuffer, partit)
+  call my_put_vara(ncid, elem_area_id, 1, mesh%elem2D, rbuffer, partit)
   deallocate(rbuffer)
 
   ! WRITE(*,*) "nlevels_nod2D"
-  allocate(ibuffer(nod2D))
-  call gather_nod(nlevels_nod2D(1:myDim_nod2D), ibuffer, partit)
-  call my_put_vara(ncid, nlevels_nod2D_id, 1, nod2D, ibuffer, partit)
+  allocate(ibuffer(mesh%nod2D))
+  call gather_nod(mesh%nlevels_nod2D(1:partit%myDim_nod2D), ibuffer, partit)
+  call my_put_vara(ncid, nlevels_nod2D_id, 1, mesh%nod2D, ibuffer, partit)
   deallocate(ibuffer)
 
   ! WRITE(*,*) "nlevels"
-  allocate(ibuffer(elem2D))
-  call gather_elem(nlevels(1:myDim_elem2D), ibuffer, partit)
-  call my_put_vara(ncid, nlevels_id, 1, elem2D, ibuffer, partit)
+  allocate(ibuffer(mesh%elem2D))
+  call gather_elem(mesh%nlevels(1:partit%myDim_elem2D), ibuffer, partit)
+  call my_put_vara(ncid, nlevels_id, 1, mesh%elem2D, ibuffer, partit)
   deallocate(ibuffer)
 
   ! WRITE(*,*) "nod_in_elem2D_num"
-  allocate(ibuffer(nod2D))
-  call gather_nod(nod_in_elem2D_num(1:myDim_nod2D), ibuffer, partit)
-  call my_put_vara(ncid, nod_in_elem2D_num_id, 1, nod2D, ibuffer, partit)
+  allocate(ibuffer(mesh%nod2D))
+  call gather_nod(mesh%nod_in_elem2D_num(1:partit%myDim_nod2D), ibuffer, partit)
+  call my_put_vara(ncid, nod_in_elem2D_num_id, 1, mesh%nod2D, ibuffer, partit)
   deallocate(ibuffer)
 
   ! WRITE(*,*) "nod_part"
-  allocate(ibuffer(nod2D))
-  allocate(lbuffer(myDim_nod2D))
-  lbuffer=mype
+  allocate(ibuffer(mesh%nod2D))
+  allocate(lbuffer(partit%myDim_nod2D))
+  lbuffer=partit%mype
   call gather_nod(lbuffer, ibuffer, partit)
-  call my_put_vara(ncid, nod_part_id, 1, nod2D, ibuffer, partit)
+  call my_put_vara(ncid, nod_part_id, 1, mesh%nod2D, ibuffer, partit)
   deallocate(lbuffer, ibuffer)
 
   ! WRITE(*,*) "elem_part"
-  allocate(ibuffer(elem2D))
-  allocate(lbuffer(myDim_elem2D))
-  lbuffer=mype
+  allocate(ibuffer(mesh%elem2D))
+  allocate(lbuffer(partit%myDim_elem2D))
+  lbuffer=partit%mype
   call gather_elem(lbuffer, ibuffer, partit)
-  call my_put_vara(ncid, elem_part_id, 1, elem2D, ibuffer, partit)
+  call my_put_vara(ncid, elem_part_id, 1, mesh%elem2D, ibuffer, partit)
   deallocate(lbuffer, ibuffer)
 
   ! WRITE(*,*) "zbar_e_bottom"
-  allocate(rbuffer(elem2D))
-  call gather_elem(-zbar_e_bot(1:myDim_elem2D), rbuffer, partit)
-  call my_put_vara(ncid, zbar_e_bot_id, 1, elem2D, rbuffer, partit)
+  allocate(rbuffer(mesh%elem2D))
+  call gather_elem(-mesh%zbar_e_bot(1:partit%myDim_elem2D), rbuffer, partit)
+  call my_put_vara(ncid, zbar_e_bot_id, 1, mesh%elem2D, rbuffer, partit)
   deallocate(rbuffer)
 
   ! WRITE(*,*) "zbar_n_bottom"
-  allocate(rbuffer(nod2D))
-  call gather_nod(-zbar_n_bot(1:myDim_nod2D), rbuffer, partit)
-  call my_put_vara(ncid, zbar_n_bot_id, 1, nod2D, rbuffer, partit)
+  allocate(rbuffer(mesh%nod2D))
+  call gather_nod(-mesh%zbar_n_bot(1:partit%myDim_nod2D), rbuffer, partit)
+  call my_put_vara(ncid, zbar_n_bot_id, 1, mesh%nod2D, rbuffer, partit)
   deallocate(rbuffer)
 
   ! WRITE(*,*) "lon and lat"
   ! nodes (GEO coordinates)
-  allocate(rbuffer(nod2D))
+  allocate(rbuffer(mesh%nod2D))
   do i=1, 2
-     call gather_nod(geo_coord_nod2D(i, 1:myDim_nod2D), rbuffer, partit)
+     call gather_nod(mesh%geo_coord_nod2D(i, 1:partit%myDim_nod2D), rbuffer, partit)
      rbuffer = rbuffer/rad
      if (i == 1) then
-        call my_put_vara(ncid, lon_id, 1, nod2D, rbuffer, partit)
+        call my_put_vara(ncid, lon_id, 1, mesh%nod2D, rbuffer, partit)
      else
-        call my_put_vara(ncid, lat_id, 1, nod2D, rbuffer, partit)
+        call my_put_vara(ncid, lat_id, 1, mesh%nod2D, rbuffer, partit)
      endif
   end do
   deallocate(rbuffer)
 
   ! WRITE(*,*) "nod_area"
-  allocate(rbuffer(nod2D))
-  do k=1, nl
-     call gather_nod(area(k, :), rbuffer, partit)
-     call my_put_vara(ncid, nod_area_id, (/1, k/), (/nod2D, 1/), rbuffer, partit)
+  allocate(rbuffer(mesh%nod2D))
+  do k=1, mesh%nl
+     call gather_nod(mesh%area(k, :), rbuffer, partit)
+     call my_put_vara(ncid, nod_area_id, (/1, k/), (/mesh%nod2D, 1/), rbuffer, partit)
   end do
   deallocate(rbuffer)
 
   ! WRITE(*,*) "face_nodes"
   ! used to be called: elements
-  allocate(ibuffer(elem2D))
-  allocate(lbuffer(myDim_elem2D))
+  allocate(ibuffer(mesh%elem2D))
+  allocate(lbuffer(partit%myDim_elem2D))
   do i=1, 3
-     do k=1, myDim_elem2D
-        lbuffer(k)=myList_nod2D(elem2d_nodes(i, k))
+     do k=1, partit%myDim_elem2D
+        lbuffer(k)=partit%myList_nod2D(mesh%elem2d_nodes(i, k))
      end do
      call gather_elem(lbuffer, ibuffer, partit)
-     call my_put_vara(ncid, face_node_id, (/1, i/), (/elem2D, 1/), ibuffer, partit)
+     call my_put_vara(ncid, face_node_id, (/1, i/), (/mesh%elem2D, 1/), ibuffer, partit)
   end do
   deallocate(lbuffer, ibuffer)
 
   ! WRITE(*,*) "edge_nodes"
   ! This used to be called "edges" before UGRID Change
-  allocate(ibuffer(edge2D))
-  allocate(lbuffer(myDim_edge2D))
+  allocate(ibuffer(mesh%edge2D))
+  allocate(lbuffer(partit%myDim_edge2D))
   do i=1, 2
-     do k=1, myDim_edge2D
-        lbuffer(k)=myList_nod2D(edges(i, k))
+     do k=1, partit%myDim_edge2D
+        lbuffer(k)=partit%myList_nod2D(mesh%edges(i, k))
      end do
      call gather_edge(lbuffer, ibuffer, partit)
-     call my_put_vara(ncid, edge_nodes_id, (/1, i/), (/edge2D, 1/), ibuffer, partit)
+     call my_put_vara(ncid, edge_nodes_id, (/1, i/), (/mesh%edge2D, 1/), ibuffer, partit)
   end do
   deallocate(lbuffer, ibuffer)
 
   ! WRITE(*,*) "face_edges"
   ! This used to be called elem_edge
-  allocate(ibuffer(elem2D))
+  allocate(ibuffer(mesh%elem2D))
   do i=1, 3
-     call gather_elem(elem_edges(i,1:myDim_elem2D), ibuffer, partit)
-     call my_put_vara(ncid, face_edges_id, (/1, i/), (/elem2D, 1/), ibuffer, partit)
+     call gather_elem(mesh%elem_edges(i,1:partit%myDim_elem2D), ibuffer, partit)
+     call my_put_vara(ncid, face_edges_id, (/1, i/), (/mesh%elem2D, 1/), ibuffer, partit)
   end do
   deallocate(ibuffer)
 
   ! WRITE(*,*) "face_links"
   ! This used to be called elem_neighbors
-  allocate(lbuffer(myDim_elem2D), ibuffer(elem2D))
+  allocate(lbuffer(partit%myDim_elem2D), ibuffer(mesh%elem2D))
   do i=1, 3
-     lbuffer(1:myDim_elem2D) = elem_neighbors(i, 1:myDim_elem2D)
+     lbuffer(1:partit%myDim_elem2D) = mesh%elem_neighbors(i, 1:partit%myDim_elem2D)
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(k)
-     do k=1, myDim_elem2D
-        if (elem_neighbors(i, k) > 0) then
-          lbuffer(k) = elem_neighbors(i, k)
+     do k=1, partit%myDim_elem2D
+        if (mesh%elem_neighbors(i, k) > 0) then
+          lbuffer(k) = mesh%elem_neighbors(i, k)
         else
           lbuffer(k) = -999
         end if
      end do
 !$OMP END PARALLEL DO
      call gather_elem(lbuffer, ibuffer, partit)
-     call my_put_vara(ncid, face_links_id, (/1, i/), (/elem2D, 1/), ibuffer, partit)
+     call my_put_vara(ncid, face_links_id, (/1, i/), (/mesh%elem2D, 1/), ibuffer, partit)
   end do
   deallocate(lbuffer, ibuffer)
 
   ! WRITE(*,*) "edge_face_links"
   ! Used to be called edge_tri
-  allocate(ibuffer(edge2D))
-  allocate(lbuffer(myDim_edge2D))
+  allocate(ibuffer(mesh%edge2D))
+  allocate(lbuffer(partit%myDim_edge2D))
   do i=1, 2
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(k)
-     do k=1, myDim_edge2D
-        if (edge_tri(i,k) > 0) then
-           lbuffer(k) = myList_elem2D(edge_tri(i,k))
+     do k=1, partit%myDim_edge2D
+        if (mesh%edge_tri(i,k) > 0) then
+           lbuffer(k) = partit%myList_elem2D(mesh%edge_tri(i,k))
         else
            lbuffer(k) = -999  ! Changed from missing value of 0 before
         endif
      end do
 !$OMP END PARALLEL DO
      call gather_edge(lbuffer, ibuffer, partit)
-     call my_put_vara(ncid, edge_face_links_id, (/1, i/), (/edge2D, 1/), ibuffer, partit)
+     call my_put_vara(ncid, edge_face_links_id, (/1, i/), (/mesh%edge2D, 1/), ibuffer, partit)
   end do
   deallocate(lbuffer, ibuffer)
 
   ! WRITE(*,*) "nod_in_elem2D"
   ! elements containing the node
-  allocate(ibuffer(nod2D))
-  allocate(lbuffer(myDim_nod2D))
+  allocate(ibuffer(mesh%nod2D))
+  allocate(lbuffer(partit%myDim_nod2D))
   DO i=1, N_max
      lbuffer=0
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(k)
-     do k=1, myDim_nod2D
-        if ((nod_in_elem2D_num(k)>=i)) then
-           lbuffer(k)=myList_elem2D(nod_in_elem2D(i, k))
+     do k=1, partit%myDim_nod2D
+        if ((mesh%nod_in_elem2D_num(k)>=i)) then
+           lbuffer(k)=partit%myList_elem2D(mesh%nod_in_elem2D(i, k))
         end if
      end do
 !$OMP END PARALLEL DO
      call gather_nod(lbuffer, ibuffer, partit)
-     call my_put_vara(ncid, nod_in_elem2D_id, (/1, i/), (/nod2D, 1/), ibuffer, partit)
+     call my_put_vara(ncid, nod_in_elem2D_id, (/1, i/), (/mesh%nod2D, 1/), ibuffer, partit)
   END DO
   deallocate(lbuffer, ibuffer)
 
 
   ! WRITE(*,*) "edge_cross_dxdy"
-  allocate(rbuffer(edge2D))
-  allocate(lrbuffer(myDim_edge2D))
+  allocate(rbuffer(mesh%edge2D))
+  allocate(lrbuffer(partit%myDim_edge2D))
   do i=1, 4
-     lrbuffer=edge_cross_dxdy(i, 1:myDim_edge2D)
+     lrbuffer=mesh%edge_cross_dxdy(i, 1:partit%myDim_edge2D)
      call gather_edge(lrbuffer, rbuffer, partit)
-     call my_put_vara(ncid, edge_cross_dxdy_id, (/1, i/), (/edge2D, 1/), rbuffer, partit)
+     call my_put_vara(ncid, edge_cross_dxdy_id, (/1, i/), (/mesh%edge2D, 1/), rbuffer, partit)
   end do
   deallocate(rbuffer, lrbuffer)
 
   ! WRITE(*,*) "gradient_sca_x"
     ! X component of gadient at elements
-  allocate(rbuffer(elem2D))
+  allocate(rbuffer(mesh%elem2D))
   do i=1, 3
-     call gather_elem(gradient_sca(i, 1:myDim_elem2D), rbuffer, partit)
+     call gather_elem(mesh%gradient_sca(i, 1:partit%myDim_elem2D), rbuffer, partit)
      !!PS call my_put_vara(ncid, gradient_sca_x_id, (/1, 4-i/), (/elem2D, 1/), rbuffer, partit) ! (4-i), NETCDF will permute otherwise
-     call my_put_vara(ncid, gradient_sca_x_id, (/1, i/), (/elem2D, 1/), rbuffer, partit) 
+     call my_put_vara(ncid, gradient_sca_x_id, (/1, i/), (/mesh%elem2D, 1/), rbuffer, partit) 
   end do
   deallocate(rbuffer)
 
   ! WRITE(*,*) "gradient_sca_y"
     ! Y component of gadient at elements
-  allocate(rbuffer(elem2D))
+  allocate(rbuffer(mesh%elem2D))
   do i=1, 3
-     call gather_elem(gradient_sca(i+3, 1:myDim_elem2D), rbuffer, partit)
+     call gather_elem(mesh%gradient_sca(i+3, 1:partit%myDim_elem2D), rbuffer, partit)
      !!PS call my_put_vara(ncid, gradient_sca_y_id, (/1, 4-i/), (/elem2D, 1/), rbuffer, partit)! (4-i), NETCDF will permute otherwise
-     call my_put_vara(ncid, gradient_sca_y_id, (/1, i/), (/elem2D, 1/), rbuffer, partit)
+     call my_put_vara(ncid, gradient_sca_y_id, (/1, i/), (/mesh%elem2D, 1/), rbuffer, partit)
   end do
   deallocate(rbuffer)
 
   ! WRITE(*,*) "gradient_vec_x"
     ! X component of gadient at elements
-  allocate(rbuffer(elem2D))
+  allocate(rbuffer(mesh%elem2D))
   do i=1, 3
-     call gather_elem(gradient_vec(i, 1:myDim_elem2D), rbuffer, partit)
+     call gather_elem(mesh%gradient_vec(i, 1:partit%myDim_elem2D), rbuffer, partit)
      !!PS call my_put_vara(ncid, gradient_vec_x_id, (/1, 4-i/), (/elem2D, 1/), rbuffer, partit) ! (4-i), NETCDF will permute otherwise
-     call my_put_vara(ncid, gradient_vec_x_id, (/1, i/), (/elem2D, 1/), rbuffer, partit) ! (4-i), NETCDF will permute otherwise
+     call my_put_vara(ncid, gradient_vec_x_id, (/1, i/), (/mesh%elem2D, 1/), rbuffer, partit) ! (4-i), NETCDF will permute otherwise
   end do
   deallocate(rbuffer)
 
   ! WRITE(*,*) "gradient_vec_y"
     ! Y component of gadient at elements
-  allocate(rbuffer(elem2D))
+  allocate(rbuffer(mesh%elem2D))
   do i=1, 3
-     call gather_elem(gradient_vec(i+3, 1:myDim_elem2D), rbuffer, partit)
+     call gather_elem(mesh%gradient_vec(i+3, 1:partit%myDim_elem2D), rbuffer, partit)
      !!PS call my_put_vara(ncid, gradient_vec_y_id, (/1, 4-i/), (/elem2D, 1/), rbuffer, partit)! (4-i), NETCDF will permute otherwise
-     call my_put_vara(ncid, gradient_vec_y_id, (/1, i/), (/elem2D, 1/), rbuffer, partit)! (4-i), NETCDF will permute otherwise
+     call my_put_vara(ncid, gradient_vec_y_id, (/1, i/), (/mesh%elem2D, 1/), rbuffer, partit)! (4-i), NETCDF will permute otherwise
   end do
   deallocate(rbuffer)
 
   if (use_cavity) then
     ! number of levels above elements
-    allocate(ibuffer(elem2D))
-    call gather_elem(ulevels(1:myDim_elem2D), ibuffer, partit)
-    call my_put_vara(ncid, ulevels_id, 1, elem2D, ibuffer, partit)
+    allocate(ibuffer(mesh%elem2D))
+    call gather_elem(mesh%ulevels(1:partit%myDim_elem2D), ibuffer, partit)
+    call my_put_vara(ncid, ulevels_id, 1, mesh%elem2D, ibuffer, partit)
     deallocate(ibuffer)
 
     ! number of levels above nodes
-    allocate(ibuffer(nod2D))
-    call gather_nod(ulevels_nod2D(1:myDim_nod2D), ibuffer, partit)
-    call my_put_vara(ncid, ulevels_nod2D_id, 1, nod2D, ibuffer, partit)
+    allocate(ibuffer(mesh%nod2D))
+    call gather_nod(mesh%ulevels_nod2D(1:partit%myDim_nod2D), ibuffer, partit)
+    call my_put_vara(ncid, ulevels_nod2D_id, 1, mesh%nod2D, ibuffer, partit)
     deallocate(ibuffer)
 
     ! nodal surface depth (take into account partial cells if used)
-    allocate(rbuffer(nod2D))
-    call gather_nod(-zbar_n_srf(1:myDim_nod2D), rbuffer, partit)
-    call my_put_vara(ncid, zbar_n_srf_id, 1, nod2D, rbuffer, partit)
+    allocate(rbuffer(mesh%nod2D))
+    call gather_nod(-mesh%zbar_n_srf(1:partit%myDim_nod2D), rbuffer, partit)
+    call my_put_vara(ncid, zbar_n_srf_id, 1, mesh%nod2D, rbuffer, partit)
     deallocate(rbuffer)
 
     ! element surface depth (take into account partial cells if used)
-    allocate(rbuffer(elem2D))
-    call gather_elem(-zbar_e_srf(1:myDim_elem2D), rbuffer, partit)
-    call my_put_vara(ncid, zbar_e_srf_id, 1, elem2D, rbuffer, partit)
+    allocate(rbuffer(mesh%elem2D))
+    call gather_elem(-mesh%zbar_e_srf(1:partit%myDim_elem2D), rbuffer, partit)
+    call my_put_vara(ncid, zbar_e_srf_id, 1, mesh%elem2D, rbuffer, partit)
     deallocate(rbuffer)
   endif
+
+  if (mod(mix_scheme_nmb,10)==7 .and. (idemix2_enable_M2 .or. idemix2_enable_niw)) then
+    allocate(ibuffer(mesh%edge2D))
+    call gather_edge(iwe2_refl_bin(1:partit%myDim_edge2D), ibuffer, partit)
+    call my_put_vara(ncid, iwe2_refl_bin_id, 1, mesh%edge2D, ibuffer, partit)
+    call gather_edge(iwe2_refl_sgn(1:partit%myDim_edge2D), ibuffer, partit)
+    call my_put_vara(ncid, iwe2_refl_sgn_id, 1, mesh%edge2D, ibuffer, partit)
+    deallocate(ibuffer)
+
+    allocate(ibuffer(mesh%nod2D))
+    allocate(lbuffer(partit%myDim_nod2D))
+    lbuffer = merge(1, 0, iwe2_refl_node(1:partit%myDim_nod2D))
+    call gather_nod(lbuffer, ibuffer, partit)
+    call my_put_vara(ncid, iwe2_refl_node_id, 1, mesh%nod2D, ibuffer, partit)
+    lbuffer = merge(1, 0, iwe2_coast_node(1:partit%myDim_nod2D))
+    call gather_nod(lbuffer, ibuffer, partit)
+    call my_put_vara(ncid, iwe2_coast_node_id, 1, mesh%nod2D, ibuffer, partit)
+    deallocate(lbuffer, ibuffer)
+  end if
 
   call my_close(ncid, partit)
 

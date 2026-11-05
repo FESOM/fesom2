@@ -37,9 +37,11 @@ endif()
 
 # Build libfyaml
 # Note: We only build the library, not the tools/utilities to avoid linking issues
+# Pinned to a release so that upstream changes cannot break the build; YAC is tested
+# with libfyaml >= 0.7.12 (#1241). Bump by hand when needed.
 ExternalProject_Add(libfyaml-external
     GIT_REPOSITORY https://github.com/pantoniou/libfyaml.git
-    GIT_TAG master
+    GIT_TAG v0.9.6
     GIT_SHALLOW ON
     PREFIX ${CMAKE_BINARY_DIR}/external/libfyaml-build
     CONFIGURE_COMMAND ${LIBFYAML_CONFIGURE_COMMAND}

@@ -40,5 +40,77 @@ contains
   end subroutine
 
 
+  ! calendar_stamp: the name a restart file gets from the clock state.
+  ! The cases that matter are the ones where the writer's clock state and the
+  ! reader's differ in representation but mean the same instant.
+
+  @test
+  subroutine test_stamp_of_a_plain_date
+    ! 1 March 1958 is day 60 of a non-leap year
+    @assertEqual("1958-03-01", calendar_stamp(1958, 60, 0, 365))
+  end subroutine
+
+
+  @test
+  subroutine test_end_of_day_is_start_of_next_day
+    ! what the writer holds at the end of 28 February ...
+    @assertEqual("1958-03-01", calendar_stamp(1958, 59, 86400, 365))
+    ! ... and what the reader holds after clock_init normalised it
+    @assertEqual("1958-03-01", calendar_stamp(1958, 60, 0, 365))
+  end subroutine
+
+
+  @test
+  subroutine test_end_of_year_rolls_into_january
+    ! the writer's state at the end of 31 December 1958
+    @assertEqual("1959-01-01", calendar_stamp(1958, 365, 86400, 365))
+    ! the reader's state, normalised into the next year by clock_finish
+    @assertEqual("1959-01-01", calendar_stamp(1959, 1, 0, 365))
+  end subroutine
+
+
+  @test
+  subroutine test_end_of_leap_year_rolls_into_january
+    @assertEqual("1961-01-01", calendar_stamp(1960, 366, 86400, 366))
+  end subroutine
+
+
+  @test
+  subroutine test_leap_day_is_not_shifted_into_march
+    ! day 60 is 29 February in a leap year, 1 March otherwise
+    @assertEqual("1960-02-29", calendar_stamp(1960, 60, 0, 366))
+    @assertEqual("1960-03-01", calendar_stamp(1960, 61, 0, 366))
+  end subroutine
+
+
+  @test
+  subroutine test_day_366_of_a_leap_year_is_31_december
+    @assertEqual("1960-12-31", calendar_stamp(1960, 366, 0, 366))
+  end subroutine
+
+
+  @test
+  subroutine test_instants_inside_a_day_share_a_stamp
+    ! the stamp is a date, so anything short of the end of the day is that date
+    @assertEqual("1958-03-01", calendar_stamp(1958, 60, 21600, 365))
+    @assertEqual("1958-03-01", calendar_stamp(1958, 60, 84600, 365))
+  end subroutine
+
+
+  @test
+  subroutine test_stamp_is_idempotent_under_normalisation
+    ! the read side applies the stamp to clock state the clock module has
+    ! already normalised; that must not shift the date a second time
+    @assertEqual(calendar_stamp(1958, 59, 86400, 365), calendar_stamp(1958, 60, 0, 365))
+    @assertEqual(calendar_stamp(1958, 365, 86400, 365), calendar_stamp(1959, 1, 0, 365))
+  end subroutine
+
+
+  @test
+  subroutine test_first_and_last_day_of_a_year
+    @assertEqual("1958-01-01", calendar_stamp(1958, 1, 0, 365))
+    @assertEqual("1958-12-31", calendar_stamp(1958, 365, 0, 365))
+  end subroutine
+
 
 end module

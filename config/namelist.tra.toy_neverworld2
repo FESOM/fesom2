@@ -73,6 +73,7 @@ gamma2_tra    = 0.            ! additional biharmonic diffusion coefficient [dim
 ! --- Vertical Diffusion and Time Stepping ---
 i_vert_diff   = .true.        ! use implicit vertical diffusion (recommended for stability)
 AB_order      = 2             ! Adams-Bashforth time stepping order (2 or 3)
+ltra_diag     = .false.       ! per-tracer diagnostics in the advection (extra cost)
 /
 
 ! ============================================================================
@@ -99,7 +100,7 @@ diff_sh_limit      = 5.0e-3            ! maximum diffusivity due to shear instab
 ! --- Background Diffusivity ---
 Kv0_const          = .false.           ! use constant background vertical diffusivity
 K_ver              = 1.0e-5            ! background vertical diffusivity [m²/s]
-K_hor              = 0.               ! background horizontal diffusivity [m²/s]
+K_hor              = 0.                ! background horizontal diffusivity [m²/s]
 
 ! --- Double Diffusion (KPP) ---
 double_diffusion   = .false.           ! enable double diffusion parameterization (for KPP)
@@ -107,7 +108,7 @@ double_diffusion   = .false.           ! enable double diffusion parameterizatio
 ! --- Surface Restoring ---
 surf_relax_T       = 0.0               ! surface temperature restoring coefficient [m/s] (0 = disabled)
 surf_relax_S       = 1.929e-06         ! surface salinity restoring coefficient [m/s]
-balance_salt_water = .false.           ! balance virtual salt flux with freshwater flux
+balance_salt_water = .false.           ! currently not used: the fluxes are always balanced globally
 
 ! --- Climatology Restoring ---
 clim_relax         = 0.0               ! 3D climatology restoring coefficient [1/s] (0 = disabled)
@@ -116,4 +117,3 @@ clim_relax         = 0.0               ! 3D climatology restoring coefficient [1
 ref_sss_local      = .true.            ! use local reference SSS (true) or global constant (false)
 ref_sss            = 34.               ! global reference salinity [psu] (if ref_sss_local=false)
 /
-

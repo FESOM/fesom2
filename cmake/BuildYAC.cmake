@@ -62,11 +62,12 @@ if(NOT DEFINED CMAKE_BUILD_PARALLEL_LEVEL)
     set(CMAKE_BUILD_PARALLEL_LEVEL ${N})
 endif()
 
-# Build YAC, for now master
+# Build YAC, pinned to a release so that upstream changes cannot break the build
+# (#1241). Bump by hand when FESOM needs something newer.
 ExternalProject_Add(yac-external
     DEPENDS yaxt-external libfyaml-external
     GIT_REPOSITORY https://gitlab.dkrz.de/dkrz-sw/yac.git
-    GIT_TAG master
+    GIT_TAG v3.21.0
     GIT_SHALLOW ON
     PREFIX ${CMAKE_BINARY_DIR}/external/yac-build
     CONFIGURE_COMMAND ${YAC_CONFIGURE_COMMAND}
@@ -117,6 +118,18 @@ find_package(LAPACK QUIET)
 if(NOT LAPACK_FOUND)
     # Fallback to system LAPACK/BLAS
     set(LAPACK_LIBRARIES "-llapack;-lblas" CACHE STRING "LAPACK libraries" FORCE)
+endif()
+
+# YAC's C core calls the LAPACKE interface, which lives in a library of
+# its own, separate from the Fortran LAPACK found above
+# Optional: MKL and YAC's bundled clapack provide it as well
+find_library(LAPACKE_LIBRARY NAMES lapacke)
+if(LAPACKE_LIBRARY)
+    message(STATUS "Found LAPACKE for YAC: ${LAPACKE_LIBRARY}")
+    list(APPEND LAPACK_LIBRARIES ${LAPACKE_LIBRARY})
+else()
+    message(STATUS "LAPACKE not found - assuming YAC provides it itself "
+                   "(MKL or bundled clapack)")
 endif()
 
 # Main YAC library that depends on all components

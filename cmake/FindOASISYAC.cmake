@@ -17,3 +17,13 @@ find_library(YACCORE_Fortran_LIBRARIES yac_core HINTS ${TOPLEVEL_DIR}/../oasis/l
 find_path(YAXT_Fortran_INCLUDE_DIRECTORIES yaxt.mod HINTS ${TOPLEVEL_DIR}/../oasis/lib/yaxt/include)
 find_library(YAXT_Fortran_LIBRARIES yaxt HINTS ${TOPLEVEL_DIR}/../oasis/lib/yaxt/lib)
 find_library(YAXTC_Fortran_LIBRARIES yaxt_c HINTS ${TOPLEVEL_DIR}/../oasis/lib/yaxt/lib)
+
+# libyac_core calls the LAPACKE interface, provided by nothing else on
+# the link line (unless YAC was built with MKL or its bundled clapack)
+find_library(LAPACKE_LIBRARY NAMES lapacke)
+if(LAPACKE_LIBRARY)
+    message(STATUS "Found LAPACKE for OASIS-YAC: ${LAPACKE_LIBRARY}")
+    list(APPEND YACCORE_Fortran_LIBRARIES ${LAPACKE_LIBRARY})
+else()
+    message(STATUS "LAPACKE not found - assuming YAC provides it itself")
+endif()

@@ -60,7 +60,6 @@
           type(t_ice), target, intent(inout) :: ice
           real(kind=WP), dimension(:), pointer  :: u_ice, v_ice, S_oc_array, T_oc_array, & 
                                                    u_w, v_w, stress_atmice_x, stress_atmice_y
-#include "associate_mesh.h"
           
           ! make sure we use the same water density to scale precip and snow in 
           ! fesom and icepack
@@ -145,11 +144,11 @@
               tvol = c0
               tx   = c0
               ty   = c0
-              do k = 1, nod_in_elem2D_num(i)
-                 elem = nod_in_elem2D(k,i)
-                 tvol = tvol + elem_area(elem)
-                 tx = tx + rdg_conv_elem(elem)  * elem_area(elem)
-                 ty = ty + rdg_shear_elem(elem) * elem_area(elem)
+              do k = 1, mesh%nod_in_elem2D_num(i)
+                 elem = mesh%nod_in_elem2D(k,i)
+                 tvol = tvol + mesh%elem_area(elem)
+                 tx = tx + rdg_conv_elem(elem)  * mesh%elem_area(elem)
+                 ty = ty + rdg_shear_elem(elem) * mesh%elem_area(elem)
               enddo
               rdg_conv(i)  = tx / tvol
               rdg_shear(i) = ty / tvol

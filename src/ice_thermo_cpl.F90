@@ -18,7 +18,6 @@ subroutine thermodynamics(ice, partit, mesh)
   use o_param
   USE MOD_ICE
   USE MOD_PARTIT
-  USE MOD_PARSUP
   USE MOD_MESH
   use o_arrays, only: fw_ice, fw_snw
   use g_config
@@ -37,6 +36,11 @@ subroutine thermodynamics(ice, partit, mesh)
   real(kind=WP)  :: A, h, hsn, alb, t
   !---- atmospheric heat fluxes (provided by ECHAM)
   real(kind=WP)  :: a2ohf, a2ihf, qres, qcon
+  !---- tref: ist anchor the atmosphere evaluated a2ihf at, the linearization
+  !---- anchor for the OpenIFS coupled-slab surface-temperature solve.
+#if defined (__oifs)
+  real(kind=WP)  :: tref
+#endif
   !---- evaporation and sublimation (provided by ECHAM)
   real(kind=WP)  :: evap, subli
   !---- add residual freshwater flux over ice to freshwater (setted in ice_growth)
@@ -51,11 +55,16 @@ subroutine thermodynamics(ice, partit, mesh)
   real(kind=WP)  :: ehf, fw, fwice, fwsnw, rsf, dhgrowth, dhsngrowth, dhflice, dAgrowth
   !---- melt pond variables
   real(kind=WP)  :: fpond, meltt_rate, melts_rate
+  !---- diagnostics for the sea-ice mass budget (output only) [kg m-2 s-1]
+  real(kind=WP)  :: h_in, d_gwat, d_gbot, d_mtop, d_mbot, d_subl, d_si
+  real(kind=WP)  :: a_in
+  real(kind=WP)  :: hsn_in, d_snf, d_snsbl, d_snmlt, d_snsi
 
   !---- geographical coordinates
   real(kind=WP)  :: geolon, geolat
-  !---- minimum and maximum of the lead closing parameter
-  real(kind=WP)  :: h0min = 0.5, h0max = 1.5
+  !---- minimum and maximum of the lead closing parameter. The minimum is
+  !---- namelist.ice ice_therm/h0 (NH) and h0_s (SH), as in ice_thermo_oce.F90
+  real(kind=WP)  :: h0min, h0max = 1.5
 
   real(kind=WP), parameter :: Aimin = 0.001, himin = 0.005
 
@@ -74,6 +83,9 @@ subroutine thermodynamics(ice, partit, mesh)
   real(kind=WP), dimension(:)  , pointer :: fresh_wa_flux, net_heat_flux
 #if defined (__oifs) || defined (__ifsinterface)
   real(kind=WP), dimension(:) , pointer  :: ice_temp, ice_alb, enthalpyoffuse, ice_heat_qres, ice_heat_qcon, runoff_liquid, runoff_solid
+#if defined (__oifs)
+  real(kind=WP), dimension(:) , pointer  :: ist_ref
+#endif
 #endif
 #if defined (__oasis) || defined (__ifsinterface) || defined (__yac)
   real(kind=WP), dimension(:)  , pointer ::  oce_heat_flux, ice_heat_flux 
@@ -109,7 +121,10 @@ subroutine thermodynamics(ice, partit, mesh)
   runoff_solid  => ice%atmcoupl%runoff_solid(:)
   ice_heat_qres => ice%atmcoupl%flx_qres(:)
   ice_heat_qcon => ice%atmcoupl%flx_qcon(:)
-#endif 
+#if defined (__oifs)
+  ist_ref       => ice%atmcoupl%ist_ref(:)
+#endif
+#endif
 #if defined (__oasis) || defined (__ifsinterface) || defined (__yac)
   oce_heat_flux => ice%atmcoupl%oce_flx_h(:)
   ice_heat_flux => ice%atmcoupl%ice_flx_h(:)
@@ -140,6 +155,26 @@ subroutine thermodynamics(ice, partit, mesh)
      A       = a_ice(inod)
      h       = m_ice(inod)
      hsn     = m_snow(inod)
+     h_in    = h
+     d_gwat  = 0._WP
+     d_gbot  = 0._WP
+     d_mtop  = 0._WP
+     d_mbot  = 0._WP
+     d_subl  = 0._WP
+     d_si    = 0._WP
+     hsn_in  = hsn
+     a_in    = A
+     d_snf   = 0._WP
+     d_snsbl = 0._WP
+     d_snmlt = 0._WP
+     d_snsi  = 0._WP
+
+     !---- lower bound of the lead closing parameter, per hemisphere
+     if (geo_coord_nod2D(2, inod) > 0._WP) then
+        h0min = ice%thermo%h0
+     else
+        h0min = ice%thermo%h0_s
+     end if
 
 #if defined (__oifs) || defined (__ifsinterface)
      a2ohf   = oce_heat_flux(inod) + shortwave(inod) + enthalpyoffuse(inod)
@@ -173,7 +208,22 @@ subroutine thermodynamics(ice, partit, mesh)
      qres     = 0.0_WP
      qcon     = 0.0_WP
      if(A>Aimin) then
+#if defined (__oifs)
+        if (use_atm_ice_tskin) then
+           ! Skin temperature received from the atmosphere (tsk_ico); freezing
+           ! point before the first receive.
+           tref = ist_ref(inod)
+           if (tref < 173.15_WP .or. tref > 400.0_WP) tref = 271.35_WP
+        else
+           tref = t
+        end if
+        call ice_surftemp(ice%thermo, max(h/(max(A,Aimin)),0.05), hsn/(max(A,Aimin)), a2ihf, tref, t)
+#else
+        ! The IFS interface does not provide the reference temperature used by
+        ! the OpenIFS coupled-slab solve. Keep its established local update
+        ! until that interface supplies a consistent temperature/flux pair.
         call ice_surftemp(ice%thermo, max(h/(max(A,Aimin)),0.05), hsn/(max(A,Aimin)), a2ihf, t)
+#endif
         ice_temp(inod)  = t
      else
         ! Freezing temp of saltwater in K
@@ -209,6 +259,23 @@ subroutine thermodynamics(ice, partit, mesh)
      thdgrsn(inod)        = dhsngrowth
      thdgra(inod)         = dAgrowth
      flice(inod)          = dhflice
+     !---- sea-ice mass budget diagnostics (output only), kg m-2 s-1, grid-cell mean
+     d_si                 = dhflice*rhoice
+     sidm_gwat(inod)      = d_gwat
+     sidm_gbot(inod)      = d_gbot
+     sidm_mtop(inod)      = d_mtop
+     sidm_mbot(inod)      = d_mbot
+     sidm_subl(inod)      = d_subl
+     sidm_si(inod)        = d_si
+     sidm_th(inod)        = d_gwat + d_gbot + d_mtop + d_mbot + d_subl + d_si
+     !---- snow mass budget diagnostics (output only), kg m-2 s-1, grid-cell mean
+     sisn_snf(inod)       = d_snf
+     sisn_sbl(inod)       = d_snsbl
+     sisn_mlt(inod)       = d_snmlt
+     sisn_si(inod)        = d_snsi
+     sisn_th(inod)        = d_snf + d_snsbl + d_snmlt + d_snsi
+     !---- sea-ice concentration tendency by thermodynamics (output only), 1/s
+     sidc_th(inod)        = (A - a_in)/dt
      
      !---- total evaporation (needed in oce_salt_balance.F90) = evap+subli
      evaporation(inod)    = evap + subli
@@ -241,6 +308,10 @@ contains
 
     !---- local variables and dummys
     real(kind=WP)  :: hold, hsnold, Aold, htmp, hsntmp, heff, h0cur, hdraft, hflood
+
+    !---- diagnostics (output only): decomposition of the ice thickness change
+    !---- into growth/melt terms, all in [m ice per time step], grid-cell mean
+    real(kind=WP)  :: Qs_d, Sn_d, Qb_d, Qo_d, P_d, N_top, N_bot, N_d, T_d, f_d, res_d
 
     !---- cut-off ice thickness (hcutoff) used to avoid very small ice
     !---- thicknesses as well as division by zero. NOTE: the standard
@@ -281,7 +352,15 @@ contains
 
     !---- atmospheric heat fluxes (provided by the atmosphere model)
 
-#if defined (__oifs) || defined (__ifsinterface)
+    ! Coupled-slab convention: the atmosphere solves the ice surface
+    ! temperature implicitly in its own surface scheme, with slab conduction
+    ! through the coupled ice/snow thickness, and its surface energy balance
+    ! flux drives ice growth directly. The ice model's own surface-temperature
+    ! solve is internal-only (albedo/melt-pond state) and does not enter the
+    ! growth budget.
+#if defined (__ifsinterface)
+    ! Keep the classic IFS-FESOM energy-budget convention.  Its atmospheric
+    ! interface has not been converted to the OpenIFS coupled-slab contract.
     Qatmice = -qres-qcon
 #else
     Qatmice = -a2ihf
@@ -358,13 +437,23 @@ contains
     hsnold = hsn
     hold = h
 
+    !---- diagnostic (output only): ice mass change by sublimation [kg m-2 s-1]
+    d_subl = (hold-h_in)*rhoice/dt
+
+    !---- diagnostic (output only): snow mass budget terms [kg m-2 s-1]
+    !---- snowfall onto sea ice, and snow sublimation (= net snow change - snowfall)
+    d_snf   = A*snow*rhofwt
+    d_snsbl = (hsnold-hsn_in)*rhosno/dt - d_snf
+
     !---- snow melt rate over sea ice (dsnow <= 0)
     !---- if there is atmospheric melting over sea ice, first melt any
     !---- snow that is present, but do not melt more snow than available
 #if defined (__oifs) || defined (__ifsinterface)
     !---- new condition added - surface temperature must be
     !----                       larger than 273K to melt snow
-    if (t.gt.273_WP) then
+    !---- (snowmelt_tgate=.false. drops the condition and melts snow on the
+    !----  energy budget alone, as the uncoupled branch below does)
+    if (t.gt.273_WP .or. .not. ice%thermo%snowmelt_tgate) then
         dsnow = A*min(Qatmice-Qicecon,0._WP)
         dsnow = max(dsnow*rhoice/rhosno,-hsn)
     else
@@ -387,6 +476,26 @@ contains
     !---- ice growth rate over open water (dhiow >= 0)
     dhiow = (1._WP-A)*max(Qatmocn-Qocnatm,0._WP)
 
+    !---- diagnostic (output only): split of dhice+dhiow into its sources.
+    !---- Identity: dhice+dhiow = P_d + N_top + N_bot (P_d>=0, N_top<=0, N_bot<=0)
+    !---- NOTE: must stay before the update of A below (A is the old concentration)
+    !---- Surface melt energy over ice (<=0), gated exactly like dsnow above
+#if defined (__oifs) || defined (__ifsinterface)
+    if (t.gt.273_WP) then
+       Qs_d = A*min(Qatmice-Qicecon,0._WP)
+    else
+       Qs_d = 0._WP
+    endif
+#else
+    Qs_d  = A*min(Qatmice-Qicecon,0._WP)
+#endif
+    Sn_d  = -dsnow*rhosno/rhoice              ! part of it already used for snow melt (>=0)
+    Qb_d  = A*Qatmice - Qs_d                  ! heat reaching the ice base by conduction
+    Qo_d  = -A*Qocnice                        ! ocean heat to ice-covered part (<0: melt)
+    P_d   = dhiow + max(Qo_d,0._WP) + max(Qb_d,0._WP)
+    N_top = min(Qs_d + Sn_d, 0._WP)          ! (min: guards against round-off)
+    N_bot = min(Qb_d,0._WP) + min(Qo_d,0._WP)
+
     !---- temporary new ice thickness [m]
     htmp = h + dhice + dhiow
 
@@ -407,6 +516,24 @@ contains
     !---- avoid very small ice thicknesses
     if (h.lt.hcutoff) h = 0._WP
 
+    !---- diagnostic (output only): scale the melt terms so that the terms sum
+    !---- exactly to the actual change (h-hold) after the limiters above
+    !---- (cannot melt more ice than available; h<hcutoff set to zero)
+    N_d   = N_top + N_bot
+    T_d   = h - hold
+    res_d = 0._WP
+    if (N_d < 0._WP) then
+       f_d = max((T_d-P_d)/N_d, 0._WP)
+    else
+       f_d = 1._WP
+       res_d = T_d - P_d - N_d                ! only non-zero if a cut-off acts without melt
+    endif
+    d_gwat = (dhiow + max(Qo_d,0._WP))*rhoice/dt   ! frazil in supercooled water
+    d_gbot = max(Qb_d,0._WP)*rhoice/dt             ! congelation growth at ice base
+    d_mtop = f_d*N_top*rhoice/dt                   ! surface melt (net of snow melt)
+    d_mbot = (f_d*N_bot + res_d)*rhoice/dt         ! basal melt
+    ! lateral melt of volume does not exist in this scheme (only dcice, area): 0
+
     !---- ice thickness before any thermodynamic change
     !---- (for h=0 use cut-off ice thickness to avoid division by zero)
     htmp = max(hold,hcutoff)
@@ -426,6 +553,9 @@ contains
 
     !---- update snow thickness after lateral snow melt
     hsn = hsn + dslat
+
+    !---- diagnostic (output only): total snow melt (atmospheric + lateral) [kg m-2 s-1]
+    d_snmlt = (hsn-hsnold)*rhosno/dt
 
     !---- subtract heat required to melt this additional amount of
     !---- snow from total oceanic heat flux (dslat <= 0)
@@ -513,6 +643,9 @@ contains
     !---- subtract converted snow from snow thickness
     hsn = hsn - hflood*rhoice/rhosno
 
+    !---- diagnostic (output only): snow lost by conversion to ice [kg m-2 s-1]
+    d_snsi = -hflood*rhoice/dt
+
     !---- rate of flooding snow to ice
     dhflice = (h-htmp)/dt
 
@@ -539,13 +672,21 @@ contains
     return
   end subroutine ice_growth
 
+#if defined (__oifs)
+ subroutine ice_surftemp(ithermp, h,hsn,a2ihf,tref,t)
+#else
  subroutine ice_surftemp(ithermp, h,hsn,a2ihf,t)
+#endif
   ! INPUT:
   ! a2ihf - Total atmo heat flux to ice
   ! A  - Ice fraction
   ! h  - Ice thickness
   ! hsn   - Snow thickness
-  ! 
+#if defined (__oifs)
+  ! tref  - linearization anchor for the implicit flux term; with
+  !         use_atm_ice_tskin the atmosphere's ice-tile skin temperature
+#endif
+  !
   ! INPUT/OUTPUT:
   ! t     - Ice surface temperature
 
@@ -556,7 +697,19 @@ contains
   !---- ocean variables (provided by FESOM)
   real(kind=WP)  h
   real(kind=WP)  hsn
+#if defined (__oifs)
+  real(kind=WP)  tref
+#endif
   real(kind=WP)  t
+#if defined (__oifs)
+  !---- flux-linearization coefficient dQ/dT [W/m2/K]
+  real(kind=WP)  zlam
+  !---- bulk near-neutral turbulent flux sensitivity rho*cp*C_H*|U| [W/m2/K]
+  !---- (C_H ~ 1.5e-3, |U| ~ 8 m/s). Radiative + turbulent together give
+  !---- ~20 W/m2/K, the standard fallback flux derivative used in
+  !---- NEMO/SI3-family couplings when the atmosphere does not export dQ/dT.
+  real(kind=WP), parameter :: zlam_turb = 16.0_WP
+#endif
   !---- local variables
   real(kind=WP)  snicecond
   real(kind=WP)  zsniced
@@ -570,12 +723,20 @@ contains
   !---- freezing temperature of sea-water [K]
   real(kind=WP)  :: TFrezs
   
+#if defined (__oifs)
+  real(kind=WP), pointer :: con, consn, cpsno, rhoice, rhosno, emiss_ice, boltzmann
+#else
   real(kind=WP), pointer :: con, consn, cpsno, rhoice, rhosno
+#endif
   con    => ice%thermo%con
   consn  => ice%thermo%consn
   cpsno  => ice%thermo%cpsno
   rhoice => ice%thermo%rhoice
   rhosno => ice%thermo%rhosno
+#if defined (__oifs)
+  emiss_ice => ice%thermo%emiss_ice
+  boltzmann => ice%thermo%boltzmann
+#endif
 
   !---- compute freezing temperature of sea-water from salinity
   TFrezs = -0.0575_WP*S_oc + 1.7105e-3_WP*sqrt(S_oc**3) - 2.155e-4_WP*(S_oc**2)+273.15
@@ -587,9 +748,37 @@ contains
   zcpdt=hcapice/dt                      ! Energy required to change temperature of top ice "layer" [J/(sm²K)]
   zcprosn=rhosno*cpsno/dt               ! Specific Energy required to change temperature of 1m snow on ice [J/(sm³K)]
   zcpdte=zcpdt !+zcprosn*hsn            ! Combined Energy required to change temperature of snow + 0.05m of upper ice
-  t=(zcpdte*t+a2ihf+zicefl)/(zcpdte+con/zsniced) ! New sea ice surf temp [K]
+
+#if defined (__oifs)
+  !---- Implicit (dQ/dT-linearized) atmospheric flux.
+  ! a2ihf was computed by the atmosphere at tref
+  ! and is held constant over the coupling interval. As the surface departs
+  ! from tref, the flux's dominant temperature response is the surface's own
+  ! longwave emission, linearized here:
+  !     Q(t) = a2ihf + zlam*(tref - t),   zlam = 4*eps*sigma*tref**3
+  ! This keeps the internal surface-temperature solve stable regardless of
+  ! the snow/ice insulation (con/zsniced) and leaves the fixed point unchanged
+  ! wherever the surface tracks the coupling temperature. In coupled-slab mode
+  ! the growth budget is driven by the atmosphere flux (-a2ihf), so this solve
+  ! only sets the internal skin temperature (albedo/melt-pond state).
+  ! With use_atm_ice_tskin the atmosphere owns the skin and already formed it
+  ! from a2ihf, so it is taken as is.
+  zlam=4.0_WP*emiss_ice*boltzmann*tref**3 + zlam_turb
+  if (use_atm_ice_tskin) then
+     t=tref
+  else
+     t=(zcpdte*t+a2ihf+zlam*tref+zicefl)/(zcpdte+con/zsniced+zlam) ! New sea ice surf temp [K]
+  end if
+#else
+  !---- Classic IFS-FESOM local surface-temperature update.
+  t=(zcpdte*t+a2ihf+zicefl)/(zcpdte+con/zsniced)
+#endif
   if (t>273.15_WP) then
+#if defined (__oifs)
+     qres=(con/zsniced+zcpdte+zlam)*(t-273.15_WP)
+#else
      qres=(con/zsniced+zcpdte)*(t-273.15_WP)
+#endif
      t=273.15_WP
   endif
   qcon=con*(t-TFrezs)/max(zsniced, himin)
@@ -619,6 +808,7 @@ contains
   real(kind=WP) :: alpha_snow          ! 0..1 snow-cover blend weight
   real(kind=WP) :: alb_snow, alb_bare  ! season-selected snow / bare-ice albedo
   real(kind=WP) :: h_snowscale         ! local copy of namelist tanh scale
+  real(kind=WP) :: fmelt               ! 0 frozen .. 1 melting albedo weight
 
   albsn       => ice%thermo%albsn
   albi        => ice%thermo%albi
@@ -628,7 +818,13 @@ contains
 
   ! Calculate standard albedo first (without pond effects)
   if (h>0.0_WP) then
-     if (t<273.15_WP) then     ! freezing surface
+     if (ice%thermo%alb_tramp > 0.0_WP) then
+        ! Linear transition over alb_tramp K below the melting point
+        fmelt    = min(1.0_WP, max(0.0_WP, &
+                   (t - 273.15_WP + ice%thermo%alb_tramp) / ice%thermo%alb_tramp))
+        alb_snow = albsn + fmelt*(albsnm - albsn)
+        alb_bare = albi  + fmelt*(albim  - albi)
+     else if (t<273.15_WP) then     ! freezing surface
         alb_snow = albsn
         alb_bare = albi
      else                      ! melting surface
