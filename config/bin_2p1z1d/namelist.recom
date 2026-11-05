@@ -53,9 +53,10 @@ use_REcoM             = .true.      ! switch REcoM on
 REcoM_restart         = .true.      ! read the REcoM tracers from the restart (false = initialize from climatology)
 recom_debug           = .false.     ! extra REcoM debug output
 Diags                 = .true.      ! compute REcoM diagnostics
+use_DICremin          = .false.     ! additional DIC tracer for the remineralization contribution (tracer 1037)
 
 ! --- Tracer Counts ---
-bgc_num               = 22          ! number of REcoM tracers, checked at startup against enable_3zoo2det and enable_coccos
+bgc_num               = 22          ! number of REcoM tracers, checked at startup against enable_3zoo2det, enable_coccos, use_DICremin and ciso
 diags3d_num           = 2           ! number of 3D diagnostic tracers to be saved
 bgc_base_num          = 22          ! number of standard (base) BGC tracers
 benthos_num           = 4           ! number of benthic BGC tracers: 8 with ciso = .true., otherwise 4
@@ -73,6 +74,7 @@ allow_var_sinking     = .true.      ! detritus sinking speed increases with dept
 ! --- Process Options ---
 REcoM_Geider_limiter  = .false.     ! selects the routine that calculates the limiters in the sources-minus-sinks
 REcoM_Grazing_Variable_Preference = .false.   ! grazing preferences weighted by prey abundance
+REcoM_Grazing_Variable_Efficiency = .false.   ! grazing efficiency depends on the food concentration (constant gfin if off)
 Grazing_detritus      = .false.     ! zooplankton also graze on detritus
 het_resp_noredfield   = .false.     ! respiration formulation of the first zooplankton (copepods)
 diatom_mucus          = .false.     ! nutrient limitation enhances diatom aggregation
@@ -111,8 +113,6 @@ sedflx_num            = 0           ! number of sediment fluxes read from MEDUSA
 bottflx_num           = 4           ! number of bottom fluxes: 8 with ciso and ciso_14, 6 with ciso only, 4 without ciso
 add_loopback          = .false.     ! return loopback fluxes to the surface through rivers
 lb_tscale             = 1.0         ! fraction of the loopback fluxes added to the surface per year [1/year]
-REcoM_Grazing_Variable_Efficiency = .false.
-use_DICremin          = .false.
 /
 
 ! ============================================================================
@@ -416,7 +416,7 @@ d_co2_calc     = 1.343e+07   ! H+ inhibition coefficient d, calcification [kg/mo
 &pairon
 Fe2N                  = 0.033d0     ! Fe:N ratio of organic matter (Fe2C * 6.625)
 Fe2N_benthos          = 0.15d0      ! Fe:N ratio of the benthic iron release (Fe2C_benthos * 6.625; was 0.14, still to be tuned)
-kScavFe               = 0.752d0     ! scavenging rate of free iron onto detritus
+kScavFe               = 0.752d0     ! scavenging rate of free iron onto detritus; 0.07 with 1 nM fixed ligand
 dust_sol              = 0.02d0      ! soluble (bioavailable) fraction of dust iron
 RiverFeConc           = 100         ! mean dissolved iron concentration in rivers (useRivFe)
 kScavFe_calc          = 0.d0        ! default: 0
