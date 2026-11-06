@@ -69,7 +69,7 @@ module mod_io_restart
     public :: restart_skip_field_on_read, restart_skip_tracers_on_read
     public :: RESTART_HALO_NONE, RESTART_HALO_NODE, RESTART_HALO_ELEM, RESTART_HALO_ELEM_FULL
 
-    integer, parameter :: RESTART_MAXF = 64
+    integer, parameter :: RESTART_MAXF = 256   ! RECOM4 M10: 31 tracers x 3 + physics need ~118
     integer, parameter :: RESTART_FORMAT_VERSION = 1
 
     ! Halo-exchange variant a field's read-back uses to reconstruct its halo from owner values, matching
