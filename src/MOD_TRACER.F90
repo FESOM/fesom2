@@ -56,7 +56,7 @@ real(kind=WP), allocatable                    :: tra_diff_part_hor_redi(:,:,:)
 real(kind=WP), allocatable                    :: tra_diff_part_ver_expl(:,:,:)
 real(kind=WP), allocatable                    :: tra_diff_part_ver_redi_expl(:,:,:)
 real(kind=WP), allocatable                    :: tra_diff_part_ver_impl(:,:,:)
-real(kind=WP), allocatable                    :: tra_recom_sms(:,:,:)
+real(kind=WP_full), allocatable               :: tra_recom_sms(:,:,:) ! written by REcoM, which is real64
 
 ! The fct part
 real(kind=WP),allocatable,dimension(:,:)      :: fct_LO          ! Low-order solution

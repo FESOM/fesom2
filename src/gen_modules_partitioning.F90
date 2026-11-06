@@ -388,6 +388,12 @@ subroutine init_mpi_types(partit, mesh)
 
       allocate(partit%r_mpitype_nod3D(partit%com_nod2D%rPEnum,mesh%nl-1:mesh%nl,3))  ! 3D with nl-1 or nl layers, 1-3 values 
       allocate(partit%s_mpitype_nod3D(partit%com_nod2D%sPEnum,mesh%nl-1:mesh%nl,3))
+#if defined(USE_SINGLE_PRECISION)
+      allocate(partit%r_mpitype_nod2D_r8(partit%com_nod2D%rPEnum))
+      allocate(partit%s_mpitype_nod2D_r8(partit%com_nod2D%sPEnum))
+      allocate(partit%r_mpitype_nod3D_r8(partit%com_nod2D%rPEnum,mesh%nl-1:mesh%nl,3))
+      allocate(partit%s_mpitype_nod3D_r8(partit%com_nod2D%sPEnum,mesh%nl-1:mesh%nl,3))
+#endif
 
 !after the allocation we just reassotiate ALL pointers again here
   
@@ -423,6 +429,11 @@ subroutine init_mpi_types(partit, mesh)
 
          call MPI_TYPE_COMMIT(partit%r_mpitype_nod2D(n),     partit%MPIerr)    
          call MPI_TYPE_COMMIT(partit%r_mpitype_nod2D_i(n),   partit%MPIerr)     
+#if defined(USE_SINGLE_PRECISION)
+         call MPI_TYPE_INDEXED(nb, blocklen,      displace,      MPI_WP_FULL, &
+              partit%r_mpitype_nod2D_r8(n),  partit%MPIerr)
+         call MPI_TYPE_COMMIT(partit%r_mpitype_nod2D_r8(n),  partit%MPIerr)
+#endif
 
          DO nl1=mesh%nl-1, mesh%nl
             DO n_val=1,3
@@ -434,6 +445,11 @@ subroutine init_mpi_types(partit, mesh)
                     partit%r_mpitype_nod3D(n,nl1,n_val),  partit%MPIerr)
 
                call MPI_TYPE_COMMIT(partit%r_mpitype_nod3D(n,nl1,n_val),  partit%MPIerr)  
+#if defined(USE_SINGLE_PRECISION)
+               call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP_FULL, &
+                    partit%r_mpitype_nod3D_r8(n,nl1,n_val),  partit%MPIerr)
+               call MPI_TYPE_COMMIT(partit%r_mpitype_nod3D_r8(n,nl1,n_val),  partit%MPIerr)
+#endif
             ENDDO
          ENDDO
       enddo
@@ -463,6 +479,11 @@ subroutine init_mpi_types(partit, mesh)
 
          call MPI_TYPE_COMMIT(partit%s_mpitype_nod2D(n),     partit%MPIerr)    
          call MPI_TYPE_COMMIT(partit%s_mpitype_nod2D_i(n),   partit%MPIerr)     
+#if defined(USE_SINGLE_PRECISION)
+         call MPI_TYPE_INDEXED(nb, blocklen,      displace,      MPI_WP_FULL, &
+              partit%s_mpitype_nod2D_r8(n),  partit%MPIerr)
+         call MPI_TYPE_COMMIT(partit%s_mpitype_nod2D_r8(n),  partit%MPIerr)
+#endif
 
          DO nl1=mesh%nl-1, mesh%nl
             DO n_val=1,3
@@ -474,6 +495,11 @@ subroutine init_mpi_types(partit, mesh)
                     partit%s_mpitype_nod3D(n,nl1,n_val),  partit%MPIerr)
 
                call MPI_TYPE_COMMIT(partit%s_mpitype_nod3D(n,nl1,n_val),  partit%MPIerr)  
+#if defined(USE_SINGLE_PRECISION)
+               call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP_FULL, &
+                    partit%s_mpitype_nod3D_r8(n,nl1,n_val),  partit%MPIerr)
+               call MPI_TYPE_COMMIT(partit%s_mpitype_nod3D_r8(n,nl1,n_val),  partit%MPIerr)
+#endif
             ENDDO
          ENDDO
       enddo

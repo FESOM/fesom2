@@ -30,6 +30,13 @@ module restart_file_group_module
     generic, public :: def_elem_var_optional => def_elem_var_2d_optional, def_elem_var_3d_optional
     procedure, private :: def_node_var_2d_optional, def_node_var_3d_optional
     procedure, private :: def_elem_var_2d_optional, def_elem_var_3d_optional
+#if defined(USE_SINGLE_PRECISION)
+    ! real64 node fields of a single-precision build, kept in the restart at full precision
+    generic, public :: def_node_var => def_node_var_2d_r8, def_node_var_3d_r8
+    generic, public :: def_node_var_optional => def_node_var_2d_r8_optional, def_node_var_3d_r8_optional
+    procedure, private :: def_node_var_2d_r8, def_node_var_3d_r8
+    procedure, private :: def_node_var_2d_r8_optional, def_node_var_3d_r8_optional
+#endif
   end type restart_file_group
   
 contains
@@ -211,6 +218,64 @@ contains
     call add_file(this, name, .false., mesh%nod2d, mesh%elem2d, mesh%nl, partit)
     call this%files(this%nfiles)%specify_elem_var(name, longname, units, local_data)
   end subroutine def_elem_var_3d_optional
+
+
+#if defined(USE_SINGLE_PRECISION)
+  subroutine def_node_var_2d_r8(this, name, longname, units, local_data, mesh, partit)
+    use mod_mesh
+    class(restart_file_group), intent(inout) :: this
+    character(len=*), intent(in) :: name
+    character(len=*), intent(in) :: units, longname
+    real(kind=8), target, intent(inout) :: local_data(:)
+    type(t_mesh), intent(in) :: mesh
+    type(t_partit), intent(in) :: partit
+    ! EO parameters
+    call add_file(this, name, .true., mesh%nod2d, mesh%elem2d, mesh%nl, partit)
+    call this%files(this%nfiles)%specify_node_var(name, longname, units, local_data)
+  end subroutine def_node_var_2d_r8
+
+
+  subroutine def_node_var_3d_r8(this, name, longname, units, local_data, mesh, partit)
+    use mod_mesh
+    class(restart_file_group), intent(inout) :: this
+    character(len=*), intent(in) :: name
+    character(len=*), intent(in) :: units, longname
+    real(kind=8), target, intent(inout) :: local_data(:,:)
+    type(t_mesh), intent(in) :: mesh
+    type(t_partit), intent(in) :: partit
+    ! EO parameters
+    call add_file(this, name, .true., mesh%nod2d, mesh%elem2d, mesh%nl, partit)
+    call this%files(this%nfiles)%specify_node_var(name, longname, units, local_data)
+  end subroutine def_node_var_3d_r8
+
+
+  subroutine def_node_var_2d_r8_optional(this, name, longname, units, local_data, mesh, partit)
+    use mod_mesh
+    class(restart_file_group), intent(inout) :: this
+    character(len=*), intent(in) :: name
+    character(len=*), intent(in) :: units, longname
+    real(kind=8), target, intent(inout) :: local_data(:)
+    type(t_mesh), intent(in) :: mesh
+    type(t_partit), intent(in) :: partit
+    ! EO parameters
+    call add_file(this, name, .false., mesh%nod2d, mesh%elem2d, mesh%nl, partit)
+    call this%files(this%nfiles)%specify_node_var(name, longname, units, local_data)
+  end subroutine def_node_var_2d_r8_optional
+
+
+  subroutine def_node_var_3d_r8_optional(this, name, longname, units, local_data, mesh, partit)
+    use mod_mesh
+    class(restart_file_group), intent(inout) :: this
+    character(len=*), intent(in) :: name
+    character(len=*), intent(in) :: units, longname
+    real(kind=8), target, intent(inout) :: local_data(:,:)
+    type(t_mesh), intent(in) :: mesh
+    type(t_partit), intent(in) :: partit
+    ! EO parameters
+    call add_file(this, name, .false., mesh%nod2d, mesh%elem2d, mesh%nl, partit)
+    call this%files(this%nfiles)%specify_node_var(name, longname, units, local_data)
+  end subroutine def_node_var_3d_r8_optional
+#endif
 
 
   subroutine assert(val, line)
