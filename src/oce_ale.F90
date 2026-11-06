@@ -828,14 +828,6 @@ subroutine init_thickness_ale(dynamics, partit, mesh)
     
     !___________________________________________________________________________
     mesh%hnode_new=mesh%hnode  ! Should be initialized, because only variable part is updated.
-#if defined(USE_SINGLE_PRECISION)
-    ! Seed the WP mirrors that the netCDF restart reads into. hnode_new is an
-    ! optional restart variable: a restart written before it existed leaves its
-    ! mirror untouched, and the copy-back after the read (fesom_module) must then
-    ! give back this initial state, not the zeros from init_ale.
-    mesh%hnode_wp     = real(mesh%hnode, WP)
-    mesh%hnode_new_wp = real(mesh%hnode_new, WP)
-#endif
     call exchange_elem(mesh%helem, partit)
     !!PS call check_total_volume(partit, mesh)
     
@@ -1483,6 +1475,9 @@ subroutine init_stiff_mat_ale(partit, mesh)
     
     !___________________________________________________________________________
     deallocate(mapping)
+    if (allocated(mesh%ssh_stiff%values_ref)) deallocate(mesh%ssh_stiff%values_ref)
+    allocate(mesh%ssh_stiff%values_ref(size(mesh%ssh_stiff%values)))
+    mesh%ssh_stiff%values_ref = real(mesh%ssh_stiff%values, real64)
     t1=MPI_Wtime()
     if (partit%mype==0) then
         write(*,*) '     took: ',t1-t0, ' sec'
@@ -1526,7 +1521,7 @@ subroutine update_stiff_mat_ale(partit, mesh)
     integer                             :: n, i, j, k, row, ed, n2
     integer                             :: enodes(2), elnodes(3), el(2)
     integer                             :: elem, npos(3), offset, nini, nend
-    real(kind=WP)                       :: factor 
+    real(kind=WP)                       :: factor, dh
     real(kind=WP)                       :: fx(3), fy(3)
 #if defined(USE_SINGLE_PRECISION) && defined(DIAG_STIFF_DRIFT)
     integer, save                       :: drift_ncall = 0
@@ -1536,14 +1531,11 @@ subroutine update_stiff_mat_ale(partit, mesh)
     ! pointer on necessary derived types
 
     !___________________________________________________________________________
-#if defined(USE_SINGLE_PRECISION)
-    !___________________________________________________________________________
-    ! Seed the full-precision accumulator on first use. Deliberately here and not
-    ! in init_stiff_mat_ale: init runs on every start, but on a restart the
-    ! restored %values (which carries every increment the previous segment
-    ! accumulated -- it is in the binary dump, see MOD_MESH) overwrites what init
-    ! assembled. Seeding here, on the first update after all of that, is the one
-    ! point correct for a cold start and a restart alike.
+    ! Start from the matrix of the unperturbed depth and add the term of the current
+    ! elevation hbar, instead of adding the change dhe of every step to the matrix of
+    ! the previous step. The two agree up to rounding, but the sum of the increments
+    ! is not in the restart: a restarted run rebuilt it from hbar in one go, and its
+    ! SSH did not reproduce a continuous run. Now the matrix is a function of hbar.
     !
     ! SIZE: size(%values), NOT %nza. init_stiff_mat_ale sets %nza to the LOCAL nnz
     ! and allocates %values with it, then later REPLACES %nza with the global sum
@@ -1551,14 +1543,17 @@ subroutine update_stiff_mat_ale(partit, mesh)
     ! here with %nza would therefore over-allocate by ~npes per rank and make the
     ! whole-array assignments below nonconforming -- reading past the end of
     ! %values. size(%values) is the array we are shadowing, by construction.
-    if (.not. allocated(mesh%ssh_stiff%values_full)) then
+#if defined(USE_SINGLE_PRECISION)
+    if (.not. allocated(mesh%ssh_stiff%values_full)) &
         allocate(mesh%ssh_stiff%values_full(size(mesh%ssh_stiff%values)))
-        mesh%ssh_stiff%values_full = real(mesh%ssh_stiff%values, real64)
+    mesh%ssh_stiff%values_full = mesh%ssh_stiff%values_ref
 #if defined(DIAG_STIFF_DRIFT)
+    if (.not. allocated(mesh%ssh_stiff%values_wp_drift)) &
         allocate(mesh%ssh_stiff%values_wp_drift(size(mesh%ssh_stiff%values)))
-        mesh%ssh_stiff%values_wp_drift = mesh%ssh_stiff%values
+    mesh%ssh_stiff%values_wp_drift = real(mesh%ssh_stiff%values_ref, WP)
 #endif
-    end if
+#else
+    mesh%ssh_stiff%values = mesh%ssh_stiff%values_ref
 #endif
 
     ! update secod term of lhs od equation (18) of "FESOM2 from finite element 
@@ -1570,7 +1565,7 @@ subroutine update_stiff_mat_ale(partit, mesh)
     ! (mesh%nod_in_edge2D) in ascending edge order; j says which end of the edge the
     ! row is. No thread writes a row it does not own, and the sums do not depend on
     ! the number of threads.
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, i, j, k, row, ed, n2, elnodes, el, elem, npos, offset, nini, nend, fx, fy)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, i, j, k, row, ed, n2, elnodes, el, elem, npos, offset, nini, nend, fx, fy, dh)
     do row=1, partit%myDim_nod2D
         ! sparse indice offset for node with index row
         offset=mesh%SSH_stiff%rowptr(row)-mesh%ssh_stiff%rowptr(1)
@@ -1603,10 +1598,12 @@ subroutine update_stiff_mat_ale(partit, mesh)
                 ! here update of second term on lhs of eq. 18 in Danilov etal 2017
                 ! --> in the initialisation of the stiff matrix the integration went 
                 !     over the unperturbed ocean depth using -zbar_e_bot 
-                ! --> here this therm is now updated with the actual change in ssh 
-                !     interpolated to the element dhe
+                ! --> here this therm is now added for the actual ssh hbar
+                !     interpolated to the element (as dhe, zero under a cavity)
                 ! calculate: - alpha*theta*g*tau*grad*(int_0^hbar(grad*(eta^(n+1)-eta^n))*dz)
-                fy(1:3) = -mesh%dhe(elem)* &
+                dh = 0.0_WP
+                if (mesh%ulevels(elem) == 1) dh = sum(mesh%hbar(elnodes))/3.0_WP
+                fy(1:3) = -dh* &
                          ( mesh%gradient_sca(1:3,el(i)) * mesh%edge_cross_dxdy(2*i  ,ed)   &
                           -mesh%gradient_sca(4:6,el(i)) * mesh%edge_cross_dxdy(2*i-1,ed) )
                           
@@ -1702,10 +1699,13 @@ subroutine update_stiff_mat_ale_acc(partit, mesh)
     real(kind=WP)                       :: factor, fy(3)
     logical, save                       :: data_created = .false.
     real(kind=WP),     pointer          :: values(:)
+    real(kind=real64), pointer          :: values_ref(:)
 #if defined(USE_SINGLE_PRECISION)
     real(kind=real64), pointer          :: values_full(:)
 #endif
     integer,           pointer          :: rowptr(:)
+    ! elevation hbar interpolated to the elements, zero under a cavity
+    real(kind=WP), allocatable, save    :: dh(:)
 
 #if defined(USE_SINGLE_PRECISION)
     if (.not. allocated(mesh%ssh_stiff%values_full)) then
@@ -1715,18 +1715,37 @@ subroutine update_stiff_mat_ale_acc(partit, mesh)
     values_full => mesh%ssh_stiff%values_full
 #endif
     values => mesh%ssh_stiff%values
+    values_ref => mesh%ssh_stiff%values_ref
     rowptr => mesh%ssh_stiff%rowptr
     if (.not. data_created) then
-        ! the values are cumulative: start from the host copy once, then keep them on the device
+        ! rebuilt every step from values_ref and hbar, as on the host
+        allocate(dh(partit%myDim_elem2D))
 #if defined(USE_SINGLE_PRECISION)
-        !$ACC ENTER DATA COPYIN(values, values_full)
+        !$ACC ENTER DATA COPYIN(values, values_full, values_ref)
 #else
-        !$ACC ENTER DATA COPYIN(values)
+        !$ACC ENTER DATA COPYIN(values, values_ref)
 #endif
-        !$ACC ENTER DATA CREATE(mesh%dhe)
+        !$ACC ENTER DATA CREATE(dh)
         data_created = .true.
     end if
-    !$ACC UPDATE DEVICE(mesh%dhe)
+    do elem=1, partit%myDim_elem2D
+        dh(elem) = 0.0_WP
+        if (mesh%ulevels(elem) == 1) dh(elem) = sum(mesh%hbar(mesh%elem2D_nodes(:,elem)))/3.0_WP
+    end do
+    !$ACC UPDATE DEVICE(dh)
+#if defined(USE_SINGLE_PRECISION)
+    !$ACC PARALLEL LOOP DEFAULT(PRESENT)
+    do n=1, size(values)
+        values_full(n) = values_ref(n)
+    end do
+    !$ACC END PARALLEL LOOP
+#else
+    !$ACC PARALLEL LOOP DEFAULT(PRESENT)
+    do n=1, size(values)
+        values(n) = values_ref(n)
+    end do
+    !$ACC END PARALLEL LOOP
+#endif
 
     factor=g*dt*alpha*theta
     myDim_nod2D=partit%myDim_nod2D
@@ -1754,7 +1773,7 @@ subroutine update_stiff_mat_ale_acc(partit, mesh)
                    end do
                 end do
                 do k=1, 3
-                    fy(k) = -mesh%dhe(elem)* &
+                    fy(k) = -dh(elem)* &
                             ( mesh%gradient_sca(k,elem)   * mesh%edge_cross_dxdy(2*i  ,ed)   &
                              -mesh%gradient_sca(k+3,elem) * mesh%edge_cross_dxdy(2*i-1,ed) )
                     if (i==2) fy(k)=-fy(k)
@@ -4079,7 +4098,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     
     !___________________________________________________________________________
     ! Compute SSH via solver
-    ! Update stiffness matrix by dhe=hbar(n+1/2)-hbar(n-1/2) on elements, only
+    ! Update stiffness matrix for the elevation hbar(n-1/2) on elements, only
     ! needed for zlevel and zstar
     if (.not. dynamics%use_ssh_se_subcycl) then
 #if defined (FESOM_PROFILING)
