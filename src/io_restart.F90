@@ -46,19 +46,9 @@ MODULE io_RESTART
 #endif  
 
 #if defined(__recom)
+  ! REcoM's restart fields are real64 (REcoM's own WP), also in a single-precision
+  ! build, and the restart keeps them at that precision
   type(restart_file_group) , save :: bio_files
-  ! REcoM's 2D restart fields are real64 (REcoM's own WP). The restart files take
-  ! WP arrays, so in a single-precision build they go through the WP copies
-  ! bio_rst_wp, filled from the real64 fields before a write and copied back after
-  ! a read (see def_bio_node_var). The restart then holds them rounded to WP, as
-  ! it holds the WP tracers, whose rounding carry is not restarted either.
-  type bio_rst_r8_type
-    real(kind=WP_full), pointer :: p(:) => null()
-  end type bio_rst_r8_type
-  integer, parameter                       :: max_bio_rst = 16
-  type(bio_rst_r8_type),            save   :: bio_rst_r8(max_bio_rst)
-  real(kind=WP), allocatable, target, save :: bio_rst_wp(:,:)
-  integer,                          save   :: n_bio_rst = 0
 #endif
 
   integer, parameter :: RAW_RESTART_METADATA_RANK = 0
@@ -181,20 +171,13 @@ subroutine ini_ocean_io(dynamics, tracers, partit, mesh)
   ! Not allocated with split-explicit subcycling (use_ssh_se_subcycl), which does not use the CG solver.
   if (allocated(dynamics%d_eta)) &
   call oce_files%def_node_var_optional('d_eta', 'SSH increment / CG initial guess', 'm', dynamics%d_eta, mesh, partit)
-#if defined(USE_SINGLE_PRECISION)
-  call oce_files%def_node_var('hnode', 'nodal layer thickness', 'm',   mesh%hnode_wp, mesh, partit)
-#else
+  ! hnode and hnode_new are real64 also in a single-precision build, and are restarted as such
   call oce_files%def_node_var('hnode', 'nodal layer thickness', 'm',   mesh%hnode, mesh, partit)
-#endif
   ! hnode_new is filled by vert_vel_ale, but fer_solve_Gamma and init_Redi_GM run EARLIER in
   ! the step and read it (oce_fer_gm.F90:82, :266), so with Fer_GM they consume the previous
   ! step's value -> prognostic across the step boundary. Also written by the binary path
   ! (MOD_MESH.F90, write_bin_array(mesh%hnode_new)).
-#if defined(USE_SINGLE_PRECISION)
-  call oce_files%def_node_var_optional('hnode_new', 'nodal layer thickness, next step', 'm', mesh%hnode_new_wp, mesh, partit)
-#else
   call oce_files%def_node_var_optional('hnode_new', 'nodal layer thickness, next step', 'm', mesh%hnode_new, mesh, partit)
-#endif
   
   !___Define the netCDF variables for 3D fields_______________________________
 #ifdef ENABLE_NVHPC_WORKAROUNDS
@@ -329,6 +312,12 @@ subroutine ini_ocean_io(dynamics, tracers, partit, mesh)
      call oce_files%def_node_var_optional(trim(trname)//'_M1', trim(longname), trim(units), tracers%data(j)%valuesold(1,:,:), mesh, partit)
      if (tracers%data(j)%AB_order==3) &
      call oce_files%def_node_var_optional(trim(trname)//'_M2', trim(longname), trim(units), tracers%data(j)%valuesold(2,:,:), mesh, partit)
+     ! single precision: the content below the WP resolution of the tracer, which the
+     ! next tracer update adds (carry, see diff_tracers_ale). Optional: without it the
+     ! carry starts from zero.
+     if (use_tracer_carry) &
+     call oce_files%def_node_var_optional(trim(trname)//'_carry', 'rounding carry of '//trim(trname)//' times layer thickness', &
+                                          trim(units)//' m', tracers%work%carry(:,:,j), mesh, partit)
   end do
   call oce_files%def_node_var('w', 'vertical velocity', 'm/s', dynamics%w, mesh, partit)
   call oce_files%def_node_var('w_expl', 'vertical velocity', 'm/s', dynamics%w_e, mesh, partit)
@@ -407,70 +396,31 @@ subroutine ini_bio_io(tracers, partit, mesh)
     !===================== Definition part =====================================
     !===========================================================================
     !___Define the netCDF variables for 2D fields_______________________________
-    call def_bio_node_var('BenN',    'Benthos Nitrogen', 'mmol/m3',   Benthos(:,1), mesh, partit)
-    call def_bio_node_var('BenC',    'Benthos Carbon',   'mmol/m3',   Benthos(:,2), mesh, partit)
-    call def_bio_node_var('BenSi',   'Benthos Silicate', 'mmol/m3',   Benthos(:,3), mesh, partit)
-    call def_bio_node_var('BenCalc', 'Benthos Calcite',  'mmol/m3',   Benthos(:,4), mesh, partit)
-    call def_bio_node_var('HPlus',   'Conc. of H-plus ions in the surface water', 'mol/kg',   GloHplus, mesh, partit)
+    call bio_files%def_node_var('BenN',    'Benthos Nitrogen', 'mmol/m3',   Benthos(:,1), mesh, partit)
+    call bio_files%def_node_var('BenC',    'Benthos Carbon',   'mmol/m3',   Benthos(:,2), mesh, partit)
+    call bio_files%def_node_var('BenSi',   'Benthos Silicate', 'mmol/m3',   Benthos(:,3), mesh, partit)
+    call bio_files%def_node_var('BenCalc', 'Benthos Calcite',  'mmol/m3',   Benthos(:,4), mesh, partit)
+    call bio_files%def_node_var('HPlus',   'Conc. of H-plus ions in the surface water', 'mol/kg',   GloHplus, mesh, partit)
   if (ciso) then
-    call def_bio_node_var('BenC_13', 'Benthos Carbon-13', 'mmol/m3',   Benthos(:,5), mesh, partit)
-    call def_bio_node_var('BenCalc_13', 'Benthos Calcite-13', 'mmol/m3',   Benthos(:,6), mesh, partit) 
+    call bio_files%def_node_var('BenC_13', 'Benthos Carbon-13', 'mmol/m3',   Benthos(:,5), mesh, partit)
+    call bio_files%def_node_var('BenCalc_13', 'Benthos Calcite-13', 'mmol/m3',   Benthos(:,6), mesh, partit) 
     if (ciso_14 .and. ciso_organic_14) then
-      call def_bio_node_var('BenC_14', 'Benthos Carbon-14',  'mmol/m3',   Benthos(:,7), mesh, partit)
-      call def_bio_node_var('BenCalc_14', 'Benthos Calcite-14', 'mmol/m3',   Benthos(:,8), mesh, partit) 
+      call bio_files%def_node_var('BenC_14', 'Benthos Carbon-14',  'mmol/m3',   Benthos(:,7), mesh, partit)
+      call bio_files%def_node_var('BenCalc_14', 'Benthos Calcite-14', 'mmol/m3',   Benthos(:,8), mesh, partit) 
     end if ! ciso_14
   end if   ! ciso
   if (use_atbox) then
-    call def_bio_node_var('xCO2', 'Atm. CO2 mixing ratio', 'mol / mol', x_co2atm(:), mesh, partit)
+    call bio_files%def_node_var('xCO2', 'Atm. CO2 mixing ratio', 'mol / mol', x_co2atm(:), mesh, partit)
     if (ciso) then
-      call def_bio_node_var('xCO2_13', 'Atm. 13CO2 mixing ratio', 'mol / mol', x_co2atm_13(:), mesh, partit)
+      call bio_files%def_node_var('xCO2_13', 'Atm. 13CO2 mixing ratio', 'mol / mol', x_co2atm_13(:), mesh, partit)
       if (ciso_14) then
-        call def_bio_node_var('xCO2_14', 'Atm. 14CO2 mixing ratio', 'mol / mol', x_co2atm_14(:), mesh, partit)
-        call def_bio_node_var('cosmic_14', 'Cosmic 14C production', 'mol / s', cosmic_14(:), mesh, partit)
+        call bio_files%def_node_var('xCO2_14', 'Atm. 14CO2 mixing ratio', 'mol / mol', x_co2atm_14(:), mesh, partit)
+        call bio_files%def_node_var('cosmic_14', 'Cosmic 14C production', 'mol / s', cosmic_14(:), mesh, partit)
       end if
     end if
   end if  ! use_atbox
 
 end subroutine ini_bio_io
-!
-!--------------------------------------------------------------------------------------------
-! a real64 REcoM field in the bio restart (directly in double precision, through
-! bio_rst_wp in single precision)
-subroutine def_bio_node_var(name, longname, units, data, mesh, partit)
-    character(len=*),           intent(in)            :: name, longname, units
-    real(kind=WP_full), target, intent(inout)         :: data(:)
-    type(t_mesh),               intent(in)            :: mesh
-    type(t_partit),             intent(inout), target :: partit
-#if defined(USE_SINGLE_PRECISION)
-    if (.not. allocated(bio_rst_wp)) allocate(bio_rst_wp(size(data), max_bio_rst))
-    if (n_bio_rst == max_bio_rst) then
-        if (partit%mype == 0) write(*,*) 'def_bio_node_var: more than ', max_bio_rst, ' REcoM restart fields'
-        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
-    end if
-    n_bio_rst = n_bio_rst + 1
-    bio_rst_r8(n_bio_rst)%p => data
-    bio_rst_wp(:, n_bio_rst) = real(data, WP)
-    call bio_files%def_node_var(name, longname, units, bio_rst_wp(:, n_bio_rst), mesh, partit)
-#else
-    call bio_files%def_node_var(name, longname, units, data, mesh, partit)
-#endif
-end subroutine def_bio_node_var
-!
-! before writing the bio restart: the WP copies from the real64 fields
-subroutine bio_rst_to_wp()
-    integer :: k
-    do k = 1, n_bio_rst
-        bio_rst_wp(:, k) = real(bio_rst_r8(k)%p, WP)
-    end do
-end subroutine bio_rst_to_wp
-!
-! after reading the bio restart: the real64 fields from the WP copies
-subroutine bio_rst_from_wp()
-    integer :: k
-    do k = 1, n_bio_rst
-        bio_rst_r8(k)%p = real(bio_rst_wp(:, k), WP_full)
-    end do
-end subroutine bio_rst_from_wp
 #endif
 
 !--------------------------------------------------------------------------------------------
@@ -587,7 +537,6 @@ subroutine read_initial_conditions(which_readr, ice, dynamics, tracers, partit, 
     if (REcoM_restart) then
         if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: bio'//achar(27)//'[0m'
         call read_netcdf_restarts(read_bio_path, legacy_bio_path, bio_files, partit%MPI_COMM_FESOM, partit%mype)
-        call bio_rst_from_wp()
     end if
 #endif
 
@@ -822,7 +771,6 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
             if(partit%my_fesom_group == 0) then
 #endif
                 if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: bio'//achar(27)//'[0m'
-                call bio_rst_to_wp()
                 call write_netcdf_restarts(write_bio_path, bio_files, istep)
 #if defined(__usetp)
             endif 
@@ -986,7 +934,6 @@ subroutine write_all_raw_restarts(dirpath, infopath, istep, mpicomm, mype)
   call write_raw_restart_group(oce_files, fileunit)
   if(use_ice) call write_raw_restart_group(ice_files, fileunit)
 #if defined(__recom)
-  call bio_rst_to_wp()
   call write_raw_restart_group(bio_files, fileunit)
 #endif
   close(fileunit)
@@ -1074,7 +1021,6 @@ subroutine read_all_raw_restarts(dirpath, infopath, mpicomm, mype)
 #if defined(__recom)
     if (use_REcoM .or. REcoM_restart) then  !fix OG:23.04.2026
       call read_raw_restart_group(bio_files, fileunit)
-      call bio_rst_from_wp()
     end if
 #endif
     close(fileunit)

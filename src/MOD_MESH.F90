@@ -143,7 +143,7 @@ integer, allocatable, dimension(:,:)          :: nn_pos
 ! change, since mixed-kind arithmetic promotes; only WP-typed call arguments do.
 real(kind=WP_full), allocatable,dimension(:,:) :: hnode
 real(kind=WP_full), allocatable,dimension(:,:) :: hnode_new
-real(kind=WP), allocatable,dimension(:,:)   :: hnode_wp, hnode_new_wp   ! WP copies for output and restart (single-precision build)
+real(kind=WP), allocatable,dimension(:,:)   :: hnode_wp, hnode_new_wp   ! WP copies for output (single-precision build)
 real(kind=WP), allocatable,dimension(:,:)   :: zbar_3d_n
 real(kind=WP), allocatable,dimension(:,:)   :: Z_3d_n
 ! LA 2023-01-31 add icebergs

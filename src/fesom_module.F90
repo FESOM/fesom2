@@ -749,10 +749,6 @@ contains
         !___IF RESTART WITH ZLEVEL OR ZSTAR IS DONE, ALSO THE ACTUAL LEVELS AND ____
         !___MIDDEPTH LEVELS NEEDS TO BE CALCULATET AT RESTART_______________________
         if (r_restart .and. .not. f%which_readr==2) then
-#if defined(USE_SINGLE_PRECISION)
-            f%mesh%hnode     = real(f%mesh%hnode_wp, WP_full)
-            f%mesh%hnode_new = real(f%mesh%hnode_new_wp, WP_full)
-#endif
             call restart_thickness_ale(f%partit, f%mesh)
         end if
         ! for KE diagnostic we need to compute an exact profile of reference density
