@@ -32,10 +32,11 @@ if(NOT DEFINED CMAKE_BUILD_PARALLEL_LEVEL)
     set(CMAKE_BUILD_PARALLEL_LEVEL ${N})
 endif()
 
-# Build YAXT
+# Build YAXT, pinned to the release ICON uses (#1241); older 0.12 releases had
+# installation issues
 ExternalProject_Add(yaxt-external
     GIT_REPOSITORY https://gitlab.dkrz.de/dkrz-sw/yaxt.git
-    GIT_TAG master
+    GIT_TAG v0.12.2.1
     GIT_SHALLOW ON
     PREFIX ${CMAKE_BINARY_DIR}/external/yaxt-build
     CONFIGURE_COMMAND ${YAXT_CONFIGURE_COMMAND}
