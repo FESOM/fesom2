@@ -2028,7 +2028,7 @@ CASE ('otracers  ')
       !___ltra_diag tracer budget terms, all as layer-integrated rates [mmol/m2/s]
       !   (tracer * layer thickness per second). For each layer:
       !   *_tendency = *_hor_adv + *_ver_adv + *_tra_diff_part_hor_redi + *_tra_diff_part_ver_redi_expl
-      !              + *_tra_diff_part_ver_impl (or *_ver_expl) + *_recom_sms + *_bf
+      !              + *_tra_diff_part_ver_impl (or *_ver_expl) + *_recom_sms + *_bf + *_sink
       if (tracers%data(j)%ltra_diag) then
          select case (tracers%data(j)%ID)
             case (1001)
@@ -2070,6 +2070,9 @@ CASE ('otracers  ')
          call def_stream((/mesh%nl-1, mesh%nod2D/), (/mesh%nl-1, partit%myDim_nod2D/), trim(bname)//'_bf', &
               'Benthic (bottom) flux of '//trim(bname), '[mmol/m2/s]', tracers%work%tra_benthic(:,:,j), &
               io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+         call def_stream((/mesh%nl-1, mesh%nod2D/), (/mesh%nl-1, partit%myDim_nod2D/), trim(bname)//'_sink', &
+              'REcoM sinking of '//trim(bname)//' (in the water column and into the benthos)', '[mmol/m2/s]', &
+              tracers%work%tra_sink(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 #endif
          call def_stream((/mesh%nl-1, mesh%nod2D/), (/mesh%nl-1, partit%myDim_nod2D/), trim(bname)//'_tendency', &
               'Total tendency of '//trim(bname), '[mmol/m2/s]', tracers%work%tra_tendency(:,:,j), &

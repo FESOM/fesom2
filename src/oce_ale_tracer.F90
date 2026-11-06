@@ -854,6 +854,13 @@ if (any(recom_sinking_tracer_id == tracers%data(tr_num)%ID)) then
                                                 vert_sink(nzmin:nzmax,n)
         tracers%data(tr_num)%values(nzmin:nzmax,n)=tracers%data(tr_num)%values(nzmin:nzmax,n)+ &
                                                 str_bf(nzmin:nzmax,n)
+        ! ltra_diag: sinking in the water column (vert_sink) and into the benthos (str_bf)
+        ! [mmol/m2/s]. Like dtr_bf, both are added before the T* update, while the values
+        ! are still on hnode, so their layer content is (vert_sink + str_bf)*hnode.
+        if (tracers%data(tr_num)%ltra_diag) then
+            tracers%work%tra_sink(nzmin:nzmax,n,tr_num) = (vert_sink(nzmin:nzmax,n) + str_bf(nzmin:nzmax,n)) &
+                                                          * mesh%hnode(nzmin:nzmax,n)/dt
+        end if
         end do
 endif
 #endif

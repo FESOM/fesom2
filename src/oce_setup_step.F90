@@ -511,9 +511,10 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
         tracers%work%tra_diff_part_ver_redi_expl = 0.0_WP
         tracers%work%tra_diff_part_ver_impl = 0.0_WP
         tracers%work%tra_recom_sms = 0.0_WP
-        allocate(tracers%work%tra_benthic(mesh%nl-1,node_size,num_tracers))
+        allocate(tracers%work%tra_benthic(mesh%nl-1,node_size,num_tracers), tracers%work%tra_sink(mesh%nl-1,node_size,num_tracers))
         allocate(tracers%work%tracer_old(mesh%nl-1,node_size,num_tracers), tracers%work%tra_tendency(mesh%nl-1,node_size,num_tracers))
         tracers%work%tra_benthic  = 0.0_WP
+        tracers%work%tra_sink     = 0.0_WP
         tracers%work%tracer_old   = 0.0_WP
         tracers%work%tra_tendency = 0.0_WP
     end if

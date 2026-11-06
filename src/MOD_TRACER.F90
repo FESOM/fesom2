@@ -59,6 +59,7 @@ real(kind=WP), allocatable                    :: tra_diff_part_ver_redi_expl(:,:
 real(kind=WP), allocatable                    :: tra_diff_part_ver_impl(:,:,:)
 real(kind=WP), allocatable                    :: tra_recom_sms(:,:,:)
 real(kind=WP), allocatable                    :: tra_benthic(:,:,:)   ! benthic (bottom) flux into the water column
+real(kind=WP), allocatable                    :: tra_sink(:,:,:)      ! REcoM sinking: in the water column and into the benthos
 real(kind=WP_full), allocatable               :: tracer_old(:,:,:)    ! c*h at the start of the step (WP_full: the tendency is a small difference of large numbers)
 real(kind=WP), allocatable                    :: tra_tendency(:,:,:)  ! total tendency over the step
 
