@@ -66,6 +66,7 @@ module mod_io_restart
     public :: restart_resolve_latest
     ! READ path (Stage 4, Task 4.1) + the per-field halo-exchange variant selectors
     public :: restart_read, restart_read_field, restart_halo_exchange_all
+    public :: restart_skip_field_on_read, restart_skip_tracers_on_read
     public :: RESTART_HALO_NONE, RESTART_HALO_NODE, RESTART_HALO_ELEM, RESTART_HALO_ELEM_FULL
 
     integer, parameter :: RESTART_MAXF = 64
@@ -104,6 +105,8 @@ module mod_io_restart
         logical           :: mp_src   = .false.
         real(MP), pointer :: pmp2d(:)   => null()      ! live array (2-D field, MP source)
         real(MP), pointer :: pmp3d(:,:) => null()      ! live array (3-D field, MP source)
+        ! RECOM4 M10 (#57): registered and written, but not read by restart_read
+        logical           :: skip_read = .false.
     end type t_restart_field
 
     type :: t_restart
@@ -355,6 +358,43 @@ contains
 
     ! Tracer store name == FESOM2 ini_ocean_io CASE(id) (io_restart.F90:167-212): id keys the canonical
     ! name (1=temp, 2=salt, passive species by tracer ID), default 'tra'//j for an unlisted passive tracer.
+    ! RECOM4 M10 (#57): mark a registered field as written but not read. Used for a
+    ! biology cold start on a physics checkpoint (REcoM_restart = .false.): the field
+    ! stays registered, so the run's own checkpoints carry it, but restart_read leaves
+    ! its live array as the cold init set it. Stops if no registered field has the name.
+    subroutine restart_skip_field_on_read(R, name)
+        type(t_restart),  intent(inout) :: R
+        character(len=*), intent(in)    :: name
+        integer :: k
+        logical :: found
+        found = .false.
+        do k = 1, R%nf
+            if (trim(R%f(k)%name) == trim(name)) then
+                R%f(k)%skip_read = .true.
+                found = .true.
+            end if
+        end do
+        call zarr_check(found, 'restart_skip_field_on_read: no registered field '//trim(name))
+    end subroutine restart_skip_field_on_read
+
+    ! The same for tracers jfirst .. num_tracers: the value and history stores
+    ! (<tr>, <tr>_AB, <tr>_M1 and, for AB_order 3, <tr>_M2), named as
+    ! restart_register_state names them.
+    subroutine restart_skip_tracers_on_read(R, tracers, jfirst)
+        type(t_restart), intent(inout) :: R
+        type(t_tracer),  intent(in)    :: tracers
+        integer,         intent(in)    :: jfirst
+        integer           :: j
+        character(len=32) :: tn
+        do j = jfirst, tracers%num_tracers
+            tn = tracer_name(tracers%data(j)%ID, j)
+            call restart_skip_field_on_read(R, trim(tn))
+            call restart_skip_field_on_read(R, trim(tn)//'_AB')
+            call restart_skip_field_on_read(R, trim(tn)//'_M1')
+            if (tracers%data(j)%AB_order == 3) call restart_skip_field_on_read(R, trim(tn)//'_M2')
+        end do
+    end subroutine restart_skip_tracers_on_read
+
     function tracer_name(id, j) result(nm)
         integer, intent(in) :: id, j
         character(len=32)   :: nm
@@ -716,6 +756,7 @@ contains
         end if
         ! restore + halo-reconstruct every field
         do k = 1, R%nf
+            if (R%f(k)%skip_read) cycle      ! RECOM4 M10: same flag on every rank
             call restart_read_field(R, R%f(k), folder//'/'//trim(R%f(k)%name)//'.zarr', partit)
         end do
         if (R%mr) call MPI_Barrier(R%comm, ierr)
