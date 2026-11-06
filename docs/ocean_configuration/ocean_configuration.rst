@@ -108,6 +108,17 @@ Section &tracer_general
 - **smooth_bh_tra=.false.**, **gamma0_tra=0.0005**, **gamma1_tra=0.0125**, **gamma2_tra=0.0** biharmonic diffusion settings for tracers (filter implementation). Recommended only at very high resolution; ``gamma2_tra`` is rarely used.
 - **i_vert_diff=.true.** implicit vertical diffusion for tracers.
 - **AB_order=2** Adams–Bashforth order for tracer advection (2 or 3).
+- **ltra_diag=.false.** tracer budget diagnostics. With ``.true.`` the terms of the tracer budget are written with the ``otracers`` output, for every tracer selected by ``ltra_diag_ids``. All terms are layer-integrated rates (tracer times layer thickness per second, mmol m\ :sup:`-2` s\ :sup:`-1` for the REcoM tracers), so for every layer
+
+  .. code-block:: text
+
+     *_tendency = *_hor_adv + *_ver_adv
+                + *_tra_diff_part_hor_redi + *_tra_diff_part_ver_redi_expl
+                + *_tra_diff_part_ver_impl   (*_tra_diff_part_ver_expl with i_vert_diff=.false.)
+                + *_recom_sms + *_bf + *_sink
+
+  ``*_hor_adv`` and ``*_ver_adv`` are the horizontal and vertical advection (low-order and anti-diffusive parts; ``*_ver_adv`` includes the implicit part with ``use_wsplit``), ``*_tra_diff_part_*`` the diffusion terms, of which ``*_tra_diff_part_ver_impl`` also contains the surface boundary flux (e.g. the air–sea CO\ :sub:`2` flux, river input), ``*_recom_sms`` the REcoM sources minus sinks, ``*_bf`` the benthic flux into the water column and ``*_sink`` the sinking in the water column and into the benthos. ``*_tendency`` is the change of tracer times layer thickness over the time step. The budget closes except for the radioactive decay of 14C and 39Ar. Each term is per m\ :sup:`2` of the layer's own area; for column or global integrals weight each layer by ``nod_area`` of its level (``fesom.mesh.diag.nc``). The diagnostics add memory for all tracers and cost run time.
+- **ltra_diag_ids** (up to 20 tracer IDs, e.g. ``1001, 1002, 1003, 1018`` for DIN, DIC, Alk and DSi) tracers that get the budget diagnostics when ``ltra_diag=.true.``; not set means all tracers.
 
 .. _sec_mixing_scheme_selection:
 
