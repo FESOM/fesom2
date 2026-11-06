@@ -400,6 +400,18 @@ subroutine ini_bio_io(tracers, partit, mesh)
     call bio_files%def_node_var('BenSi',   'Benthos Silicate', 'mmol/m3',   Benthos(:,3), mesh, partit);
     call bio_files%def_node_var('BenCalc', 'Benthos Calcite',  'mmol/m3',   Benthos(:,4), mesh, partit);
     call bio_files%def_node_var('HPlus',   'Conc. of H-plus ions in the surface water', 'mol/kg',   GloHplus, mesh, partit);
+    ! The 3D carbonate chemistry is updated only every 7 or 30 days (REcoM's
+    ! calculate_carbonate_chemistry) and used in between. Optional: without it REcoM
+    ! recomputes it on the first step, as before.
+    call bio_files%def_node_var_optional('CO2_3D',    'aqueous CO2',                'mol/m3',     CO23D,    mesh, partit)
+    call bio_files%def_node_var_optional('pH_3D',     'pH, total scale',            '-',          pH3D,     mesh, partit)
+    call bio_files%def_node_var_optional('pCO2_3D',   'CO2 partial pressure',       'uatm',       pCO23D,   mesh, partit)
+    call bio_files%def_node_var_optional('HCO3_3D',   'bicarbonate',                'mol/m3',     HCO33D,   mesh, partit)
+    call bio_files%def_node_var_optional('CO3_3D',    'carbonate ion',              'mol/m3',     CO33D,    mesh, partit)
+    call bio_files%def_node_var_optional('OmegaC_3D', 'calcite saturation state',   '-',          OmegaC3D, mesh, partit)
+    call bio_files%def_node_var_optional('OmegaA_3D', 'aragonite saturation state', '-',          OmegaA3D, mesh, partit)
+    call bio_files%def_node_var_optional('kspc_3D',   'calcite solubility product', 'mol2/kg2',   kspc3D,   mesh, partit)
+    call bio_files%def_node_var_optional('rhoSW_3D',  'in-situ seawater density',   'kg/m3',      rhoSW3D,  mesh, partit)
   if (ciso) then
     call bio_files%def_node_var('BenC_13', 'Benthos Carbon-13', 'mmol/m3',   Benthos(:,5), mesh, partit);
     call bio_files%def_node_var('BenCalc_13', 'Benthos Calcite-13', 'mmol/m3',   Benthos(:,6), mesh, partit); 
