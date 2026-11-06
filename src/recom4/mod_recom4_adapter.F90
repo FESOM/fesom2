@@ -13,6 +13,8 @@
 !!                             open-ocean node to each point is dumped
 !!   FESOM3_RECOM_DUMP_STEPS   number of steps dumped (default 11)
 !!   FESOM3_RECOM_CHECK        gate items 3 and 4 (#48): total N and the DICremin reset
+!!   FESOM3_RECOM_MSTEP_RESET  gate of RECOM4 #57 only: from this step on, recom4_step gets
+!!                             mstep counted again from 1, as in a run resumed there
 module mod_recom4_adapter
     use mod_precision,     only: WP
     use mod_mesh,          only: t_mesh
@@ -92,6 +94,7 @@ module mod_recom4_adapter
     ! Column dumps for gate item 1 (#48): off unless FESOM3_RECOM_DUMP_DIR is set
     integer, parameter :: NDUMP_MAX = 4
     integer :: ndump = 0, dump_nsteps = 0, cur_step = 0
+    integer :: mstep_reset = 0                  ! FESOM3_RECOM_MSTEP_RESET; 0 = off (M10 gate only)
     integer :: dump_node(NDUMP_MAX) = 0
     character(len=32) :: dump_name(NDUMP_MAX) = ''
     integer :: u_step(NDUMP_MAX), u_surf(NDUMP_MAX), u_surfo(NDUMP_MAX), u_tran(NDUMP_MAX)
@@ -200,6 +203,15 @@ contains
         check_on = (ios == 0 .and. len_env > 0)
         if (check_on .and. partit%mype == 0) write(*,'(a)') &
             'recom4_adapter: checks of total N and the DICremin reset on'
+
+        call get_environment_variable('FESOM3_RECOM_MSTEP_RESET', path, length=len_env, status=ios)
+        if (ios == 0 .and. len_env > 0) then
+            read(path(1:len_env), *, iostat=ios) mstep_reset
+            if (ios /= 0 .or. mstep_reset < 1) &
+                call fail('FESOM3_RECOM_MSTEP_RESET must be a step number of at least 1', partit)
+            if (partit%mype == 0) write(*,'(a,i0)') &
+                'recom4_adapter: gate switch on, mstep starts again at 1 at step ', mstep_reset
+        end if
 #endif
     end subroutine recom4_adapter_init
 
@@ -378,6 +390,17 @@ contains
 #endif
     end subroutine recom4_adapter_restart_check
 
+#ifdef __RECOM4
+    ! The step number recom4_step gets: the driver's n, or with FESOM3_RECOM_MSTEP_RESET
+    ! (gate of RECOM4 #57) n counted again from 1 at that step, as in a run resumed
+    ! there (FESOM2-REcoM's mstep, too, starts at 1 in every run).
+    integer function step_for_recom4(mstep)
+        integer, intent(in) :: mstep
+        step_for_recom4 = mstep
+        if (mstep_reset > 0 .and. mstep >= mstep_reset) step_for_recom4 = mstep - mstep_reset + 1
+    end function step_for_recom4
+#endif
+
     ! After FESOM_F has filled its forcing table: sea-level pressure as one more
     ! field, only with RECOM4 on. FESOM_F's bulk formulae do not use it; REcoM's
     ! gas exchange does. JRA55-do psl is in Pa, REcoM's unit.
@@ -481,7 +504,7 @@ contains
                              tracers%data(1)%values(nzmin:nzmax, n),                    &
                              tracers%data(2)%values(nzmin:nzmax, n),                    &
                              mesh%geo_coord_nod2D(1, n), mesh%geo_coord_nod2D(2, n),    &
-                             daynew, ndpyr, mstep, dt,                                  &
+                             daynew, ndpyr, step_for_recom4(mstep), dt,                                  &
                              shortwave(n), ice_frac(n), frc%atmdata(islp, n), wind10,   &
                              hs%CO2_for_spinup, dust_fe(n), 0.0_WP, nzmin > 1,          &
                              zero, rflux, zero, zero, 0.0_WP,                           &
