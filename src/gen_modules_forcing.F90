@@ -91,11 +91,7 @@ use o_param
   real(kind=WP), allocatable, dimension(:)         :: flux_correction_north, flux_correction_south, flux_correction_total
 #endif
 
-! TODO: __cpl_yac is absent here, as in the pre-rework guard. Declaration
-! and use agree, so this is self-consistent, but YAC does not get
-! residualifwflx or the rhofwt/rhowat freshwater conversion. Widening the
-! guard changes YAC results, so it is left to a separate change.
-#if defined (__cpl_oasis) || defined (__cpl_direct)
+#if defined (__cpl_enabled)
   real(kind=WP), allocatable, dimension(:)         :: residualifwflx
 #endif
 

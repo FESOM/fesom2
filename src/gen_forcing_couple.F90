@@ -257,11 +257,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   real(kind=WP), dimension(:), pointer  :: u_ice, v_ice, u_w, v_w
   real(kind=WP), dimension(:), pointer  :: stress_atmice_x, stress_atmice_y
   real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
-! TODO: __cpl_yac is absent here, as in the pre-rework guard. Declaration
-! and use agree, so this is self-consistent, but YAC does not get
-! residualifwflx or the rhofwt/rhowat freshwater conversion. Widening the
-! guard changes YAC results, so it is left to a separate change.
-#if defined (__cpl_oasis) || defined (__cpl_direct)
+#if defined (__cpl_enabled)
   real(kind=WP), dimension(:), pointer  ::  oce_heat_flux, ice_heat_flux 
   real(kind=WP), dimension(:), pointer  ::  tmp_oce_heat_flux, tmp_ice_heat_flux 
 #endif 
@@ -290,7 +286,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   runoff_liquid    => ice%atmcoupl%runoff_liquid(:)
   runoff_solid     => ice%atmcoupl%runoff_solid(:)
 #endif  
-#if defined (__cpl_oasis) || defined (__cpl_direct)
+#if defined (__cpl_enabled)
   oce_heat_flux    => ice%atmcoupl%oce_flx_h(:)
   ice_heat_flux    => ice%atmcoupl%ice_flx_h(:)
   tmp_oce_heat_flux=> ice%atmcoupl%tmpoce_flx_h(:)

@@ -254,7 +254,7 @@ contains
 !> Every slot is claimed here, so that consumers index by name instead of
 !> counting from the end of the array.
 subroutine set_ice_tracer_layout(ice)
-    use cpl_config, only: is_coupled_to_oifs, is_coupled_to_ifs
+    use cpl_config, only: fesom_provides_ice_surface
     use g_config,   only: use_icebergs
     implicit none
     type(t_ice), intent(inout) :: ice
@@ -263,7 +263,7 @@ subroutine set_ice_tracer_layout(ice)
     ice%num_itracers = 3
 
     ! optional ice surface temperature tracer for IFS-family atmospheres
-    if (is_coupled_to_oifs .or. is_coupled_to_ifs) then
+    if (fesom_provides_ice_surface) then
         ice%ist_itracer_idx = ice%num_itracers + 1
         ice%num_itracers    = ice%num_itracers + 1
     end if
@@ -413,6 +413,7 @@ end subroutine READ_T_ICE_THERMO
 ! Unformatted writing for T_ICE_ATMCOUPL
 #if defined (__cpl_enabled)
 subroutine WRITE_T_ICE_ATMCOUPL(tcoupl, unit)
+    use cpl_config, only: fesom_provides_ice_surface
     IMPLICIT NONE
     class(T_ICE_ATMCOUPL),  intent(in)     :: tcoupl
     integer,                intent(in)     :: unit
@@ -422,16 +423,13 @@ subroutine WRITE_T_ICE_ATMCOUPL(tcoupl, unit)
     call write_bin_array(tcoupl%ice_flx_h,      unit, iostat, iomsg)
     call write_bin_array(tcoupl%tmpoce_flx_h,   unit, iostat, iomsg)
     call write_bin_array(tcoupl%tmpice_flx_h,   unit, iostat, iomsg)
-! TODO: still compile-time, so the bin-restart stream layout is unchanged.
-! Making this follow ist_itracer_idx means writing a leading flag/count and
-! branching on it when reading -- a restart format change, handled
-! separately.
-#if defined (__cpl_direct) || defined (__cpl_oasis50)
-    call write_bin_array(tcoupl%ice_alb,        unit, iostat, iomsg)
-    call write_bin_array(tcoupl%enthalpyoffuse, unit, iostat, iomsg)
-    call write_bin_array(tcoupl%runoff_liquid, unit, iostat, iomsg)
-    call write_bin_array(tcoupl%runoff_solid, unit, iostat, iomsg)
-#endif /* IFS-family partners */
+    ! Only the partners that take the ice surface from FESOM carry these.
+    if (fesom_provides_ice_surface) then
+       call write_bin_array(tcoupl%ice_alb,        unit, iostat, iomsg)
+       call write_bin_array(tcoupl%enthalpyoffuse, unit, iostat, iomsg)
+       call write_bin_array(tcoupl%runoff_liquid, unit, iostat, iomsg)
+       call write_bin_array(tcoupl%runoff_solid, unit, iostat, iomsg)
+    end if
 
 end subroutine WRITE_T_ICE_ATMCOUPL  
 #endif /* (__cpl_enabled) */
@@ -439,6 +437,7 @@ end subroutine WRITE_T_ICE_ATMCOUPL
 ! Unformatted reading for T_ICE_ATMCOUPL
 #if defined (__cpl_enabled)
 subroutine READ_T_ICE_ATMCOUPL(tcoupl, unit)
+    use cpl_config, only: fesom_provides_ice_surface
     IMPLICIT NONE
     class(T_ICE_ATMCOUPL),  intent(inout)  :: tcoupl
     integer,                intent(in)     :: unit
@@ -448,16 +447,13 @@ subroutine READ_T_ICE_ATMCOUPL(tcoupl, unit)
     call read_bin_array(tcoupl%ice_flx_h, unit, iostat, iomsg)
     call read_bin_array(tcoupl%tmpoce_flx_h, unit, iostat, iomsg)
     call read_bin_array(tcoupl%tmpice_flx_h, unit, iostat, iomsg)
-! TODO: still compile-time, so the bin-restart stream layout is unchanged.
-! Making this follow ist_itracer_idx means writing a leading flag/count and
-! branching on it when reading -- a restart format change, handled
-! separately.
-#if defined (__cpl_direct) || defined (__cpl_oasis50)
-    call read_bin_array(tcoupl%ice_alb, unit, iostat, iomsg)
-    call read_bin_array(tcoupl%enthalpyoffuse, unit, iostat, iomsg)
-    call read_bin_array(tcoupl%runoff_liquid, unit, iostat, iomsg)
-    call read_bin_array(tcoupl%runoff_solid, unit, iostat, iomsg)
-#endif /* IFS-family partners */
+    ! Only the partners that take the ice surface from FESOM carry these.
+    if (fesom_provides_ice_surface) then
+       call read_bin_array(tcoupl%ice_alb, unit, iostat, iomsg)
+       call read_bin_array(tcoupl%enthalpyoffuse, unit, iostat, iomsg)
+       call read_bin_array(tcoupl%runoff_liquid, unit, iostat, iomsg)
+       call read_bin_array(tcoupl%runoff_solid, unit, iostat, iomsg)
+    end if
 end subroutine READ_T_ICE_ATMCOUPL
 #endif /* (__cpl_enabled) */
 !
