@@ -110,6 +110,7 @@ ltra_diag     = .false.       ! tracer budget diagnostics (all terms in mmol/m2/
 ! ltra_diag_ids = 1001, 1002, 1003, 1018
 !   tracer IDs that get the budget diagnostics when ltra_diag=.true. (max. 20);
 !   not set = all tracers. Example: DIN, DIC, Alk, DSi.
+!   The budget closes except for the 14C/39Ar decay.
 /
 
 ! ============================================================================

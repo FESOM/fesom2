@@ -79,6 +79,7 @@ ltra_diag     = .false.       ! tracer budget diagnostics (all terms in mmol/m2/
 ! ltra_diag_ids = <tracer IDs>
 !   tracer IDs that get the budget diagnostics when ltra_diag=.true. (max. 20); not set = all
 !   tracers. The terms are written with 'otracers'.
+!   The budget closes except for the 14C/39Ar decay.
 /
 
 ! ============================================================================
