@@ -23,6 +23,8 @@ module mod_recom4_adapter
     use mod_forcing_read,  only: t_atm_forcing
     use mod_io_means,      only: t_io_means, means_define_node2d, means_define_node3d, &
                                  means_accumulate, means_has
+    use mod_io_restart,    only: t_restart, restart_register_field, DECOMP_NODE, &
+                                 restart_skip_field_on_read, restart_skip_tracers_on_read
 #ifdef __RECOM4
     use recom4_api,     only: recom4_state, recom4_init, recom4_ntr, recom4_ncol,    &
                               recom4_ndiag2d, recom4_ndiag3d, recom4_ndiag3dw, recom4_tracer_id, &
@@ -46,7 +48,9 @@ module mod_recom4_adapter
                               RECOM4_D3_DOCEX_DIA, RECOM4_D3_CALCIF, RECOM4_D3_CALCDISS,     &
                               RECOM4_D2_NPP_PHY, RECOM4_D2_NPP_DIA, RECOM4_D2_GPP_PHY,       &
                               RECOM4_D2_GPP_DIA, RECOM4_D2_NNA_PHY, RECOM4_D2_NNA_DIA,       &
-                              RECOM4_D2_CHLDEG_PHY, RECOM4_D2_CHLDEG_DIA
+                              RECOM4_D2_CHLDEG_PHY, RECOM4_D2_CHLDEG_DIA,            &
+                              recom4_col_restart, recom4_col_name,                   &
+                              recom4_restart_tag, recom4_restart_check
     use recom4_text_io, only: recom4_read_text
     use recom4_dump_io, only: dump_open_write, dump_write, dump_close
     use iso_fortran_env, only: real64
@@ -62,6 +66,7 @@ module mod_recom4_adapter
     public :: recom4_adapter_forcing, recom4_adapter_monthly
     public :: recom4_adapter_step, recom4_adapter_bc_surface, recom4_adapter_transport
     public :: recom4_adapter_register_output, recom4_adapter_accumulate
+    public :: recom4_adapter_register_restart, recom4_adapter_restart_check
 
     logical :: on   = .false.
     integer :: ntr  = 0
@@ -69,7 +74,7 @@ module mod_recom4_adapter
 #ifdef __RECOM4
     type(recom4_state) :: state
     ! Per-node arrays of the host (IMPLEMENTATION.md section 1), all local nodes
-    real(WP), allocatable :: col(:, :)          ! (ncol, nNodL)  per-column memory
+    real(WP), allocatable, target :: col(:, :)  ! (ncol, nNodL)  per-column memory (target: restart, M10)
     real(WP), allocatable :: sflux(:, :)        ! (ntr, nNodL)   surface flux of the step
     real(WP), allocatable :: diag2d(:, :)       ! (ndiag2d, nNodL)
     real(WP), allocatable :: diag3d(:, :, :)    ! (nl-1, ndiag3d, nNodL)
@@ -82,6 +87,7 @@ module mod_recom4_adapter
     real(WP) :: ocean_area = 0.0_WP             ! open-ocean area, cavities excluded [m2]
     real(WP), allocatable :: alk_surf(:)        ! (nNodL) initial surface alkalinity
     real(WP), allocatable :: relax_alk(:)       ! (nNodL) alkalinity restoring of the step
+    real(WP), allocatable, target :: rst_tag(:) ! (nNodL) restart tag, the same at every node (M10)
 
     ! Column dumps for gate item 1 (#48): off unless FESOM3_RECOM_DUMP_DIR is set
     integer, parameter :: NDUMP_MAX = 4
@@ -185,6 +191,8 @@ contains
         diag3d = 0.0_WP
         allocate(dust_fe(nNodL))
         dust_fe = 0.0_WP
+        allocate(rst_tag(nNodL))
+        rst_tag = recom4_restart_tag(state)
         if (partit%mype == 0) write(*,'(a,i0,2a)') 'recom4_adapter: RECOM4 on, ', ntr, &
             ' tracers, ', trim(path)
 
@@ -304,6 +312,71 @@ contains
         call setup_dumps(mesh, partit)
 #endif
     end subroutine recom4_adapter_initial_values
+
+    ! RECOM4 M10 (#57), after restart_register_state: RECOM4's part of the restart,
+    ! the benthic pools of col (recom4_col_restart; names and units from
+    ! recom4_col_name) and the restart tag. RECOM4's tracers are registered by
+    ! restart_register_state already. With REcoM_restart = .false. they are all
+    ! written but not read: a biology cold start on the checkpoint.
+    subroutine recom4_adapter_register_restart(rst, tracers)
+        type(t_restart), intent(inout) :: rst
+        type(t_tracer),  intent(in)    :: tracers
+#ifdef __RECOM4
+        real(WP), pointer :: p2(:)
+        character(len=64) :: nm, lnm, un
+        integer :: first, n, i
+
+        if (.not. on) return
+        call recom4_col_restart(state, first, n)
+        do i = first, first + n - 1
+            call recom4_col_name(state, i, nm, lnm, un)
+            p2 => col(i, :)
+            call restart_register_field(rst, trim(nm), trim(un), DECOMP_NODE, p2d=p2)
+        end do
+        p2 => rst_tag
+        call restart_register_field(rst, 'recom4_restart_tag', '1', DECOMP_NODE, p2d=p2)
+
+        if (.not. hs%REcoM_restart) then
+            call restart_skip_tracers_on_read(rst, tracers, 3)
+            do i = first, first + n - 1
+                call recom4_col_name(state, i, nm, lnm, un)
+                call restart_skip_field_on_read(rst, trim(nm))
+            end do
+            call restart_skip_field_on_read(rst, 'recom4_restart_tag')
+        end if
+#endif
+    end subroutine recom4_adapter_register_restart
+
+    ! RECOM4 M10 (#57), after restart_read in a resumed run:
+    !   REcoM_restart = .true.:  the tag read from the checkpoint must be this
+    !                            configuration's (recom4_restart_check, ierr 12);
+    !   REcoM_restart = .false.: RECOM4's tracers kept their initial values; their
+    !                            history is set as at a cold start.
+    subroutine recom4_adapter_restart_check(tracers, partit)
+        type(t_tracer), intent(inout) :: tracers
+        type(t_partit), intent(in)    :: partit
+#ifdef __RECOM4
+        character(len=512) :: errmsg
+        integer :: n, i, ierr
+
+        if (.not. on) return
+        if (hs%REcoM_restart) then
+            do n = 1, size(rst_tag)
+                call recom4_restart_check(state, rst_tag(n), ierr, errmsg)
+                if (ierr /= 0) call fail(trim(errmsg), partit)
+            end do
+            if (partit%mype == 0) write(*,'(a)') 'recom4_adapter: restart tag ok'
+        else
+            do i = 1, ntr
+                tracers%data(2 + i)%valuesAB = 0.0_WP
+                tracers%data(2 + i)%valuesold(1, :, :) = tracers%data(2 + i)%values
+                tracers%data(2 + i)%valuesold(2, :, :) = tracers%data(2 + i)%values
+            end do
+            if (partit%mype == 0) write(*,'(a)') &
+                'recom4_adapter: REcoM_restart = .false.: biology cold start on the checkpoint'
+        end if
+#endif
+    end subroutine recom4_adapter_restart_check
 
     ! After FESOM_F has filled its forcing table: sea-level pressure as one more
     ! field, only with RECOM4 on. FESOM_F's bulk formulae do not use it; REcoM's

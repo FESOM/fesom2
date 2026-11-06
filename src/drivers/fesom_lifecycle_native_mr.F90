@@ -107,6 +107,7 @@ program fesom_lifecycle_native_mr
                                   means_has, means_output, means_finalize
     use mod_dump,           only: dump_init, dump_finalize
     ! Restart Stage 5: checkpoint registry + register/write/read hooks (the lifecycle wiring of mod_io_restart).
+    use mod_recom4_adapter, only: recom4_adapter_register_restart, recom4_adapter_restart_check
     use mod_io_restart,     only: t_restart, restart_init, restart_register_state, restart_write, &
                                   restart_read, restart_finalize, restart_resolve_latest
     implicit none
@@ -931,11 +932,13 @@ program fesom_lifecycle_native_mr
     if (do_restart) then
         call restart_init(rst, mesh, partit)
         call restart_register_state(rst, dyn, tracers, ice, mesh, mix_scheme=mix_scheme_nmb)
+        call recom4_adapter_register_restart(rst, tracers)   ! RECOM4 M10: pools, tag
         if (partit%mype == 0) write(*,'(a,i0,a)') &
             'restart: registered ', rst%nf, ' prognostic fields -> '//trim(RestartOutPath)
         if (r_restart) then
             call restart_read(rst, trim(RestartInPath), mesh, partit, &
                               clock_year=yearnew, clock_day=daynew, clock_time_sec=real(timenew, real64))
+            call recom4_adapter_restart_check(tracers, partit)   ! RECOM4 M10: tag, or biology cold start
             if (partit%mype == 0) write(*,'(a,f9.1,a,i0,a,i0)') &
                 'restart: state restored (resumed run) at clock time=', timenew, ' day=', daynew, &
                 ' year=', yearnew
