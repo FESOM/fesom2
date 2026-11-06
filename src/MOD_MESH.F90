@@ -18,6 +18,9 @@ TYPE SPARSE_MATRIX
      integer(int32), allocatable,   dimension(:) :: colind_loc
      integer(int32), allocatable,   dimension(:) :: rowptr_loc
      real(kind=WP),  allocatable,   dimension(:) :: pr_values !preconditioner values
+     ! SSH stiffness matrix for the unperturbed depth, as init_stiff_mat_ale assembled
+     ! it; update_stiff_mat_ale adds the term of the current elevation to it
+     real(kind=real64), allocatable, dimension(:) :: values_ref
 #if defined(USE_SINGLE_PRECISION)
      ! Full-precision accumulator for the SSH stiffness matrix, single precision only.
      ! update_stiff_mat_ale adds a per-step increment whose size relative to the

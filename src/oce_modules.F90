@@ -291,7 +291,7 @@ real(kind=WP), allocatable    :: tau_x_t(:,:), tau_y_t(:,:)
 real(kind=WP), allocatable    :: heat_flux_t(:,:), heat_rel_t(:,:), heat_rel(:)
 !!PS real(kind=WP), allocatable    :: coriolis(:), coriolis_node(:)
 real(kind=WP), allocatable    :: relax2clim(:)
-real(kind=WP), allocatable    :: MLD1(:), MLD2(:), MLD3(:)
+real(kind=WP), allocatable    :: MLD1(:), MLD2(:), MLD3(:), MLD4(:)
 real(kind=WP), allocatable    :: mle_psi(:,:)   ! Fox-Kemper MLE streamfunction magnitude [m2/s]
 real(kind=WP), allocatable    :: mle_hbar(:)    ! running-mean mixed layer depth used by MLE [m]
 integer,       allocatable    :: MLD1_ind(:), MLD2_ind(:), MLD3_ind(:)

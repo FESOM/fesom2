@@ -325,6 +325,7 @@ subroutine pressure_bv(tracers, partit, mesh)
 
         if (flag2) MLD2_ind(node)=nzmax-1
         if (flag3) MLD3_ind(node)=nzmax-1
+        call mld_ref10m(MLD4(node), mesh%Z_3d_n(:,node), rhopot, nzmin, nzmax, sigma_theta_crit_cmor)
 
         bvfreq(nzmin,node)=bvfreq(nzmin+1,node)
         bvfreq(nzmax,node)=bvfreq(nzmax-1,node)
@@ -517,6 +518,39 @@ subroutine pressure_bv_acc(tracers, partit, mesh)
     end if
 end subroutine pressure_bv_acc
 #endif
+!
+!
+!===============================================================================
+! Mixed layer depth, criterion Delta sigma = crit, referenced to the full level closest to 10 m
+! (CMIP7 mlotst definition). Sign convention as MLD1-3 (negative depth, m).
+! Ties between two levels equally close to 10 m: the shallower level is used.
+subroutine mld_ref10m(mld, zc, rhop, nzmin, nzmax, crit)
+    use o_PARAM, only: WP
+    implicit none
+    real(kind=WP), intent(out) :: mld
+    integer,       intent(in)  :: nzmin, nzmax
+    real(kind=WP), intent(in)  :: zc(nzmax), rhop(nzmax), crit
+    integer                    :: nz, nzref
+    real(kind=WP)              :: dbest, d
+    nzref = nzmin
+    dbest = abs(zc(nzmin)+10.0_WP)
+    do nz=nzmin+1, nzmax-1
+        d = abs(zc(nz)+10.0_WP)
+        if (d < dbest) then
+            dbest = d
+            nzref = nz
+        end if
+    end do
+    ! default: criterion never reached -> deepest wet level (same behaviour as MLD3)
+    mld = zc(nzmax-1)
+    do nz=nzref+1, nzmax-1
+        if (rhop(nz)-rhop(nzref) > crit) then
+            mld = zc(nz-1) + (zc(nz)-zc(nz-1))/(rhop(nz)-rhop(nz-1)+1.e-20_WP) &
+                             *(rhop(nzref)+crit-rhop(nz-1))
+            return
+        end if
+    end do
+end subroutine mld_ref10m
 !
 !
 !

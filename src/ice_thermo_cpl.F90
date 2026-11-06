@@ -55,6 +55,10 @@ subroutine thermodynamics(ice, partit, mesh)
   real(kind=WP)  :: ehf, fw, fwice, fwsnw, rsf, dhgrowth, dhsngrowth, dhflice, dAgrowth
   !---- melt pond variables
   real(kind=WP)  :: fpond, meltt_rate, melts_rate
+  !---- diagnostics for the sea-ice mass budget (output only) [kg m-2 s-1]
+  real(kind=WP)  :: h_in, d_gwat, d_gbot, d_mtop, d_mbot, d_subl, d_si
+  real(kind=WP)  :: a_in
+  real(kind=WP)  :: hsn_in, d_snf, d_snsbl, d_snmlt, d_snsi
 
   !---- geographical coordinates
   real(kind=WP)  :: geolon, geolat
@@ -151,6 +155,19 @@ subroutine thermodynamics(ice, partit, mesh)
      A       = a_ice(inod)
      h       = m_ice(inod)
      hsn     = m_snow(inod)
+     h_in    = h
+     d_gwat  = 0._WP
+     d_gbot  = 0._WP
+     d_mtop  = 0._WP
+     d_mbot  = 0._WP
+     d_subl  = 0._WP
+     d_si    = 0._WP
+     hsn_in  = hsn
+     a_in    = A
+     d_snf   = 0._WP
+     d_snsbl = 0._WP
+     d_snmlt = 0._WP
+     d_snsi  = 0._WP
 
      !---- lower bound of the lead closing parameter, per hemisphere
      if (geo_coord_nod2D(2, inod) > 0._WP) then
@@ -242,6 +259,23 @@ subroutine thermodynamics(ice, partit, mesh)
      thdgrsn(inod)        = dhsngrowth
      thdgra(inod)         = dAgrowth
      flice(inod)          = dhflice
+     !---- sea-ice mass budget diagnostics (output only), kg m-2 s-1, grid-cell mean
+     d_si                 = dhflice*rhoice
+     sidm_gwat(inod)      = d_gwat
+     sidm_gbot(inod)      = d_gbot
+     sidm_mtop(inod)      = d_mtop
+     sidm_mbot(inod)      = d_mbot
+     sidm_subl(inod)      = d_subl
+     sidm_si(inod)        = d_si
+     sidm_th(inod)        = d_gwat + d_gbot + d_mtop + d_mbot + d_subl + d_si
+     !---- snow mass budget diagnostics (output only), kg m-2 s-1, grid-cell mean
+     sisn_snf(inod)       = d_snf
+     sisn_sbl(inod)       = d_snsbl
+     sisn_mlt(inod)       = d_snmlt
+     sisn_si(inod)        = d_snsi
+     sisn_th(inod)        = d_snf + d_snsbl + d_snmlt + d_snsi
+     !---- sea-ice concentration tendency by thermodynamics (output only), 1/s
+     sidc_th(inod)        = (A - a_in)/dt
      
      !---- total evaporation (needed in oce_salt_balance.F90) = evap+subli
      evaporation(inod)    = evap + subli
@@ -274,6 +308,10 @@ contains
 
     !---- local variables and dummys
     real(kind=WP)  :: hold, hsnold, Aold, htmp, hsntmp, heff, h0cur, hdraft, hflood
+
+    !---- diagnostics (output only): decomposition of the ice thickness change
+    !---- into growth/melt terms, all in [m ice per time step], grid-cell mean
+    real(kind=WP)  :: Qs_d, Sn_d, Qb_d, Qo_d, P_d, N_top, N_bot, N_d, T_d, f_d, res_d
 
     !---- cut-off ice thickness (hcutoff) used to avoid very small ice
     !---- thicknesses as well as division by zero. NOTE: the standard
@@ -399,6 +437,14 @@ contains
     hsnold = hsn
     hold = h
 
+    !---- diagnostic (output only): ice mass change by sublimation [kg m-2 s-1]
+    d_subl = (hold-h_in)*rhoice/dt
+
+    !---- diagnostic (output only): snow mass budget terms [kg m-2 s-1]
+    !---- snowfall onto sea ice, and snow sublimation (= net snow change - snowfall)
+    d_snf   = A*snow*rhofwt
+    d_snsbl = (hsnold-hsn_in)*rhosno/dt - d_snf
+
     !---- snow melt rate over sea ice (dsnow <= 0)
     !---- if there is atmospheric melting over sea ice, first melt any
     !---- snow that is present, but do not melt more snow than available
@@ -430,6 +476,26 @@ contains
     !---- ice growth rate over open water (dhiow >= 0)
     dhiow = (1._WP-A)*max(Qatmocn-Qocnatm,0._WP)
 
+    !---- diagnostic (output only): split of dhice+dhiow into its sources.
+    !---- Identity: dhice+dhiow = P_d + N_top + N_bot (P_d>=0, N_top<=0, N_bot<=0)
+    !---- NOTE: must stay before the update of A below (A is the old concentration)
+    !---- Surface melt energy over ice (<=0), gated exactly like dsnow above
+#if defined (__oifs) || defined (__ifsinterface)
+    if (t.gt.273_WP) then
+       Qs_d = A*min(Qatmice-Qicecon,0._WP)
+    else
+       Qs_d = 0._WP
+    endif
+#else
+    Qs_d  = A*min(Qatmice-Qicecon,0._WP)
+#endif
+    Sn_d  = -dsnow*rhosno/rhoice              ! part of it already used for snow melt (>=0)
+    Qb_d  = A*Qatmice - Qs_d                  ! heat reaching the ice base by conduction
+    Qo_d  = -A*Qocnice                        ! ocean heat to ice-covered part (<0: melt)
+    P_d   = dhiow + max(Qo_d,0._WP) + max(Qb_d,0._WP)
+    N_top = min(Qs_d + Sn_d, 0._WP)          ! (min: guards against round-off)
+    N_bot = min(Qb_d,0._WP) + min(Qo_d,0._WP)
+
     !---- temporary new ice thickness [m]
     htmp = h + dhice + dhiow
 
@@ -450,6 +516,24 @@ contains
     !---- avoid very small ice thicknesses
     if (h.lt.hcutoff) h = 0._WP
 
+    !---- diagnostic (output only): scale the melt terms so that the terms sum
+    !---- exactly to the actual change (h-hold) after the limiters above
+    !---- (cannot melt more ice than available; h<hcutoff set to zero)
+    N_d   = N_top + N_bot
+    T_d   = h - hold
+    res_d = 0._WP
+    if (N_d < 0._WP) then
+       f_d = max((T_d-P_d)/N_d, 0._WP)
+    else
+       f_d = 1._WP
+       res_d = T_d - P_d - N_d                ! only non-zero if a cut-off acts without melt
+    endif
+    d_gwat = (dhiow + max(Qo_d,0._WP))*rhoice/dt   ! frazil in supercooled water
+    d_gbot = max(Qb_d,0._WP)*rhoice/dt             ! congelation growth at ice base
+    d_mtop = f_d*N_top*rhoice/dt                   ! surface melt (net of snow melt)
+    d_mbot = (f_d*N_bot + res_d)*rhoice/dt         ! basal melt
+    ! lateral melt of volume does not exist in this scheme (only dcice, area): 0
+
     !---- ice thickness before any thermodynamic change
     !---- (for h=0 use cut-off ice thickness to avoid division by zero)
     htmp = max(hold,hcutoff)
@@ -469,6 +553,9 @@ contains
 
     !---- update snow thickness after lateral snow melt
     hsn = hsn + dslat
+
+    !---- diagnostic (output only): total snow melt (atmospheric + lateral) [kg m-2 s-1]
+    d_snmlt = (hsn-hsnold)*rhosno/dt
 
     !---- subtract heat required to melt this additional amount of
     !---- snow from total oceanic heat flux (dslat <= 0)
@@ -555,6 +642,9 @@ contains
 
     !---- subtract converted snow from snow thickness
     hsn = hsn - hflood*rhoice/rhosno
+
+    !---- diagnostic (output only): snow lost by conversion to ice [kg m-2 s-1]
+    d_snsi = -hflood*rhoice/dt
 
     !---- rate of flooding snow to ice
     dhflice = (h-htmp)/dt

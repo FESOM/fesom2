@@ -688,7 +688,7 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
     !     velocity
     if (dynamics%se_visc .or. dynamics%se_bottdrag) then
         ! --> remove viscosity: each owned element gathers the contributions of
-        !     its three edges in ascending edge order
+        !     its three edges in ascending global edge order
         ! --> remove bottom drag
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, q, edge, eledges, edelem, ednodes, elnodes, nzmax, &
 !$OMP                                  hh, len, vi, update_ubt, update_vbt)
@@ -696,9 +696,9 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
         do elem=1, partit%myDim_elem2D
             if (dynamics%se_visc) then
                 eledges=mesh%elem_edges(:,elem)
-                if (eledges(1)>eledges(2)) then; q=eledges(1); eledges(1)=eledges(2); eledges(2)=q; end if
-                if (eledges(2)>eledges(3)) then; q=eledges(2); eledges(2)=eledges(3); eledges(3)=q; end if
-                if (eledges(1)>eledges(2)) then; q=eledges(1); eledges(1)=eledges(2); eledges(2)=q; end if
+                if (partit%myList_edge2D(eledges(1))>partit%myList_edge2D(eledges(2))) then; q=eledges(1); eledges(1)=eledges(2); eledges(2)=q; end if
+                if (partit%myList_edge2D(eledges(2))>partit%myList_edge2D(eledges(3))) then; q=eledges(2); eledges(2)=eledges(3); eledges(3)=q; end if
+                if (partit%myList_edge2D(eledges(1))>partit%myList_edge2D(eledges(2))) then; q=eledges(1); eledges(1)=eledges(2); eledges(2)=q; end if
                 do q=1,3
                     edge=eledges(q)
                     ! if ed is an outer boundary edge, skip it
@@ -775,16 +775,16 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
         
         !_______________________________________________________________________
         ! compute harmonic viscosity for stability: each owned element gathers
-        ! the contributions of its three edges in ascending edge order
+        ! the contributions of its three edges in ascending global edge order
         if (dynamics%se_visc) then 
 !$OMP DO
             do elem=1, partit%myDim_elem2D
                 visc_u = 0.0_WP
                 visc_v = 0.0_WP
                 eledges=mesh%elem_edges(:,elem)
-                if (eledges(1)>eledges(2)) then; q=eledges(1); eledges(1)=eledges(2); eledges(2)=q; end if
-                if (eledges(2)>eledges(3)) then; q=eledges(2); eledges(2)=eledges(3); eledges(3)=q; end if
-                if (eledges(1)>eledges(2)) then; q=eledges(1); eledges(1)=eledges(2); eledges(2)=q; end if
+                if (partit%myList_edge2D(eledges(1))>partit%myList_edge2D(eledges(2))) then; q=eledges(1); eledges(1)=eledges(2); eledges(2)=q; end if
+                if (partit%myList_edge2D(eledges(2))>partit%myList_edge2D(eledges(3))) then; q=eledges(2); eledges(2)=eledges(3); eledges(3)=q; end if
+                if (partit%myList_edge2D(eledges(1))>partit%myList_edge2D(eledges(2))) then; q=eledges(1); eledges(1)=eledges(2); eledges(2)=q; end if
                 do q=1,3
                     edge=eledges(q)
                     ! if ed is an outer boundary edge, skip it
