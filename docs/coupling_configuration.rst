@@ -62,8 +62,9 @@ if the selection does not match the compiled interface.
 - **is_coupled_to_icon_a=.false.** ICON-A atmosphere; requires ``yac``.
 - **is_coupled_to_ifs=.false.** IFS atmosphere; requires ``direct``.
 
-The selection drives the exchanged field set (the ``cpl_send``/``cpl_recv``
-name tables and their counts), whether the ECHAM-only flux-correction
+The selection drives the exchanged field set, which ``define_cpl_fields`` in
+``src/cpl_fields.F90`` registers by name; the names must match the
+``namcouple`` or ``coupling.yaml``. It also decides whether the ECHAM-only flux-correction
 machinery runs (``force_flux_consv`` and the out-of-band net-flux exchange in
 ``net_rec_from_atm``), and whether the ice model carries a prognostic ice
 surface temperature as a fourth advected ice tracer, which the IFS-family

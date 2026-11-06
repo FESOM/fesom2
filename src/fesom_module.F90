@@ -74,11 +74,13 @@ module fesom_main_storage_module
 #endif
 
 #if defined (__cpl_enabled)
-  use cpl_config, only: read_cpl_namelist, check_cpl_config, &
-                        is_coupled_to_echam, is_coupled_to_oifs
+  use cpl_config, only: read_cpl_namelist, check_cpl_config
   ! Same entity as g_config's compute_oasis_corners (use'd wholesale above);
   ! the alias marks which of the two homonyms is meant at the call site.
   use g_config,   only: deprecated_oasis_corners => compute_oasis_corners
+#endif
+#if defined (__cpl_coupler)
+  use cpl_fields, only: define_cpl_fields
 #endif
 #if defined (__cpl_oasis)
   use cpl_driver
@@ -509,28 +511,11 @@ contains
         ! and additional arrays needed for 
         ! fancy advection etc.  
         !=====================
-#if defined (__cpl_oasis)
-        !---wiso-code
-        IF (lwiso) THEN
-          nsend = nsend + 6       ! add number of water isotope tracers to coupling parameter nsend, nrecv
-          nrecv = nrecv + 6
-        END IF
-        !---wiso-code-end
-        ! Iceberg wind fields are only in the ECHAM field set.
-        IF (is_coupled_to_echam .and. use_icebergs) THEN
-          nrecv = nrecv + 2
-        END IF
-        ! tsk_ico and mslp_oce are OpenIFS-only extras.
-        IF (is_coupled_to_oifs) THEN
-          IF (use_atm_ice_tskin) THEN
-            nrecv = nrecv + 1
-            recv_tsk_ico = nrecv
-          END IF
-          IF (use_atm_mslp) THEN
-            nrecv = nrecv + 1
-            recv_mslp_oce = nrecv
-          END IF
-        END IF
+#if defined (__cpl_coupler)
+        ! The exchanged field set follows from the partner and from lwiso,
+        ! use_icebergs, use_atm_ice_tskin and use_atm_mslp, so it is fixed
+        ! once the namelists are read.
+        call define_cpl_fields()
 #endif
 
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call check_mesh_consistency'//achar(27)//'[0m'
@@ -671,18 +656,9 @@ contains
     call MPI_Barrier(f%MPI_COMM_FESOM_WORLD, f%MPIERR)
     
     if(num_fesom_groups > 1) then
-        call MPI_Bcast(nsend, 1, MPI_INTEGER, 0, f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, f%MPIerr)
-        call MPI_Bcast(nrecv, 1, MPI_INTEGER, 0, f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, f%MPIerr)
+        ! The field names need no broadcast: every group registered the same
+        ! set in define_cpl_fields.
 
-        if(f%my_fesom_group > 0) then
-            ALLOCATE(cpl_send(nsend))
-            ALLOCATE(cpl_recv(nrecv))
-        end if        
-
-! kh 10.11.25 it is assumed here that both nsend and nrecv are >= 1
-        call MPI_Bcast(cpl_send, len(cpl_send(1)) * nsend, MPI_CHARACTER, 0, f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, f%MPIerr)
-        call MPI_Bcast(cpl_recv, len(cpl_recv(1)) * nrecv, MPI_CHARACTER, 0, f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, f%MPIerr)
- 
 !  needed in SUBROUTINE net_rec_from_atm(action)
         call MPI_Bcast(target_root, 1, MPI_INTEGER, 0, f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, f%MPIerr)
     end if
