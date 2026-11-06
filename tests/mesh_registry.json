@@ -26,6 +26,31 @@
         "checksum": "optional"
       }
     },
+    "core3": {
+      "name": "CORE3 Global Ocean Mesh",
+      "description": "Default global ocean mesh: CORE2 successor with Antarctic ice-shelf cavities",
+      "url": "https://swift.dkrz.de/v1/dkrz_035d8f6ff058403bb42f8302e6badfbc/FESOM_MESHES2.1/core3.tar.gz",
+      "archive_type": "tar.gz",
+      "config": {
+        "force_rotation": true,
+        "use_cavity": true,
+        "typical_processors": [16],
+        "timing": {
+          "step_per_day": 48,
+          "run_length": 1,
+          "run_length_unit": "s"
+        }
+      },
+      "mesh_stats": {
+        "nodes_2d": 220509,
+        "elements_2d": 426403,
+        "vertical_levels": 48
+      },
+      "verification": {
+        "required_files": ["nod2d.out", "elem2d.out", "aux3d.out", "cavity_depth@node.out"],
+        "checksum": "optional"
+      }
+    },
     "orca25": {
       "name": "Global ~0.25-degree Ocean Mesh", 
       "description": "Global ocean mesh at ~1 degree resolution",
