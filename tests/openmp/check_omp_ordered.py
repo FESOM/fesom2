@@ -183,7 +183,7 @@ def main():
                     help="flags that make the compiler preprocess only")
     ap.add_argument("--mode", required=True, choices=["reproducible", "default"])
     ap.add_argument("--extra-defines", default="",
-                    help="additional -D flags, e.g. to reach code behind __oifs")
+                    help="additional -D flags, e.g. to reach code behind a coupling macro")
     args = ap.parse_args()
 
     src_dir = os.path.join(args.source_dir, "src")

@@ -30,6 +30,7 @@ Authors
    general_configuration/general_configuration
    ocean_configuration/ocean_configuration
    forcing_configuration
+   coupling_configuration
    output_configuration
    seaice_configuration
    icepack_in_fesom
