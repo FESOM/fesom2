@@ -879,12 +879,16 @@ if (any(recom_remin_tracer_id == tracers%data(tr_num)%ID)) then
             nzmin=mesh%ulevels_nod2D(n)
         tracers%data(tr_num)%values(nzmin:nzmax,n)=tracers%data(tr_num)%values(nzmin:nzmax,n)+ &
                                                 dtr_bf(nzmin:nzmax,n)
-        ! ltra_diag: benthic flux into the water column [mmol/m2/s]. dtr_bf is added
-        ! before the T* update, while the values are still on hnode, so its layer
-        ! content is dtr_bf*hnode.
-        if (tracers%data(tr_num)%ltra_diag) then
+        end do
+    end if
+    ! ltra_diag: benthic flux into the water column [mmol/m2/s]. dtr_bf enters before
+    ! the T* update, on hnode (added to the values, or with use_tracer_carry as
+    ! content dtr_bf*hnode below), so its layer content is dtr_bf*hnode.
+    if (tracers%data(tr_num)%ltra_diag) then
+        do n=1, partit%myDim_nod2D
+            nzmax=mesh%nlevels_nod2D(n)-1
+            nzmin=mesh%ulevels_nod2D(n)
             tracers%work%tra_benthic(nzmin:nzmax,n,tr_num) = dtr_bf(nzmin:nzmax,n)*mesh%hnode(nzmin:nzmax,n)/dt
-        end if
         end do
     end if
 end if
@@ -933,13 +937,17 @@ if (any(recom_sinking_tracer_id == tracers%data(tr_num)%ID)) then
                                                 vert_sink(nzmin:nzmax,n)
         tracers%data(tr_num)%values(nzmin:nzmax,n)=tracers%data(tr_num)%values(nzmin:nzmax,n)+ &
                                                 str_bf(nzmin:nzmax,n)
-        ! ltra_diag: sinking in the water column (vert_sink) and into the benthos (str_bf)
-        ! [mmol/m2/s]. Like dtr_bf, both are added before the T* update, while the values
-        ! are still on hnode, so their layer content is (vert_sink + str_bf)*hnode.
-        if (tracers%data(tr_num)%ltra_diag) then
+        end do
+    end if
+    ! ltra_diag: sinking in the water column (vert_sink) and into the benthos (str_bf)
+    ! [mmol/m2/s]. Like dtr_bf, both enter before the T* update, on hnode, so their
+    ! layer content is (vert_sink + str_bf)*hnode.
+    if (tracers%data(tr_num)%ltra_diag) then
+        do n=1, partit%myDim_nod2D
+            nzmax=mesh%nlevels_nod2D(n)-1
+            nzmin=mesh%ulevels_nod2D(n)
             tracers%work%tra_sink(nzmin:nzmax,n,tr_num) = (vert_sink(nzmin:nzmax,n) + str_bf(nzmin:nzmax,n)) &
                                                           * mesh%hnode(nzmin:nzmax,n)/dt
-        end if
         end do
     end if
 endif

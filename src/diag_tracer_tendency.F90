@@ -6,6 +6,9 @@ module mod_diag_tracer_tendency
    ! thickness that matches the tracer values at these points: update_thickness_ale
    ! sets hnode = hnode_new at the end of the step, while hnode_new does not hold
    ! the current thickness then, as with ldiag_DVD it gets the old thickness back.
+   ! In single precision (use_tracer_carry) the layer content also includes the
+   ! rounding carry: c*h + carry.
+   USE o_PARAM, only: use_tracer_carry
    USE MOD_MESH
    USE MOD_TRACER
    USE MOD_PARTIT
@@ -30,6 +33,8 @@ subroutine store_tracer_old(tracers, partit, mesh)
          do nz = nu1, nl1-1
             tracers%work%tracer_old(nz,n,tr_num) = tracers%data(tr_num)%values(nz,n)*mesh%hnode(nz,n)
          end do
+         if (use_tracer_carry) tracers%work%tracer_old(nu1:nl1-1,n,tr_num) = &
+              tracers%work%tracer_old(nu1:nl1-1,n,tr_num) + tracers%work%carry(nu1:nl1-1,n,tr_num)
       end do
    end do
 end subroutine store_tracer_old
@@ -52,6 +57,8 @@ subroutine tracer_tendency(tracers, partit, mesh)
                  (tracers%data(tr_num)%values(nz,n)*mesh%hnode(nz,n) &
                 - tracers%work%tracer_old(nz,n,tr_num)) / dt
          end do
+         if (use_tracer_carry) tracers%work%tra_tendency(nu1:nl1-1,n,tr_num) = &
+              tracers%work%tra_tendency(nu1:nl1-1,n,tr_num) + tracers%work%carry(nu1:nl1-1,n,tr_num)/dt
       end do
    end do
 end subroutine tracer_tendency
