@@ -582,7 +582,18 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
 
     !___________________________________________________________________________
     ! compute total global net freshwater flux into the ocean 
-    call integrate_nod(flux, net, partit, mesh)
+    ! with ice_ave_steps > 1 the ocean receives the fluxes of the last ice update
+    ! (fresh_wa_flux, evaporation, thdgr, thdgrsn are held) until the next update,
+    ! while prec_rain, prec_snow and runoff change every step. The steps in between
+    ! therefore reuse the net flux of the update step: balancing their own forcing
+    ! against the held fluxes loses volume, since prec_snow*(1-a_ice_old) does not
+    ! average out (a_ice_old changes only at the updates)
+    if (ice%ice_update) then
+        call integrate_nod(flux, net, partit, mesh)
+        ice%fw_balance_net = net
+    else
+        net = ice%fw_balance_net
+    end if
     
     !___________________________________________________________________________
     ! here the + sign must be used because we switched up the sign of the 

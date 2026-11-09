@@ -230,6 +230,7 @@ TYPE T_ICE
 
     integer                   :: ice_steps_since_upd=0
     logical                   :: ice_update = .true.
+    real(kind=WP)             :: fw_balance_net = 0.0_WP   ! net freshwater flux of the last ice update (oce_fluxes)
     !___________________________________________________________________________
     contains
 #if defined(__PGI)
@@ -467,6 +468,7 @@ subroutine WRITE_T_ICE(ice, unit, iostat, iomsg)
     write(unit, iostat=iostat, iomsg=iomsg) ice%Tevp_inv
     write(unit, iostat=iostat, iomsg=iomsg) ice%ice_steps_since_upd
     write(unit, iostat=iostat, iomsg=iomsg) ice%ice_update
+    write(unit, iostat=iostat, iomsg=iomsg) ice%fw_balance_net
 
     !___________________________________________________________________________
     call write_bin_array(ice%uice           , unit, iostat, iomsg)
@@ -540,6 +542,7 @@ subroutine READ_T_ICE(ice, unit, iostat, iomsg)
     read(unit, iostat=iostat, iomsg=iomsg) ice%Tevp_inv
     read(unit, iostat=iostat, iomsg=iomsg) ice%ice_steps_since_upd
     read(unit, iostat=iostat, iomsg=iomsg) ice%ice_update
+    read(unit, iostat=iostat, iomsg=iomsg) ice%fw_balance_net
 
     !___________________________________________________________________________
     call read_bin_array(ice%uice            , unit, iostat, iomsg)
