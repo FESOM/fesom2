@@ -16,6 +16,9 @@ module oce_ale_tracer_module
     USE g_forcing_arrays
     USE oce_adv_tra_driver_module, only: do_oce_adv_tra
     USE fesom_conservation_module, only: conservation_probe
+#if defined(__recom)
+    USE fesom_conservation_module, only: conservation_bgc_column, conservation_bgc_bc
+#endif
     USE oce_dyn_module, only: mom_on_device
 #if defined (FESOM_PROFILING)
     use fesom_profiler
@@ -33,6 +36,8 @@ module oce_ale_tracer_module
     use recom_config
     use recom_ciso
     use o_arrays
+    use recom_views
+    use recom_declarations, only: tracer_ids
 #endif
 #if defined(__recom)
     use recom_sinking
@@ -296,6 +301,9 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         ExpFlux = 0.0_WP
         BotFlux = 0.0_WP
     end if
+    ! the geometry REcoM's sinking reads in the tracer loop (real64 views)
+    call recom_views_mesh(mesh)
+    if (use_ballasting) call recom_ballasting(tracers, partit, mesh)
 #endif
 
 #if defined(__recom) && defined(__usetp)
@@ -407,16 +415,17 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 #endif
 
         !___________________________________________________________________________
-        ! Radioactive decay of 14C and 39Ar
-        if (tracers%data(tr_num)%ID == 14) tracers%data(tr_num)%values(:,:) = tracers%data(tr_num)%values(:,:) * exp(-decay14 * dt)
-        if (tracers%data(tr_num)%ID == 39) tracers%data(tr_num)%values(:,:) = tracers%data(tr_num)%values(:,:) * exp(-decay39 * dt)
+        ! Radioactive decay of 14C and 39Ar (decay_tracer: in single precision one
+        ! step of decay is below the real32 resolution and goes through the carry)
+        if (tracers%data(tr_num)%ID == 14) call decay_tracer(tr_num, exp(-real(decay14, WP_full) * real(dt, WP_full)), tracers, partit, mesh)
+        if (tracers%data(tr_num)%ID == 39) call decay_tracer(tr_num, exp(-real(decay39, WP_full) * real(dt, WP_full)), tracers, partit, mesh)
 
 !YY: C14 seems to be calculated both in fesom and recom
 !YY: decay differently calculated???
 #if defined(__ciso)
         ! radioactive decay of 14C
         if (ciso_14 .and. any(c14_tracer_id == tracers%data(tr_num)%ID)) then
-          tracers%data(tr_num)%values(:,:) = tracers%data(tr_num)%values(:,:) * (1 - lambda_14 * dt)
+          call decay_tracer(tr_num, real(1 - lambda_14 * dt, WP_full), tracers, partit, mesh)
         end if    ! ciso & ciso_14
 #endif
 
@@ -468,10 +477,10 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
                                                 group_i, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, tr_arr_requests(request_count),     partit%MPIerr)
 
                     if(use_MEDUSA) then
-                        call MPI_IBcast(Sinkflx_tr (:, :, tr_num_to_send), Sinkflx_tr_slice_count_fix_1, MPI_WP, &
+                        call MPI_IBcast(Sinkflx_tr (:, :, tr_num_to_send), Sinkflx_tr_slice_count_fix_1, MPI_WP_FULL, &
                                                     group_i, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, SinkFlx_tr_requests(request_count), partit%MPIerr)
                     endif
-                        call MPI_IBcast(Benthos_tr (:, :, tr_num_to_send), Benthos_tr_slice_count_fix_1, MPI_WP, &
+                        call MPI_IBcast(Benthos_tr (:, :, tr_num_to_send), Benthos_tr_slice_count_fix_1, MPI_WP_FULL, &
                                                     group_i, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, Benthos_tr_requests(request_count), partit%MPIerr)
                 end if
             end do
@@ -492,10 +501,10 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
                 call MPI_IBcast(tracers%data(tr_num_end)%values(:, :), tr_arr_slice_count_fix_1, MPI_WP, &
                                 group_i, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, tr_arr_requests(request_count),     partit%MPIerr)
                 if(use_MEDUSA) then
-                    call MPI_IBcast(Sinkflx_tr (:, :, tr_num_end), Sinkflx_tr_slice_count_fix_1, MPI_WP, &
+                    call MPI_IBcast(Sinkflx_tr (:, :, tr_num_end), Sinkflx_tr_slice_count_fix_1, MPI_WP_FULL, &
                                     group_i, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, SinkFlx_tr_requests(request_count), partit%MPIerr)
                 endif
-                    call MPI_IBcast(Benthos_tr (:, :, tr_num_end), Benthos_tr_slice_count_fix_1, MPI_WP, &
+                    call MPI_IBcast(Benthos_tr (:, :, tr_num_end), Benthos_tr_slice_count_fix_1, MPI_WP_FULL, &
                                     group_i, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, Benthos_tr_requests(request_count), partit%MPIerr)
             end if
         end do
@@ -529,18 +538,29 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
                 SinkFlx = SinkFlx + SinkFlx_tr(:, :, tr_num)
             endif
             Benthos = Benthos + Benthos_tr(:, :, tr_num)
-!            Sinkingvel1(:,:) = Sinkingvel1(:,:) + Sinkvel1_tr(:, :, tr_num)
-!            Sinkingvel2(:,:) = Sinkingvel2(:,:) + Sinkvel2_tr(:, :, tr_num)
         end do
 
 ! Each tracer is stepped in one FESOM group only, so the sinking diagnostics hold the
 ! contributions of this group's tracers: sum them over the groups
         if (Diags .and. num_fesom_groups > 1) then
-            call MPI_Allreduce(MPI_IN_PLACE, ExpFlux, size(ExpFlux), MPI_WP, MPI_SUM, &
+            call MPI_Allreduce(MPI_IN_PLACE, ExpFlux, size(ExpFlux), MPI_WP_FULL, MPI_SUM, &
                                partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%MPIerr)
-            call MPI_Allreduce(MPI_IN_PLACE, BotFlux, size(BotFlux), MPI_WP, MPI_SUM, &
+            call MPI_Allreduce(MPI_IN_PLACE, BotFlux, size(BotFlux), MPI_WP_FULL, MPI_SUM, &
                                partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%MPIerr)
         end if
+#endif
+#if defined(__recom)
+    ! sinking speeds of the two detritus classes for output, set per tracer in ver_sinking_recom
+    Sinkingvel1(:,:) = sum(Sinkvel1_tr, dim=3)
+    Sinkingvel2(:,:) = sum(Sinkvel2_tr, dim=3)
+#if defined(__usetp)
+    if (num_fesom_groups > 1) then
+        call MPI_Allreduce(MPI_IN_PLACE, Sinkingvel1, size(Sinkingvel1), MPI_WP_FULL, MPI_SUM, &
+                           partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%MPIerr)
+        call MPI_Allreduce(MPI_IN_PLACE, Sinkingvel2, size(Sinkingvel2), MPI_WP_FULL, MPI_SUM, &
+                           partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%MPIerr)
+    end if
+#endif
 #endif
 
     !___________________________________________________________________________
@@ -635,6 +655,90 @@ end subroutine solve_tracers_ale
 !
 !
 !===============================================================================
+! multiply tracer tr_num by the decay factor f of one time step. In double
+! precision this is values*f. In single precision (use_tracer_carry) 1 - f is
+! far below the real32 spacing for 14C (about 7e-9 per step), so values*f would
+! round back to values and nothing would decay: the product is formed in real64
+! and its remainder below WP goes into the carry, as REcoM's sources and sinks.
+! values are at hnode_new here (after the T* update and the implicit diffusion).
+subroutine decay_tracer(tr_num, f, tracers, partit, mesh)
+    implicit none
+    integer,            intent(in)            :: tr_num
+    real(kind=WP_full), intent(in)            :: f
+    type(t_tracer),     intent(inout), target :: tracers
+    type(t_partit),     intent(inout), target :: partit
+    type(t_mesh),       intent(in),    target :: mesh
+    integer            :: n, nz
+    real(kind=WP_full) :: x
+    real(kind=WP)      :: v
+
+    if (.not. use_tracer_carry) then
+        tracers%data(tr_num)%values(:,:) = tracers%data(tr_num)%values(:,:) * f
+        return
+    end if
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, x, v)
+    do n = 1, partit%myDim_nod2D
+        do nz = mesh%ulevels_nod2D(n), mesh%nlevels_nod2D(n)-1
+            x = real(tracers%data(tr_num)%values(nz,n), WP_full) * f
+            v = real(x, WP)
+            tracers%work%carry(nz,n,tr_num) = tracers%work%carry(nz,n,tr_num) &
+                + real((x - real(v, WP_full))*mesh%hnode_new(nz,n), WP)
+            tracers%data(tr_num)%values(nz,n) = v
+        end do
+    end do
+!$OMP END PARALLEL DO
+end subroutine decay_tracer
+!
+!
+!===============================================================================
+! REcoM ballasting: seawater viscosity, particle density and the scaling of the
+! sinking speeds. They do not depend on the sinking tracer, so they are computed
+! once per step, before the tracer loop, from the tracers at the start of the step.
+#if defined(__recom)
+subroutine recom_ballasting(tracers, partit, mesh)
+    implicit none
+    type(t_tracer), intent(inout), target :: tracers
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh),   intent(in),    target :: mesh
+    type(tracers_info_type)               :: tracers_info
+    integer                               :: n, tr_num
+
+    tr_num = 1
+    ! seawater_visc_3D
+    call get_seawater_viscosity(tr_num, partit%myDim_nod2D, &
+                                mesh%ulevels_nod2D, mesh%nlevels_nod2D, &
+                                recom_tracer_r8(tracers, 1), recom_tracer_r8(tracers, 2)) ! seawater_visc_3D
+
+    allocate(tracers_info%ids(tracers%num_tracers))
+    allocate(tracers_info%data_pointers(tracers%num_tracers))
+
+    do n = 1, tracers%num_tracers
+      tracers_info%ids(n) = tracers%data(n)%id
+    end do
+    ! the particle density reads the detritus classes only
+    call recom_tracer_pointers(tracers, tracers_info, only=[ &
+        tracer_ids%detrital_carbon, tracer_ids%detrital_nitrogen, &
+        tracer_ids%detrital_silica, tracer_ids%detrital_calcite, &
+        tracer_ids%macrozooplankton_detrital_carbon, tracer_ids%macrozooplankton_detrital_nitrogen, &
+        tracer_ids%macrozooplankton_detrital_silica, tracer_ids%macrozooplankton_detrital_calcite])
+
+    ! rho_particle1 and rho_particle2
+    call get_particle_density(tracers%num_tracers, partit%myDim_nod2D, partit%eDim_nod2D, &
+                              mesh%nl, mesh%ulevels_nod2D, mesh%nlevels_nod2D, &
+                              tracers_info) ! rho_particle = density of particle class 1 and 2
+
+    deallocate(tracers_info%ids)
+    deallocate(tracers_info%data_pointers)
+
+    ! scaling_visc_3D, scaling_density1_3D, scaling_density2_3D
+    call ballast(partit%myDim_nod2D, mesh%ulevels_nod2D, &
+                 mesh%nlevels_nod2D, geo_coord_nod2D_r8, z_3d_n_r8,                     &
+                 recom_tracer_r8(tracers, 1), recom_tracer_r8(tracers, 2), real(rad, WP_full))
+end subroutine recom_ballasting
+#endif
+!
+!
+!===============================================================================
 subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
 
     implicit none
@@ -649,7 +753,7 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     real(kind=WP)                         :: ttf_rhs_bak (mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
     integer                               :: nz, nu1, nl1
 #if defined(__recom)
-    type(tracers_info_type)               :: tracers_info
+    integer, pointer                      :: s_nod2D(:), r_nod2D(:), s_nod3D(:,:,:), r_nod3D(:,:,:)
 #endif
     !___________________________________________________________________________
     ! pointer on necessary derived types
@@ -745,6 +849,13 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
 !        if (recom_debug .and. mype==0)  print *, tracers%data(tr_num)%ID
 
 #if defined(__recom)
+! REcoM is real64 (its own WP = 8): it reads the geometry and tracers through the
+! real64 views of recom_views (FESOM's own arrays in double precision, real64
+! copies in single precision) and returns dtr_bf, vert_sink and str_bf in real64.
+! In double precision they are added to the tracer here, as always. In single
+! precision (use_tracer_carry) they enter the update below as real64 content, so
+! that they are rounded once, together with the transport, into the carried T*.
+
 ! 1) Remineralization from the benthos
 !    Nutrient fluxes come from the bottom boundary
 !    Unit [mmol/m2/s]
@@ -755,17 +866,17 @@ if (any(recom_remin_tracer_id == tracers%data(tr_num)%ID)) then
       call diff_ver_recom_expl(mesh%nl, &  !--- vert_sink ---
                                mesh%ulevels_nod2D, mesh%nlevels_nod2D, &
                                mesh%nod_in_elem2D_num, &
-                               mesh%nod_in_elem2D, mesh%nlevels, mesh%elem_area, &
-                               mesh%area, mesh%areasvol, mesh%hnode_new, &
+                               mesh%nod_in_elem2D, mesh%nlevels, elem_area_r8, &
+                               area_r8, areasvol_r8, mesh%hnode_new, &
                                tracers%data(tr_num)%ID,  &
                                partit%myDim_nod2D, partit%eDim_nod2D, &
-                               partit%mype, partit%MPI_COMM_FESOM, dtr_bf, dt)  !--- str_bf ---
+                               partit%mype, partit%MPI_COMM_FESOM, dtr_bf, real(dt, WP_full))  !--- str_bf ---
+    if (conservation_freq > 0) call conservation_bgc_column('return', tr_num, dtr_bf, partit, mesh)
 ! update tracer fields
+    if (.not. use_tracer_carry) then
         do n=1, partit%myDim_nod2D
             nzmax=mesh%nlevels_nod2D(n)-1
             nzmin=mesh%ulevels_nod2D(n)
-!            tr_arr(nzmin:nzmax,n,tr_num)=tr_arr(nzmin:nzmax,n,tr_num)+ &
-!                                                dtr_bf(nzmin:nzmax,n)
         tracers%data(tr_num)%values(nzmin:nzmax,n)=tracers%data(tr_num)%values(nzmin:nzmax,n)+ &
                                                 dtr_bf(nzmin:nzmax,n)
         ! ltra_diag: benthic flux into the water column [mmol/m2/s]. dtr_bf is added
@@ -775,6 +886,7 @@ if (any(recom_remin_tracer_id == tracers%data(tr_num)%ID)) then
             tracers%work%tra_benthic(nzmin:nzmax,n,tr_num) = dtr_bf(nzmin:nzmax,n)*mesh%hnode(nzmin:nzmax,n)/dt
         end if
         end do
+    end if
 end if
 
 ! 2) Sinking in water column
@@ -782,74 +894,41 @@ end if
 ! but not for the combination ciso + 2. zoo!
 if (any(recom_sinking_tracer_id == tracers%data(tr_num)%ID)) then
 
-!< activate Ballasting
-!< .OG. 04.11.2022
-
-         if (use_ballasting) then
-!< get seawater viscosity, seawater_visc_3D
-              call get_seawater_viscosity(tr_num, partit%myDim_nod2D, &
-                                          mesh%ulevels_nod2D, mesh%nlevels_nod2D, &
-                                          tracers%data(1)%values, tracers%data(2)%values) ! seawater_visc_3D
-
-              allocate(tracers_info%ids(tracers%num_tracers))
-              allocate(tracers_info%data_pointers(tracers%num_tracers))
-
-              do n = 1, tracers%num_tracers
-                tracers_info%ids(n) = tracers%data(n)%id
-                tracers_info%data_pointers(n)%tracer_data => tracers%data(n)%values
-              end do
-
-!< get particle density of class 1 and 2 !rho_particle1 and rho_particle2
-              call get_particle_density(tracers%num_tracers, partit%myDim_nod2D, partit%eDim_nod2D, &
-                                        mesh%nl, mesh%ulevels_nod2D, mesh%nlevels_nod2D, &
-                                        tracers_info) ! rho_particle = density of particle class 1 and 2
-
-              deallocate(tracers_info%ids)
-              deallocate(tracers_info%data_pointers)
-
-!< calculate scaling factors
-!< scaling_visc_3D
-!< scaling_density1_3D, scaling_density2_3D
-              call ballast(partit%myDim_nod2D, mesh%ulevels_nod2D, &
-                           mesh%nlevels_nod2D, mesh%geo_coord_nod2D, mesh%z_3d_n,                 &
-                           tracers%data(1)%values, tracers%data(2)%values, rad)
-        end if
-
 ! sinking
         call ver_sinking_recom(tr_num, mesh%nl, &  !--- vert_sink ---
                                mesh%ulevels_nod2D, mesh%nlevels_nod2D, &
-                               mesh%zbar_3d_n, mesh%z_3d_n, mesh%nod_in_elem2D_num, &
+                               zbar_3d_n_r8, z_3d_n_r8, mesh%nod_in_elem2D_num, &
                                mesh%nod_in_elem2D, mesh%nlevels,       &
-                               mesh%area, mesh%areasvol, mesh%hnode, mesh%hnode_new, &
+                               area_r8, areasvol_r8, mesh%hnode, mesh%hnode_new, &
                                tracers%data(tr_num)%ID,  &
-                               tracers%data(tr_num)%values(:,:),       &
-                               partit%myDim_nod2D, vert_sink, dt)  !--- str_bf ---
+                               recom_tracer_r8(tracers, tr_num),       &
+                               partit%myDim_nod2D, vert_sink, real(dt, WP_full))  !--- str_bf ---
 ! update tracer fields
 ! sinking into the benthos
+        call recom_mpitypes(partit, s_nod2D, r_nod2D, s_nod3D, r_nod3D)
         call ver_sinking_recom_benthos(tr_num, mesh%nl, &
                                        mesh%ulevels_nod2D, mesh%nlevels_nod2D, &
-                                       mesh%zbar_3d_n, mesh%nod_in_elem2D_num, &
-                                       mesh%nod_in_elem2D, mesh%nlevels, mesh%elem_area, &
-                                       mesh%area, mesh%areasvol, tracers%data(tr_num)%ID, &
-                                       tracers%data(tr_num)%values(:,:),       &
+                                       zbar_3d_n_r8, mesh%nod_in_elem2D_num, &
+                                       mesh%nod_in_elem2D, mesh%nlevels, elem_area_r8, &
+                                       area_r8, areasvol_r8, tracers%data(tr_num)%ID, &
+                                       recom_tracer_r8(tracers, tr_num),       &
                                        partit%myDim_nod2D, str_bf,             &
                                        partit%mype, partit%MPI_COMM_FESOM,   &
                                        partit%npes, partit%com_nod2D%sPEnum,   &
                                        partit%com_nod2D%rPEnum,  &
-                                       partit%s_mpitype_nod2D, partit%r_mpitype_nod2D,              &
-                                       partit%s_mpitype_nod3D, partit%r_mpitype_nod3D,              &
+                                       s_nod2D, r_nod2D, s_nod3D, r_nod3D,     &
                                        partit%com_nod2D%sPE, partit%com_nod2D%rPE,                  &
-                                       partit%com_nod2D%req, partit%com_nod2D%nreq, dt)  !--- str_bf ---
+                                       partit%com_nod2D%req, partit%com_nod2D%nreq, real(dt, WP_full))  !--- str_bf ---
+        if (conservation_freq > 0) then
+            call conservation_bgc_column('sinking',  tr_num, vert_sink, partit, mesh)
+            call conservation_bgc_column('seafloor', tr_num, str_bf,    partit, mesh)
+        end if
 
 ! update tracer fields
-
+    if (.not. use_tracer_carry) then
         do n=1, partit%myDim_nod2D
             nzmax=mesh%nlevels_nod2D(n)-1
             nzmin=mesh%ulevels_nod2D(n)
-!            tr_arr(nzmin:nzmax,n,tr_num)=tr_arr(nzmin:nzmax,n,tr_num)+ &
-!                                                vert_sink(nzmin:nzmax,n)
-!            tr_arr(nzmin:nzmax,n,tr_num)=tr_arr(nzmin:nzmax,n,tr_num)+ &
-!                                                str_bf(nzmin:nzmax,n)
         tracers%data(tr_num)%values(nzmin:nzmax,n)=tracers%data(tr_num)%values(nzmin:nzmax,n)+ &
                                                 vert_sink(nzmin:nzmax,n)
         tracers%data(tr_num)%values(nzmin:nzmax,n)=tracers%data(tr_num)%values(nzmin:nzmax,n)+ &
@@ -862,7 +941,21 @@ if (any(recom_sinking_tracer_id == tracers%data(tr_num)%ID)) then
                                                           * mesh%hnode(nzmin:nzmax,n)/dt
         end if
         end do
+    end if
 endif
+
+! single precision: REcoM's terms as real64 content, (C + d)*hnode = C*hnode + d*hnode
+if (use_tracer_carry .and. (any(recom_remin_tracer_id == tracers%data(tr_num)%ID) .or. &
+                            any(recom_sinking_tracer_id == tracers%data(tr_num)%ID))) then
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nzmin, nzmax)
+    do n=1, partit%myDim_nod2D
+        nzmax=mesh%nlevels_nod2D(n)-1
+        nzmin=mesh%ulevels_nod2D(n)
+        del_ttf(nzmin:nzmax,n) = del_ttf(nzmin:nzmax,n) + &
+            (dtr_bf(nzmin:nzmax,n) + vert_sink(nzmin:nzmax,n) + str_bf(nzmin:nzmax,n))*mesh%hnode(nzmin:nzmax,n)
+    end do
+!$OMP END PARALLEL DO
+end if
 #endif
     !___________________________________________________________________________
     ! Update tracers --> calculate T* see Danilov et al. (2017)
@@ -1178,6 +1271,9 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
             nzmin=mesh%ulevels_nod2D(n)
             impl_bc(n)=bc_surface(n, tr_id, trarr(nzmin,n), nzmin, partit, mesh, sst(nzmin,n), sss(nzmin,n), a_ice(n))
         end do
+#if defined(__recom)
+        if (conservation_freq > 0) call conservation_bgc_bc(tr_num, impl_bc, partit, mesh)
+#endif
     end if
     
     ! solve equation diffusion equation implicite part:
