@@ -751,6 +751,7 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     !___________________________________________________________________________
     integer                               :: n, nzmax, nzmin
     real(kind=WP)                         :: ttf_rhs_bak (mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP)                         :: carry_bak (mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
     integer                               :: nz, nu1, nl1
 #if defined(__recom)
     integer, pointer                      :: s_nod2D(:), r_nod2D(:), s_nod3D(:,:,:), r_nod3D(:,:,:)
@@ -1043,6 +1044,7 @@ end if
 
         ! (w/out Redi)
         if (conservation_freq > 0) call conservation_probe('divided', 'b', tr_num, tracers, partit, mesh)
+        if (tracers%data(tr_num)%ltra_diag .and. use_tracer_carry) carry_bak = tracers%work%carry(:,:,tr_num)
         call diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
         if (impl_on_device) then
             !$ACC UPDATE HOST(tracers%data(tr_num)%values)
@@ -1060,6 +1062,8 @@ end if
               do nz = nu1, nl1-1
                  tracers%work%tra_diff_part_ver_impl(nz,n,tr_num) = (tracers%data(tr_num)%values(nz,n) - ttf_rhs_bak(nz,n)) &
                       * mesh%hnode_new(nz,n) / dt ! values are on hnode_new after the T* update --> [mmol/m2/s]
+                 if (use_tracer_carry) tracers%work%tra_diff_part_ver_impl(nz,n,tr_num) = tracers%work%tra_diff_part_ver_impl(nz,n,tr_num) &
+                      + (tracers%work%carry(nz,n,tr_num) - carry_bak(nz,n)) / dt
                  !if (mype==0)  print *,  tra_diff_part_ver_impl(:,:,tr_num)
               end do
            end do
