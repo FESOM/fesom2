@@ -130,7 +130,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 
     !___________________________________________________________________________
     integer                                  :: i, tr_num, node, elem, nzmax, nzmin
-    real(kind=WP)                            :: ttf_rhs_bak (mesh%nl-1, partit%myDim_nod2D+partit%eDim_elem2D) ! local variable
+    real(kind=WP)                            :: ttf_rhs_bak (mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D) ! local variable
     integer                                  :: nz, n, nu1, nl1
     real(kind=WP), dimension(:,:), pointer   :: salt_dev
     !___________________________________________________________________________
@@ -751,6 +751,7 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     !___________________________________________________________________________
     integer                               :: n, nzmax, nzmin
     real(kind=WP)                         :: ttf_rhs_bak (mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP)                         :: carry_bak (mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
     integer                               :: nz, nu1, nl1
 #if defined(__recom)
     integer, pointer                      :: s_nod2D(:), r_nod2D(:), s_nod3D(:,:,:), r_nod3D(:,:,:)
@@ -808,7 +809,7 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     if (conservation_freq > 0) call conservation_probe('hor_diff', 'a', tr_num, tracers, partit, mesh)
 
     if (tracers%data(tr_num)%ltra_diag) then
-       call store_diag_component(del_ttf, ttf_rhs_bak, mesh%hnode_new, mesh%ulevels_nod2D, mesh%nlevels_nod2D, partit%myDim_nod2D, partit%eDim_nod2D, &
+       call store_diag_component(del_ttf, ttf_rhs_bak, dt, mesh%ulevels_nod2D, mesh%nlevels_nod2D, partit%myDim_nod2D, partit%eDim_nod2D, &
                                  tracers%work%tra_diff_part_hor_redi(:,:,tr_num))
     end if
 
@@ -822,7 +823,7 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     ! OG i_vert_diff = TRUE so, we dont call explicit scheme
     ! If we use this, check surface forcing for recom variables (They are not updated)
     if ((.not. tracers%data(tr_num)%i_vert_diff) .and. tracers%data(tr_num)%ltra_diag) then 
-       call store_diag_component(del_ttf, ttf_rhs_bak, mesh%hnode_new, mesh%ulevels_nod2D, mesh%nlevels_nod2D, partit%myDim_nod2D, partit%eDim_nod2D, &
+       call store_diag_component(del_ttf, ttf_rhs_bak, dt, mesh%ulevels_nod2D, mesh%nlevels_nod2D, partit%myDim_nod2D, partit%eDim_nod2D, &
                                  tracers%work%tra_diff_part_ver_expl(:,:,tr_num))
     end if
 
@@ -837,7 +838,7 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     if (conservation_freq > 0) call conservation_probe('vert_expl', 'a', tr_num, tracers, partit, mesh)
 
     if (tracers%data(tr_num)%ltra_diag .and. Redi) then
-       call store_diag_component(del_ttf, ttf_rhs_bak, mesh%hnode_new, mesh%ulevels_nod2D, mesh%nlevels_nod2D, partit%myDim_nod2D, partit%eDim_nod2D, &
+       call store_diag_component(del_ttf, ttf_rhs_bak, dt, mesh%ulevels_nod2D, mesh%nlevels_nod2D, partit%myDim_nod2D, partit%eDim_nod2D, &
                                  tracers%work%tra_diff_part_ver_redi_expl(:,:,tr_num))
     end if
 
@@ -879,6 +880,16 @@ if (any(recom_remin_tracer_id == tracers%data(tr_num)%ID)) then
             nzmin=mesh%ulevels_nod2D(n)
         tracers%data(tr_num)%values(nzmin:nzmax,n)=tracers%data(tr_num)%values(nzmin:nzmax,n)+ &
                                                 dtr_bf(nzmin:nzmax,n)
+        end do
+    end if
+    ! ltra_diag: benthic flux into the water column [mmol/m2/s]. dtr_bf enters before
+    ! the T* update, on hnode (added to the values, or with use_tracer_carry as
+    ! content dtr_bf*hnode below), so its layer content is dtr_bf*hnode.
+    if (tracers%data(tr_num)%ltra_diag) then
+        do n=1, partit%myDim_nod2D
+            nzmax=mesh%nlevels_nod2D(n)-1
+            nzmin=mesh%ulevels_nod2D(n)
+            tracers%work%tra_benthic(nzmin:nzmax,n,tr_num) = dtr_bf(nzmin:nzmax,n)*mesh%hnode(nzmin:nzmax,n)/dt
         end do
     end if
 end if
@@ -927,6 +938,17 @@ if (any(recom_sinking_tracer_id == tracers%data(tr_num)%ID)) then
                                                 vert_sink(nzmin:nzmax,n)
         tracers%data(tr_num)%values(nzmin:nzmax,n)=tracers%data(tr_num)%values(nzmin:nzmax,n)+ &
                                                 str_bf(nzmin:nzmax,n)
+        end do
+    end if
+    ! ltra_diag: sinking in the water column (vert_sink) and into the benthos (str_bf)
+    ! [mmol/m2/s]. Like dtr_bf, both enter before the T* update, on hnode, so their
+    ! layer content is (vert_sink + str_bf)*hnode.
+    if (tracers%data(tr_num)%ltra_diag) then
+        do n=1, partit%myDim_nod2D
+            nzmax=mesh%nlevels_nod2D(n)-1
+            nzmin=mesh%ulevels_nod2D(n)
+            tracers%work%tra_sink(nzmin:nzmax,n,tr_num) = (vert_sink(nzmin:nzmax,n) + str_bf(nzmin:nzmax,n)) &
+                                                          * mesh%hnode(nzmin:nzmax,n)/dt
         end do
     end if
 endif
@@ -1022,6 +1044,7 @@ end if
 
         ! (w/out Redi)
         if (conservation_freq > 0) call conservation_probe('divided', 'b', tr_num, tracers, partit, mesh)
+        if (tracers%data(tr_num)%ltra_diag .and. use_tracer_carry) carry_bak = tracers%work%carry(:,:,tr_num)
         call diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
         if (impl_on_device) then
             !$ACC UPDATE HOST(tracers%data(tr_num)%values)
@@ -1037,7 +1060,10 @@ end if
               nu1 = mesh%ulevels_nod2D(n)
               nl1 = mesh%nlevels_nod2D(n)
               do nz = nu1, nl1-1
-                 tracers%work%tra_diff_part_ver_impl(nz,n,tr_num) = tracers%data(tr_num)%values(nz,n) - ttf_rhs_bak(nz,n)
+                 tracers%work%tra_diff_part_ver_impl(nz,n,tr_num) = (tracers%data(tr_num)%values(nz,n) - ttf_rhs_bak(nz,n)) &
+                      * mesh%hnode_new(nz,n) / dt ! values are on hnode_new after the T* update --> [mmol/m2/s]
+                 if (use_tracer_carry) tracers%work%tra_diff_part_ver_impl(nz,n,tr_num) = tracers%work%tra_diff_part_ver_impl(nz,n,tr_num) &
+                      + (tracers%work%carry(nz,n,tr_num) - carry_bak(nz,n)) / dt
                  !if (mype==0)  print *,  tra_diff_part_ver_impl(:,:,tr_num)
               end do
            end do
@@ -1087,10 +1113,10 @@ subroutine backup_ttf_rhs(del_ttf, ttf_rhs_bak, ulevels_nod2D, nlevels_nod2D, my
     end do
 end subroutine backup_ttf_rhs
 
-subroutine store_diag_component(del_ttf, ttf_rhs_bak, hnode_new, ulevels_nod2D, nlevels_nod2D, myDim_nod2D, eDim_nod2D, target_field)
+subroutine store_diag_component(del_ttf, ttf_rhs_bak, dt, ulevels_nod2D, nlevels_nod2D, myDim_nod2D, eDim_nod2D, target_field)
     real(kind=WP_full), intent(in)    :: del_ttf(:,:)
     real(kind=WP), intent(in)    :: ttf_rhs_bak(:,:)
-    real(kind=WP_full), intent(in)  :: hnode_new(:,:)
+    real(kind=WP), intent(in)    :: dt
     integer      , intent(in)    :: ulevels_nod2D(:)
     integer      , intent(in)    :: nlevels_nod2D(:)
     integer      , intent(in)    :: myDim_nod2D
@@ -1103,7 +1129,7 @@ subroutine store_diag_component(del_ttf, ttf_rhs_bak, hnode_new, ulevels_nod2D, 
         nu1 = ulevels_nod2D(n)
         nl1 = nlevels_nod2D(n)
         do nz = nu1, nl1-1
-            target_field(nz,n) = (del_ttf(nz,n) - ttf_rhs_bak(nz,n)) / hnode_new(nz,n) ! Unit [Conc]
+            target_field(nz,n) = (del_ttf(nz,n) - ttf_rhs_bak(nz,n)) / dt ! del_ttf is tracer*thickness per step --> [mmol/m2/s]
         end do
     end do
 end subroutine store_diag_component
