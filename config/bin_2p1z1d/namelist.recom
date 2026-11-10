@@ -40,7 +40,7 @@ nm_co2_data_file      = '/albedo/work/projects/p_pool_recom/input/mesh_CORE2_fin
 ! bgc_num in &pavariables is checked against these switches at startup.
 ! ============================================================================
 &parecomsetup
-enable_3zoo2det       = .true.      ! three zooplankton groups and two detritus classes instead of one each
+enable_3zoo2det       = .false.     ! three zooplankton groups and two detritus classes instead of one each
 enable_coccos         = .false.     ! coccolithophore and Phaeocystis tracers
 /
 
@@ -55,7 +55,7 @@ recom_debug           = .false.     ! extra REcoM debug output
 Diags                 = .true.      ! compute REcoM diagnostics
 
 ! --- Tracer Counts ---
-bgc_num               = 22          ! number of REcoM tracers, checked at startup against enable_3zoo2det and enable_coccos
+bgc_num               = 23          ! number of REcoM tracers, checked at startup against enable_3zoo2det and enable_coccos
 diags3d_num           = 28          ! number of 3D diagnostic tracers to be saved
 bgc_base_num          = 22          ! number of standard (base) BGC tracers
 benthos_num           = 4           ! number of benthic BGC tracers: 8 with ciso = .true., otherwise 4
@@ -107,6 +107,7 @@ currentCO2cycle       = 1           ! forcing cycle currently running
 ! --- Carbon Isotopes and Sediment ---
 ciso                  = .false.     ! main switch for carbon isotopes (13C, 14C), see &paciso
 use_MEDUSA            = .false.     ! main switch for the sediment model MEDUSA
+use_DICremin          = .true.      ! DIC remineralization tracer (ID 1037 in namelist.tra, counted in bgc_num)
 sedflx_num            = 0           ! number of sediment fluxes read from MEDUSA (0 = none, default sediment)
 bottflx_num           = 4           ! number of bottom fluxes: 8 with ciso and ciso_14, 6 with ciso only, 4 without ciso
 add_loopback          = .false.     ! return loopback fluxes to the surface through rivers
