@@ -2,6 +2,16 @@
 !------------------------------------------------------------------------------------
 !
 module g_read_other_NetCDF
+! read_2ddata_on_grid_NetCDF reads a field already on the model grid. In a
+! single-precision build REcoM's forcing arrays stay real64, so the generic also
+! takes a real64 target; in a double-precision build both would be the same
+! specific, hence the #if.
+interface read_2ddata_on_grid_NetCDF
+    module procedure read_2ddata_on_grid_NetCDF_wp
+#if defined(USE_SINGLE_PRECISION)
+    module procedure read_2ddata_on_grid_NetCDF_r8
+#endif
+end interface
 contains
 subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_onvert, partit, mesh)
     use ieee_arithmetic
@@ -766,7 +776,7 @@ end subroutine read_surf_hydrography_NetCDF
 !
 !------------------------------------------------------------------------------------
 !
-subroutine read_2ddata_on_grid_NetCDF(file, vari, itime, model_2Darray, partit, mesh)  
+subroutine read_2ddata_on_grid_NetCDF_wp(file, vari, itime, model_2Darray, partit, mesh)
 
   use, intrinsic :: ISO_FORTRAN_ENV, only: real64
 
@@ -815,5 +825,51 @@ subroutine read_2ddata_on_grid_NetCDF(file, vari, itime, model_2Darray, partit, 
   end if      
   call MPI_BCast(ncdata, mesh%nod2D, MPI_WP, 0, partit%MPI_COMM_FESOM, ierror)
   model_2Darray=ncdata(partit%myList_nod2D) 
-end subroutine read_2ddata_on_grid_NetCDF
+end subroutine read_2ddata_on_grid_NetCDF_wp
+#if defined(USE_SINGLE_PRECISION)
+!
+!------------------------------------------------------------------------------------
+!
+! read_2ddata_on_grid_NetCDF_wp for a real64 target: netCDF converts the file
+! values to double directly, so nothing passes through real32
+subroutine read_2ddata_on_grid_NetCDF_r8(file, vari, itime, model_2Darray, partit, mesh)
+  use, intrinsic :: ISO_FORTRAN_ENV, only: real64
+  use g_config
+  use o_param
+  USE MOD_MESH
+  USE MOD_PARTIT
+  use par_support_module, only: par_abort
+  use netcdf
+  implicit none
+
+  type(t_mesh),   intent(in)   , target :: mesh
+  type(t_partit), intent(inout), target :: partit
+  integer                       :: itime
+  integer                       :: status, ncid, varid
+  integer                       :: istart(2), icount(2)
+  real(real64)                  :: ncdata(mesh%nod2D)
+  real(real64),  intent(out)    :: model_2Darray(partit%myDim_nod2D+partit%eDim_nod2D)
+  character(*),  intent(in)     :: file
+  character(*),  intent(in)     :: vari
+  integer                       :: ierror
+
+  if (partit%mype==0) status=nf90_open(file, nf90_nowrite, ncid)
+  call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+  if (status.ne.nf90_noerr)then
+     print*,'Error in opening netcdf file '//file
+     call par_abort(partit%MPI_COMM_FESOM, partit%mype)
+     stop
+  endif
+
+  if (partit%mype==0) then
+     status=nf90_inq_varid(ncid, vari, varid)
+     istart = (/1, itime/)
+     icount= (/mesh%nod2D, 1/)
+     status=nf90_get_var(ncid, varid, ncdata, start=istart, count=icount)
+     status=nf90_close(ncid)
+  end if
+  call MPI_BCast(ncdata, mesh%nod2D, MPI_WP_FULL, 0, partit%MPI_COMM_FESOM, ierror)
+  model_2Darray=ncdata(partit%myList_nod2D)
+end subroutine read_2ddata_on_grid_NetCDF_r8
+#endif
 end module g_read_other_NetCDF

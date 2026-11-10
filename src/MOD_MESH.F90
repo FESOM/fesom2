@@ -18,6 +18,9 @@ TYPE SPARSE_MATRIX
      integer(int32), allocatable,   dimension(:) :: colind_loc
      integer(int32), allocatable,   dimension(:) :: rowptr_loc
      real(kind=WP),  allocatable,   dimension(:) :: pr_values !preconditioner values
+     ! SSH stiffness matrix for the unperturbed depth, as init_stiff_mat_ale assembled
+     ! it; update_stiff_mat_ale adds the term of the current elevation to it
+     real(kind=real64), allocatable, dimension(:) :: values_ref
 #if defined(USE_SINGLE_PRECISION)
      ! Full-precision accumulator for the SSH stiffness matrix, single precision only.
      ! update_stiff_mat_ale adds a per-step increment whose size relative to the
@@ -143,7 +146,7 @@ integer, allocatable, dimension(:,:)          :: nn_pos
 ! change, since mixed-kind arithmetic promotes; only WP-typed call arguments do.
 real(kind=WP_full), allocatable,dimension(:,:) :: hnode
 real(kind=WP_full), allocatable,dimension(:,:) :: hnode_new
-real(kind=WP), allocatable,dimension(:,:)   :: hnode_wp, hnode_new_wp   ! WP copies for output and restart (single-precision build)
+real(kind=WP), allocatable,dimension(:,:)   :: hnode_wp, hnode_new_wp   ! WP copies for output (single-precision build)
 real(kind=WP), allocatable,dimension(:,:)   :: zbar_3d_n
 real(kind=WP), allocatable,dimension(:,:)   :: Z_3d_n
 ! LA 2023-01-31 add icebergs

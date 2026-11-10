@@ -107,6 +107,10 @@ TYPE T_PARTIT
   integer, allocatable       :: s_mpitype_nod2D(:),     r_mpitype_nod2D(:)
   integer, allocatable       :: s_mpitype_nod2D_i(:),   r_mpitype_nod2D_i(:)
   integer, allocatable       :: s_mpitype_nod3D(:,:,:), r_mpitype_nod3D(:,:,:)
+  ! the same on MPI_WP_FULL, for real64 node fields in a single-precision build
+  ! (REcoM keeps its fields in real64); allocated only when WP /= WP_full
+  integer, allocatable       :: s_mpitype_nod2D_r8(:),     r_mpitype_nod2D_r8(:)
+  integer, allocatable       :: s_mpitype_nod3D_r8(:,:,:), r_mpitype_nod3D_r8(:,:,:)
 
   ! Spectral bin (fbin) fields for IDEMIX2 halo exchange
   ! Full spectral column exchanged at once (like standard nod3D exchanges full depth column).

@@ -13,7 +13,10 @@ module io_fesom_file_module
   type var_info
     integer var_index
     real(kind=WP), pointer :: external_local_data_ptr(:,:) => null()
-    real(kind=WP), allocatable, dimension(:,:) :: local_data_copy
+    ! a real64 field of a single-precision build (specify_node_var with real64 data)
+    ! goes to and from the file without rounding to WP; set instead of the WP pointer
+    real(kind=8), pointer :: external_local_data_ptr_r8(:,:) => null()
+    real(kind=8), allocatable, dimension(:,:) :: local_data_copy
     real(kind=8), allocatable :: global_level_data(:)
     integer :: global_level_data_size = 0
     logical is_elem_based
@@ -56,6 +59,10 @@ module io_fesom_file_module
     generic, public :: specify_node_var => specify_node_var_2d, specify_node_var_2dicepack, specify_node_var_3d
     generic, public :: specify_elem_var => specify_elem_var_2d, specify_elem_var_3d
     procedure, private :: specify_node_var_2d, specify_node_var_2dicepack, specify_node_var_3d
+#if defined(USE_SINGLE_PRECISION)
+    generic, public :: specify_node_var => specify_node_var_2d_r8, specify_node_var_3d_r8
+    procedure, private :: specify_node_var_2d_r8, specify_node_var_3d_r8
+#endif
     procedure, private :: specify_elem_var_2d, specify_elem_var_3d
     procedure, private :: gather_and_write_variables
     procedure, private :: redist_and_write_variables
@@ -294,6 +301,9 @@ contains
         !PS dim= parameter to get the proper dimension 
         nlvl = size(var%external_local_data_ptr,dim=2)
         allocate(laux( size(var%external_local_data_ptr,dim=1) )) ! i.e. myDim_elem2D+eDim_elem2D or myDim_nod2D+eDim_nod2D
+      else if (associated(var%external_local_data_ptr_r8)) then
+        nlvl = size(var%external_local_data_ptr_r8,dim=1)
+        allocate(laux( size(var%external_local_data_ptr_r8,dim=2) ))
       else
         nlvl = size(var%external_local_data_ptr,dim=1)
         allocate(laux( size(var%external_local_data_ptr,dim=2) )) ! i.e. myDim_elem2D+eDim_elem2D or myDim_nod2D+eDim_nod2D
@@ -337,6 +347,8 @@ contains
             ! PS Again icepack variable demension is [nod2, ncat] thats why we need 
             ! PS to switch here the index where we sort in the 2d slices
             var%external_local_data_ptr(:,lvl) = laux ! todo: remove this buffer and pass the data directly to MPI (change order of data layout to be levelwise or do not gather levelwise but by columns)
+       else if (associated(var%external_local_data_ptr_r8)) then
+            var%external_local_data_ptr_r8(lvl,:) = laux
        else
             ! the data from our pointer is not contiguous (if it is 3D data), so we can not pass the pointer directly to MPI
             var%external_local_data_ptr(lvl,:) = laux ! todo: remove this buffer and pass the data directly to MPI (change order of data layout to be levelwise or do not gather levelwise but by columns)
@@ -654,6 +666,9 @@ contains
       if(var%is_icepackvar2) then
         nlvl = size(var%external_local_data_ptr, dim=2)
         nloc = size(var%external_local_data_ptr, dim=1)
+      else if(associated(var%external_local_data_ptr_r8)) then
+        nlvl = size(var%external_local_data_ptr_r8, dim=1)
+        nloc = size(var%external_local_data_ptr_r8, dim=2)
       else
         nlvl = size(var%external_local_data_ptr, dim=1)
         nloc = size(var%external_local_data_ptr, dim=2)
@@ -726,6 +741,10 @@ contains
       if(var%is_icepackvar2) then
         do k = 1, nloc
           var%external_local_data_ptr(k, 1:nlvl) = out(1:nlvl, k)
+        end do
+      else if(associated(var%external_local_data_ptr_r8)) then
+        do k = 1, nloc
+          var%external_local_data_ptr_r8(1:nlvl, k) = out(1:nlvl, k)
         end do
       else
         do k = 1, nloc
@@ -838,7 +857,11 @@ contains
     
     do i=1, this%nvar_infos
       var => this%var_infos(i)
-      read(fileunit) var%external_local_data_ptr ! directly use external_local_data_ptr, use the local_data_copy only when called asynchronously
+      if(associated(var%external_local_data_ptr_r8)) then
+        read(fileunit) var%external_local_data_ptr_r8
+      else
+        read(fileunit) var%external_local_data_ptr ! directly use external_local_data_ptr, use the local_data_copy only when called asynchronously
+      end if
     end do
   end subroutine
 
@@ -852,7 +875,11 @@ contains
     
     do i=1, this%nvar_infos
       var => this%var_infos(i)
-      write(fileunit) var%external_local_data_ptr ! directly use external_local_data_ptr, use the local_data_copy only when called asynchronously
+      if(associated(var%external_local_data_ptr_r8)) then
+        write(fileunit) var%external_local_data_ptr_r8
+      else
+        write(fileunit) var%external_local_data_ptr ! directly use external_local_data_ptr, use the local_data_copy only when called asynchronously
+      end if
     end do
   end subroutine
 
@@ -888,6 +915,11 @@ contains
     ! copy data so we can write the current values asynchronously
     do i=1, this%nvar_infos
       var => this%var_infos(i)
+      if(associated(var%external_local_data_ptr_r8)) then
+        if(.not. allocated(var%local_data_copy)) allocate( var%local_data_copy(size(var%external_local_data_ptr_r8,dim=1), size(var%external_local_data_ptr_r8,dim=2)) )
+        var%local_data_copy = var%external_local_data_ptr_r8
+        cycle
+      end if
       if(.not. allocated(var%local_data_copy)) allocate( var%local_data_copy(size(var%external_local_data_ptr,dim=1), size(var%external_local_data_ptr,dim=2)) )
         if (var%is_icepackvar2) then 
             var%local_data_copy = transpose(var%external_local_data_ptr)
@@ -1012,6 +1044,42 @@ contains
     call repoint_nvhpc_subarray(this%var_infos(this%nvar_infos))
 #endif
   end subroutine
+
+
+#if defined(USE_SINGLE_PRECISION)
+  ! real64 node fields of a single-precision build (layer thicknesses, REcoM's
+  ! fields): the file variable is double anyway, so they are written and read
+  ! without rounding to WP
+  subroutine specify_node_var_2d_r8(this, name, longname, units, local_data)
+    class(fesom_file_type), intent(inout) :: this
+    character(len=*), intent(in) :: name
+    character(len=*), intent(in) :: units, longname
+    real(kind=8), target, intent(inout) :: local_data(:)
+    ! EO parameters
+    real(kind=8), pointer :: external_local_data_ptr(:,:)
+    type(dim_info) level_diminfo
+
+    level_diminfo = obtain_diminfo(this, m_nod2d)
+    external_local_data_ptr(1:1,1:size(local_data)) => local_data(:)
+    call add_variable(this, name, [level_diminfo%idx, this%time_dimidx], level_diminfo%len, .false., longname, units)
+    this%var_infos(this%nvar_infos)%external_local_data_ptr_r8 => external_local_data_ptr
+  end subroutine
+
+
+  subroutine specify_node_var_3d_r8(this, name, longname, units, local_data)
+    class(fesom_file_type), intent(inout) :: this
+    character(len=*), intent(in) :: name
+    character(len=*), intent(in) :: units, longname
+    real(kind=8), target, intent(inout) :: local_data(:,:)
+    ! EO parameters
+    type(dim_info) level_diminfo, depth_diminfo
+
+    level_diminfo = obtain_diminfo(this, m_nod2d)
+    depth_diminfo = obtain_diminfo(this, size(local_data, dim=1))
+    call add_variable(this, name, [level_diminfo%idx, depth_diminfo%idx, this%time_dimidx], level_diminfo%len, .false., longname, units)
+    this%var_infos(this%nvar_infos)%external_local_data_ptr_r8 => local_data
+  end subroutine
+#endif
   
   
 #ifdef ENABLE_NVHPC_WORKAROUNDS
@@ -1079,6 +1147,23 @@ contains
     integer              , intent(in)   , optional  :: ncat
     
     ! EO parameters
+
+    call add_variable(this, name, dim_indices, global_level_data_size, is_elem_based, longname, units)
+    this%var_infos(this%nvar_infos)%external_local_data_ptr => local_data
+    if (present(ncat)) this%var_infos(this%nvar_infos)%is_icepackvar2=.true.
+    
+  end subroutine
+
+
+  ! the file variable and its var_info, without the model array it belongs to
+  subroutine add_variable(this, name, dim_indices, global_level_data_size, is_elem_based, longname, units)
+    type(fesom_file_type), intent(inout)            :: this
+    character(len=*)     , intent(in)               :: name
+    integer              , intent(in)               :: dim_indices(:)
+    integer              , intent(in)               :: global_level_data_size
+    logical              , intent(in)               :: is_elem_based
+    character(len=*)     , intent(in)               :: units, longname
+    ! EO parameters
     integer var_index
 
     var_index = this%add_var_double(name, dim_indices)
@@ -1088,12 +1173,9 @@ contains
     call assert(this%nvar_infos < size(this%var_infos), __LINE__)
     this%nvar_infos = this%nvar_infos+1
     this%var_infos(this%nvar_infos)%var_index = var_index
-    this%var_infos(this%nvar_infos)%external_local_data_ptr => local_data
     this%var_infos(this%nvar_infos)%global_level_data_size = global_level_data_size
     this%var_infos(this%nvar_infos)%is_elem_based = is_elem_based
     this%var_infos(this%nvar_infos)%varname = name
-    if (present(ncat)) this%var_infos(this%nvar_infos)%is_icepackvar2=.true.
-    
   end subroutine
   
   

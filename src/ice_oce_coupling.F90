@@ -808,27 +808,31 @@ contains
     ! virtual_salt: the net over all nodes (cavities included) is removed over the
     ! open ocean only
     subroutine virtual_tracer_flux(id, vflx)
-        integer,       intent(in)    :: id
-        real(kind=WP), intent(inout) :: vflx(:)
-        integer                      :: i, itr, node
-        real(kind=WP)                :: vnet
+        integer,            intent(in)    :: id
+        ! REcoM's flux arrays are real64 also in a single-precision build; the
+        ! flux itself is formed in WP like virtual_salt
+        real(kind=WP_full), intent(inout) :: vflx(:)
+        real(kind=WP)                     :: vwp(size(vflx))
+        integer                           :: i, itr, node
+        real(kind=WP)                     :: vnet
 
         itr = 0
         do i = 1, tracers%num_tracers
             if (tracers%data(i)%ID == id) itr = i
         end do
-        vflx = 0.0_WP
+        vflx = 0.0_WP_full
         if (itr == 0) return
 
         do node = 1, partit%myDim_nod2D+partit%eDim_nod2D
-            vflx(node) = tracers%data(itr)%values(mesh%ulevels_nod2d(node), node)*water_flux(node)
+            vwp(node) = tracers%data(itr)%values(mesh%ulevels_nod2d(node), node)*water_flux(node)
         end do
-        call integrate_nod(vflx, vnet, partit, mesh)
+        call integrate_nod(vwp, vnet, partit, mesh)
         vnet = vnet/mesh%ocean_area
         do node = 1, partit%myDim_nod2D+partit%eDim_nod2D
             if (mesh%ulevels_nod2d(node) > 1) cycle ! --> is cavity node
-            vflx(node) = vflx(node)-vnet
+            vwp(node) = vwp(node)-vnet
         end do
+        vflx = real(vwp, WP_full)
     end subroutine virtual_tracer_flux
 #endif
 

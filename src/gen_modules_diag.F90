@@ -2636,13 +2636,17 @@ subroutine dvd_add_difflux_vertexpl(do_SDdvd, tr_num, dvd_tot, tr, trstar, Kv, p
             ! d/dt(h*T^2) + div*(u*h*T^2) + h*d/dz(w*T^2) - ... = (-2*T_k*Q_hf - W*T_w*T_k - W*T_k*(T_w-T_k) )_k=1
             !                                                   = 2*(-T_k*Q_hf - 0.5*W*T_w*T_k - 0.5*W*T_k*(T_w-T_k) )_k=1
             ! --> temp: T_w=T_k --> 2*(-T_k*Q_hf - 0.5*W*T_w*T_k)
-            ! --> salt: T_w=0   --> 2*(-T_k*Q_hf + 0.5*W*T_w*T_k)
+            ! --> salt: T_w=0   --> 2*(-T_k*Q_hf + 0.5*W*T_k*T_k)
+            !     with -Q_hf = virtual_salt + relax_salt + (real_salt_flux + S_ref_anomaly*W)*is_nonlinfs,
+            !     the salt flux into the ocean of the tracer equation (bc_surface), so the
+            !     sea-ice salt flux enters in full and with (+) sign, as in dvd_add_difflux_sbc
             nz = nu1
-            if     (tr_num==1) then 
+            if     (tr_num==1) then
                 sbc = -(heat_flux(node)/vcpw + trN(nz)*water_flux(node)*is_nonlinfs*0.5_WP)
-            elseif (tr_num==2) then 
-                sbc =  (virtual_salt(node) + relax_salt(node) - real_salt_flux(node)*is_nonlinfs*0.5_WP)
-            end if 
+            elseif (tr_num==2) then
+                sbc =  (virtual_salt(node) + relax_salt(node) + (real_salt_flux(node) + S_ref_anomaly*water_flux(node) &
+                                                                 + trN(nz)*water_flux(node)*0.5_WP)*is_nonlinfs)
+            end if
             Dflx(nz) = Dflx(nz) + sbc*mesh%area(nz, node)
             
             !___________________________________________________________________
@@ -3170,14 +3174,23 @@ subroutine dvd_add_difflux_sbc(do_SDdvd, tr_num, dvd_tot, tr, trstar, partit, me
         !       -->SBC_dvd = -2*T_k (Qflx + 0.5*T_k*W)        
         !       
         ! salt: T_w=0  , ((T_k - T_w)^2 - T_w^2) =  T_k^2
-        !       -->SBC_dvd = -2*T_k (Qflx - 0.5*T_k*W)        
+        !       -->SBC_dvd = -2*T_k (Qflx - 0.5*T_k*W)
         !
+        ! salt, explicitly: Qflx is the upward salt flux, i.e. minus the salt flux
+        ! into the ocean of the tracer equation (bc_surface in oce_ale_tracer.F90),
+        !       -Qflx = virtual_salt + relax_salt + (real_salt_flux + S_ref_anomaly*W)*is_nonlinfs
+        ! --> real_salt_flux (salt released/taken up by melting/forming sea ice) enters
+        !     with the same (+) sign as in the tracer equation
+        !       -->SBC_dvd = 2*S_k*( virtual_salt + relax_salt
+        !                            + (real_salt_flux + S_ref_anomaly*W + 0.5*S_k*W)*is_nonlinfs )
+        !     (S_ref_anomaly=0 unless use_salt_anomaly)
         nz = nu1
-        if     (tr_num==1) then 
+        if     (tr_num==1) then
             sbc = -(heat_flux(node)/vcpw + tr(nz, node)*water_flux(node)*is_nonlinfs*0.5_WP)
-        elseif (tr_num==2) then 
-            sbc =  (virtual_salt(node) + relax_salt(node) - (real_salt_flux(node) - tr(nz, node)*water_flux(node)*0.5_WP)*is_nonlinfs)
-        end if 
+        elseif (tr_num==2) then
+            sbc =  (virtual_salt(node) + relax_salt(node) + (real_salt_flux(node) + S_ref_anomaly*water_flux(node) &
+                                                             + tr(nz, node)*water_flux(node)*0.5_WP)*is_nonlinfs)
+        end if
         Dflx(nz) = Dflx(nz) + sbc*mesh%area(nz, node)
             
         !_______________________________________________________________________

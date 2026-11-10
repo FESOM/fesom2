@@ -46,6 +46,8 @@ MODULE io_RESTART
 #endif  
 
 #if defined(__recom)
+  ! REcoM's restart fields are real64 (REcoM's own WP), also in a single-precision
+  ! build, and the restart keeps them at that precision
   type(restart_file_group) , save :: bio_files
 #endif
 
@@ -169,20 +171,13 @@ subroutine ini_ocean_io(dynamics, tracers, partit, mesh)
   ! Not allocated with split-explicit subcycling (use_ssh_se_subcycl), which does not use the CG solver.
   if (allocated(dynamics%d_eta)) &
   call oce_files%def_node_var_optional('d_eta', 'SSH increment / CG initial guess', 'm', dynamics%d_eta, mesh, partit)
-#if defined(USE_SINGLE_PRECISION)
-  call oce_files%def_node_var('hnode', 'nodal layer thickness', 'm',   mesh%hnode_wp, mesh, partit)
-#else
+  ! hnode and hnode_new are real64 also in a single-precision build, and are restarted as such
   call oce_files%def_node_var('hnode', 'nodal layer thickness', 'm',   mesh%hnode, mesh, partit)
-#endif
   ! hnode_new is filled by vert_vel_ale, but fer_solve_Gamma and init_Redi_GM run EARLIER in
   ! the step and read it (oce_fer_gm.F90:82, :266), so with Fer_GM they consume the previous
   ! step's value -> prognostic across the step boundary. Also written by the binary path
   ! (MOD_MESH.F90, write_bin_array(mesh%hnode_new)).
-#if defined(USE_SINGLE_PRECISION)
-  call oce_files%def_node_var_optional('hnode_new', 'nodal layer thickness, next step', 'm', mesh%hnode_new_wp, mesh, partit)
-#else
   call oce_files%def_node_var_optional('hnode_new', 'nodal layer thickness, next step', 'm', mesh%hnode_new, mesh, partit)
-#endif
   
   !___Define the netCDF variables for 3D fields_______________________________
 #ifdef ENABLE_NVHPC_WORKAROUNDS
@@ -317,6 +312,12 @@ subroutine ini_ocean_io(dynamics, tracers, partit, mesh)
      call oce_files%def_node_var_optional(trim(trname)//'_M1', trim(longname), trim(units), tracers%data(j)%valuesold(1,:,:), mesh, partit)
      if (tracers%data(j)%AB_order==3) &
      call oce_files%def_node_var_optional(trim(trname)//'_M2', trim(longname), trim(units), tracers%data(j)%valuesold(2,:,:), mesh, partit)
+     ! single precision: the content below the WP resolution of the tracer, which the
+     ! next tracer update adds (carry, see diff_tracers_ale). Optional: without it the
+     ! carry starts from zero.
+     if (use_tracer_carry) &
+     call oce_files%def_node_var_optional(trim(trname)//'_carry', 'rounding carry of '//trim(trname)//' times layer thickness', &
+                                          trim(units)//' m', tracers%work%carry(:,:,j), mesh, partit)
   end do
   call oce_files%def_node_var('w', 'vertical velocity', 'm/s', dynamics%w, mesh, partit)
   call oce_files%def_node_var('w_expl', 'vertical velocity', 'm/s', dynamics%w_e, mesh, partit)
@@ -395,26 +396,38 @@ subroutine ini_bio_io(tracers, partit, mesh)
     !===================== Definition part =====================================
     !===========================================================================
     !___Define the netCDF variables for 2D fields_______________________________
-    call bio_files%def_node_var('BenN',    'Benthos Nitrogen', 'mmol/m3',   Benthos(:,1), mesh, partit);
-    call bio_files%def_node_var('BenC',    'Benthos Carbon',   'mmol/m3',   Benthos(:,2), mesh, partit);
-    call bio_files%def_node_var('BenSi',   'Benthos Silicate', 'mmol/m3',   Benthos(:,3), mesh, partit);
-    call bio_files%def_node_var('BenCalc', 'Benthos Calcite',  'mmol/m3',   Benthos(:,4), mesh, partit);
-    call bio_files%def_node_var('HPlus',   'Conc. of H-plus ions in the surface water', 'mol/kg',   GloHplus, mesh, partit);
+    call bio_files%def_node_var('BenN',    'Benthos Nitrogen', 'mmol/m3',   Benthos(:,1), mesh, partit)
+    call bio_files%def_node_var('BenC',    'Benthos Carbon',   'mmol/m3',   Benthos(:,2), mesh, partit)
+    call bio_files%def_node_var('BenSi',   'Benthos Silicate', 'mmol/m3',   Benthos(:,3), mesh, partit)
+    call bio_files%def_node_var('BenCalc', 'Benthos Calcite',  'mmol/m3',   Benthos(:,4), mesh, partit)
+    call bio_files%def_node_var('HPlus',   'Conc. of H-plus ions in the surface water', 'mol/kg',   GloHplus, mesh, partit)
+    ! The 3D carbonate chemistry is updated only every 7 or 30 days (REcoM's
+    ! calculate_carbonate_chemistry) and used in between. Optional: without it REcoM
+    ! recomputes it on the first step, as before.
+    call bio_files%def_node_var_optional('CO2_3D',    'aqueous CO2',                'mol/m3',     CO23D,    mesh, partit)
+    call bio_files%def_node_var_optional('pH_3D',     'pH, total scale',            '-',          pH3D,     mesh, partit)
+    call bio_files%def_node_var_optional('pCO2_3D',   'CO2 partial pressure',       'uatm',       pCO23D,   mesh, partit)
+    call bio_files%def_node_var_optional('HCO3_3D',   'bicarbonate',                'mol/m3',     HCO33D,   mesh, partit)
+    call bio_files%def_node_var_optional('CO3_3D',    'carbonate ion',              'mol/m3',     CO33D,    mesh, partit)
+    call bio_files%def_node_var_optional('OmegaC_3D', 'calcite saturation state',   '-',          OmegaC3D, mesh, partit)
+    call bio_files%def_node_var_optional('OmegaA_3D', 'aragonite saturation state', '-',          OmegaA3D, mesh, partit)
+    call bio_files%def_node_var_optional('kspc_3D',   'calcite solubility product', 'mol2/kg2',   kspc3D,   mesh, partit)
+    call bio_files%def_node_var_optional('rhoSW_3D',  'in-situ seawater density',   'kg/m3',      rhoSW3D,  mesh, partit)
   if (ciso) then
-    call bio_files%def_node_var('BenC_13', 'Benthos Carbon-13', 'mmol/m3',   Benthos(:,5), mesh, partit);
-    call bio_files%def_node_var('BenCalc_13', 'Benthos Calcite-13', 'mmol/m3',   Benthos(:,6), mesh, partit); 
+    call bio_files%def_node_var('BenC_13', 'Benthos Carbon-13', 'mmol/m3',   Benthos(:,5), mesh, partit)
+    call bio_files%def_node_var('BenCalc_13', 'Benthos Calcite-13', 'mmol/m3',   Benthos(:,6), mesh, partit) 
     if (ciso_14 .and. ciso_organic_14) then
-      call bio_files%def_node_var('BenC_14', 'Benthos Carbon-14',  'mmol/m3',   Benthos(:,7), mesh, partit);
-      call bio_files%def_node_var('BenCalc_14', 'Benthos Calcite-14', 'mmol/m3',   Benthos(:,8), mesh, partit); 
+      call bio_files%def_node_var('BenC_14', 'Benthos Carbon-14',  'mmol/m3',   Benthos(:,7), mesh, partit)
+      call bio_files%def_node_var('BenCalc_14', 'Benthos Calcite-14', 'mmol/m3',   Benthos(:,8), mesh, partit) 
     end if ! ciso_14
   end if   ! ciso
   if (use_atbox) then
-    call bio_files%def_node_var('xCO2', 'Atm. CO2 mixing ratio', 'mol / mol', x_co2atm(:), mesh, partit);
+    call bio_files%def_node_var('xCO2', 'Atm. CO2 mixing ratio', 'mol / mol', x_co2atm(:), mesh, partit)
     if (ciso) then
-      call bio_files%def_node_var('xCO2_13', 'Atm. 13CO2 mixing ratio', 'mol / mol', x_co2atm_13(:), mesh, partit);
+      call bio_files%def_node_var('xCO2_13', 'Atm. 13CO2 mixing ratio', 'mol / mol', x_co2atm_13(:), mesh, partit)
       if (ciso_14) then
-        call bio_files%def_node_var('xCO2_14', 'Atm. 14CO2 mixing ratio', 'mol / mol', x_co2atm_14(:), mesh, partit);
-        call bio_files%def_node_var('cosmic_14', 'Cosmic 14C production', 'mol / s', cosmic_14(:), mesh, partit);
+        call bio_files%def_node_var('xCO2_14', 'Atm. 14CO2 mixing ratio', 'mol / mol', x_co2atm_14(:), mesh, partit)
+        call bio_files%def_node_var('cosmic_14', 'Cosmic 14C production', 'mol / s', cosmic_14(:), mesh, partit)
       end if
     end if
   end if  ! use_atbox

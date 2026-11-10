@@ -107,6 +107,10 @@ module io_MEANDATA
     ! 2D streams: rank-1 pointer to the source (a rank-2 remap of a strided section such as values(1,:)
     ! goes through a temporary copy with nvfortran and leaves ptr3 pointing to freed memory)
     real(kind=WP), pointer                             :: ptr1(:) => null()
+    ! real64 sources (def_stream2D_r8/def_stream3D_r8, single-precision builds only):
+    ! exactly one of ptr1, ptr3, ptr1_r8, ptr3_r8 is set
+    real(real64), pointer                              :: ptr1_r8(:) => null()
+    real(real64), pointer                              :: ptr3_r8(:,:) => null()
     real(kind=WP)                                      :: offset = 0.0_WP ! added ONCE to the mean after the division, not per sample (use_salt_anomaly: salt/sss carry +S_ref_anomaly so output stays absolute)
     character(500)                                     :: filename
     character(100)                                     :: name
@@ -263,6 +267,11 @@ module io_MEANDATA
 ! this allows for automatic streaming of associated variables into the netcdf file
   INTERFACE def_stream
             MODULE PROCEDURE def_stream2D, def_stream2D_row, def_stream3D, def_stream3D_comp
+#if defined(USE_SINGLE_PRECISION)
+            ! real64 sources in a WP=real32 build (REcoM keeps its own fields in real64);
+            ! in a double-precision build they are the WP routines above
+            MODULE PROCEDURE def_stream2D_r8, def_stream3D_r8
+#endif
   END INTERFACE
 !
 !--------------------------------------------------------------------------------------------
@@ -619,6 +628,7 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
     integer,dimension(15)     :: sel_forcvar=0
     integer                   :: sel_dmoc=0, sel_trgrd_xyz=0, sel_dvd=0, sel_redi=0
     character(len=10)         :: id_string
+    character(len=20)         :: bname   ! ltra_diag budget stream prefix (DIN, DIC, Alk, DSi or tra_<ID>)
 
     type(t_mesh), intent(in) , target :: mesh
     type(t_partit), intent(inout), target :: partit
@@ -1957,35 +1967,9 @@ CASE ('otracers  ')
          call def_stream((/mesh%nl-1, mesh%nod2D/),  (/mesh%nl-1, partit%myDim_nod2D/),  'DIN', 'Dissolved Inorganic Nitrogen', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
          endif
 
-      else if (tracers%data(j)%ID==1002) then    ! NOTE Divide tracers%work%tra_advvert(:,:,j) by dt
+      else if (tracers%data(j)%ID==1002) then
          if (use_REcoM) then
          call def_stream((/mesh%nl-1, mesh%nod2D/),  (/mesh%nl-1, partit%myDim_nod2D/),  'DIC', 'Dissolved Inorganic C', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
-            if (tracers%data(j)%ltra_diag) then
-               ! horizontal advection
-               call def_stream((/mesh%nl-1, mesh%nod2D/),  (/mesh%nl-1, partit%myDim_nod2D/),  'DIC_hor_adv', 'Horizontal advection part of dissolved Inorganic C', '[mmol/m3/s]', tracers%work%tra_advhoriz(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
-               ! vertical advection
-               call def_stream((/mesh%nl-1, mesh%nod2D/),  (/mesh%nl-1, partit%myDim_nod2D/),  'DIC_ver_adv', 'Vertical advection part of dissolved Inorganic C', '[mmol/m3/s]', tracers%work%tra_advvert(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
-               ! horizontal diffusion
-               call def_stream((/mesh%nl-1, mesh%nod2D/),  (/mesh%nl-1, partit%myDim_nod2D/),  'DIC_tra_diff_part_hor_redi', 'Horizontal diffusion of dissolved Inorganic C (includes Redi diffusivity if Redi=.true.)', '[mmol/m3/s]', tracers%work%tra_diff_part_hor_redi(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
-               if (.not. tracers%data(j)%i_vert_diff) then
-               ! vertical diffusion (Explicit)
-                   call def_stream((/mesh%nl-1, mesh%nod2D/),  (/mesh%nl-1, partit%myDim_nod2D/),  'DIC_tra_diff_part_ver_expl', 'Vertical diffusion of dissolved Inorganic C (Explicit)', '[mmol/m3/s]', tracers%work%tra_diff_part_ver_expl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-               end if
-
-               ! projection of horizontal Redi diffussivity onto vertical
-               call def_stream((/mesh%nl-1, mesh%nod2D/),  (/mesh%nl-1, partit%myDim_nod2D/),  'DIC_tra_diff_part_ver_redi_expl', 'Projection of horizontal Redi diffussivity onto vertical for dissolved Inorganic C (Explicit)', '[mmol/m3/s]', tracers%work%tra_diff_part_ver_redi_expl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
-               ! vertical diffusion (Implicit)
-               call def_stream((/mesh%nl-1, mesh%nod2D/),  (/mesh%nl-1, partit%myDim_nod2D/),  'DIC_tra_diff_part_ver_impl', 'Vertical diffusion of dissolved Inorganic C (Implicit)', '[mmol/m3/s]', tracers%work%tra_diff_part_ver_impl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
-               ! recom_sms
-               call def_stream((/mesh%nl-1, mesh%nod2D/),  (/mesh%nl-1, partit%myDim_nod2D/),  'DIC_recom_sms', 'Recom SMS', '[mmol/m3/s]', tracers%work%tra_recom_sms(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-            end if
-
          endif
 
       else if (tracers%data(j)%ID==1003) then
@@ -2248,6 +2232,60 @@ CASE ('otracers  ')
 #if defined(__recom)
       end if
 #endif
+
+      !___ltra_diag tracer budget terms, all as layer-integrated rates [mmol/m2/s]
+      !   (tracer * layer thickness per second). For each layer:
+      !   *_tendency = *_hor_adv + *_ver_adv + *_tra_diff_part_hor_redi + *_tra_diff_part_ver_redi_expl
+      !              + *_tra_diff_part_ver_impl (or *_ver_expl) + *_recom_sms + *_bf + *_sink
+      if (tracers%data(j)%ltra_diag) then
+         select case (tracers%data(j)%ID)
+            case (1001)
+               bname = 'DIN'
+            case (1002)
+               bname = 'DIC'
+            case (1003)
+               bname = 'Alk'
+            case (1018)
+               bname = 'DSi'
+            case default
+               bname = 'tra_'//trim(id_string)
+         end select
+         call def_stream((/mesh%nl-1, mesh%nod2D/), (/mesh%nl-1, partit%myDim_nod2D/), trim(bname)//'_hor_adv', &
+              'Horizontal advection of '//trim(bname)//' (LO + anti-diffusive)', '[mmol/m2/s]', tracers%work%tra_advhoriz(:,:,j), &
+              io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+         call def_stream((/mesh%nl-1, mesh%nod2D/), (/mesh%nl-1, partit%myDim_nod2D/), trim(bname)//'_ver_adv', &
+              'Vertical advection of '//trim(bname)//' (LO incl. implicit w_split part + anti-diffusive)', '[mmol/m2/s]', tracers%work%tra_advvert(:,:,j), &
+              io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+         call def_stream((/mesh%nl-1, mesh%nod2D/), (/mesh%nl-1, partit%myDim_nod2D/), trim(bname)//'_tra_diff_part_hor_redi', &
+              'Horizontal diffusion of '//trim(bname)//' (includes Redi diffusivity if Redi=.true.)', '[mmol/m2/s]', tracers%work%tra_diff_part_hor_redi(:,:,j), &
+              io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+         call def_stream((/mesh%nl-1, mesh%nod2D/), (/mesh%nl-1, partit%myDim_nod2D/), trim(bname)//'_tra_diff_part_ver_redi_expl', &
+              'Projection of horizontal Redi diffusivity onto vertical for '//trim(bname)//' (Explicit)', '[mmol/m2/s]', tracers%work%tra_diff_part_ver_redi_expl(:,:,j), &
+              io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+         if (tracers%data(j)%i_vert_diff) then
+            call def_stream((/mesh%nl-1, mesh%nod2D/), (/mesh%nl-1, partit%myDim_nod2D/), trim(bname)//'_tra_diff_part_ver_impl', &
+                 'Vertical diffusion of '//trim(bname)//' (Implicit; includes the surface boundary flux)', '[mmol/m2/s]', tracers%work%tra_diff_part_ver_impl(:,:,j), &
+                 io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+         else
+            call def_stream((/mesh%nl-1, mesh%nod2D/), (/mesh%nl-1, partit%myDim_nod2D/), trim(bname)//'_tra_diff_part_ver_expl', &
+                 'Vertical diffusion of '//trim(bname)//' (Explicit)', '[mmol/m2/s]', tracers%work%tra_diff_part_ver_expl(:,:,j), &
+                 io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+         end if
+#if defined(__recom)
+         call def_stream((/mesh%nl-1, mesh%nod2D/), (/mesh%nl-1, partit%myDim_nod2D/), trim(bname)//'_recom_sms', &
+              'REcoM sources minus sinks of '//trim(bname), '[mmol/m2/s]', tracers%work%tra_recom_sms(:,:,j), &
+              io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+         call def_stream((/mesh%nl-1, mesh%nod2D/), (/mesh%nl-1, partit%myDim_nod2D/), trim(bname)//'_bf', &
+              'Benthic (bottom) flux of '//trim(bname), '[mmol/m2/s]', tracers%work%tra_benthic(:,:,j), &
+              io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+         call def_stream((/mesh%nl-1, mesh%nod2D/), (/mesh%nl-1, partit%myDim_nod2D/), trim(bname)//'_sink', &
+              'REcoM sinking of '//trim(bname)//' (in the water column and into the benthos)', '[mmol/m2/s]', &
+              tracers%work%tra_sink(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+#endif
+         call def_stream((/mesh%nl-1, mesh%nod2D/), (/mesh%nl-1, partit%myDim_nod2D/), trim(bname)//'_tendency', &
+              'Total tendency of '//trim(bname), '[mmol/m2/s]', tracers%work%tra_tendency(:,:,j), &
+              io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      end if
 
     end do
 
@@ -3200,6 +3238,12 @@ subroutine def_xios_aliases(partit, mesh)
             call par_abort(partit%MPI_COMM_FESOM, partit%mype)
         end if
 #endif
+
+        if (associated(base%ptr1_r8) .or. associated(base%ptr3_r8)) then
+            if (partit%mype==0) write(*,*) 'XIOS alias ', trim(alias_id(a)), ': ', trim(alias_of(a)), &
+                                           ' has a real64 source (REcoM in single precision), not supported as an alias base'
+            call par_abort(partit%MPI_COMM_FESOM, partit%mype)
+        end if
 
         nbefore = io_NSTREAMS
         select case (trim(alias_mode(a)))
@@ -4239,7 +4283,9 @@ subroutine update_means
         ! entry%offset is NOT added here: it is a constant, so mean(x+c) == mean(x)+c,
         ! and adding it once after the division keeps the sum on the (small) anomaly
         ! scale instead of pushing it back onto ~35 psu.
-        IF (associated(entry%ptr1)) then
+        IF (associated(entry%ptr1_r8) .or. associated(entry%ptr3_r8)) then
+            call update_mean_r8(entry)
+        ELSE IF (associated(entry%ptr1)) then
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(J)
             DO J=1, size(entry%local_values_r8,dim=2)
                 entry%local_values_r8(1,J)=entry%local_values_r8(1,J)+real(entry%ptr1(J), real64)
@@ -4271,6 +4317,40 @@ subroutine update_means
         io_stream0D(n)%local_value = io_stream0D(n)%local_value + real(io_stream0D(n)%ptr, real64)
         io_stream0D(n)%addcounter = io_stream0D(n)%addcounter + 1
     END DO
+end subroutine
+!
+!
+!_______________________________________________________________________________
+! update_means for a real64 source (def_stream2D_r8/def_stream3D_r8); the sum is
+! real64 as for every stream, so the source needs no conversion at all
+subroutine update_mean_r8(entry)
+    implicit none
+    type(Meandata), pointer, intent(inout) :: entry
+    integer                                :: I, J
+
+    if (associated(entry%ptr1_r8)) then
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(J)
+        DO J=1, size(entry%local_values_r8,dim=2)
+            entry%local_values_r8(1,J)=entry%local_values_r8(1,J)+entry%ptr1_r8(J)
+        END DO
+!$OMP END PARALLEL DO
+    else if (entry%flip) then
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
+        DO J=1, size(entry%local_values_r8,dim=2)
+            DO I=1, size(entry%local_values_r8,dim=1)
+                entry%local_values_r8(I,J)=entry%local_values_r8(I,J)+entry%ptr3_r8(J,I)
+            END DO
+        END DO
+!$OMP END PARALLEL DO
+    else
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
+        DO J=1, size(entry%local_values_r8,dim=2)
+            DO I=1, size(entry%local_values_r8,dim=1)
+                entry%local_values_r8(I,J)=entry%local_values_r8(I,J)+entry%ptr3_r8(I,J)
+            END DO
+        END DO
+!$OMP END PARALLEL DO
+    end if
 end subroutine
 #ifdef ENABLE_OPENACC
 !
@@ -5110,8 +5190,6 @@ end subroutine
 subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, freq_unit, accuracy, partit, mesh, flip_array, long_description)
   use mod_mesh
   USE MOD_PARTIT
-  use par_support_module, only: par_abort
-  use g_cvmix_idemix2, only: idemix2_nfbin
   implicit none
   type(t_partit),        intent(inout), target :: partit
   integer,               intent(in)    :: glsize(2), lcsize(2)
@@ -5120,22 +5198,73 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
   integer,               intent(in)    :: freq
   character,             intent(in)    :: freq_unit
   integer,               intent(in)    :: accuracy
-  type(Meandata),        allocatable   :: tmparr(:)
+  type(t_mesh), intent(in), target     :: mesh
+  logical, optional, intent(in)        :: flip_array
+  character(len=*), optional, intent(in) :: long_description
+  type(Meandata),        pointer       :: entry
+
+    call def_stream3D_entry(glsize, lcsize, name, description, units, ubound(data), freq, freq_unit, accuracy, &
+                            partit, mesh, entry, flip_array, long_description)
+    if (associated(entry)) entry%ptr3 => data
+end subroutine
+#if defined(USE_SINGLE_PRECISION)
+!
+!
+!_______________________________________________________________________________
+! def_stream3D for a real64 source in a WP=real32 build
+subroutine def_stream3D_r8(glsize, lcsize, name, description, units, data, freq, freq_unit, accuracy, partit, mesh, flip_array, long_description)
+  use mod_mesh
+  USE MOD_PARTIT
+  implicit none
+  type(t_partit),        intent(inout), target :: partit
+  integer,               intent(in)    :: glsize(2), lcsize(2)
+  character(len=*),      intent(in)    :: name, description, units
+  real(real64),  target, intent(in)    :: data(:,:)
+  integer,               intent(in)    :: freq
+  character,             intent(in)    :: freq_unit
+  integer,               intent(in)    :: accuracy
+  type(t_mesh), intent(in), target     :: mesh
+  logical, optional, intent(in)        :: flip_array
+  character(len=*), optional, intent(in) :: long_description
+  type(Meandata),        pointer       :: entry
+
+    call def_stream3D_entry(glsize, lcsize, name, description, units, ubound(data), freq, freq_unit, accuracy, &
+                            partit, mesh, entry, flip_array, long_description)
+    if (associated(entry)) entry%ptr3_r8 => data
+end subroutine
+#endif
+!
+!
+!_______________________________________________________________________________
+! the 3D stream object without its source: entry is null when the stream is not added
+subroutine def_stream3D_entry(glsize, lcsize, name, description, units, ubnd, freq, freq_unit, accuracy, partit, mesh, entry, flip_array, long_description)
+  use mod_mesh
+  USE MOD_PARTIT
+  use par_support_module, only: par_abort
+  use g_cvmix_idemix2, only: idemix2_nfbin
+  implicit none
+  type(t_partit),        intent(inout), target :: partit
+  integer,               intent(in)    :: glsize(2), lcsize(2)
+  character(len=*),      intent(in)    :: name, description, units
+  integer,               intent(in)    :: ubnd(2)
+  integer,               intent(in)    :: freq
+  character,             intent(in)    :: freq_unit
+  integer,               intent(in)    :: accuracy
   type(Meandata),        pointer       :: entry
   type(t_mesh), intent(in), target     :: mesh
   logical, optional, intent(in)        :: flip_array
   character(len=*), optional, intent(in) :: long_description
   integer i
 
- 
+    entry => null()
     !___________________________________________________________________________
-    ! data is rank 2 here; the rank is hardcoded because nvfortran implements
+    ! the source is rank 2 here; the rank is hardcoded because nvfortran implements
     ! the rank() intrinsic only since 25.1
     do i = 1, 2
-        if ((ubound(data, dim = i)<=0)) then
+        if ((ubnd(i)<=0)) then
             if (partit%mype==0) then
                 write(*,*) 'WARNING: adding I/O stream for ', trim(name), ' failed (contains 0 dimension)'
-                write(*,*) 'upper bound is: ', ubound(data, dim = i)
+                write(*,*) 'upper bound is: ', ubnd(i)
             end if
             return
         end if    
@@ -5162,8 +5291,7 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
     entry%t_accum_year  = yearold
     !___________________________________________________________________________
     ! fill up 3d meandata streaming object
-    ! 3d specific
-    entry%ptr3 => data                      !2D! entry%ptr3(1:1,1:size(data)) => data
+    ! 3d specific: the caller points entry%ptr3 (or ptr3_r8) to the source
 
     if (present(flip_array)) then
         if (flip_array) then
@@ -5229,7 +5357,6 @@ end subroutine
 subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, freq_unit, accuracy, partit, mesh, long_description)
   use mod_mesh
   USE MOD_PARTIT
-  use par_support_module, only: par_abort
   implicit none
   integer,               intent(in)    :: glsize, lcsize
   character(len=*),      intent(in)    :: name, description, units
@@ -5237,25 +5364,69 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
   integer,               intent(in)    :: freq
   character,             intent(in)    :: freq_unit
   integer,               intent(in)    :: accuracy
-  type(Meandata),        allocatable   :: tmparr(:)
+  type(t_mesh),          intent(in)    :: mesh
+  type(t_partit),        intent(inout) :: partit
+  character(len=*), optional, intent(in) :: long_description
+  type(Meandata),        pointer       :: entry
+
+    call def_stream2D_entry(glsize, lcsize, name, description, units, ubound(data, dim=1), freq, freq_unit, accuracy, &
+                            partit, mesh, entry, long_description)
+    if (associated(entry)) entry%ptr1 => data
+end subroutine
+#if defined(USE_SINGLE_PRECISION)
+!
+!
+!_______________________________________________________________________________
+! def_stream2D for a real64 source in a WP=real32 build
+subroutine def_stream2D_r8(glsize, lcsize, name, description, units, data, freq, freq_unit, accuracy, partit, mesh, long_description)
+  use mod_mesh
+  USE MOD_PARTIT
+  implicit none
+  integer,               intent(in)    :: glsize, lcsize
+  character(len=*),      intent(in)    :: name, description, units
+  real(real64),  target, intent(in)    :: data(:)
+  integer,               intent(in)    :: freq
+  character,             intent(in)    :: freq_unit
+  integer,               intent(in)    :: accuracy
+  type(t_mesh),          intent(in)    :: mesh
+  type(t_partit),        intent(inout) :: partit
+  character(len=*), optional, intent(in) :: long_description
+  type(Meandata),        pointer       :: entry
+
+    call def_stream2D_entry(glsize, lcsize, name, description, units, ubound(data, dim=1), freq, freq_unit, accuracy, &
+                            partit, mesh, entry, long_description)
+    if (associated(entry)) entry%ptr1_r8 => data
+end subroutine
+#endif
+!
+!
+!_______________________________________________________________________________
+! the 2D stream object without its source: entry is null when the stream is not added
+subroutine def_stream2D_entry(glsize, lcsize, name, description, units, ubnd, freq, freq_unit, accuracy, partit, mesh, entry, long_description)
+  use mod_mesh
+  USE MOD_PARTIT
+  use par_support_module, only: par_abort
+  implicit none
+  integer,               intent(in)    :: glsize, lcsize
+  character(len=*),      intent(in)    :: name, description, units
+  integer,               intent(in)    :: ubnd
+  integer,               intent(in)    :: freq
+  character,             intent(in)    :: freq_unit
+  integer,               intent(in)    :: accuracy
   type(Meandata),        pointer       :: entry
   type(t_mesh),          intent(in)    :: mesh
   type(t_partit),        intent(inout) :: partit
   character(len=*), optional, intent(in) :: long_description
-  integer i
 
+    entry => null()
     !___________________________________________________________________________
-    ! data is rank 1 here; the rank is hardcoded because nvfortran implements
-    ! the rank() intrinsic only since 25.1
-    do i = 1, 1
-        if ((ubound(data, dim = i)<=0)) then
+    if (ubnd<=0) then
         if (partit%mype==0) then
             write(*,*) 'WARNING: adding I/O stream for ', trim(name), ' failed (contains 0 dimension)'
-            write(*,*) 'upper bound is: ', ubound(data, dim = i)
+            write(*,*) 'upper bound is: ', ubnd
         end if
         return
-        end if    
-    end do
+    end if    
 
     !___________________________________________________________________________
     if (partit%mype==0) then
@@ -5278,8 +5449,7 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
     entry%t_accum_year  = yearold
     !___________________________________________________________________________
     ! fill up 3d meandata streaming object
-    ! 2d specific
-    entry%ptr1 => data
+    ! 2d specific: the caller points entry%ptr1 (or ptr1_r8) to the source
 
     ! one accumulator, always real64 -- accuracy only picks the on-disk type
     allocate(entry%local_values_r8(1, lcsize))

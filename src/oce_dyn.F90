@@ -358,15 +358,17 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
 
     !___________________________________________________________________________
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(u1, v1, len, vi, nz, ed, el, nelem, k, elem, nzmin, nzmax, update_u, update_v, eledges, q)
-    ! Each owned element gathers the contributions of its three edges in ascending
+    ! Each owned element gathers the contributions of its three edges in ascending global
     ! edge order, with the sign of the edge orientation. No thread writes an element
-    ! it does not own, and the sum does not depend on the number of threads.
+    ! it does not own, and the sum depends neither on the number of threads nor on
+    ! the rank: an element next to a partition boundary is computed on every rank
+    ! that has one of its nodes, and a restart keeps only one of these copies.
 !$OMP DO
     DO elem=1, partit%myDim_elem2D
         eledges=mesh%elem_edges(:,elem)
-        if (eledges(1)>eledges(2)) then; q=eledges(1); eledges(1)=eledges(2); eledges(2)=q; end if
-        if (eledges(2)>eledges(3)) then; q=eledges(2); eledges(2)=eledges(3); eledges(3)=q; end if
-        if (eledges(1)>eledges(2)) then; q=eledges(1); eledges(1)=eledges(2); eledges(2)=q; end if
+        if (partit%myList_edge2D(eledges(1))>partit%myList_edge2D(eledges(2))) then; q=eledges(1); eledges(1)=eledges(2); eledges(2)=q; end if
+        if (partit%myList_edge2D(eledges(2))>partit%myList_edge2D(eledges(3))) then; q=eledges(2); eledges(2)=eledges(3); eledges(3)=q; end if
+        if (partit%myList_edge2D(eledges(1))>partit%myList_edge2D(eledges(2))) then; q=eledges(1); eledges(1)=eledges(2); eledges(2)=q; end if
         DO q=1,3
             ed=eledges(q)
             if(partit%myList_edge2D(ed)>mesh%edge2D_in) cycle
@@ -500,7 +502,7 @@ SUBROUTINE visc_filt_bcksct_acc(dynamics, partit, mesh)
 !$ACC END PARALLEL LOOP
 
     !___________________________________________________________________________
-    ! each owned element gathers the contributions of its three edges in ascending
+    ! each owned element gathers the contributions of its three edges in ascending global
     ! edge order, as on the host
     ! one gang per element, the levels over the vector lanes; each level adds its three edges in edge order
 !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) PRIVATE(e1, e2, e3, q) VECTOR_LENGTH(32)
@@ -508,9 +510,9 @@ SUBROUTINE visc_filt_bcksct_acc(dynamics, partit, mesh)
         e1=mesh%elem_edges(1,elem)
         e2=mesh%elem_edges(2,elem)
         e3=mesh%elem_edges(3,elem)
-        if (e1>e2) then; q=e1; e1=e2; e2=q; end if
-        if (e2>e3) then; q=e2; e2=e3; e3=q; end if
-        if (e1>e2) then; q=e1; e1=e2; e2=q; end if
+        if (partit%myList_edge2D(e1)>partit%myList_edge2D(e2)) then; q=e1; e1=e2; e2=q; end if
+        if (partit%myList_edge2D(e2)>partit%myList_edge2D(e3)) then; q=e2; e2=e3; e3=q; end if
+        if (partit%myList_edge2D(e1)>partit%myList_edge2D(e2)) then; q=e1; e1=e2; e2=q; end if
 !$ACC LOOP VECTOR PRIVATE(q, ed, el1, el2, len, nzmin, nzmax, u1, v1, vi)
         DO nz=1, nl1
 !$ACC LOOP SEQ
@@ -623,15 +625,17 @@ SUBROUTINE visc_filt_bilapl(dynamics, partit, mesh)
     !___________________________________________________________________________
     ! Sum up velocity differences over edge with respect to elemtnal index
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(u1, v1, len, vi, ed, el, nz, nzmin, nzmax, update_u, update_v, elem, eledges, q)
-    ! Each owned element gathers the contributions of its three edges in ascending
+    ! Each owned element gathers the contributions of its three edges in ascending global
     ! edge order, with the sign of the edge orientation. No thread writes an element
-    ! it does not own, and the sum does not depend on the number of threads.
+    ! it does not own, and the sum depends neither on the number of threads nor on
+    ! the rank: an element next to a partition boundary is computed on every rank
+    ! that has one of its nodes, and a restart keeps only one of these copies.
 !$OMP DO
     DO elem=1, partit%myDim_elem2D
         eledges=mesh%elem_edges(:,elem)
-        if (eledges(1)>eledges(2)) then; q=eledges(1); eledges(1)=eledges(2); eledges(2)=q; end if
-        if (eledges(2)>eledges(3)) then; q=eledges(2); eledges(2)=eledges(3); eledges(3)=q; end if
-        if (eledges(1)>eledges(2)) then; q=eledges(1); eledges(1)=eledges(2); eledges(2)=q; end if
+        if (partit%myList_edge2D(eledges(1))>partit%myList_edge2D(eledges(2))) then; q=eledges(1); eledges(1)=eledges(2); eledges(2)=q; end if
+        if (partit%myList_edge2D(eledges(2))>partit%myList_edge2D(eledges(3))) then; q=eledges(2); eledges(2)=eledges(3); eledges(3)=q; end if
+        if (partit%myList_edge2D(eledges(1))>partit%myList_edge2D(eledges(2))) then; q=eledges(1); eledges(1)=eledges(2); eledges(2)=q; end if
         DO q=1,3
             ed=eledges(q)
             if(partit%myList_edge2D(ed)>mesh%edge2D_in) cycle
@@ -682,15 +686,17 @@ SUBROUTINE visc_filt_bilapl(dynamics, partit, mesh)
 !$OMP BARRIER
 
     !___________________________________________________________________________
-    ! Each owned element gathers the contributions of its three edges in ascending
+    ! Each owned element gathers the contributions of its three edges in ascending global
     ! edge order, with the sign of the edge orientation. No thread writes an element
-    ! it does not own, and the sum does not depend on the number of threads.
+    ! it does not own, and the sum depends neither on the number of threads nor on
+    ! the rank: an element next to a partition boundary is computed on every rank
+    ! that has one of its nodes, and a restart keeps only one of these copies.
 !$OMP DO
     DO elem=1, partit%myDim_elem2D
         eledges=mesh%elem_edges(:,elem)
-        if (eledges(1)>eledges(2)) then; q=eledges(1); eledges(1)=eledges(2); eledges(2)=q; end if
-        if (eledges(2)>eledges(3)) then; q=eledges(2); eledges(2)=eledges(3); eledges(3)=q; end if
-        if (eledges(1)>eledges(2)) then; q=eledges(1); eledges(1)=eledges(2); eledges(2)=q; end if
+        if (partit%myList_edge2D(eledges(1))>partit%myList_edge2D(eledges(2))) then; q=eledges(1); eledges(1)=eledges(2); eledges(2)=q; end if
+        if (partit%myList_edge2D(eledges(2))>partit%myList_edge2D(eledges(3))) then; q=eledges(2); eledges(2)=eledges(3); eledges(3)=q; end if
+        if (partit%myList_edge2D(eledges(1))>partit%myList_edge2D(eledges(2))) then; q=eledges(1); eledges(1)=eledges(2); eledges(2)=q; end if
         DO q=1,3
             ed=eledges(q)
             if(partit%myList_edge2D(ed)>mesh%edge2D_in) cycle
@@ -764,15 +770,17 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
 
     !___________________________________________________________________________
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(u1, v1, len, vi, viLapl, ed, el, nz, nzmin, nzmax, update_u, update_v, elem, eledges, q)
-    ! Each owned element gathers the contributions of its three edges in ascending
+    ! Each owned element gathers the contributions of its three edges in ascending global
     ! edge order, with the sign of the edge orientation. No thread writes an element
-    ! it does not own, and the sum does not depend on the number of threads.
+    ! it does not own, and the sum depends neither on the number of threads nor on
+    ! the rank: an element next to a partition boundary is computed on every rank
+    ! that has one of its nodes, and a restart keeps only one of these copies.
 !$OMP DO
     DO elem=1, partit%myDim_elem2D
         eledges=mesh%elem_edges(:,elem)
-        if (eledges(1)>eledges(2)) then; q=eledges(1); eledges(1)=eledges(2); eledges(2)=q; end if
-        if (eledges(2)>eledges(3)) then; q=eledges(2); eledges(2)=eledges(3); eledges(3)=q; end if
-        if (eledges(1)>eledges(2)) then; q=eledges(1); eledges(1)=eledges(2); eledges(2)=q; end if
+        if (partit%myList_edge2D(eledges(1))>partit%myList_edge2D(eledges(2))) then; q=eledges(1); eledges(1)=eledges(2); eledges(2)=q; end if
+        if (partit%myList_edge2D(eledges(2))>partit%myList_edge2D(eledges(3))) then; q=eledges(2); eledges(2)=eledges(3); eledges(3)=q; end if
+        if (partit%myList_edge2D(eledges(1))>partit%myList_edge2D(eledges(2))) then; q=eledges(1); eledges(1)=eledges(2); eledges(2)=q; end if
         DO q=1,3
             ed=eledges(q)
             if(partit%myList_edge2D(ed)>mesh%edge2D_in) cycle
@@ -811,15 +819,17 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
 !$OMP BARRIER
 
     !___________________________________________________________________________
-    ! Each owned element gathers the contributions of its three edges in ascending
+    ! Each owned element gathers the contributions of its three edges in ascending global
     ! edge order, with the sign of the edge orientation. No thread writes an element
-    ! it does not own, and the sum does not depend on the number of threads.
+    ! it does not own, and the sum depends neither on the number of threads nor on
+    ! the rank: an element next to a partition boundary is computed on every rank
+    ! that has one of its nodes, and a restart keeps only one of these copies.
 !$OMP DO
     DO elem=1, partit%myDim_elem2D
         eledges=mesh%elem_edges(:,elem)
-        if (eledges(1)>eledges(2)) then; q=eledges(1); eledges(1)=eledges(2); eledges(2)=q; end if
-        if (eledges(2)>eledges(3)) then; q=eledges(2); eledges(2)=eledges(3); eledges(3)=q; end if
-        if (eledges(1)>eledges(2)) then; q=eledges(1); eledges(1)=eledges(2); eledges(2)=q; end if
+        if (partit%myList_edge2D(eledges(1))>partit%myList_edge2D(eledges(2))) then; q=eledges(1); eledges(1)=eledges(2); eledges(2)=q; end if
+        if (partit%myList_edge2D(eledges(2))>partit%myList_edge2D(eledges(3))) then; q=eledges(2); eledges(2)=eledges(3); eledges(3)=q; end if
+        if (partit%myList_edge2D(eledges(1))>partit%myList_edge2D(eledges(2))) then; q=eledges(1); eledges(1)=eledges(2); eledges(2)=q; end if
         DO q=1,3
             ed=eledges(q)
             if(partit%myList_edge2D(ed)>mesh%edge2D_in) cycle
