@@ -138,6 +138,14 @@ foreach(_drv ${fesom3_drivers})
     get_filename_component(_name ${_drv} NAME_WE)
     add_executable(${_name} ${_drv})
     apply_fesom_compile_flags(${_name})
+    # The main program must not trap floating-point exceptions, as in
+    # FESOM2-REcoM: with ifort, -fpe acts in the main program only, and
+    # REcoM's NaNs (Phaeocystis above Tmax_phaeo) pass there quietly.
+    # -fpe3 (the ifort default) after the base -fpe0; the last one wins.
+    if(CMAKE_Fortran_COMPILER_ID STREQUAL "Intel" OR
+       CMAKE_Fortran_COMPILER_ID STREQUAL "IntelLLVM")
+        target_compile_options(${_name} PRIVATE $<$<NOT:$<CONFIG:Debug>>:-fpe3>)
+    endif()
     target_link_libraries(${_name} PUBLIC fesom3)
     set_target_properties(${_name} PROPERTIES LINKER_LANGUAGE Fortran)
 endforeach()
