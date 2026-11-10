@@ -14,6 +14,12 @@ else()
    set(FESOM_PLATFORM_STRATEGY "notset" CACHE STRING "switch to platform specific compile settings, this is usually determined via the env.sh script")
 endif()
 
+if(DEFINED ENV{ENABLE_ALBEDO_INTELMPI_WORKAROUNDS}) # be able to set the initial cache value from our env settings for albedo, not only via cmake command
+   option(ALBEDO_INTELMPI_WORKAROUNDS "workaround for performance issues on albedo" ON)
+else()
+   option(ALBEDO_INTELMPI_WORKAROUNDS "workaround for performance issues on albedo" OFF)
+endif()
+
 # Cray compiler specific optimizations
 if(CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
    # Make sure to also set these variables in the runtime environment:
@@ -38,6 +44,11 @@ if(DEFINED DISABLE_MULTITHREADING)
 endif()
 
 #TODO: these machine specific block can easyly go in cmake toolchain.
+if(ALBEDO_INTELMPI_WORKAROUNDS)
+   add_compile_options(-DENABLE_ALBEDO_INTELMPI_WORKAROUNDS)
+   #SH add_compile_options(-DDISABLE_PARALLEL_RESTART_READ)
+endif()
+
 if    (${FESOM_PLATFORM_STRATEGY} STREQUAL levante.dkrz.de )
    option(ASYNCHRONOUS_IO_THREADS "enable asynchronous I/O threads" OFF)
 elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL leo-dcgp )
@@ -341,6 +352,9 @@ if(${FESOM_COUPLED})
       include(${CMAKE_CURRENT_LIST_DIR}/../cmake/FindOASIS.cmake)
    endif()
    target_compile_definitions(${PROJECT_NAME} PRIVATE __oasis)
+   if(${OASIS_WAITGROUP})
+      target_compile_definitions(${PROJECT_NAME} PRIVATE __oasis_waitgroup)
+   endif()
 endif()
 if(${ASYNC_ICEBERGS})
    target_compile_definitions(${PROJECT_NAME} PRIVATE __async_icebergs)
@@ -392,11 +406,7 @@ if(OPENMP_REPRODUCIBLE)
 endif()
 
 if(${RECOM_COUPLED})
-   target_compile_definitions(${PROJECT_NAME} PRIVATE __recom USE_PRECISION=2 __usetp) #__3Zoo2Det __coccos)
-endif()
-
-if(${CISO_COUPLED})
-   target_compile_definitions(${PROJECT_NAME} PRIVATE __ciso)
+   target_compile_definitions(${PROJECT_NAME} PRIVATE __recom USE_PRECISION=2 __usetp) 
 endif()
 
 if(${FESOM_PROFILING})
