@@ -33,7 +33,7 @@ After cloning FESOM2, fetch the REcoM submodule and enable the corresponding CMa
     git submodule update --init src/recom
     ./configure.sh -DRECOM_COUPLED=ON
 
-``RECOM_COUPLED`` is defined in the top level ``CMakeLists.txt`` and is ``OFF`` by default. The additional flag ``CISO_COUPLED`` compiles the carbon isotope extension and only works together with an active ``RECOM_COUPLED``.
+``RECOM_COUPLED`` is defined in the top level ``CMakeLists.txt`` and is ``OFF`` by default. The carbon isotopes need no extra flag: they are switched on at run time with ``ciso`` in ``&pavariables``.
 
 Configuration with namelist.recom
 =================================
@@ -44,7 +44,7 @@ All REcoM settings are collected in ``namelist.recom``, which must be present in
 - **&parecomsetup** the two switches ``enable_3zoo2det`` and ``enable_coccos`` that select the ecosystem complexity, and thereby the number of biogeochemical tracers.
 - **&pavariables** the main control group: tracer counts (``bgc_num``), sinking velocities, process switches such as ``O2dep_remin`` or ``use_ballasting``, the input path ``REcoMDataPath``, and the handling of atmospheric CO2 over forcing cycles.
 - Process parameter groups, one per topic, for photosynthesis, nutrient assimilation and limitation, the zooplankton groups and their grazing preferences, aggregation, iron chemistry, calcification and dissolution, ballasting, benthos decay rates, air-sea gas exchange and alkalinity restoring.
-- **&paciso** the carbon isotope settings, only relevant when compiled with ``CISO_COUPLED``.
+- **&paciso** the carbon isotope settings, only relevant with ``ciso = .true.``.
 
 The individual parameters are documented by comments in the shipped configuration files, which act as the reference catalog; this page intentionally does not duplicate them.
 
