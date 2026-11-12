@@ -472,7 +472,7 @@ rho_opal             = 2090.d0   ! density of opal [kg/m3] (Cram et al. 2018, Ta
 rho_ref_part         = 1230.d0   ! reference particle density [kg/m3]
 rho_ref_water        = 1027.d0   ! reference seawater density [kg/m3]
 visc_ref_water       = 0.00158d0 ! reference seawater viscosity at 4 degC [kg/(m s)]
-w_ref1               = 5.d0      ! reference sinking velocity of small detritus [m/day]
+w_ref1               = 10.d0      ! reference sinking velocity of small detritus [m/day]
 w_ref2               = 200.d0    ! reference sinking velocity of large detritus [m/day]
 depth_scaling1       = 0.01d0    ! increase of small detritus sinking speed with depth [1/day], 0 = off
 depth_scaling2       = 0.d0      ! increase of large detritus sinking speed with depth [1/day], 0 = off
