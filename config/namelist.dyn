@@ -76,6 +76,8 @@ maxiter            = 2000        ! ssh CG iteration cap (optional; default 2000 
 precond_variant    = 1           ! ssh CG preconditioner formula.
                                  !   0 = as coded since 60b46bdc, used before 2.8.0
                                  !   1 = symmetric 2D^-1 - D^-1*A*D^-1 (default, as on main)
+                                 !   2 = Chebyshev polynomial in D^-1*A of degree precond_cheb_degree;
+                                 !       fewer iterations and global reductions, more halo exchanges
                                  !  -1 = auto: 1 in a single-precision build, 0 in double.
                                  !       The resolved value is echoed at startup along with
                                  !       where it came from.
@@ -85,6 +87,7 @@ precond_variant    = 1           ! ssh CG preconditioner formula.
                                  ! Unlike soltol/maxiter this is re-read on restart.
                                  ! NOTE hitting the iteration cap does not abort -- it is
                                  ! reported as 'non-convergences' in the end-of-run summary
+precond_cheb_degree = 5          ! Chebyshev degree, used only with precond_variant = 2
 
 ! --- Split-Explicit Barotropic Subcycling ---
 use_ssh_se_subcycl = .false.     ! enable split-explicit subcycling for barotropic mode

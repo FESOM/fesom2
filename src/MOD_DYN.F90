@@ -29,6 +29,8 @@ TYPE T_SOLVERINFO
     ! WRITE/READ_T_SOLVERINFO -- so it is re-read from the namelist on every run,
     ! including restarts, rather than being pinned by the restart dump.
     integer       :: precond_variant = 0
+    ! Chebyshev polynomial degree for precond_variant = 2 (not in the restart dump either)
+    integer       :: precond_cheb_degree = 5
     real(kind=WP), allocatable   :: rr(:), zz(:), pp(:), App(:)
     !___________________________________________________________________________
     ! Per-run solver diagnostics. Deliberately NOT in WRITE/READ_T_SOLVERINFO

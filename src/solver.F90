@@ -13,6 +13,13 @@ module solver_module
     private
     public :: ssh_solve_preconditioner, ssh_solve_cg
 
+    ! Chebyshev preconditioner (precond_variant = 2): polynomial in D^-1 A on [cheb_a, cheb_b]
+    integer,            parameter        :: cheb_powit = 80
+    real(kind=WP_full), parameter        :: cheb_margin = 1.1_WP_full, cheb_ratio = 30.0_WP_full
+    integer,            save             :: cheb_deg = 5
+    real(kind=WP_full), save             :: cheb_a = 0.0_WP_full, cheb_b = 0.0_WP_full
+    real(kind=WP), allocatable, save     :: cheb_dinv(:), cheb_d(:), cheb_res(:)
+
 contains
 
 !=========================================================================
@@ -93,6 +100,7 @@ subroutine ssh_solve_preconditioner(solverinfo, partit, mesh)
    solverinfo%zz =0.0_WP
    solverinfo%pp =0.0_WP
    solverinfo%App=0.0_WP
+   if (solverinfo%precond_variant == 2) call cheb_setup(solverinfo, partit, mesh)
 end subroutine ssh_solve_preconditioner
 
 ! ========================================================
@@ -160,19 +168,27 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
                     real(X(cind(rptr(row):rptr(row+1)-1)),WP_full)), WP)
   END DO
 !$OMP END PARALLEL DO 
-  call exchange_nod(rr, partit)
-!$OMP BARRIER
   ! =============
   ! z_0=M^{-1} r_0  (M^{-1} is the precondit. matrix)
   ! pp is the search direction
   ! =============
+  if (solverinfo%precond_variant == 2) then
+     call cheb_apply(rr, zz, partit, mesh)
+  else
+  call exchange_nod(rr, partit)
+!$OMP BARRIER
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row) 
   DO row=1, partit%myDim_nod2D
      zz(row)= real(sum(real(pr_values(rptr(row):rptr(row+1)-1),WP_full)*       &
                        real(rr(cind(rptr(row):rptr(row+1)-1)),WP_full)), WP)
-     pp(row)=zz(row)
   END DO
 !$OMP END PARALLEL DO 
+  end if
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row)
+  DO row=1, partit%myDim_nod2D
+     pp(row)=zz(row)
+  END DO
+!$OMP END PARALLEL DO
   ! ===============
   ! Scalar product of r*z
   ! ===============
@@ -240,6 +256,9 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
      ! =========== 
      ! New z
      ! ===========
+  if (solverinfo%precond_variant == 2) then
+     call cheb_apply(rr, zz, partit, mesh)
+  else
   call exchange_nod(rr, partit)     ! Update before matrix-vector multiplications
 !$OMP BARRIER
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row)
@@ -248,6 +267,7 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
                        real(rr(cind(rptr(row):rptr(row+1)-1)),WP_full)), WP)
   END DO
 !$OMP END PARALLEL DO
+  end if
      ! ===========
      ! Scalar products for beta
      ! ===========
@@ -356,6 +376,7 @@ subroutine ssh_cg_iterate_acc(x, rhs, solverinfo, partit, mesh, iter, converged,
   real(kind=WP_full),  intent(out)           :: sprod(2), rtol
   real(kind=WP_full)           :: s_old, s_aux, al, be, acc, sp1, sp2
   integer                      :: row, j, nrow
+  logical                      :: cheb
   logical, save                :: on_device = .false.
   real(kind=WP), pointer       :: pr_values(:), values(:), rr(:), zz(:), pp(:), App(:)
   integer,       pointer       :: rptr(:), cind(:)
@@ -368,6 +389,7 @@ subroutine ssh_cg_iterate_acc(x, rhs, solverinfo, partit, mesh, iter, converged,
   pp =>solverinfo%pp
   App=>solverinfo%App
   nrow=partit%myDim_nod2D
+  cheb=(solverinfo%precond_variant == 2)
   if (.not. on_device) then
      !$ACC ENTER DATA COPYIN(cind, rptr, pr_values) CREATE(values, rr, zz, pp, App, x, rhs)
      on_device = .true.
@@ -395,10 +417,18 @@ subroutine ssh_cg_iterate_acc(x, rhs, solverinfo, partit, mesh, iter, converged,
      end do
      rr(row)=real(real(rhs(row),WP_full)-acc, WP)
   end do
-  call exchange_nod(rr, partit, luse_g2g=.true.)
 
   ! z0 = M^-1 r0, p0 = z0, r.z
   s_old = 0.0_WP_full
+  if (cheb) then
+     call cheb_apply_acc(rr, zz, values, rptr, cind, nrow, partit)
+     !$ACC PARALLEL LOOP DEFAULT(PRESENT) REDUCTION(+:s_old)
+     do row=1, nrow
+        pp(row)=zz(row)
+        s_old = s_old + real(rr(row),WP_full)*real(zz(row),WP_full)
+     end do
+  else
+  call exchange_nod(rr, partit, luse_g2g=.true.)
   !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(acc, j) REDUCTION(+:s_old)
   do row=1, nrow
      acc = 0.0_WP_full
@@ -410,6 +440,7 @@ subroutine ssh_cg_iterate_acc(x, rhs, solverinfo, partit, mesh, iter, converged,
      pp(row)=zz(row)
      s_old = s_old + real(rr(row),WP_full)*real(zz(row),WP_full)
   end do
+  end if
   if (ht_on) call ht_sum_mark()
   call MPI_Allreduce(MPI_IN_PLACE, s_old, 1, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
   if (ht_on) call ht_sum_done()
@@ -448,9 +479,17 @@ subroutine ssh_cg_iterate_acc(x, rhs, solverinfo, partit, mesh, iter, converged,
         rr(row)=rr(row)-al*App(row)
      end do
      ! z = M^-1 r, r.z and r.r
-     call exchange_nod(rr, partit, luse_g2g=.true.)
      sp1 = 0.0_WP_full
      sp2 = 0.0_WP_full
+     if (cheb) then
+        call cheb_apply_acc(rr, zz, values, rptr, cind, nrow, partit)
+        !$ACC PARALLEL LOOP DEFAULT(PRESENT) REDUCTION(+:sp1, sp2)
+        do row=1, nrow
+           sp1 = sp1 + real(rr(row),WP_full)*real(zz(row),WP_full)
+           sp2 = sp2 + real(rr(row),WP_full)*real(rr(row),WP_full)
+        end do
+     else
+     call exchange_nod(rr, partit, luse_g2g=.true.)
      !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(acc, j) REDUCTION(+:sp1, sp2)
      do row=1, nrow
         acc = 0.0_WP_full
@@ -462,6 +501,7 @@ subroutine ssh_cg_iterate_acc(x, rhs, solverinfo, partit, mesh, iter, converged,
         sp1 = sp1 + real(rr(row),WP_full)*real(zz(row),WP_full)
         sp2 = sp2 + real(rr(row),WP_full)*real(rr(row),WP_full)
      end do
+     end if
      sprod(1)=sp1
      sprod(2)=sp2
      if (ht_on) call ht_sum_mark()
@@ -495,6 +535,176 @@ subroutine ssh_cg_iterate_acc(x, rhs, solverinfo, partit, mesh, iter, converged,
   ! the halo of x is exchanged by the caller (on the host)
   !$ACC UPDATE HOST(x)
 end subroutine ssh_cg_iterate_acc
+#endif
+
+!=========================================================================
+! Chebyshev preconditioner setup: D^-1 and lmax(D^-1 A) by power iteration.
+! The interval is [b/cheb_ratio, b] with b = cheb_margin*lmax.
+subroutine cheb_setup(solverinfo, partit, mesh)
+  IMPLICIT NONE
+  type(t_solverinfo), intent(inout), target :: solverinfo
+  type(t_partit),     intent(inout), target :: partit
+  type(t_mesh),       intent(inout), target :: mesh
+  integer                    :: n, nt, row, it
+  integer, pointer           :: rptr(:), cind(:)
+  real(kind=WP_full)         :: sbuf(2), lam
+  real(kind=WP), allocatable :: v(:), w(:)
+
+  cheb_deg = max(1, solverinfo%precond_cheb_degree)
+  rptr => mesh%ssh_stiff%rowptr_loc
+  cind => mesh%ssh_stiff%colind_loc
+  n  = partit%myDim_nod2D
+  nt = partit%myDim_nod2D + partit%eDim_nod2D
+  if (allocated(cheb_dinv)) then
+     !$ACC EXIT DATA DELETE(cheb_dinv, cheb_d, cheb_res)
+     deallocate(cheb_dinv, cheb_d, cheb_res)
+  end if
+  allocate(cheb_dinv(n), cheb_d(nt), cheb_res(n), v(nt), w(n))
+  do row = 1, n
+     cheb_dinv(row) = 1.0_WP / mesh%ssh_stiff%values(rptr(row))
+  end do
+  ! deterministic start vector that does not depend on the partitioning
+  do row = 1, nt
+     v(row) = 1.0_WP + 0.1_WP*real(mod(partit%myList_nod2D(row), 13), WP)
+  end do
+  lam = 0.0_WP_full
+  do it = 1, cheb_powit
+     call exchange_nod(v, partit)
+     do row = 1, n
+        w(row) = real(sum(real(mesh%ssh_stiff%values(rptr(row):rptr(row+1)-1),WP_full)* &
+                          real(v(cind(rptr(row):rptr(row+1)-1)),WP_full)), WP)
+     end do
+     ! Rayleigh quotient v.Av / v.Dv
+     sbuf(1) = sum(real(v(1:n),WP_full)*real(w(1:n),WP_full))
+     sbuf(2) = sum(real(v(1:n),WP_full)**2 / real(cheb_dinv(1:n),WP_full))
+     call MPI_Allreduce(MPI_IN_PLACE, sbuf, 2, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+     lam = sbuf(1)/sbuf(2)
+     v(1:n) = real(real(cheb_dinv(1:n),WP_full)*real(w(1:n),WP_full)/lam, WP)
+  end do
+  deallocate(v, w)
+  cheb_b = cheb_margin*lam
+  cheb_a = cheb_b/cheb_ratio
+  cheb_d   = 0.0_WP
+  cheb_res = 0.0_WP
+  !$ACC ENTER DATA COPYIN(cheb_dinv, cheb_d, cheb_res)
+  if (partit%mype == 0) write(*,'(a,i3,a,es12.5,a,es12.5,a)') '     ssh CG Chebyshev: degree=', cheb_deg, &
+       '  interval=[', cheb_a, ',', cheb_b, ']'
+end subroutine cheb_setup
+
+!=========================================================================
+! z = p(D^-1 A) D^-1 r by cheb_deg steps of the Chebyshev iteration on D^-1 A z = D^-1 r from z=0.
+! Uses r on the owned rows only, so r needs no halo exchange; z is valid on the owned rows.
+subroutine cheb_apply(r, z, partit, mesh)
+  IMPLICIT NONE
+  type(t_partit), intent(inout), target :: partit
+  type(t_mesh),   intent(inout), target :: mesh
+  real(kind=WP),  intent(in)            :: r(:)
+  real(kind=WP),  intent(inout)         :: z(:)
+  integer            :: n, row, i
+  integer, pointer   :: rptr(:), cind(:)
+  real(kind=WP_full) :: th, de, s1, rho, rhon, c1, c2
+
+  rptr => mesh%ssh_stiff%rowptr_loc
+  cind => mesh%ssh_stiff%colind_loc
+  n  = partit%myDim_nod2D
+  th = 0.5_WP_full*(cheb_b + cheb_a)
+  de = 0.5_WP_full*(cheb_b - cheb_a)
+  s1 = th/de
+  rho = 1.0_WP_full/s1
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row)
+  do row = 1, n
+     z(row) = real(real(cheb_dinv(row),WP_full)*real(r(row),WP_full)/th, WP)
+     cheb_d(row) = z(row)
+  end do
+!$OMP END PARALLEL DO
+  call exchange_nod(z, partit)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row)
+  do row = 1, n
+     cheb_res(row) = real(real(cheb_dinv(row),WP_full)*(real(r(row),WP_full) - &
+                     sum(real(mesh%ssh_stiff%values(rptr(row):rptr(row+1)-1),WP_full)* &
+                         real(z(cind(rptr(row):rptr(row+1)-1)),WP_full))), WP)
+  end do
+!$OMP END PARALLEL DO
+  do i = 1, cheb_deg
+     rhon = 1.0_WP_full/(2.0_WP_full*s1 - rho)
+     c1 = rhon*rho
+     c2 = 2.0_WP_full*rhon/de
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row)
+     do row = 1, n
+        cheb_d(row) = real(c1*real(cheb_d(row),WP_full) + c2*real(cheb_res(row),WP_full), WP)
+        z(row) = z(row) + cheb_d(row)
+     end do
+!$OMP END PARALLEL DO
+     rho = rhon
+     if (i < cheb_deg) then
+        call exchange_nod(cheb_d, partit)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row)
+        do row = 1, n
+           cheb_res(row) = cheb_res(row) - real(real(cheb_dinv(row),WP_full)* &
+                sum(real(mesh%ssh_stiff%values(rptr(row):rptr(row+1)-1),WP_full)* &
+                    real(cheb_d(cind(rptr(row):rptr(row+1)-1)),WP_full)), WP)
+        end do
+!$OMP END PARALLEL DO
+     end if
+  end do
+end subroutine cheb_apply
+
+#ifdef ENABLE_OPENACC
+!=========================================================================
+! cheb_apply on the device; all arrays are present on the device.
+subroutine cheb_apply_acc(r, z, values, rptr, cind, nrow, partit)
+  IMPLICIT NONE
+  real(kind=WP),  intent(inout)         :: r(:), z(:)
+  real(kind=WP),  intent(in)            :: values(:)
+  integer,        intent(in)            :: rptr(:), cind(:)
+  integer,        intent(in)            :: nrow
+  type(t_partit), intent(inout), target :: partit
+  integer            :: row, j, i
+  real(kind=WP_full) :: acc, th, de, s1, rho, rhon, c1, c2
+
+  th = 0.5_WP_full*(cheb_b + cheb_a)
+  de = 0.5_WP_full*(cheb_b - cheb_a)
+  s1 = th/de
+  rho = 1.0_WP_full/s1
+  !$ACC PARALLEL LOOP DEFAULT(PRESENT)
+  do row = 1, nrow
+     z(row) = real(real(cheb_dinv(row),WP_full)*real(r(row),WP_full)/th, WP)
+     cheb_d(row) = z(row)
+  end do
+  call exchange_nod(z, partit, luse_g2g=.true.)
+  !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(acc, j)
+  do row = 1, nrow
+     acc = 0.0_WP_full
+     !$ACC LOOP SEQ
+     do j = rptr(row), rptr(row+1)-1
+        acc = acc + real(values(j),WP_full)*real(z(cind(j)),WP_full)
+     end do
+     cheb_res(row) = real(real(cheb_dinv(row),WP_full)*(real(r(row),WP_full) - acc), WP)
+  end do
+  do i = 1, cheb_deg
+     rhon = 1.0_WP_full/(2.0_WP_full*s1 - rho)
+     c1 = rhon*rho
+     c2 = 2.0_WP_full*rhon/de
+     !$ACC PARALLEL LOOP DEFAULT(PRESENT)
+     do row = 1, nrow
+        cheb_d(row) = real(c1*real(cheb_d(row),WP_full) + c2*real(cheb_res(row),WP_full), WP)
+        z(row) = z(row) + cheb_d(row)
+     end do
+     rho = rhon
+     if (i < cheb_deg) then
+        call exchange_nod(cheb_d, partit, luse_g2g=.true.)
+        !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(acc, j)
+        do row = 1, nrow
+           acc = 0.0_WP_full
+           !$ACC LOOP SEQ
+           do j = rptr(row), rptr(row+1)-1
+              acc = acc + real(values(j),WP_full)*real(cheb_d(cind(j)),WP_full)
+           end do
+           cheb_res(row) = cheb_res(row) - real(real(cheb_dinv(row),WP_full)*acc, WP)
+        end do
+     end if
+  end do
+end subroutine cheb_apply_acc
 #endif
 
 ! ===================================================================

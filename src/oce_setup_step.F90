@@ -575,6 +575,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     ! either direction, so a DP run can opt in to 1 and an SP run can force 0 to
     ! reproduce an older experiment.
     integer        :: precond_variant = -1
+    integer        :: precond_cheb_degree = 5  ! polynomial degree for precond_variant = 2
     logical        :: precond_auto = .false.  ! true if the auto default was applied
     logical        :: use_ssh_se_subcycl=.false.
     integer        :: se_BTsteps
@@ -592,7 +593,8 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
                                 ldiag_KE, AB_order,                                  &
                                 use_ssh_se_subcycl, se_BTsteps, se_BTtheta,          &
                                 se_bottdrag, se_bdrag_si, se_visc, se_visc_gamma0,   &
-                                se_visc_gamma1, se_visc_gamma2, soltol, maxiter, precond_variant
+                                se_visc_gamma1, se_visc_gamma2, soltol, maxiter, precond_variant, &
+                                precond_cheb_degree
 
     !___________________________________________________________________________
     ! pointer on necessary derived types
@@ -739,7 +741,13 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
         precond_variant = merge(1, 0, precision(0.0_WP) < precision(0.0d0))
         precond_auto = .true.
     end if
+    if (precond_variant > 2) then
+        if (partit%mype==0) write(*,*) 'ERROR: precond_variant must be 0, 1 or 2, got ', precond_variant
+        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
+        stop
+    end if
     dynamics%solverinfo%precond_variant = precond_variant
+    dynamics%solverinfo%precond_cheb_degree = max(1, precond_cheb_degree)
     if (partit%mype==0) then
         if (precond_auto) then
             write(*,*) '     ssh CG precond = ', dynamics%solverinfo%precond_variant, &
