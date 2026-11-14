@@ -31,6 +31,8 @@ TYPE T_SOLVERINFO
     integer       :: precond_variant = 0
     ! Chebyshev polynomial degree for precond_variant = 2 (not in the restart dump either)
     integer       :: precond_cheb_degree = 5
+    ! CG form: 0 = standard PCG, 1 = one-reduction (Chronopoulos-Gear); not in the restart dump
+    integer       :: cg_variant = 0
     real(kind=WP), allocatable   :: rr(:), zz(:), pp(:), App(:)
     !___________________________________________________________________________
     ! Per-run solver diagnostics. Deliberately NOT in WRITE/READ_T_SOLVERINFO

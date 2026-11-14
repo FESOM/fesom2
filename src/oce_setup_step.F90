@@ -576,6 +576,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     ! reproduce an older experiment.
     integer        :: precond_variant = -1
     integer        :: precond_cheb_degree = 5  ! polynomial degree for precond_variant = 2
+    integer        :: cg_variant = 0           ! 0 = standard PCG, 1 = one-reduction CG
     logical        :: precond_auto = .false.  ! true if the auto default was applied
     logical        :: use_ssh_se_subcycl=.false.
     integer        :: se_BTsteps
@@ -594,7 +595,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
                                 use_ssh_se_subcycl, se_BTsteps, se_BTtheta,          &
                                 se_bottdrag, se_bdrag_si, se_visc, se_visc_gamma0,   &
                                 se_visc_gamma1, se_visc_gamma2, soltol, maxiter, precond_variant, &
-                                precond_cheb_degree
+                                precond_cheb_degree, cg_variant
 
     !___________________________________________________________________________
     ! pointer on necessary derived types
@@ -748,6 +749,13 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     end if
     dynamics%solverinfo%precond_variant = precond_variant
     dynamics%solverinfo%precond_cheb_degree = max(1, precond_cheb_degree)
+    if (cg_variant < 0 .or. cg_variant > 1) then
+        if (partit%mype==0) write(*,*) 'ERROR: cg_variant must be 0 or 1, got ', cg_variant
+        call par_abort(partit%MPI_COMM_FESOM, partit%mype)
+        stop
+    end if
+    dynamics%solverinfo%cg_variant = cg_variant
+    if (partit%mype==0) write(*,*) '     ssh CG variant = ', cg_variant
     if (partit%mype==0) then
         if (precond_auto) then
             write(*,*) '     ssh CG precond = ', dynamics%solverinfo%precond_variant, &

@@ -88,6 +88,9 @@ precond_variant    = 1           ! ssh CG preconditioner formula.
                                  ! NOTE hitting the iteration cap does not abort -- it is
                                  ! reported as 'non-convergences' in the end-of-run summary
 precond_cheb_degree = 5          ! Chebyshev degree, used only with precond_variant = 2
+cg_variant         = 0           ! ssh CG form: 0 = standard PCG (two global reductions per iteration)
+                                 !              1 = one-reduction CG (Chronopoulos-Gear): same
+                                 !                  iterations, one reduction, one extra vector update
 
 ! --- Split-Explicit Barotropic Subcycling ---
 use_ssh_se_subcycl = .false.     ! enable split-explicit subcycling for barotropic mode
