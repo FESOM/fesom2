@@ -1233,6 +1233,7 @@ contains
                    f%partit%com_nod2D%req, f%partit%com_nod2D%nreq,                 &
                    dt_r8, daynew, month, mstep, ndpyr, yearold, timenew_r8, real(rad, WP_full), kappa_r8, &
                    real(press_air, WP_full), real(u_wind, WP_full), real(v_wind, WP_full), &
+                   real(stress_atmoce_x, WP_full), real(stress_atmoce_y, WP_full), &
                    real(shortwave, WP_full), use_age_tracer, use_transit, l_sf6, &
                    l_f11, l_f12, l_r14c, l_r39ar)
         f%t_recom_e = MPI_Wtime()
