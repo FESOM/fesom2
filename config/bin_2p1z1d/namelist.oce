@@ -48,7 +48,7 @@ scaling_GINsea     = .false. ! Increase K_GM resolution scaling only in the GIN 
 GINsea_fac         = 2.0     ! GIN sea K_GM upscaling factor 
 
 scaling_ODM95      = .true.  ! tapering based on critical slope, Danabasoglu and McWilliams, 1995
-ODM95_Scr          = 0.2e-2  ! Critical slope for tapering
+ODM95_Scr          = 1.0e-2  ! Critical slope for tapering
 ODM95_Sd           = 1.0e-3  ! slope width of tapering smoothing zone
 
 scaling_LDD97      = .false. ! tapering in surface, William G. Large, Gokhan Danabasoglu, Scott C. Doney, 1997

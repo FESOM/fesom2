@@ -392,7 +392,12 @@ contains
 
     do i=1, this%nvar_infos
       var => this%var_infos(i)
-      call MPI_Bcast(var%external_local_data_ptr, size(var%external_local_data_ptr), MPI_DOUBLE_PRECISION, root, comm, mpierr)
+      if (associated(var%external_local_data_ptr)) then
+        call MPI_Bcast(var%external_local_data_ptr, size(var%external_local_data_ptr), MPI_WP, root, comm, mpierr)
+      end if
+      if (associated(var%external_local_data_ptr_r8)) then
+        call MPI_Bcast(var%external_local_data_ptr_r8, size(var%external_local_data_ptr_r8), MPI_DOUBLE_PRECISION, root, comm, mpierr)
+      end if
     end do
   end subroutine broadcast_local_data
   !> Select the collective write path. Call before any file is initialised.
