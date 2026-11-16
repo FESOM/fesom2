@@ -28,9 +28,9 @@
 ! non-local salt term, transient tracers, and anything a coupled model adds
 ! outside the surface-flux arrays.
 !
-! With REcoM (__recom) also DIC, alkalinity and total carbon (all REcoM carbon
-! pools, organic and calcite, plus the benthic carbon and calcite), in mmol:
-!
+! With REcoM (__recom) also DIC, alkalinity, total carbon (all REcoM carbon
+! pools, organic and calcite, plus the benthic carbon and calcite) and total
+! silicon (DSi, diatom and detrital silica, plus the benthic silica), in mmol:
 !   CONSB  <step> <name> <inventory> <change> <terms> <residual> <residual/inventory> <floor> <ulp>
 !   CONSBT <step> <name> <term> <integral of the term since start>
 !   CONSPB <step> <stage> <DIC> <Alk>   stage contributions in the last tracer step
@@ -54,7 +54,7 @@
 !   deposit         change of the benthic pools in the ocean step
 ! Not in the sum: the components of surface_bc from REcoM's real64 fluxes (air-sea,
 ! virtual, river, erosion, restoring, loopback), surface_bc minus them, and the
-! benthic mismatches benthic_return+benthos_recom and seafloor+deposit (carbon).
+! benthic mismatches benthic_return+benthos_recom and seafloor+deposit (carbon, Si).
 ! Not covered: explicit vertical diffusion (i_vert_diff false) and more than one
 ! FESOM group (__usetp with num_fesom_groups > 1).
 !===============================================================================
@@ -72,7 +72,7 @@ module fesom_conservation_module
     use recom_config,       only: use_MEDUSA, add_loopback, benthos_num
     use recom_glovar,       only: tracers_info_type, GloCO2flux_seaicemask, virtual_dic, virtual_alk, &
                                   relax_alk, RiverDIC2D, RiverAlk2D, RiverDOC2D, ErosionTOC2D, &
-                                  lb_flux, Benthos
+                                  virtual_dsi, RiverDSi2D, ErosionTSi2D, lb_flux, Benthos
 #endif
 
     implicit none
@@ -100,9 +100,9 @@ module fesom_conservation_module
     integer,            save :: np = 0
 
 #if defined(__recom)
-    ! DIC, alkalinity, total carbon
-    integer, parameter :: NB = 3
-    character(len=6), parameter :: bname(NB) = ['DIC   ', 'Alk   ', 'carbon']
+    ! DIC, alkalinity, total carbon, total silicon
+    integer, parameter :: NB = 4
+    character(len=6), parameter :: bname(NB) = ['DIC   ', 'Alk   ', 'carbon', 'Si    ']
     integer, parameter :: T_RECOM = 1, T_BENREC = 2, T_BC = 3, T_RETURN = 4, T_SINK = 5, &
                           T_FLOOR = 6, T_DEPOSIT = 7, NTB = 7
     character(len=16), parameter :: tname(NTB) = ['recom           ', 'benthos_recom   ', &
@@ -115,9 +115,9 @@ module fesom_conservation_module
     real(kind=WP_full), allocatable, save :: wb(:,:)
     integer,            allocatable, save :: btr(:)
     logical,                         save :: benthic_c = .false., has_doc = .false.
-    ! the state REcoM reads, for the change in one call; the benthic carbon then
-    ! and at the start of the ocean step
-    real(kind=WP_full), allocatable, save :: before(:,:,:), ben_r(:), ben_s(:)
+    ! the state REcoM reads, for the change in one call; the benthic pools of each
+    ! budget then and at the start of the ocean step
+    real(kind=WP_full), allocatable, save :: before(:,:,:), ben_r(:,:), ben_s(:,:)
     ! terms and surface components since the start, local
     real(kind=WP_full), save :: bterm(NTB, NB) = 0.0_WP_full
     real(kind=WP_full), save :: bcomp(NCB, NB) = 0.0_WP_full
@@ -198,7 +198,8 @@ subroutine conservation_before_step(partit, tracers, mesh)
 
 #if defined(__recom)
     ! the components of bc_surface for DIC (1002) and alkalinity (1003) from
-    ! REcoM's real64 fluxes; carbon has DIC's and the river DOC (1012)
+    ! REcoM's real64 fluxes; carbon has DIC's and the river DOC (1012); Si those
+    ! of DSi (1018)
     c = 0.0_WP_full
     x = 0.0_WP_full
     do n = 1, partit%myDim_nod2D
@@ -212,9 +213,13 @@ subroutine conservation_before_step(partit, tracers, mesh)
         x              = x              + RiverDOC2D(n)*is_riverinput*a
         c(C_EROS, 1)   = c(C_EROS, 1)   + ErosionTOC2D(n)*is_erosioninput*a
         c(C_RESTORE, 2) = c(C_RESTORE, 2) + relax_alk(n)*a
+        c(C_VIRT, 4)   = c(C_VIRT, 4)   + virtual_dsi(n)*a
+        c(C_RIVER, 4)  = c(C_RIVER, 4)  + RiverDSi2D(n)*is_riverinput*a
+        c(C_EROS, 4)   = c(C_EROS, 4)   + ErosionTSi2D(n)*is_erosioninput*a
         if (use_MEDUSA .and. add_loopback) then
             c(C_LOOP, 1) = c(C_LOOP, 1) + (lb_flux(n, 2) + lb_flux(n, 5))*a
             c(C_LOOP, 2) = c(C_LOOP, 2) + (lb_flux(n, 3) + 2.0_WP_full*lb_flux(n, 5))*a
+            c(C_LOOP, 4) = c(C_LOOP, 4) + lb_flux(n, 4)*a
         end if
     end do
     c(:, 3) = c(:, 1)
@@ -222,7 +227,7 @@ subroutine conservation_before_step(partit, tracers, mesh)
     bcomp = bcomp + c
     if (benthic_c) then
         do n = 1, partit%myDim_nod2D
-            ben_s(n) = benthic_carbon(n, mesh)
+            ben_s(:, n) = benthic_pools(n, mesh)
         end do
     end if
 #endif
@@ -239,6 +244,9 @@ subroutine conservation_after_step(istep, partit, tracers, mesh)
     type(t_mesh),   intent(in),    target :: mesh
     real(kind=WP_full) :: inow(NQ), l(2*NQ), g(2*NQ), change, fl, res, rdt, w
     integer            :: n, nz, k, ierr
+#if defined(__recom)
+    real(kind=WP_full) :: sb(NB)
+#endif
 
     if (.not. started) return
     ! relax_to_clim sets T = T_b + r dt (Tclim - T_b), so T_b = (T - r dt Tclim)/(1 - r dt)
@@ -257,11 +265,11 @@ subroutine conservation_after_step(istep, partit, tracers, mesh)
     end if
 #if defined(__recom)
     if (benthic_c) then
-        w = 0.0_WP_full
+        sb = 0.0_WP_full
         do n = 1, partit%myDim_nod2D
-            w = w + (benthic_carbon(n, mesh) - ben_s(n))
+            sb = sb + (benthic_pools(n, mesh) - ben_s(:, n))
         end do
-        bterm(T_DEPOSIT, 3) = bterm(T_DEPOSIT, 3) + w
+        bterm(T_DEPOSIT, :) = bterm(T_DEPOSIT, :) + sb
     end if
 #endif
     if (mod(istep, conservation_freq) /= 0) return
@@ -471,7 +479,7 @@ subroutine bgc_setup(tracers, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_mesh),   intent(in),    target :: mesh
     integer :: tr, id, k, nsel
-    integer :: cid(14)
+    integer :: cid(14), sid(4)
 
     if (allocated(wb)) return
     cid = [tracer_ids%dissolved_inorganic_carbon, tracer_ids%dissolved_organic_carbon,     &
@@ -481,6 +489,8 @@ subroutine bgc_setup(tracers, partit, mesh)
            tracer_ids%macrozooplankton_carbon, tracer_ids%macrozooplankton_detrital_carbon, &
            tracer_ids%macrozooplankton_detrital_calcite, tracer_ids%microzooplankton_carbon, &
            tracer_ids%coccolithophore_carbon, tracer_ids%phaeocystis_carbon]
+    sid = [tracer_ids%silica, tracer_ids%diatom_silica, tracer_ids%detrital_silica, &
+           tracer_ids%macrozooplankton_detrital_silica]
     allocate(wb(NB, tracers%num_tracers))
     wb = 0.0_WP_full
     nsel = 0
@@ -489,6 +499,7 @@ subroutine bgc_setup(tracers, partit, mesh)
         if (id == tracer_ids%dissolved_inorganic_carbon) wb(1, tr) = 1.0_WP_full
         if (id == tracer_ids%alkalinity)                 wb(2, tr) = 1.0_WP_full
         if (any(cid == id) .and. id > 0)                 wb(3, tr) = 1.0_WP_full
+        if (any(sid == id) .and. id > 0)                 wb(4, tr) = 1.0_WP_full
         if (id == tracer_ids%dissolved_organic_carbon)   has_doc = .true.
         if (any(wb(:, tr) /= 0.0_WP_full)) nsel = nsel + 1
     end do
@@ -503,27 +514,31 @@ subroutine bgc_setup(tracers, partit, mesh)
     allocate(before(mesh%nl-1, partit%myDim_nod2D, nsel))
     before = 0.0_WP_full
     benthic_c = benthos_num >= 4
-    allocate(ben_r(partit%myDim_nod2D), ben_s(partit%myDim_nod2D))
+    allocate(ben_r(NB, partit%myDim_nod2D), ben_s(NB, partit%myDim_nod2D))
     ben_r = 0.0_WP_full
     ben_s = 0.0_WP_full
     if (partit%mype == 0) then
-        write(*, '(" CONSB budget tracers (ID: DIC Alk carbon):")')
+        write(*, '(" CONSB budget tracers (ID: DIC Alk carbon Si):")')
         do k = 1, nsel
-            write(*, '(" CONSB   ",I6,3(1X,F3.0))') tracers%data(btr(k))%ID, wb(:, btr(k))
+            write(*, '(" CONSB   ",I6,4(1X,F3.0))') tracers%data(btr(k))%ID, wb(:, btr(k))
         end do
-        if (benthic_c) write(*, '(" CONSB   benthos pools 2 (C) and 4 (CaCO3) in carbon")')
+        if (benthic_c) write(*, '(" CONSB   benthos pools 2 (C) and 4 (CaCO3) in carbon, 3 (Si) in Si")')
     end if
 end subroutine bgc_setup
 !
 !
 !===============================================================================
-! benthic carbon and calcite of node n [mmol]: REcoM's pools are per area(ulevels)
-function benthic_carbon(n, mesh) result(c)
+! benthic pools of node n per budget [mmol]: carbon and calcite in carbon, silica
+! in Si, none in DIC and Alk; REcoM's pools are per area(ulevels)
+function benthic_pools(n, mesh) result(c)
     integer,      intent(in)         :: n
     type(t_mesh), intent(in), target :: mesh
-    real(kind=WP_full) :: c
-    c = (Benthos(n, 2) + Benthos(n, 4))*real(mesh%area(mesh%ulevels_nod2D(n), n), WP_full)
-end function benthic_carbon
+    real(kind=WP_full) :: c(NB), a
+    a = real(mesh%area(mesh%ulevels_nod2D(n), n), WP_full)
+    c = 0.0_WP_full
+    c(3) = (Benthos(n, 2) + Benthos(n, 4))*a
+    c(4) = Benthos(n, 3)*a
+end function benthic_pools
 !
 !
 !===============================================================================
@@ -534,7 +549,7 @@ subroutine bgc_inventory(tracers, partit, mesh, g)
     type(t_partit),     intent(inout), target :: partit
     type(t_mesh),       intent(in),    target :: mesh
     real(kind=WP_full), intent(out)           :: g(3*NB)
-    real(kind=WP_full) :: hi(2*NB), lo(2*NB), gh(2*NB), gl(2*NB), c, w
+    real(kind=WP_full) :: hi(2*NB), lo(2*NB), gh(2*NB), gl(2*NB), c, w, cb(NB)
     integer :: k, tr, n, nz, q
 
     hi = 0.0_WP_full
@@ -557,9 +572,11 @@ subroutine bgc_inventory(tracers, partit, mesh, g)
     end do
     if (benthic_c) then
         do n = 1, partit%myDim_nod2D
-            c = benthic_carbon(n, mesh)
-            call two_sum(hi(3), lo(3), c)
-            hi(NB+3) = hi(NB+3) + c**2
+            cb = benthic_pools(n, mesh)
+            do q = 3, NB
+                call two_sum(hi(q), lo(q), cb(q))
+                hi(NB+q) = hi(NB+q) + cb(q)**2
+            end do
         end do
     end if
     call dd_gather(hi, lo, gh, gl, 2*NB, partit)
@@ -598,7 +615,7 @@ subroutine conservation_recom(stage, info, tracers, partit, mesh)
         end do
         if (benthic_c) then
             do n = 1, partit%myDim_nod2D
-                ben_r(n) = benthic_carbon(n, mesh)
+                ben_r(:, n) = benthic_pools(n, mesh)
             end do
         end if
         return
@@ -617,11 +634,11 @@ subroutine conservation_recom(stage, info, tracers, partit, mesh)
     end do
     bterm(T_RECOM, :) = bterm(T_RECOM, :) + l
     if (benthic_c) then
-        s = 0.0_WP_full
+        l = 0.0_WP_full
         do n = 1, partit%myDim_nod2D
-            s = s + (benthic_carbon(n, mesh) - ben_r(n))
+            l = l + (benthic_pools(n, mesh) - ben_r(:, n))
         end do
-        bterm(T_BENREC, 3) = bterm(T_BENREC, 3) + s
+        bterm(T_BENREC, :) = bterm(T_BENREC, :) + l
     end if
 end subroutine conservation_recom
 !
@@ -713,7 +730,7 @@ subroutine bgc_report(istep, tracers, partit, mesh)
             if (comp(t, q) /= 0.0_WP_full) write(*, ft) istep, bname(q), cname(t), comp(t, q)
         end do
         write(*, ft) istep, bname(q), '  bc-components ', term(T_BC, q) - sum(comp(:, q))
-        if (q == 3 .and. benthic_c) then
+        if (q >= 3 .and. benthic_c) then
             write(*, ft) istep, bname(q), 'return+decay    ', term(T_RETURN, q) + term(T_BENREC, q)
             write(*, ft) istep, bname(q), 'seafloor+deposit', term(T_FLOOR, q) + term(T_DEPOSIT, q)
         end if
