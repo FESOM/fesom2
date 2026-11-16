@@ -148,7 +148,7 @@
 ! --- Ice-Ocean Exchange ---
     ustar_min       = 0.0005        ! minimum friction velocity for the ice-ocean heat flux [m/s]
     fbot_xfer_type  = 'constant'    ! ice-ocean heat transfer coefficient: 'constant' or 'Cdn_ocn' (needs formdrag)
-    update_ocn_f    = .false.       ! include frazil ice fluxes in the ocean flux fields
+    update_ocn_f    = .true.        ! include frazil ice fluxes in the ocean flux fields
     l_mpond_fresh   = .false.       ! retain (topo) pond water until the ponds drain
     tfrz_option     = 'linear_salt' ! seawater freezing temperature: 'minus1p8', 'linear_salt' or 'mushy'
     oceanmixed_ice  = .true.        ! active ocean mixed layer calculation in Icepack

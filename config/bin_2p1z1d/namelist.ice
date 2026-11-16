@@ -56,8 +56,20 @@ ice_ave_steps  = 1              ! ice time step = ice_ave_steps × ocean time st
 ! --- Ice Properties ---
 Sice           = 4.0            ! bulk ice salinity [ppt] (typical range: 3.2-5.0)
 
+! --- Ice Thickness Distribution ---
+iclasses       = 7              ! number of ice thickness categories (default: 7)
+                                ! set to 15 if using EM distribution (new_iceclasses=.true.)
+new_iclasses   = .false.        ! use ice thickness distribution from EM observations
+                                ! (Castro-Morales et al., JGR, 2013)
+h_cutoff       = 3.0            ! thickness cutoff for new_iclasses [m]
+
 ! --- Lead Closing Parameters ---
 h0             = 0.5            ! lead closing parameter for Northern Hemisphere [m]
+h0_s           = 0.5            ! lead closing parameter for Southern Hemisphere [m]
+
+! --- Minimum Thresholds ---
+hmin           = 0.01           ! minimum ice thickness [m]
+armin          = 0.01           ! minimum ice concentration (dimensionless)
 
 ! --- Emissivity (Longwave Radiation) ---
 emiss_ice      = 0.97           ! emissivity of snow/ice surface (dimensionless, 0-1)
@@ -69,8 +81,47 @@ albsnm            = 0.77           ! albedo of melting snow (dimensionless, 0-1)
 albi              = 0.7            ! albedo of frozen ice (dimensionless, 0-1)
 albim             = 0.68           ! albedo of melting ice (dimensionless, 0-1)
 albw              = 0.1            ! albedo of open water (dimensionless, 0-1)
+open_water_albedo = 0           ! open water albedo scheme:
+                                !   0 = default (constant albw)
+                                !   1 = Taylor et al.
+                                !   2 = Briegleb et al.
 
 ! --- Thermal Conductivity ---
 con            = 2.1656         ! thermal conductivity of ice [W/m/K]
 consn          = 0.31           ! thermal conductivity of snow [W/m/K]
+
+! --- Snow Distribution ---
+snowdist       = .true.         ! distribute snow depth according to ice thickness distribution
+
+! --- Snow-cover albedo blending ---
+h_snowscale    = 0.0            ! tanh blend scale for snow → bare-ice albedo [m]
+                                !   0.0    -> legacy step function at hsn > 1 mm (default)
+                                !   0.02-0.05 -> CICE-like smooth transition
+
+! --- Melting Parameters ---
+c_melt         = 0.5            ! constant in concentration equation for melting conditions (0-1)
+/
+
+! ============================================================================
+! MELT POND PARAMETERS  (used only when ice_therm/use_meltponds = .true.)
+!   Defaults reproduce Icepack/CESM `meltpond_lvl` ('hlid' branch) behaviour.
+!   The lid `ipnd` is bounded by Stefan energy balance + freeboard, not by
+!   accumulated `meltt*dt`. Output: simprefrozen (CMIP7 SIMIP) ~ ipnd*rhoice.
+! ============================================================================
+&meltpond
+! --- Pond geometry / formation thresholds ---
+hi_min         = 0.10           ! min ice thickness for ponds to form [m]
+hs1            = 0.03           ! snow-depth threshold for pond reset [m]
+                                !   hsno > hs1 -> ponds reset to 0
+pndaspect      = 0.80           ! pond depth-to-area aspect ratio (CESM default)
+                                !   smaller value -> wider shallower ponds,
+                                !                    more grid darkening per pond volume
+
+! --- Surface melt retention (fraction of melt water that stays in ponds) ---
+rfracmin       = 0.15           ! min retained fraction (thin ice)
+rfracmax       = 1.00           ! max retained fraction (thick ice, h_i >= 0.5 m)
+
+! --- Albedo of pond surface ---
+albpnd         = 0.20           ! open melt pond albedo
+albpnd_frz     = 0.36           ! frozen pond albedo (lid >= 1 cm thick)
 /
