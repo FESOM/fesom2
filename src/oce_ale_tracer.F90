@@ -54,7 +54,7 @@ module oce_ale_tracer_module
    use recom_glovar
    use recom_config
 #endif
-#if defined (__ciso)
+#if defined (__recom)
    use recom_ciso
 #endif
     implicit none
@@ -424,7 +424,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 !YY: decay differently calculated???
 #if defined(__recom)
         ! radioactive decay of 14C
-        if (ciso_14 .and. any(c14_tracer_id == tracers%data(tr_num)%ID)) then
+        if (ciso .and. ciso_14 .and. any(c14_tracer_id == tracers%data(tr_num)%ID)) then
           call decay_tracer(tr_num, real(1 - lambda_14 * dt, WP_full), tracers, partit, mesh)
         end if    ! ciso & ciso_14
 #endif
