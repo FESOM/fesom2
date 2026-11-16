@@ -395,10 +395,6 @@ if(${RECOM_COUPLED})
    target_compile_definitions(${PROJECT_NAME} PRIVATE __recom USE_PRECISION=2 __usetp) #__3Zoo2Det __coccos)
 endif()
 
-if(${CISO_COUPLED})
-   target_compile_definitions(${PROJECT_NAME} PRIVATE __ciso)
-endif()
-
 if(${FESOM_PROFILING})
    target_compile_definitions(${PROJECT_NAME} PRIVATE FESOM_PROFILING)
 endif()
