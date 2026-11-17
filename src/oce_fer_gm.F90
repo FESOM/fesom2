@@ -232,6 +232,9 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
                 !!PS c1=c1+hnode_new(nz,n)*(sqrt(max(bvfreq(nz,n), 0._WP))+sqrt(max(bvfreq(nz+1,n), 0._WP)))/2._WP
                 cm=cm+mesh%hnode_new(nz,n)*(sqrt(abs(max(bvfreq(nz,n), 0._WP)))+sqrt(abs(max(bvfreq(nz+1,n), 0._WP))))/2._WP ! add abs() for -0 case, cray
             end do
+            ! the level the vertical scaling below reads as surface template;
+            ! the sum above keeps the levels of the surrounding elements
+            nzmin=mesh%ulevels_nod2D(n)
             c1=max(K_GM_cmin, cm/pi)         !ca. first baroclinic gravity wave speed limited from below by c_min --> need for rosbyradius
             cm=max(K_GM_cmin, cm/pi/K_GM_cm) !ca. mth baroclinic gravity wave speed limited from below by c_min   --> needed for ferrari GM
             scaling=1._WP
@@ -311,6 +314,8 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
         ! note, Redi can be used without GM and vise versa!
         ! if both are used it will be reset below
         if (Redi) then
+            ! the level the vertical scaling below reads as surface template
+            nzmin=mesh%ulevels_nod2D(n)
             !!PS Ki(1,n)=K_hor*(reso/100000.0_WP)**2
             !!PS Ki(nzmin,n)=K_hor*(reso/100000.0_WP)**2
             if     (K_GM_resscalorder==1) then
@@ -588,6 +593,8 @@ subroutine init_Redi_GM_acc(dynamics, partit, mesh)
             do nz=nzmin, nzmax-1
                 cm=cm+mesh%hnode_new(nz,n)*(sqrt(abs(max(bvfreq(nz,n), 0._WP)))+sqrt(abs(max(bvfreq(nz+1,n), 0._WP))))/2._WP
             end do
+            ! the level the third loop reads as surface template
+            nzmin=mesh%ulevels_nod2D(n)
             c1=max(K_GM_cmin, cm/pi)
             cm=max(K_GM_cmin, cm/pi/K_GM_cm)
             scaling=1._WP
@@ -617,6 +624,8 @@ subroutine init_Redi_GM_acc(dynamics, partit, mesh)
             fer_c(n)    = cm*cm
         end if
         if (Redi) then
+            ! the level the third loop reads as surface template
+            nzmin=mesh%ulevels_nod2D(n)
             if     (K_GM_resscalorder==1) then
                 Ki(nzmin,n)=K_hor*(reso/refscalresol)**K_GM_resscalorder
             elseif (K_GM_resscalorder==2) then
