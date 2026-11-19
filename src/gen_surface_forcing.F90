@@ -62,6 +62,10 @@ MODULE g_sbf
    public  atmdata
    public  i_totfl, i_xwind, i_ywind, i_xstre, i_ystre, i_humi, i_qsr, i_qlw, i_tair, i_prec, i_mslp, i_cloud, i_snow
    public  l_xwind, l_ywind, l_xstre, l_ystre, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow
+
+   !CV needed for hydrothermal reading in gen_ic3d.F90
+   public nm_hydrothermal_file, nm_hydrothermal_varname
+   
    private
 
    integer :: i_totfl = 12 ! total number of fluxes
@@ -114,6 +118,10 @@ MODULE g_sbf
    character(len=MAX_PATH), save   :: nm_co2_data_file     ='MonthlyAtmCO2_gcb2021.nc'
 
    character(len=MAX_PATH), save   :: nm_sed_data_file     ='medusa_flux2fesom.nc'
+
+! CV: file for 3-dimensional flux field of mantle 3He and variable name in that file
+   character(len=MAX_PATH), save   :: nm_hydrothermal_file ='he3flux_DeVries_Holzer_2021.nc'
+   character(len=MAX_PATH), save   :: nm_hydrothermal_varname ='he3flux'
 
 #endif
 
@@ -1041,7 +1049,7 @@ CONTAINS
                         chl_data_source, nm_chl_data_file, chl_const, use_runoff_mapper, runoff_basins_file, runoff_radius
 
 #if defined(__recom)
-      namelist /nam_rsbc/ fe_data_source, nm_fe_data_file, nm_aen_data_file, nm_river_data_file, nm_erosion_data_file, nm_co2_data_file
+      namelist /nam_rsbc/ fe_data_source, nm_fe_data_file, nm_aen_data_file, nm_river_data_file, nm_erosion_data_file, nm_co2_data_file, nm_hydrothermal_file, nm_hydrothermal_varname
 #endif
 
 #include "associate_part_def.h"

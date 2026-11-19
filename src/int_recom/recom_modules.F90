@@ -148,6 +148,9 @@ module recom_config
   !Logical                :: inter_CT_CL           = .true.    ! NEW inter use interaction between CO2 and both, temperature and light
   Logical                :: Diags                 = .true.    !!!!!!!!!!!!!!!!!!!!!!Change in recom.F90 Diagnostics -> Diags
   Logical                :: constant_CO2          = .true.
+! CV: Hydrothermal code ---------------------
+  Logical                :: UseHydrothermalFe     = .true.     ! tuns hydrothermal source for iron on/off
+! end hydrothermal code ---------------------
   Logical                :: UseFeDust             = .true.     ! Turns dust input of iron off when set to.false.
   Logical                :: UseDustClim           = .true.
   Logical                :: UseFeDust_vsol        = .false.     ! use iron flux from dust with variable solubility 
@@ -195,6 +198,7 @@ module recom_config
                        O2dep_remin,                       use_ballasting,        use_density_scaling,     & ! O2remin, NEW BALL
                        use_viscosity_scaling,             OmegaC_diss,           CO2lim,                  & ! BALL, DISS added OmegaC_diss, added CO2lim
                        Diags      ,                       constant_CO2,                                   &
+                       UseHydrothermalFe,                                                                 & ! hydrothermal code
                        UseFeDust,                         UseDustClim, UseFeDust_vsol,                    &
                        UseDustClimAlbani,                 UseDustClimMyrio,                               &
                        use_photodamage,                   HetRespFlux_plus,      REcoMDataPath,           &
@@ -334,7 +338,10 @@ module recom_config
 !! *** Iron chemistry ***
   Real(kind=8)                 :: totalligand     = 1.d0        ! [mumol/m3] order 1. Total free ligand
   Real(kind=8)                 :: ligandStabConst = 100.d0      ! [m3/mumol] order 100. Ligand-free iron stability constant
-  namelist /pairon_chem/ totalligand, ligandStabConst
+  Real(kind=8)                 :: hydrothermal_fe2he = 4.134e9  ! [(micromol Fe/day) / (mol He/year)] conversion from mantle He flux to Fe flux.
+                                                                ! This number ensures that a total 3He flux of 596 mol/year results in an iron
+                                                                ! flux of 9.e8 mol Fe/year (taking into account the conversion to micromol/day!)
+  namelist /pairon_chem/ totalligand, ligandStabConst, hydrothermal_fe2he
 !!------------------------------------------------------------------------------
 !! *** Zooplankton ***
   Real(kind=8)                 :: graz_max      = 2.4d0           ! [mmol N/(m3 * day)] Maximum grazing loss parameter 
@@ -823,7 +830,11 @@ Module REcoM_GloVar
   Real(kind=8),allocatable,dimension(:)   :: AtmFeInput       ! [umol/m2/s] Includes ice, but is, other than that identlical to GloFeDust
 #if defined (__seaice_tracers)
   Real(kind=8),allocatable,dimension(:)   :: IceFeInput       ! [umol/m2/s] Input/loss of Fe into ocean from melting/formation of ice.
-#endif /* (__seaice_tracers) */  
+#endif /* (__seaice_tracers) */
+
+  ! CV for hydrothermal iron input
+  real(kind=8), allocatable,dimension(:,:) :: hydrothermal_3he_flux ! [mol 3He/year] mantle 3He flux, to calculate iron flux 
+  
   Real(kind=8),allocatable,dimension(:)   :: SedFeInput       ! [umol/m2/s] sedimentary iron input variable
   Real(kind=8),allocatable,dimension(:)   :: AtmNInput        ! [umol/m2/s] Includes ice, but is, other than that identlical to GloNDust
   Real(kind=8),allocatable,dimension(:)   :: GloPCO2surf      ! [uatm] Surface ocean CO2 partial pressure

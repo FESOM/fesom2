@@ -104,6 +104,8 @@ subroutine recom_init(tracers, partit, mesh)
     allocate(decayBenthos          ( benthos_num ))     ! [1/day] Decay rate of detritus in the benthic layer
     allocate(PAR3D                 ( nl-1, node_size ))
 
+    ! CV for hydrothermal Fe input
+    allocate(hydrothermal_3he_flux (nl-1, node_size ))
 
     GloFeDust             = 0.d0
     AtmFeInput            = 0.d0
@@ -143,6 +145,8 @@ subroutine recom_init(tracers, partit, mesh)
     wFluxDia              = 0.d0
     wFluxDiaH             = 0.d0
     PAR3D                 = 0.d0
+    ! CV for hydrothermal Fe flux
+    hydrothermal_3he_flux = 0.d0
 
 !    pco2surf           = 0.d0
 !    dflux              = 0.d0

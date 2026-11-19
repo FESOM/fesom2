@@ -20,7 +20,12 @@ MODULE g_ic3d
    USE g_comm_auto
    USE g_support
    USE g_config, only: dummy, ClimateDataPath, use_cavity
-   
+
+   ! module variables that are needed for reading in hydrothermal helium fluxes
+   USE recom_config, only: UseHydrothermalFe
+   USE g_sbf, only: nm_hydrothermal_file, nm_hydrothermal_varname
+   USE REcoM_GloVar, only: hydrothermal_3he_flux
+
    IMPLICIT NONE
 
    include 'netcdf.inc'
@@ -530,7 +535,22 @@ CONTAINS
             stop
          end if
       END DO
-      END DO
+   END DO
+   
+! CV read 3-D hydrothermal 3He flux field from regular grid,
+! then interpolate to FESOM mesh. I am doing it here because only here the interpolation and reading
+! routines for 3-D netCDF files are defined and used. 
+      if (UseHydrothermalFe) then                  ! defined in module recom_config
+         if (partit%mype==0) write(*,*) "Reading 3d field of hydrothermal 3He input"
+         filename = trim(nm_hydrothermal_file)     ! defined in module g_sbf 
+         varname  = trim(nm_hydrothermal_varname)  ! defined in module g_sbf 
+         call nc_ic3d_ini(partit, mesh)
+         call getcoeffld(tracers, partit, mesh)
+         call nc_end
+         call extrap_nod(hydrothermal_3he_flux(:,:), &
+              partit, mesh)                        ! defined in module REcoM_GloVar
+      endif
+   
       DEALLOCATE(bilin_indx_i, bilin_indx_j)
 
       do current_tracer=1, tracers%num_tracers
