@@ -1,0 +1,54 @@
+name: FESOM2 MPI rank reproducibility
+
+# pi mesh on 2 and 8 ranks, on the committed partitions and on partitions made
+# by fesom_meshpart: bit-identical initial state, and restarts/daily means
+# within a relative tolerance after the run (ctest -L mpi_repro). The strict
+# bit-for-bit comparison of the full runs (ctest -L mpi_bitwise) is expected to
+# fail until all global reductions are decomposition independent; it is
+# reported but does not fail the job. Runs on demand only.
+on:
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'Run length in days'
+        required: false
+        default: '1'
+      rtol:
+        description: 'Relative tolerance of the 2 vs 8 rank comparison'
+        required: false
+        default: '1e-3'
+
+jobs:
+  mpi_reproducibility:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    container: ghcr.io/fesom/fesom2_docker:fesom2_test_refactoring-master
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Git safe directory
+      run: |
+        git config --global --add safe.directory ${PWD}
+
+    - name: Python netCDF4
+      run: |
+        python3 -c "import netCDF4, numpy" || pip install netCDF4 numpy
+
+    - name: Compile model and mesh partitioner
+      run: |
+        bash -l configure.sh ubuntu -DBUILD_TESTING=ON -DENABLE_MPI_REPRO_TESTS=ON \
+          -DBUILD_MESHPARTITIONER=ON \
+          -DFESOM_MPI_REPRO_DAYS=${{ inputs.days }} \
+          -DFESOM_MPI_REPRO_RTOL=${{ inputs.rtol }}
+
+    - name: MPI reproducibility (initial state bitwise, run within tolerance)
+      run: |
+        cd build
+        ctest -L mpi_repro --output-on-failure
+
+    - name: MPI reproducibility, bit for bit (expected to fail)
+      continue-on-error: true
+      run: |
+        cd build
+        ctest -L mpi_bitwise --output-on-failure

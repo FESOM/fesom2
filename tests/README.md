@@ -87,6 +87,15 @@ The test framework is organized into **4 focused directories**:
 
 **Requirements**: `BUILD_MESHPARTITIONER=ON`
 
+### 📁 `mpi_reproducibility/` - MPI Rank-Count Reproducibility
+**Purpose**: pi mesh on 2 vs 8 ranks
+- `mpi_repro_pi_ic_np2_np8` - Initial state (`temp_M1`/`salt_M1` after one step) bit-identical
+- `mpi_repro_pi_day_close_np2_np8` - Restarts and daily means within `FESOM_MPI_REPRO_RTOL` (EVP stresses excluded)
+- `mpi_repro_pi_fresh_*` - The same on partitions made by `fesom_meshpart` (needs `BUILD_MESHPARTITIONER=ON`)
+- `mpi_bitwise_*` - Full runs bit for bit; expected to fail for now (`ctest -L mpi_bitwise`)
+
+**Requirements**: `ENABLE_MPI_REPRO_TESTS=ON`, Python 3 with netCDF4. Run with `ctest -L mpi_repro`.
+
 ### 📁 `ecbundle/` - External Tool Integration Tests
 **Purpose**: Test ECBundle integration and build system
 - `ecbundle_basic_build` - Basic ECBundle functionality
@@ -208,6 +217,7 @@ make run_meshpartitioner_tests # Mesh partitioner tests only
 # Component-specific testing  
 -DBUILD_MESHDIAG=ON             # Enable mesh diagnostics tests
 -DBUILD_MESHPARTITIONER=ON      # Enable mesh partitioner tests
+-DENABLE_MPI_REPRO_TESTS=ON     # Enable MPI rank-count reproducibility tests (default: OFF)
 
 # MPI configuration
 -DENABLE_MPI_TESTS=ON           # Enable MPI tests (default: ON)

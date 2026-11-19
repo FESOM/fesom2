@@ -416,7 +416,7 @@ endfunction()
 
 # Function to add a FESOM integration test with custom options
 function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH RUN_LENGTH_UNIT RESTART_LENGTH RESTART_LENGTH_UNIT LOGFILE_OUTFREQ FORCE_ROTATION USE_CAVITY)
-    set(options MPI_TEST)
+    set(options MPI_TEST FRESH_START)
     set(oneValueArgs NP TIMEOUT LABEL MIX_SCHEME FORCING FORCING_YEAR LEAPYEAR USE_ICE OMP_THREADS DATA_DIR CONSERVATION_FREQ COMPARE_TO)
     # OMP_THREADS: run with this many OpenMP threads per rank (OMP_NUM_THREADS), with
     # the passive wait policy and without MPI core binding, so that all threads of a
@@ -431,6 +431,8 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
     # FORCING_SBC: namelist settings ("key=value") for &nam_sbc in namelist.forcing,
     # e.g. "forcing_distribution='redist'"; an existing setting of the same key is
     # removed first, so the value given here is the one fesom.x reads.
+    # FRESH_START: empty the results directory before every run, so that a rerun starts
+    # from the initial conditions instead of the previous run's restart.
     # COMPARE_TO: name of another test registered in the same directory; after the run
     # checks, every NetCDF file of its results (outputs and restarts) must be identical
     # bit for bit to this test's (tools/compare_nc_exact.py, run with FESOM_NC_PYTHON,
@@ -495,16 +497,18 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
     # Generate the test script
     set(TEST_SCRIPT "${TEST_RUN_DIR}/run_test.cmake")
     
-    # A conservation test starts from rest every time: without this a rerun would
-    # restart from the previous run's restart files and judge a different day.
+    # Conservation and FRESH_START tests start from rest every time: without this a
+    # rerun would restart from the previous run's restart files and judge a different day.
     set(_pre_run "")
     set(_post_checks "")
-    if(DEFINED FESOM_TEST_CONSERVATION_FREQ)
+    if(DEFINED FESOM_TEST_CONSERVATION_FREQ OR FESOM_TEST_FRESH_START)
         set(_pre_run "
             file(REMOVE_RECURSE \"${RESULT_DIR}\")
             file(MAKE_DIRECTORY \"${RESULT_DIR}\")
             file(WRITE \"${RESULT_DIR}/fesom.clock\" \"0 1 ${FESOM_TEST_FORCING_YEAR}\\n0 1 ${FESOM_TEST_FORCING_YEAR}\\n\")
 ")
+    endif()
+    if(DEFINED FESOM_TEST_CONSERVATION_FREQ)
         if(NOT Python3_EXECUTABLE)
             message(FATAL_ERROR "add_fesom_test_with_options(${TEST_NAME}): CONSERVATION_FREQ needs a Python 3 interpreter")
         endif()
