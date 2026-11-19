@@ -19,10 +19,9 @@ module g_support
   real(kind=WP), allocatable, save :: smth_vol(:,:), smth_work(:,:)
 #endif
   ! Deterministic, decomposition-independent hole filling for initial
-  ! conditions (see extrap_nod3D). Off by default: the historical fill is kept
-  ! bit-for-bit. Set ic_extrap_det=.true. in &tracer_init3d to make the filled
-  ! values independent of the partitioning and of the node numbering.
-  logical,       save :: ic_extrap_det = .false.
+  ! conditions (see extrap_nod3D). Set ic_extrap_det=.false. in &tracer_init3d
+  ! to use the legacy partition-dependent fill.
+  logical,       save :: ic_extrap_det = .true.
   real(kind=WP), save :: ic_extrap_tol = 1.e-3_WP
   real(kind=WP), dimension(:), allocatable  :: work_array
 !
@@ -408,9 +407,9 @@ subroutine extrap_nod3D(arr, partit, mesh)
     ! 5 km global mesh: ~10 kg/m3 across one 2 km element in the Sea of
     ! Marmara for one partitioning, zero gradient for another), which drives an
     ! immediate local velocity ramp and a cold-start blow-up on unlucky
-    ! partitionings. ic_extrap_det=.true. (namelist tracer_init3d) switches to
-    ! a deterministic fill whose result is independent of the decomposition;
-    ! the default keeps the historical behaviour bit-for-bit.
+    ! partitionings. ic_extrap_det=.true. (namelist tracer_init3d, default)
+    ! selects a deterministic fill whose result is independent of the
+    ! decomposition.
     if (ic_extrap_det) then
        call extrap_nod3D_det(arr, partit, mesh)
        return
