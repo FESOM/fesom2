@@ -13,6 +13,7 @@ module fesom_main_storage_module
   use g_clock
   use g_config
   use g_comm_auto
+  use halo_timing, only: ht_start, ht_report
   use g_forcing_arrays
   use io_RESTART
   use io_MEANDATA
@@ -985,6 +986,7 @@ contains
 #if defined (FESOM_PROFILING)
         call fesom_profiler_start("fesom_runloop_total")
 #endif
+        call ht_start(halo_timing, f%mesh%nl)
     !___MODEL TIME STEPPING LOOP________________________________________________
     nstart=f%from_nstep
     ntotal=f%from_nstep-1+current_nsteps
@@ -1512,6 +1514,7 @@ contains
     ! par_finalize. In the OpenIFS-coupled build par_finalize calls oasis_terminate, which finalizes
     ! MPI, so a report after it aborts every rank ("MPI_Comm_f2c() was called after
     ! MPI_FINALIZE") once the run is otherwise complete.
+    call ht_report(f%partit%MPI_COMM_FESOM, f%partit%mype, f%partit%npes)
 #if defined (FESOM_PROFILING)
         call fesom_profiler_end("fesom_finalize_total")
         call fesom_profiler_report(f%MPI_COMM_FESOM, f%mype)

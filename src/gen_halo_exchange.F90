@@ -18,6 +18,7 @@ module g_comm
 
   use, intrinsic :: ISO_FORTRAN_ENV, only: int16, int32, real32, real64
   use o_PARAM, only: WP
+  use halo_timing
 #ifdef ENABLE_OPENACC
   use, intrinsic :: iso_c_binding, only: c_ptr, c_loc, c_f_pointer
 #endif
@@ -100,7 +101,7 @@ END SUBROUTINE exchange_nod2D_i
 
 !=============================================================================
 ! General version of the communication routine for 2D nodal fields
-subroutine exchange_nod2D_i_begin(nod_array2D, partit, luse_g2g)
+subroutine exchange_nod2D_i_begin_x(nod_array2D, partit, luse_g2g)
 use MOD_MESH
 USE MOD_PARTIT
 use par_support_module, only: par_abort
@@ -161,7 +162,7 @@ end if
      partit%com_nod2D%nreq = rn+sn
 
   endif
-END SUBROUTINE exchange_nod2D_i_begin
+END SUBROUTINE exchange_nod2D_i_begin_x
 
 ! ========================================================================
 ! General version of the communication routine for 2D nodal fields
@@ -183,7 +184,7 @@ END SUBROUTINE exchange_nod2D
 
 ! ========================================================================
 ! General version of the communication routine for 2D nodal fields
-subroutine exchange_nod2D_begin(nod_array2D, partit, luse_g2g)
+subroutine exchange_nod2D_begin_x(nod_array2D, partit, luse_g2g)
 use MOD_MESH
 USE MOD_PARTIT
 use par_support_module, only: par_abort
@@ -243,7 +244,7 @@ end if
 
   end if
 
-END SUBROUTINE exchange_nod2D_begin
+END SUBROUTINE exchange_nod2D_begin_x
 !===============================================
 ! General version of the communication routine for 2D nodal fields
 subroutine exchange_nod2D_2fields(nod1_array2D, nod2_array2D, partit, luse_g2g)
@@ -265,7 +266,7 @@ END SUBROUTINE exchange_nod2D_2fields
 
 ! ========================================================================
 ! General version of the communication routine for 2D nodal fields
-subroutine exchange_nod2D_2fields_begin(nod1_array2D, nod2_array2D, partit, luse_g2g)
+subroutine exchange_nod2D_2fields_begin_x(nod1_array2D, nod2_array2D, partit, luse_g2g)
 use MOD_MESH
 USE MOD_PARTIT
 use par_support_module, only: par_abort
@@ -337,7 +338,7 @@ if (partit%npes > 1) then
 
 end if
 
-END SUBROUTINE exchange_nod2D_2fields_begin
+END SUBROUTINE exchange_nod2D_2fields_begin_x
 
 !===============================================
 subroutine exchange_nod2D_3fields(nod1_array2D, nod2_array2D, nod3_array2D, partit, luse_g2g)
@@ -361,7 +362,7 @@ logical,        intent(in),optional   :: luse_g2g
 END SUBROUTINE exchange_nod2D_3fields
 
 ! ========================================================================
-subroutine exchange_nod2D_3fields_begin(nod1_array2D, nod2_array2D, nod3_array2D, partit, luse_g2g)
+subroutine exchange_nod2D_3fields_begin_x(nod1_array2D, nod2_array2D, nod3_array2D, partit, luse_g2g)
 ! General version of the communication routine for 2D nodal fields
 use MOD_MESH
 USE MOD_PARTIT
@@ -449,7 +450,7 @@ end if
 
 end if
 
-END SUBROUTINE exchange_nod2D_3fields_begin
+END SUBROUTINE exchange_nod2D_3fields_begin_x
 
 ! ========================================================================
 ! General version of the communication routine for 3D nodal fields
@@ -473,7 +474,7 @@ END SUBROUTINE exchange_nod3D
 ! ========================================================================
 ! General version of the communication routine for 3D nodal fields
 ! stored in (vertical, horizontal) format
-subroutine exchange_nod3D_begin(nod_array3D, partit, luse_g2g)
+subroutine exchange_nod3D_begin_x(nod_array3D, partit, luse_g2g)
 use MOD_MESH
 USE MOD_PARTIT
 use par_support_module, only: par_abort
@@ -542,7 +543,7 @@ end if
     partit%com_nod2D%nreq = rn+sn
 
  endif
-END SUBROUTINE exchange_nod3D_begin
+END SUBROUTINE exchange_nod3D_begin_x
 
 ! ========================================================================
 ! General version of the communication routine for 3D nodal fields
@@ -564,7 +565,7 @@ endif
 END SUBROUTINE exchange_nod3D_2fields
 
 ! ========================================================================
-subroutine exchange_nod3D_2fields_begin(nod1_array3D,nod2_array3D, partit, luse_g2g)
+subroutine exchange_nod3D_2fields_begin_x(nod1_array3D,nod2_array3D, partit, luse_g2g)
 ! General version of the communication routine for 3D nodal fields
 ! stored in (vertical, horizontal) format
 use MOD_MESH
@@ -659,7 +660,7 @@ end if
   partit%com_nod2D%nreq = 2*(rn+sn)
 
  endif
-END SUBROUTINE exchange_nod3D_2fields_begin
+END SUBROUTINE exchange_nod3D_2fields_begin_x
 ! ========================================================================
 subroutine exchange_nod3D_n(nod_array3D, partit, luse_g2g)
 use MOD_MESH
@@ -679,7 +680,7 @@ END SUBROUTINE exchange_nod3D_n
 !=================================================
 ! General version of the communication routine for 3D nodal fields
 ! stored in (vertical, horizontal) format
-subroutine exchange_nod3D_n_begin(nod_array3D, partit, luse_g2g)
+subroutine exchange_nod3D_n_begin_x(nod_array3D, partit, luse_g2g)
 use MOD_MESH
 USE MOD_PARTIT
 use par_support_module, only: par_abort
@@ -760,13 +761,13 @@ if (partit%npes>1) then
  endif
 
 
-END SUBROUTINE exchange_nod3D_n_begin
+END SUBROUTINE exchange_nod3D_n_begin_x
 
 !=======================================
 ! AND WAITING
 !=======================================
 
-SUBROUTINE exchange_nod_end(partit)
+SUBROUTINE exchange_nod_end_x(partit)
 use MOD_MESH
 USE MOD_PARTIT
 use par_support_module, only: par_abort
@@ -780,7 +781,7 @@ if (g2g_unpack_pending) call g2g_unpack_2fields(partit)
 if (g2g_cols(1)%pending) call g2g_cols_unpack(1, partit)
 #endif
 
-END SUBROUTINE exchange_nod_end
+END SUBROUTINE exchange_nod_end_x
 
 #ifdef ENABLE_OPENACC
 ! Pack the send halo of two device fields, then post contiguous device-buffer messages
@@ -1243,7 +1244,7 @@ allocate(st%sbuf(max(1,nsb)), st%rbuf(max(1,nrb)))
 END SUBROUTINE g2g_cols_alloc
 #endif
 
-SUBROUTINE exchange_elem_end(partit)
+SUBROUTINE exchange_elem_end_x(partit)
 use MOD_MESH
 USE MOD_PARTIT
 use par_support_module, only: par_abort
@@ -1262,7 +1263,7 @@ type(t_partit), intent(inout), target :: partit
 #ifdef ENABLE_OPENACC
   if (g2g_cols(2)%pending) call g2g_cols_unpack(2, partit)
 #endif
-END SUBROUTINE exchange_elem_end
+END SUBROUTINE exchange_elem_end_x
 !=============================================================================
 subroutine exchange_elem3D(elem_array3D, partit, luse_g2g)
 use MOD_MESH
@@ -1280,7 +1281,7 @@ END SUBROUTINE exchange_elem3D
 !===========================================
 ! General version of the communication routine for 3D elemental fields
 ! stored in (vertical, horizontal) format
-subroutine exchange_elem3D_begin(elem_array3D, partit, luse_g2g)
+subroutine exchange_elem3D_begin_x(elem_array3D, partit, luse_g2g)
 use MOD_MESH
 USE MOD_PARTIT
 use par_support_module, only: par_abort
@@ -1484,7 +1485,7 @@ if (partit%npes> 1) then
 
 endif
 
-END SUBROUTINE exchange_elem3D_begin
+END SUBROUTINE exchange_elem3D_begin_x
 
 !=============================================================================
 ! General version of the communication routine for 3D elemental fields
@@ -1504,7 +1505,7 @@ logical,        intent(in),optional    :: luse_g2g
  endif
 END SUBROUTINE exchange_elem3D_n
 !=============================================================================
-subroutine exchange_elem3D_n_begin(elem_array3D, partit, luse_g2g)
+subroutine exchange_elem3D_n_begin_x(elem_array3D, partit, luse_g2g)
 ! General version of the communication routine for 3D elemental fields
 ! stored in (vertical, horizontal) format
 use MOD_MESH
@@ -1624,7 +1625,7 @@ end if
 
 
 endif
-END SUBROUTINE exchange_elem3D_n_begin
+END SUBROUTINE exchange_elem3D_n_begin_x
 !========================================================================
 ! General version of the communication routine for 3D elemental fields
 ! stored in (vertical, horizontal) format
@@ -1646,7 +1647,7 @@ END SUBROUTINE exchange_elem2D
 !========================================================================
 ! General version of the communication routine for 3D elemental fields
 ! stored in (vertical, horizontal) format
-subroutine exchange_elem2D_begin(elem_array2D, partit, luse_g2g)
+subroutine exchange_elem2D_begin_x(elem_array2D, partit, luse_g2g)
 use MOD_MESH
 USE MOD_PARTIT
 use par_support_module, only: par_abort
@@ -1745,7 +1746,7 @@ if (partit%npes> 1) then
 
 end if
 
-END SUBROUTINE exchange_elem2D_begin
+END SUBROUTINE exchange_elem2D_begin_x
 ! ========================================================================
 !Exchange with ALL(!) the neighbours
 subroutine exchange_elem2D_i(elem_array2D, partit, luse_g2g)
@@ -1766,7 +1767,7 @@ end if
 END SUBROUTINE exchange_elem2D_i
 !=============================================================================
 !Exchange with ALL(!) the neighbours
-subroutine exchange_elem2D_i_begin(elem_array2D, partit, luse_g2g)
+subroutine exchange_elem2D_i_begin_x(elem_array2D, partit, luse_g2g)
 use MOD_MESH
 USE MOD_PARTIT
 use par_support_module, only: par_abort
@@ -1825,7 +1826,7 @@ end if
 
 end if
 
-END SUBROUTINE exchange_elem2D_i_begin
+END SUBROUTINE exchange_elem2D_i_begin_x
 ! ========================================================================
 ! Broadcast routines
 ! Many because of different sizes.
@@ -3668,6 +3669,223 @@ END SUBROUTINE exchange_elem3D_fbin_begin
 
 ! ========================================================================
 
+
+! Timing wrapper (halo_timing): posting time of exchange_nod2D_i_begin_x
+subroutine exchange_nod2D_i_begin(nod_array2D, partit, luse_g2g)
+USE MOD_PARTIT
+IMPLICIT NONE
+integer,        intent(inout), target :: nod_array2D(:)
+type(t_partit), intent(inout), target :: partit
+logical,        intent(in),optional   :: luse_g2g
+real(real64) :: t0
+if (.not. ht_on) then
+   call exchange_nod2D_i_begin_x(nod_array2D, partit, luse_g2g)
+   return
+end if
+t0=MPI_Wtime()
+call exchange_nod2D_i_begin_x(nod_array2D, partit, luse_g2g)
+call ht_post(1, HT_NOD2D, 1, partit%com_nod2D%rPEnum, MPI_Wtime()-t0)
+END SUBROUTINE exchange_nod2D_i_begin
+
+! Timing wrapper (halo_timing): posting time of exchange_nod2D_begin_x
+subroutine exchange_nod2D_begin(nod_array2D, partit, luse_g2g)
+USE MOD_PARTIT
+IMPLICIT NONE
+real(kind=WP),   intent(inout), target :: nod_array2D(:)
+type(t_partit), intent(inout), target :: partit
+logical,        intent(in),optional   :: luse_g2g
+real(real64) :: t0
+if (.not. ht_on) then
+   call exchange_nod2D_begin_x(nod_array2D, partit, luse_g2g)
+   return
+end if
+t0=MPI_Wtime()
+call exchange_nod2D_begin_x(nod_array2D, partit, luse_g2g)
+call ht_post(1, HT_NOD2D, 1, partit%com_nod2D%rPEnum, MPI_Wtime()-t0)
+END SUBROUTINE exchange_nod2D_begin
+
+! Timing wrapper (halo_timing): posting time of exchange_nod2D_2fields_begin_x
+subroutine exchange_nod2D_2fields_begin(nod1_array2D, nod2_array2D, partit, luse_g2g)
+USE MOD_PARTIT
+IMPLICIT NONE
+real(kind=WP),   intent(inout), target :: nod1_array2D(:), nod2_array2D(:)
+type(t_partit), intent(inout), target :: partit
+logical,        intent(in),optional   :: luse_g2g
+real(real64) :: t0
+if (.not. ht_on) then
+   call exchange_nod2D_2fields_begin_x(nod1_array2D, nod2_array2D, partit, luse_g2g)
+   return
+end if
+t0=MPI_Wtime()
+call exchange_nod2D_2fields_begin_x(nod1_array2D, nod2_array2D, partit, luse_g2g)
+call ht_post(1, HT_NOD2D, 2, partit%com_nod2D%rPEnum, MPI_Wtime()-t0)
+END SUBROUTINE exchange_nod2D_2fields_begin
+
+! Timing wrapper (halo_timing): posting time of exchange_nod2D_3fields_begin_x
+subroutine exchange_nod2D_3fields_begin(nod1_array2D, nod2_array2D, nod3_array2D, partit, luse_g2g)
+USE MOD_PARTIT
+IMPLICIT NONE
+real(kind=WP),   intent(inout), target :: nod1_array2D(:), nod2_array2D(:), nod3_array2D(:)
+type(t_partit), intent(inout), target :: partit
+logical,        intent(in),optional   :: luse_g2g
+real(real64) :: t0
+if (.not. ht_on) then
+   call exchange_nod2D_3fields_begin_x(nod1_array2D, nod2_array2D, nod3_array2D, partit, luse_g2g)
+   return
+end if
+t0=MPI_Wtime()
+call exchange_nod2D_3fields_begin_x(nod1_array2D, nod2_array2D, nod3_array2D, partit, luse_g2g)
+call ht_post(1, HT_NOD2D, 3, partit%com_nod2D%rPEnum, MPI_Wtime()-t0)
+END SUBROUTINE exchange_nod2D_3fields_begin
+
+! Timing wrapper (halo_timing): posting time of exchange_nod3D_begin_x
+subroutine exchange_nod3D_begin(nod_array3D, partit, luse_g2g)
+USE MOD_PARTIT
+IMPLICIT NONE
+real(kind=WP),   intent(inout), target :: nod_array3D(:,:)
+type(t_partit), intent(inout), target :: partit
+logical,        intent(in),optional   :: luse_g2g
+real(real64) :: t0
+if (.not. ht_on) then
+   call exchange_nod3D_begin_x(nod_array3D, partit, luse_g2g)
+   return
+end if
+t0=MPI_Wtime()
+call exchange_nod3D_begin_x(nod_array3D, partit, luse_g2g)
+call ht_post(1, ht_kind(1, size(nod_array3D,1)), 1, partit%com_nod2D%rPEnum, MPI_Wtime()-t0)
+END SUBROUTINE exchange_nod3D_begin
+
+! Timing wrapper (halo_timing): posting time of exchange_nod3D_2fields_begin_x
+subroutine exchange_nod3D_2fields_begin(nod1_array3D, nod2_array3D, partit, luse_g2g)
+USE MOD_PARTIT
+IMPLICIT NONE
+real(kind=WP),   intent(inout), target :: nod1_array3D(:,:), nod2_array3D(:,:)
+type(t_partit), intent(inout), target :: partit
+logical,        intent(in),optional   :: luse_g2g
+real(real64) :: t0
+if (.not. ht_on) then
+   call exchange_nod3D_2fields_begin_x(nod1_array3D, nod2_array3D, partit, luse_g2g)
+   return
+end if
+t0=MPI_Wtime()
+call exchange_nod3D_2fields_begin_x(nod1_array3D, nod2_array3D, partit, luse_g2g)
+call ht_post(1, ht_kind(1, size(nod1_array3D,1)), 2, partit%com_nod2D%rPEnum, MPI_Wtime()-t0)
+END SUBROUTINE exchange_nod3D_2fields_begin
+
+! Timing wrapper (halo_timing): posting time of exchange_nod3D_n_begin_x
+subroutine exchange_nod3D_n_begin(nod_array3D, partit, luse_g2g)
+USE MOD_PARTIT
+IMPLICIT NONE
+real(kind=WP),   intent(inout), target :: nod_array3D(:,:,:)
+type(t_partit), intent(inout), target :: partit
+logical,        intent(in),optional   :: luse_g2g
+real(real64) :: t0
+if (.not. ht_on) then
+   call exchange_nod3D_n_begin_x(nod_array3D, partit, luse_g2g)
+   return
+end if
+t0=MPI_Wtime()
+call exchange_nod3D_n_begin_x(nod_array3D, partit, luse_g2g)
+call ht_post(1, ht_kind(1, size(nod_array3D,2)), 1, partit%com_nod2D%rPEnum, MPI_Wtime()-t0)
+END SUBROUTINE exchange_nod3D_n_begin
+
+! Timing wrapper (halo_timing): posting time of exchange_elem3D_begin_x
+subroutine exchange_elem3D_begin(elem_array3D, partit, luse_g2g)
+USE MOD_PARTIT
+IMPLICIT NONE
+real(kind=WP),   intent(inout), target :: elem_array3D(:,:)
+type(t_partit), intent(inout), target :: partit
+logical,        intent(in),optional   :: luse_g2g
+real(real64) :: t0
+if (.not. ht_on) then
+   call exchange_elem3D_begin_x(elem_array3D, partit, luse_g2g)
+   return
+end if
+t0=MPI_Wtime()
+call exchange_elem3D_begin_x(elem_array3D, partit, luse_g2g)
+call ht_post(2, ht_kind(2, size(elem_array3D,1)), 1, merge(partit%com_elem2D_full%rPEnum, partit%com_elem2D%rPEnum, partit%elem_full_flag), MPI_Wtime()-t0)
+END SUBROUTINE exchange_elem3D_begin
+
+! Timing wrapper (halo_timing): posting time of exchange_elem3D_n_begin_x
+subroutine exchange_elem3D_n_begin(elem_array3D, partit, luse_g2g)
+USE MOD_PARTIT
+IMPLICIT NONE
+real(kind=WP),   intent(inout), target :: elem_array3D(:,:,:)
+type(t_partit), intent(inout), target :: partit
+logical,        intent(in),optional   :: luse_g2g
+real(real64) :: t0
+if (.not. ht_on) then
+   call exchange_elem3D_n_begin_x(elem_array3D, partit, luse_g2g)
+   return
+end if
+t0=MPI_Wtime()
+call exchange_elem3D_n_begin_x(elem_array3D, partit, luse_g2g)
+call ht_post(2, ht_kind(2, size(elem_array3D,2)), 1, merge(partit%com_elem2D_full%rPEnum, partit%com_elem2D%rPEnum, partit%elem_full_flag), MPI_Wtime()-t0)
+END SUBROUTINE exchange_elem3D_n_begin
+
+! Timing wrapper (halo_timing): posting time of exchange_elem2D_begin_x
+subroutine exchange_elem2D_begin(elem_array2D, partit, luse_g2g)
+USE MOD_PARTIT
+IMPLICIT NONE
+real(kind=WP),   intent(inout), target :: elem_array2D(:)
+type(t_partit), intent(inout), target :: partit
+logical,        intent(in),optional   :: luse_g2g
+real(real64) :: t0
+if (.not. ht_on) then
+   call exchange_elem2D_begin_x(elem_array2D, partit, luse_g2g)
+   return
+end if
+t0=MPI_Wtime()
+call exchange_elem2D_begin_x(elem_array2D, partit, luse_g2g)
+call ht_post(2, HT_ELEM2D, 1, merge(partit%com_elem2D_full%rPEnum, partit%com_elem2D%rPEnum, partit%elem_full_flag), MPI_Wtime()-t0)
+END SUBROUTINE exchange_elem2D_begin
+
+! Timing wrapper (halo_timing): posting time of exchange_elem2D_i_begin_x
+subroutine exchange_elem2D_i_begin(elem_array2D, partit, luse_g2g)
+USE MOD_PARTIT
+IMPLICIT NONE
+integer,        intent(inout), target :: elem_array2D(:)
+type(t_partit), intent(inout), target :: partit
+logical,        intent(in),optional   :: luse_g2g
+real(real64) :: t0
+if (.not. ht_on) then
+   call exchange_elem2D_i_begin_x(elem_array2D, partit, luse_g2g)
+   return
+end if
+t0=MPI_Wtime()
+call exchange_elem2D_i_begin_x(elem_array2D, partit, luse_g2g)
+call ht_post(2, HT_ELEM2D, 1, merge(partit%com_elem2D_full%rPEnum, partit%com_elem2D%rPEnum, partit%elem_full_flag), MPI_Wtime()-t0)
+END SUBROUTINE exchange_elem2D_i_begin
+
+! Timing wrapper (halo_timing): completion time of exchange_nod_end_x
+SUBROUTINE exchange_nod_end(partit)
+USE MOD_PARTIT
+IMPLICIT NONE
+type(t_partit), intent(inout), target :: partit
+real(real64) :: t0
+if (.not. ht_on) then
+   call exchange_nod_end_x(partit)
+   return
+end if
+t0=MPI_Wtime()
+call exchange_nod_end_x(partit)
+call ht_done(1, MPI_Wtime()-t0)
+END SUBROUTINE exchange_nod_end
+
+! Timing wrapper (halo_timing): completion time of exchange_elem_end_x
+SUBROUTINE exchange_elem_end(partit)
+USE MOD_PARTIT
+IMPLICIT NONE
+type(t_partit), intent(inout), target :: partit
+real(real64) :: t0
+if (.not. ht_on) then
+   call exchange_elem_end_x(partit)
+   return
+end if
+t0=MPI_Wtime()
+call exchange_elem_end_x(partit)
+call ht_done(2, MPI_Wtime()-t0)
+END SUBROUTINE exchange_elem_end
 end module g_comm
 
 
