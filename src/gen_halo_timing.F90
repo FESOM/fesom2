@@ -4,7 +4,7 @@
 ! (exchange_nod_end / exchange_elem_end: MPI_Waitall and device unpacking), by kind: nodal or
 ! elemental, 2D (one value per point, or up to four values) or 3D (levels). Report: slowest rank
 ! and mean over ranks, written by rank 0 in fesom_finalize.
-module halo_timing
+module halo_timing_mod
   use mpi
   use, intrinsic :: iso_fortran_env, only: real64, int64
   implicit none
@@ -96,4 +96,4 @@ contains
     write(*,'(a)') '   (messages = fields x receiving neighbours on the busiest rank; for the global sums'
     write(*,'(a)') '    "wait" is the whole MPI_Allreduce)'
   end subroutine ht_report
-end module halo_timing
+end module halo_timing_mod

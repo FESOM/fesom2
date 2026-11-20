@@ -13,7 +13,7 @@ module fesom_main_storage_module
   use g_clock
   use g_config
   use g_comm_auto
-  use halo_timing, only: ht_start, ht_report
+  use halo_timing_mod, only: ht_start, ht_report
   use g_forcing_arrays
   use io_RESTART
   use io_MEANDATA

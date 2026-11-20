@@ -18,7 +18,7 @@ module g_comm
 
   use, intrinsic :: ISO_FORTRAN_ENV, only: int16, int32, real32, real64
   use o_PARAM, only: WP
-  use halo_timing
+  use halo_timing_mod
 #ifdef ENABLE_OPENACC
   use, intrinsic :: iso_c_binding, only: c_ptr, c_loc, c_f_pointer
 #endif
