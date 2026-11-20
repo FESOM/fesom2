@@ -13,7 +13,7 @@ module fesom_main_storage_module
   use g_clock
   use g_config
   use g_comm_auto
-  use halo_timing_mod, only: ht_start, ht_report
+  use halo_timing_mod, only: ht_start, ht_report, ht_phase, ht_step, ht_on
   use g_forcing_arrays
   use io_RESTART
   use io_MEANDATA
@@ -62,7 +62,7 @@ module fesom_main_storage_module
 #if defined(__recom)
   use fesom_conservation_module, only: conservation_recom
 #endif
-  use, intrinsic :: iso_fortran_env, only : real32
+  use, intrinsic :: iso_fortran_env, only : real32, real64
   use g_forcing_param, only: use_landice_water, use_age_tracer
   use oce_landice_water_module, only: landice_water_init
   use oce_age_tracer_module, only: age_tracer_init
@@ -1097,6 +1097,7 @@ contains
         
         !___model sea-ice step__________________________________________________
         f%t_ice_s = MPI_Wtime()
+        call ht_phase(1)
         if(use_ice) then
             !___compute fluxes from ocean to ice________________________________
 #if defined(__recom) && defined(__usetp)
@@ -1176,6 +1177,7 @@ contains
             call oce_fluxes(f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
             f%t_ice_e = MPI_Wtime()
         end if
+        call ht_phase(0)
 
         if(use_ice) then
             !___freshwater depth hosing routine_______________________________________
@@ -1261,6 +1263,7 @@ contains
 
         if (conservation_freq > 0) call conservation_before_step(f%partit, f%tracers, f%mesh)
         f%t_oce_s = MPI_Wtime()
+        call ht_phase(2)
 #if defined (FESOM_PROFILING)
         call fesom_profiler_start("oce_timestep_ale")
 #endif
@@ -1306,6 +1309,7 @@ contains
 #endif
         if (conservation_freq > 0) call conservation_after_step(n, f%partit, f%tracers, f%mesh)
         f%t_oce_e = MPI_Wtime()
+        call ht_phase(0)
         
         !___compute energy diagnostics..._______________________________________
 #if defined(__recom) && defined(__usetp)
@@ -1450,6 +1454,14 @@ contains
         end if 
         
         f%rtime_oce_full      = f%rtime_oce_full      + f%t_oce_e      - f%t_oce_s
+        if (ht_on) then
+            if (use_ice) then
+                call ht_step(count(f%ice%data(1)%values(1:f%partit%myDim_nod2D) > 0._WP .and. &
+                                   f%ice%data(2)%values(1:f%partit%myDim_nod2D) > 0._WP))
+            else
+                call ht_step(0)
+            end if
+        end if
         
         if (use_icebergs) then 
             f%rtime_iceb_full = f%rtime_iceb_full + f%t_iceb_e-f%t_iceb_s + f%t_iceb_e0-f%t_iceb_s0 + f%t_iceb_e1-f%t_iceb_s1 
@@ -1522,7 +1534,22 @@ contains
     ! par_finalize. In the OpenIFS-coupled build par_finalize calls oasis_terminate, which finalizes
     ! MPI, so a report after it aborts every rank ("MPI_Comm_f2c() was called after
     ! MPI_FINALIZE") once the run is otherwise complete.
-    call ht_report(f%partit%MPI_COMM_FESOM, f%partit%mype, f%partit%npes)
+    if (ht_on) then
+        associate(p => f%partit, m => f%mesh)
+        call ht_report(p%MPI_COMM_FESOM, p%mype, p%npes, &
+             [real(p%myDim_nod2D, real64), &
+              real(sum(m%nlevels_nod2D(1:p%myDim_nod2D) - m%ulevels_nod2D(1:p%myDim_nod2D)), real64), &
+              real(p%myDim_elem2D, real64), &
+              real(sum(m%nlevels(1:p%myDim_elem2D) - m%ulevels(1:p%myDim_elem2D)), real64), &
+              real(p%eDim_nod2D, real64), &
+              real(sum(m%nlevels_nod2D(p%myDim_nod2D+1:p%myDim_nod2D+p%eDim_nod2D) &
+                     - m%ulevels_nod2D(p%myDim_nod2D+1:p%myDim_nod2D+p%eDim_nod2D)), real64), &
+              real(p%com_nod2D%rPEnum, real64), &
+              real(f%rtime_ice_full, real64), real(f%rtime_oce_full, real64)], &
+             [character(len=12) :: 'own_nod', 'own_nod_lay', 'own_elem', 'own_elem_lay', 'halo_nod', &
+              'halo_nod_lay', 'neigh_nod', 't_ice', 't_oce'])
+        end associate
+    end if
 #if defined (FESOM_PROFILING)
         call fesom_profiler_end("fesom_finalize_total")
         call fesom_profiler_report(f%MPI_COMM_FESOM, f%mype)
