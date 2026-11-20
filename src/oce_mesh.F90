@@ -69,6 +69,7 @@ IMPLICIT NONE
       if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call find_levels_min_e2n'//achar(27)//'[0m'
       call find_levels_min_e2n(partit, mesh)
       if (halo_wet_levels) call init_mpi_types_wet(partit, mesh)
+      partit%halo_pack = halo_pack_fields
       
       if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call mesh_areas'//achar(27)//'[0m'
       call mesh_areas(partit, mesh)

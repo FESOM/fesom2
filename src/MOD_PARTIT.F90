@@ -135,6 +135,8 @@ TYPE T_PARTIT
   logical :: elem_full_flag
   ! 3D halo exchange of wet levels only (halo_wet_levels): level bounds of all local points
   logical :: halo_wet = .false.
+  ! halo exchanges through packed buffers, one message per neighbour for all fields (halo_pack_fields)
+  logical :: halo_pack = .false.
   integer :: wet_nl = 0
   integer, allocatable :: wet_ulev_nod(:), wet_nlev_nod(:), wet_ulev_elem(:), wet_nlev_elem(:)
 

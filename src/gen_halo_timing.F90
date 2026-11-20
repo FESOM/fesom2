@@ -61,15 +61,17 @@ contains
     end if
   end function ht_kind
 
-  subroutine ht_post(side, cat, nfields, nneigh, dt)
+  ! packed: all fields of the exchange travel in one message per neighbour
+  subroutine ht_post(side, cat, nfields, nneigh, dt, packed)
     integer,      intent(in) :: side, cat, nfields, nneigh
     real(real64), intent(in) :: dt
+    logical,      intent(in) :: packed
     pending(side) = cat
     if (ht_sites) call fesom_halo_site(cat, 0, nfields, dt)
     t_post(cat)  = t_post(cat) + dt
     n_call(cat)  = n_call(cat) + 1
     n_field(cat) = n_field(cat) + nfields
-    n_msg(cat)   = n_msg(cat) + int(nfields, int64)*nneigh
+    n_msg(cat)   = n_msg(cat) + merge(1, nfields, packed)*int(nneigh, int64)
   end subroutine ht_post
 
   subroutine ht_done(side, dt)

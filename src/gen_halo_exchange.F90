@@ -19,9 +19,7 @@ module g_comm
   use, intrinsic :: ISO_FORTRAN_ENV, only: int16, int32, real32, real64
   use o_PARAM, only: WP
   use halo_timing
-#ifdef ENABLE_OPENACC
   use, intrinsic :: iso_c_binding, only: c_ptr, c_loc, c_f_pointer
-#endif
 
   implicit none
 
@@ -34,6 +32,7 @@ module g_comm
   real(kind=WP), pointer             :: g2g_f1(:) => null(), g2g_f2(:) => null()
   logical                            :: g2g_unpack_pending = .false.
   integer                            :: g2g_nfields = 0
+#endif
   ! The same for whole columns (3D fields, several values per point) of nodal (kind 1) and elemental
   ! (kind 2) fields, one message per neighbour; unpacked in exchange_nod_end / exchange_elem_end.
   type g2g_cols_state
@@ -50,7 +49,7 @@ module g_comm
      integer,       allocatable :: wtop_r(:), wcnt_r(:,:), wpre_r(:,:)
   end type g2g_cols_state
   type(g2g_cols_state), target :: g2g_cols(2)
-#endif
+  logical :: pk_last = .false.   ! the last exchange_*_begin went through the packed path (halo_timing)
 
 contains
 
@@ -212,6 +211,12 @@ end if
           partit%com_nod2D%rPE, partit%com_nod2D%sPE)
 #endif
 
+#ifndef ENABLE_OPENACC
+     if (partit%halo_pack .and. is_contiguous(nod_array2D)) then
+        call g2g_cols_begin(1, 1, size(nod_array2D), partit, nod_array2D)
+        return
+     end if
+#endif
      if(lg2g) then
 #ifdef ENABLE_OPENACC
          call g2g_exchange_1field_begin(nod_array2D, partit)
@@ -293,6 +298,12 @@ if (partit%npes > 1) then
 #ifdef DEBUG
      call check_mpi_comm(rn, sn, partit%r_mpitype_nod2D, partit%s_mpitype_nod2D,           &
           partit%com_nod2D%rPE, partit%com_nod2D%sPE)
+#endif
+#ifndef ENABLE_OPENACC
+  if (partit%halo_pack .and. is_contiguous(nod1_array2D) .and. is_contiguous(nod2_array2D)) then
+     call g2g_cols_begin(1, 1, size(nod1_array2D), partit, nod1_array2D, nod2_array2D)
+     return
+  end if
 #endif
   if (lg2g) then 
 #ifdef ENABLE_OPENACC
@@ -393,6 +404,12 @@ end if
           partit%com_nod2D%rPE, partit%com_nod2D%sPE)
 #endif
 
+#ifndef ENABLE_OPENACC
+  if (partit%halo_pack .and. is_contiguous(nod1_array2D) .and. is_contiguous(nod2_array2D) .and. is_contiguous(nod3_array2D)) then
+     call g2g_cols_begin(1, 1, size(nod1_array2D), partit, nod1_array2D, nod2_array2D, nod3_array2D)
+     return
+  end if
+#endif
   if (lg2g) then
 #ifdef ENABLE_OPENACC
      call g2g_cols_begin(1, 1, size(nod1_array2D), partit, nod1_array2D, nod2_array2D, nod3_array2D)
@@ -511,6 +528,13 @@ end if
     call check_mpi_comm(rn, sn, partit%r_mpitype_nod3D(:,nl1,1), partit%s_mpitype_nod3D(:,nl1,1), &
          partit%com_nod2D%rPE, partit%com_nod2D%sPE)
 #endif
+#ifndef ENABLE_OPENACC
+    if (partit%halo_pack .and. is_contiguous(nod_array3D)) then
+       call g2g_cols_begin(1, size(nod_array3D,1), size(nod_array3D,2), partit, nod_array3D, &
+            nlev=size(nod_array3D,1), nval=1)
+       return
+    end if
+#endif
     if(lg2g) then
 #ifdef ENABLE_OPENACC
        call g2g_cols_begin(1, size(nod_array3D,1), size(nod_array3D,2), partit, nod_array3D, &
@@ -614,6 +638,13 @@ end if
          partit%com_nod2D%rPE, partit%com_nod2D%sPE)
 #endif
 
+#ifndef ENABLE_OPENACC
+  if (partit%halo_pack .and. is_contiguous(nod1_array3D) .and. is_contiguous(nod2_array3D)) then
+     call g2g_cols_begin(1, size(nod1_array3D,1), size(nod1_array3D,2), partit, nod1_array3D, nod2_array3D, &
+          nlev=size(nod1_array3D,1), nval=1)
+     return
+  end if
+#endif
   if(lg2g) then 
 #ifdef ENABLE_OPENACC
      call g2g_cols_begin(1, size(nod1_array3D,1), size(nod1_array3D,2), partit, nod1_array3D, nod2_array3D, &
@@ -725,6 +756,13 @@ if (partit%npes>1) then
        partit%s_mpitype_nod3D(:,nl1,n_val), partit%com_nod2D%rPE, partit%com_nod2D%sPE)
 #endif
 
+#ifndef ENABLE_OPENACC
+  if (partit%halo_pack .and. is_contiguous(nod_array3D)) then
+     call g2g_cols_begin(1, size(nod_array3D,1)*size(nod_array3D,2), size(nod_array3D,3), partit, nod_array3D, &
+          nlev=size(nod_array3D,2), nval=size(nod_array3D,1))
+     return
+  end if
+#endif
   if(lg2g) then
 #ifdef ENABLE_OPENACC
      call g2g_cols_begin(1, size(nod_array3D,1)*size(nod_array3D,2), size(nod_array3D,3), partit, nod_array3D, &
@@ -778,8 +816,8 @@ if (partit%npes > 1) &
   call MPI_WAITALL(partit%com_nod2D%nreq, partit%com_nod2D%req, MPI_STATUSES_IGNORE, partit%MPIerr)
 #ifdef ENABLE_OPENACC
 if (g2g_unpack_pending) call g2g_unpack_2fields(partit)
-if (g2g_cols(1)%pending) call g2g_cols_unpack(1, partit)
 #endif
+if (g2g_cols(1)%pending) call g2g_cols_unpack(1, partit)
 
 END SUBROUTINE exchange_nod_end_x
 
@@ -829,6 +867,7 @@ g2g_f1 => f1
 g2g_f2 => f2
 g2g_nfields = 2
 g2g_unpack_pending = .true.
+pk_last=.true.
 END SUBROUTINE g2g_exchange_2fields_begin
 
 ! The same for one field (requests and tags as in exchange_nod2D_begin).
@@ -869,6 +908,7 @@ end do
 g2g_f1 => f1
 g2g_nfields = 1
 g2g_unpack_pending = .true.
+pk_last=.true.
 END SUBROUTINE g2g_exchange_1field_begin
 
 ! Buffers for two fields and the send/receive node lists on the device, once.
@@ -914,6 +954,7 @@ g2g_unpack_pending = .false.
 g2g_nfields = 0
 nullify(g2g_f1, g2g_f2)
 END SUBROUTINE g2g_unpack_2fields
+#endif
 
 ! Packed device exchange of nf (1-3) contiguous device fields over the nodal (kind=1) or elemental (kind=2)
 ! halo: whole columns of the listed points, same values as the MPI indexed datatypes, one message per neighbour.
@@ -1002,6 +1043,7 @@ com%nreq=rn+sn
 st%nf=nf
 st%inner=inner
 st%ntot=ntot
+pk_last=.true.
 st%pending=.true.
 END SUBROUTINE g2g_cols_begin
 
@@ -1135,6 +1177,7 @@ st%ntot=ntot
 st%nval=nval
 st%lay=lay
 st%wet=.true.
+pk_last=.true.
 st%pending=.true.
 END SUBROUTINE g2g_cols_wet_begin
 
@@ -1244,7 +1287,6 @@ end if
 allocate(st%sbuf(max(1,nsb)), st%rbuf(max(1,nrb)))
 !$ACC ENTER DATA CREATE(st%sbuf, st%rbuf)
 END SUBROUTINE g2g_cols_alloc
-#endif
 
 SUBROUTINE exchange_elem_end_x(partit)
 use MOD_MESH
@@ -1262,9 +1304,7 @@ type(t_partit), intent(inout), target :: partit
              partit%com_elem2D%req, MPI_STATUSES_IGNORE, partit%MPIerr)
      endif
   end if
-#ifdef ENABLE_OPENACC
   if (g2g_cols(2)%pending) call g2g_cols_unpack(2, partit)
-#endif
 END SUBROUTINE exchange_elem_end_x
 !=============================================================================
 subroutine exchange_elem3D(elem_array3D, partit, luse_g2g)
@@ -1319,6 +1359,13 @@ if (partit%npes> 1) then
               partit%com_elem2D%rPE, partit%com_elem2D%sPE)
 #endif
 
+#ifndef ENABLE_OPENACC
+        if (partit%halo_pack .and. is_contiguous(elem_array3D)) then
+           call g2g_cols_begin(2, size(elem_array3D,1), size(elem_array3D,2), partit, elem_array3D, &
+                nlev=size(elem_array3D,1), nval=1)
+           return
+        end if
+#endif
         if(lg2g) then
 #ifdef ENABLE_OPENACC
            call g2g_cols_begin(2, size(elem_array3D,1), size(elem_array3D,2), partit, elem_array3D, &
@@ -1356,6 +1403,12 @@ if (partit%npes> 1) then
 #ifdef DEBUG
          call check_mpi_comm(rn, sn, partit%r_mpitype_elem2D(:,nl1), partit%s_mpitype_elem2D(:,nl1), &
               partit%com_elem2D%rPE, partit%com_elem2D%sPE)
+#endif
+#ifndef ENABLE_OPENACC
+        if (partit%halo_pack .and. is_contiguous(elem_array3D)) then
+           call g2g_cols_begin(2, size(elem_array3D,1), size(elem_array3D,2), partit, elem_array3D)
+           return
+        end if
 #endif
         if(lg2g) then
 #ifdef ENABLE_OPENACC
@@ -1557,6 +1610,13 @@ end if
      call check_mpi_comm(rn, sn, partit%r_mpitype_elem3D(:,nl1,n_val), &
           partit%s_mpitype_elem3D(:,nl1,n_val), partit%com_elem2D%rPE, partit%com_elem2D%sPE)
 #endif
+#ifndef ENABLE_OPENACC
+     if (partit%halo_pack .and. is_contiguous(elem_array3D)) then
+        call g2g_cols_begin(2, size(elem_array3D,1)*size(elem_array3D,2), size(elem_array3D,3), partit, elem_array3D, &
+             nlev=size(elem_array3D,2), nval=size(elem_array3D,1))
+        return
+     end if
+#endif
      if(lg2g) then
 #ifdef ENABLE_OPENACC
         call g2g_cols_begin(2, size(elem_array3D,1)*size(elem_array3D,2), size(elem_array3D,3), partit, elem_array3D, &
@@ -1680,6 +1740,12 @@ if (partit%npes> 1) then
           partit%com_elem2D%rPE, partit%com_elem2D%sPE)
 #endif
 
+#ifndef ENABLE_OPENACC
+     if (partit%halo_pack .and. is_contiguous(elem_array2D)) then
+        call g2g_cols_begin(2, 1, size(elem_array2D), partit, elem_array2D)
+        return
+     end if
+#endif
      if(lg2g) then
 #ifdef ENABLE_OPENACC
         call g2g_cols_begin(2, 1, size(elem_array2D), partit, elem_array2D)
@@ -3684,8 +3750,9 @@ if (.not. ht_on) then
    return
 end if
 t0=MPI_Wtime()
+pk_last=.false.
 call exchange_nod2D_i_begin_x(nod_array2D, partit, luse_g2g)
-call ht_post(1, HT_NOD2D, 1, partit%com_nod2D%rPEnum, MPI_Wtime()-t0)
+call ht_post(1, HT_NOD2D, 1, partit%com_nod2D%rPEnum, MPI_Wtime()-t0, pk_last)
 END SUBROUTINE exchange_nod2D_i_begin
 
 ! Timing wrapper (halo_timing): posting time of exchange_nod2D_begin_x
@@ -3701,8 +3768,9 @@ if (.not. ht_on) then
    return
 end if
 t0=MPI_Wtime()
+pk_last=.false.
 call exchange_nod2D_begin_x(nod_array2D, partit, luse_g2g)
-call ht_post(1, HT_NOD2D, 1, partit%com_nod2D%rPEnum, MPI_Wtime()-t0)
+call ht_post(1, HT_NOD2D, 1, partit%com_nod2D%rPEnum, MPI_Wtime()-t0, pk_last)
 END SUBROUTINE exchange_nod2D_begin
 
 ! Timing wrapper (halo_timing): posting time of exchange_nod2D_2fields_begin_x
@@ -3718,8 +3786,9 @@ if (.not. ht_on) then
    return
 end if
 t0=MPI_Wtime()
+pk_last=.false.
 call exchange_nod2D_2fields_begin_x(nod1_array2D, nod2_array2D, partit, luse_g2g)
-call ht_post(1, HT_NOD2D, 2, partit%com_nod2D%rPEnum, MPI_Wtime()-t0)
+call ht_post(1, HT_NOD2D, 2, partit%com_nod2D%rPEnum, MPI_Wtime()-t0, pk_last)
 END SUBROUTINE exchange_nod2D_2fields_begin
 
 ! Timing wrapper (halo_timing): posting time of exchange_nod2D_3fields_begin_x
@@ -3735,8 +3804,9 @@ if (.not. ht_on) then
    return
 end if
 t0=MPI_Wtime()
+pk_last=.false.
 call exchange_nod2D_3fields_begin_x(nod1_array2D, nod2_array2D, nod3_array2D, partit, luse_g2g)
-call ht_post(1, HT_NOD2D, 3, partit%com_nod2D%rPEnum, MPI_Wtime()-t0)
+call ht_post(1, HT_NOD2D, 3, partit%com_nod2D%rPEnum, MPI_Wtime()-t0, pk_last)
 END SUBROUTINE exchange_nod2D_3fields_begin
 
 ! Timing wrapper (halo_timing): posting time of exchange_nod3D_begin_x
@@ -3752,8 +3822,9 @@ if (.not. ht_on) then
    return
 end if
 t0=MPI_Wtime()
+pk_last=.false.
 call exchange_nod3D_begin_x(nod_array3D, partit, luse_g2g)
-call ht_post(1, ht_kind(1, size(nod_array3D,1)), 1, partit%com_nod2D%rPEnum, MPI_Wtime()-t0)
+call ht_post(1, ht_kind(1, size(nod_array3D,1)), 1, partit%com_nod2D%rPEnum, MPI_Wtime()-t0, pk_last)
 END SUBROUTINE exchange_nod3D_begin
 
 ! Timing wrapper (halo_timing): posting time of exchange_nod3D_2fields_begin_x
@@ -3769,8 +3840,9 @@ if (.not. ht_on) then
    return
 end if
 t0=MPI_Wtime()
+pk_last=.false.
 call exchange_nod3D_2fields_begin_x(nod1_array3D, nod2_array3D, partit, luse_g2g)
-call ht_post(1, ht_kind(1, size(nod1_array3D,1)), 2, partit%com_nod2D%rPEnum, MPI_Wtime()-t0)
+call ht_post(1, ht_kind(1, size(nod1_array3D,1)), 2, partit%com_nod2D%rPEnum, MPI_Wtime()-t0, pk_last)
 END SUBROUTINE exchange_nod3D_2fields_begin
 
 ! Timing wrapper (halo_timing): posting time of exchange_nod3D_n_begin_x
@@ -3786,8 +3858,9 @@ if (.not. ht_on) then
    return
 end if
 t0=MPI_Wtime()
+pk_last=.false.
 call exchange_nod3D_n_begin_x(nod_array3D, partit, luse_g2g)
-call ht_post(1, ht_kind(1, size(nod_array3D,2)), 1, partit%com_nod2D%rPEnum, MPI_Wtime()-t0)
+call ht_post(1, ht_kind(1, size(nod_array3D,2)), 1, partit%com_nod2D%rPEnum, MPI_Wtime()-t0, pk_last)
 END SUBROUTINE exchange_nod3D_n_begin
 
 ! Timing wrapper (halo_timing): posting time of exchange_elem3D_begin_x
@@ -3803,8 +3876,9 @@ if (.not. ht_on) then
    return
 end if
 t0=MPI_Wtime()
+pk_last=.false.
 call exchange_elem3D_begin_x(elem_array3D, partit, luse_g2g)
-call ht_post(2, ht_kind(2, size(elem_array3D,1)), 1, merge(partit%com_elem2D_full%rPEnum, partit%com_elem2D%rPEnum, partit%elem_full_flag), MPI_Wtime()-t0)
+call ht_post(2, ht_kind(2, size(elem_array3D,1)), 1, merge(partit%com_elem2D_full%rPEnum, partit%com_elem2D%rPEnum, partit%elem_full_flag), MPI_Wtime()-t0, pk_last)
 END SUBROUTINE exchange_elem3D_begin
 
 ! Timing wrapper (halo_timing): posting time of exchange_elem3D_n_begin_x
@@ -3820,8 +3894,9 @@ if (.not. ht_on) then
    return
 end if
 t0=MPI_Wtime()
+pk_last=.false.
 call exchange_elem3D_n_begin_x(elem_array3D, partit, luse_g2g)
-call ht_post(2, ht_kind(2, size(elem_array3D,2)), 1, merge(partit%com_elem2D_full%rPEnum, partit%com_elem2D%rPEnum, partit%elem_full_flag), MPI_Wtime()-t0)
+call ht_post(2, ht_kind(2, size(elem_array3D,2)), 1, merge(partit%com_elem2D_full%rPEnum, partit%com_elem2D%rPEnum, partit%elem_full_flag), MPI_Wtime()-t0, pk_last)
 END SUBROUTINE exchange_elem3D_n_begin
 
 ! Timing wrapper (halo_timing): posting time of exchange_elem2D_begin_x
@@ -3837,8 +3912,9 @@ if (.not. ht_on) then
    return
 end if
 t0=MPI_Wtime()
+pk_last=.false.
 call exchange_elem2D_begin_x(elem_array2D, partit, luse_g2g)
-call ht_post(2, HT_ELEM2D, 1, merge(partit%com_elem2D_full%rPEnum, partit%com_elem2D%rPEnum, partit%elem_full_flag), MPI_Wtime()-t0)
+call ht_post(2, HT_ELEM2D, 1, merge(partit%com_elem2D_full%rPEnum, partit%com_elem2D%rPEnum, partit%elem_full_flag), MPI_Wtime()-t0, pk_last)
 END SUBROUTINE exchange_elem2D_begin
 
 ! Timing wrapper (halo_timing): posting time of exchange_elem2D_i_begin_x
@@ -3854,8 +3930,9 @@ if (.not. ht_on) then
    return
 end if
 t0=MPI_Wtime()
+pk_last=.false.
 call exchange_elem2D_i_begin_x(elem_array2D, partit, luse_g2g)
-call ht_post(2, HT_ELEM2D, 1, merge(partit%com_elem2D_full%rPEnum, partit%com_elem2D%rPEnum, partit%elem_full_flag), MPI_Wtime()-t0)
+call ht_post(2, HT_ELEM2D, 1, merge(partit%com_elem2D_full%rPEnum, partit%com_elem2D%rPEnum, partit%elem_full_flag), MPI_Wtime()-t0, pk_last)
 END SUBROUTINE exchange_elem2D_i_begin
 
 ! Timing wrapper (halo_timing): completion time of exchange_nod_end_x
