@@ -587,7 +587,9 @@ subroutine cheb_setup(solverinfo, partit, mesh)
      ! Rayleigh quotient v.Av / v.Dv
      sbuf(1) = sum(real(v(1:n),WP_full)*real(w(1:n),WP_full))
      sbuf(2) = sum(real(v(1:n),WP_full)**2 / real(cheb_dinv(1:n),WP_full))
+     if (ht_on) call ht_sum_mark()
      call MPI_Allreduce(MPI_IN_PLACE, sbuf, 2, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+     if (ht_on) call ht_sum_done()
      lam = sbuf(1)/sbuf(2)
      v(1:n) = real(real(cheb_dinv(1:n),WP_full)*real(w(1:n),WP_full)/lam, WP)
   end do
@@ -773,7 +775,9 @@ subroutine ssh_cg1_iterate(x, rhs, solverinfo, partit, mesh, iter, converged, sp
   if (.not. allocated(cg1_s)) allocate(cg1_s(n))
 
   s_old = sum(real(rhs(1:n), WP_full) * real(rhs(1:n), WP_full))
+  if (ht_on) call ht_sum_mark()
   call MPI_Allreduce(MPI_IN_PLACE, s_old, 1, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+  if (ht_on) call ht_sum_done()
   rtol=solverinfo%soltol*sqrt(s_old/real(mesh%nod2D,WP_full))
 
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row)
@@ -795,7 +799,9 @@ subroutine ssh_cg1_iterate(x, rhs, solverinfo, partit, mesh, iter, converged, sp
 !$OMP END PARALLEL DO
   s3(1) = sum(real(rr(1:n), WP_full) * real(zz(1:n), WP_full))
   s3(2) = sum(real(zz(1:n), WP_full) * real(App(1:n), WP_full))
+  if (ht_on) call ht_sum_mark()
   call MPI_Allreduce(MPI_IN_PLACE, s3, 2, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+  if (ht_on) call ht_sum_done()
   s_old = s3(1)
   dlt   = s3(2)
 
@@ -828,7 +834,9 @@ subroutine ssh_cg1_iterate(x, rhs, solverinfo, partit, mesh, iter, converged, sp
      s3(1) = sum(real(rr(1:n), WP_full) * real(zz(1:n), WP_full))
      s3(2) = sum(real(App(1:n), WP_full) * real(zz(1:n), WP_full))
      s3(3) = sum(real(rr(1:n), WP_full) * real(rr(1:n), WP_full))
+     if (ht_on) call ht_sum_mark()
      call MPI_Allreduce(MPI_IN_PLACE, s3, 3, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+     if (ht_on) call ht_sum_done()
      gam      = s3(1)
      dlt      = s3(2)
      sprod(1) = s3(1)
@@ -935,7 +943,9 @@ subroutine ssh_cg1_iterate_acc(x, rhs, solverinfo, partit, mesh, iter, converged
   do row=1, nrow
      s_old = s_old + real(rhs(row),WP_full)*real(rhs(row),WP_full)
   end do
+  if (ht_on) call ht_sum_mark()
   call MPI_Allreduce(MPI_IN_PLACE, s_old, 1, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+  if (ht_on) call ht_sum_done()
   rtol=solverinfo%soltol*sqrt(s_old/real(mesh%nod2D,WP_full))
 
   !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(acc, j)
@@ -966,7 +976,9 @@ subroutine ssh_cg1_iterate_acc(x, rhs, solverinfo, partit, mesh, iter, converged
   end do
   sprod(1)=sa
   sprod(2)=sb
+  if (ht_on) call ht_sum_mark()
   call MPI_Allreduce(MPI_IN_PLACE, sprod, 2, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+  if (ht_on) call ht_sum_done()
   s_old=sprod(1)
   dlt  =sprod(2)
 
@@ -1006,7 +1018,9 @@ subroutine ssh_cg1_iterate_acc(x, rhs, solverinfo, partit, mesh, iter, converged
         sc = sc + real(rr(row),WP_full)*real(rr(row),WP_full)
      end do
      s3 = (/ sa, sb, sc /)
+     if (ht_on) call ht_sum_mark()
      call MPI_Allreduce(MPI_IN_PLACE, s3, 3, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+     if (ht_on) call ht_sum_done()
      gam      = s3(1)
      dlt      = s3(2)
      sprod(1) = s3(1)
