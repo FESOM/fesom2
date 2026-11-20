@@ -44,13 +44,31 @@
 #if METIS_VERSION == 5 /* ---------------- METIS 5 part ------------------------ */
 #include "metis.h"
 
+/* Optional sea-ice classes per node (0 none, 1..g_nice), balanced as extra constraints */
+static idx_t *g_ice = NULL;
+static int g_nice = 0;
+
+void set_partit_ice(idx_t *ice, idx_t nice)
+{
+  g_ice = ice;
+  g_nice = nice;
+}
+
+static void partit_rec(idx_t *n, idx_t *ptr, idx_t *adj, idx_t *wgt, idx_t *ice, idx_t *np, idx_t *part);
+
 void do_partit(idx_t *n, idx_t *ptr, idx_t *adj, idx_t *wgt, idx_t *np, idx_t *part)
+{
+  partit_rec(n, ptr, adj, wgt, g_ice, np, part);
+}
+
+static void partit_rec(idx_t *n, idx_t *ptr, idx_t *adj, idx_t *wgt, idx_t *ice, idx_t *np, idx_t *part)
 {
   int i, j, wgt_type;
   idx_t opt[METIS_NOPTIONS];
   idx_t ncon, ec;
   idx_t *wgt_2d3d = NULL;
   idx_t *wgt_edge = NULL;
+  real_t *ubvec = NULL;
   int ierr;
   int n_levels, n_part_low = 1;     /* Number of lower hierarchy levels and partitions in them */
 
@@ -70,7 +88,7 @@ void do_partit(idx_t *n, idx_t *ptr, idx_t *adj, idx_t *wgt, idx_t *np, idx_t *p
     for (i = 0; i < *n; i++)
       part[i] = 0;
     if (current_level < n_levels - 1)
-      do_partit(n, ptr, adj, wgt, np, part);
+      partit_rec(n, ptr, adj, wgt, ice, np, part);
     current_level--;
     return;
   }
@@ -197,6 +215,40 @@ void do_partit(idx_t *n, idx_t *ptr, idx_t *adj, idx_t *wgt, idx_t *np, idx_t *p
     printf("Wrong weighting option for partitioning\n");
     exit(1);
   }
+
+  if (ice != NULL && g_nice > 0)
+  {
+    idx_t tot[2] = {0, 0}, nb = ncon, *w;
+    int c, k, nact = 0, act[2];
+    for (i=0; i<*n; i++)
+      if (ice[i] > 0) tot[ice[i]-1]++;
+    for (c=0; c<g_nice; c++)
+      if (tot[c] > 0) act[nact++] = c+1;
+    if (nact > 0)
+    {
+      w = (idx_t*) malloc(*n*(nb+nact)*sizeof(idx_t));
+      ubvec = (real_t*) malloc((nb+nact)*sizeof(real_t));
+      if (w == NULL || ubvec == NULL)
+      {
+        printf("Error allocating dynamic memory for sea-ice constraints!\n");
+        exit(1);
+      }
+      for (i=0; i<*n; i++)
+      {
+        for (k=0; k<nb; k++)
+          w[i*(nb+nact)+k] = wgt_2d3d != NULL ? wgt_2d3d[i*nb+k] : 1;
+        for (k=0; k<nact; k++)
+          w[i*(nb+nact)+nb+k] = ice[i] == act[k];
+      }
+      for (k=0; k<nb+nact; k++)
+        ubvec[k] = k < nb ? 1.001 : 1.03;
+      if (wgt_2d3d != NULL && wgt_2d3d != wgt)
+        free(wgt_2d3d);
+      wgt_2d3d = w;
+      ncon = nb+nact;
+      printf("Distribution weight: plus %d sea-ice constraint(s), %d + %d nodes\n", nact, (int)tot[0], (int)tot[1]);
+    }
+  }
    
 #ifdef USE_EDGE_WEIGHTS /* At the coarsest level, set edge weights to the number of the 3D nodes */
   if (current_level==0 && wgt_type!=0)
@@ -240,7 +292,9 @@ void do_partit(idx_t *n, idx_t *ptr, idx_t *adj, idx_t *wgt, idx_t *np, idx_t *p
   fclose(coord_file);
 #endif
 
-  ierr = METIS_PartGraphRecursive(n,&ncon,ptr,adj,wgt_2d3d,NULL,wgt_edge,np+current_level,NULL,NULL,opt,&ec,part);
+  ierr = METIS_PartGraphRecursive(n,&ncon,ptr,adj,wgt_2d3d,NULL,wgt_edge,np+current_level,NULL,ubvec,opt,&ec,part);
+  if (ubvec != NULL)
+    free(ubvec);
   if (ierr != METIS_OK) {
     printf("MEITS finished with error, code=%d\n", ierr);
     exit(1);
@@ -257,8 +311,9 @@ void do_partit(idx_t *n, idx_t *ptr, idx_t *adj, idx_t *wgt, idx_t *np, idx_t *p
     idx_t *adj_loc = calloc(ptr[*n], sizeof(*adj_loc));
     idx_t *wgt_loc = calloc(*n, sizeof(*wgt_loc));
     idx_t *part_loc = calloc(*n, sizeof(*part_loc));
+    idx_t *ice_loc = ice != NULL ? calloc(*n, sizeof(*ice_loc)) : NULL;
     if (vertex_glob_loc == NULL || ptr_loc == NULL || adj_loc == NULL || 
-        wgt_loc == NULL || part_loc == NULL)
+        wgt_loc == NULL || part_loc == NULL || (ice != NULL && ice_loc == NULL))
     {
       printf("Error allocating dynamic memory for hierarchical partitioning!\n");
       exit(1);
@@ -286,9 +341,11 @@ void do_partit(idx_t *n, idx_t *ptr, idx_t *adj, idx_t *wgt, idx_t *np, idx_t *p
           ptr_loc[vertex_loc+1]=index_loc+1;
           if (wgt!=NULL)
             wgt_loc[vertex_loc]=wgt[j];
+          if (ice!=NULL)
+            ice_loc[vertex_loc]=ice[j];
         }
 
-      do_partit(&n_loc, ptr_loc, adj_loc, wgt_loc, np, part_loc);
+      partit_rec(&n_loc, ptr_loc, adj_loc, wgt_loc, ice_loc, np, part_loc);
 
       /* Convert the partitioned graph back to the current level indexing */
       for (j=0; j<*n; j++)
@@ -300,6 +357,8 @@ void do_partit(idx_t *n, idx_t *ptr, idx_t *adj, idx_t *wgt, idx_t *np, idx_t *p
     free(adj_loc);
     free(wgt_loc);
     free(part_loc);
+    if (ice_loc != NULL)
+      free(ice_loc);
   }
 
   if (wgt_2d3d != wgt_edge && wgt_2d3d != NULL)
@@ -311,6 +370,11 @@ void do_partit(idx_t *n, idx_t *ptr, idx_t *adj, idx_t *wgt, idx_t *np, idx_t *p
 }
 
 #elif METIS_VERSION == 4 /* ---------------- METIS 4 part ------------------------ */
+
+void set_partit_ice(int *ice, int nice)
+{
+  if (nice > 0) printf("Sea-ice constraints need METIS 5; ignored\n");
+}
 
 void do_partit(int *n, int *ptr, int *adj, int *wgt, int *np, int *part)
 {

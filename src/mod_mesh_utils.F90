@@ -25,6 +25,7 @@ module mod_mesh_utils
               edge_center, elem_center, find_elem_neighbors_ini, &
               stiff_mat_ini, communication_ini, set_par_support_ini, &
               check_partitioning
+    integer(idx_t), allocatable :: part_ice(:)   ! partitioner: 0 open ocean, 1 north / 2 south ice-possible
 
 contains
 
@@ -58,6 +59,12 @@ INTEGER                             :: i_error
      read(20,*) nq, x1, x2, tag
      x1=x1*rad
      x2=x2*rad
+     if (part_ice_lat > 0.0) then
+        if (n == 1) allocate(part_ice(mesh%nod2D))
+        part_ice(n) = 0
+        if (x2 >=  part_ice_lat*rad) part_ice(n) = 1
+        if (x2 <= -part_ice_lat*rad) part_ice(n) = merge(2, 1, part_ice_hemispheres)
+     end if
      if (force_rotation) then
         gx1=x1
         gx2=x2
@@ -1541,6 +1548,11 @@ subroutine set_par_support_ini(partit, mesh)
        integer(idx_t), intent(in)  :: n, ptr(*), adj(*), wgt(*), np(*)
        integer(idx_t), intent(out) :: part(*)
      end subroutine do_partit
+     subroutine set_partit_ice(ice, nice) bind(C)
+       use iso_c_binding, only: idx_t=>C_INT32_T
+       integer(idx_t), intent(in) :: ice(*)
+       integer(idx_t), value      :: nice
+     end subroutine set_partit_ice
   end interface
 
 
@@ -1573,6 +1585,11 @@ subroutine set_par_support_ini(partit, mesh)
      stop
   end if
   
+  if (allocated(part_ice)) then
+     write(*,'(a,f6.1,a,2i9)') ' sea-ice constraint: nodes poleward of ', part_ice_lat, &
+          ' deg, north / south: ', count(part_ice == 1), count(part_ice == 2)
+     call set_partit_ice(part_ice, int(merge(2, 1, part_ice_hemispheres), idx_t))
+  end if
   write(*,*) 'Calling partit for npes=', np
   call do_partit(mesh%ssh_stiff%dim, mesh%ssh_stiff%rowptr, mesh%ssh_stiff%colind, &
        mesh%nlevels_nod2D, np, partit%part)
@@ -1589,6 +1606,7 @@ write(*,*) size(partit%part)
         
   !NR No longer needed - last use was as weight for partitioning
   deallocate(mesh%nlevels_nod2D)
+  if (allocated(part_ice)) deallocate(part_ice)
 end subroutine set_par_support_ini
 !=======================================================================
 subroutine check_partitioning(partit, mesh)

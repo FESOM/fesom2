@@ -123,7 +123,12 @@ module g_config
   ! *** machine ***
   integer                :: n_levels = 1       ! Number of levels for hierarchic partitioning
   integer, dimension(10) :: n_part = RESHAPE((/0/), (/10/), (/0/)) ! Number of partitions on each hierarchy level
-  namelist /machine/ n_levels, n_part
+  ! Partitioner only: with part_ice_lat > 0 (degrees), nodes poleward of +-part_ice_lat (geographic)
+  ! are balanced over the partitions as extra METIS constraints, one per hemisphere if
+  ! part_ice_hemispheres, otherwise one for both
+  real                   :: part_ice_lat = 0.0
+  logical                :: part_ice_hemispheres = .true.
+  namelist /machine/ n_levels, n_part, part_ice_lat, part_ice_hemispheres
 
   ! --- parallel output/restart writing -------------------------------------
   ! Lives in namelist.config, NOT namelist.io: namelist.io is read by
