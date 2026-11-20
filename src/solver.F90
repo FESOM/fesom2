@@ -3,6 +3,7 @@ module solver_module
     USE MOD_PARTIT
     USE MOD_DYN
     USE g_comm_auto
+    USE halo_timing, only: ht_on, ht_sum_mark, ht_sum_done
 #if defined(FESOM_PROFILING)
   USE fesom_rtdiagnostics, only: diag_count
 #endif
@@ -145,7 +146,9 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
   ! ==============
  s_old = sum(real(rhs(1:partit%myDim_nod2D), WP_full) * real(rhs(1:partit%myDim_nod2D), WP_full))
 
+  if (ht_on) call ht_sum_mark()
   call MPI_Allreduce(MPI_IN_PLACE, s_old, 1, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+  if (ht_on) call ht_sum_done()
   rtol=solverinfo%soltol*sqrt(s_old/real(mesh%nod2D,WP_full))
   ! ==============
   ! Compute r0
@@ -176,7 +179,9 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
 
   s_old = sum(real(rr(1:partit%myDim_nod2D), WP_full) * real(zz(1:partit%myDim_nod2D), WP_full))
 
+  if (ht_on) call ht_sum_mark()
   call MPI_Allreduce(MPI_IN_PLACE, s_old, 1, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+  if (ht_on) call ht_sum_done()
   
   ! ===============
   ! Iterations
@@ -200,7 +205,9 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
  
  s_aux = sum(real(pp(1:partit%myDim_nod2D), WP_full) * real(App(1:partit%myDim_nod2D), WP_full))
 
+  if (ht_on) call ht_sum_mark()
   call MPI_Allreduce(MPI_IN_PLACE, s_aux, 1, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+  if (ht_on) call ht_sum_done()
 
      ! ===========
      ! Breakdown guard. An equivalent check existed until 4eb2f21d ("Removed
@@ -247,7 +254,9 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
     sprod(1) = sum(real(rr(1:partit%myDim_nod2D), WP_full) * real(zz(1:partit%myDim_nod2D), WP_full))
     sprod(2) = sum(real(rr(1:partit%myDim_nod2D), WP_full) * real(rr(1:partit%myDim_nod2D), WP_full))
   
+  if (ht_on) call ht_sum_mark()
   call MPI_Allreduce(MPI_IN_PLACE, sprod, 2, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+  if (ht_on) call ht_sum_done()
 
 !$OMP BARRIER
      ! ===========
@@ -371,7 +380,9 @@ subroutine ssh_cg_iterate_acc(x, rhs, solverinfo, partit, mesh, iter, converged,
   do row=1, nrow
      s_old = s_old + real(rhs(row),WP_full)*real(rhs(row),WP_full)
   end do
+  if (ht_on) call ht_sum_mark()
   call MPI_Allreduce(MPI_IN_PLACE, s_old, 1, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+  if (ht_on) call ht_sum_done()
   rtol=solverinfo%soltol*sqrt(s_old/real(mesh%nod2D,WP_full))
 
   ! r0 = b - A x0 (one thread per row: the rows have a few entries only)
@@ -399,7 +410,9 @@ subroutine ssh_cg_iterate_acc(x, rhs, solverinfo, partit, mesh, iter, converged,
      pp(row)=zz(row)
      s_old = s_old + real(rr(row),WP_full)*real(zz(row),WP_full)
   end do
+  if (ht_on) call ht_sum_mark()
   call MPI_Allreduce(MPI_IN_PLACE, s_old, 1, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+  if (ht_on) call ht_sum_done()
 
   converged = .false.
   sprod = 0.0_WP_full
@@ -417,7 +430,9 @@ subroutine ssh_cg_iterate_acc(x, rhs, solverinfo, partit, mesh, iter, converged,
         App(row)=real(acc, WP)
         s_aux = s_aux + real(pp(row),WP_full)*real(App(row),WP_full)
      end do
+     if (ht_on) call ht_sum_mark()
      call MPI_Allreduce(MPI_IN_PLACE, s_aux, 1, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+     if (ht_on) call ht_sum_done()
      if (s_aux <= 0.0_WP .or. s_aux /= s_aux) then
         solverinfo%nbreakdown = solverinfo%nbreakdown + 1
         if (partit%mype==0 .and. solverinfo%nbreakdown <= 5) then
@@ -449,7 +464,9 @@ subroutine ssh_cg_iterate_acc(x, rhs, solverinfo, partit, mesh, iter, converged,
      end do
      sprod(1)=sp1
      sprod(2)=sp2
+     if (ht_on) call ht_sum_mark()
      call MPI_Allreduce(MPI_IN_PLACE, sprod, 2, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+     if (ht_on) call ht_sum_done()
      if (sqrt(sprod(2)/mesh%nod2D)< rtol) then
         converged = .true.
         exit
