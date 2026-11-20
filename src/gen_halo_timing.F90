@@ -17,20 +17,34 @@ module halo_timing
        'nodal 2D exchanges', 'nodal 3D exchanges', 'element 2D exchanges', 'element 3D exchanges', &
        'SSH solver global sums']
   logical,        save :: ht_on = .false.
+  logical,        save :: ht_sites = .false.                 ! per-call-site records (gen_halo_sites.c)
   integer,        save :: nl_ref = 0
   integer,        save :: pending(2) = 0                     ! category in flight: 1 nodal, 2 element
   real(real64),   save :: t_post(NCAT) = 0, t_done(NCAT) = 0, t_mark = 0, t_loop0 = 0
   integer(int64), save :: n_call(NCAT) = 0, n_field(NCAT) = 0, n_msg(NCAT) = 0
 
+  interface
+     subroutine fesom_halo_site(cat, iend, nfields, sec) bind(C, name='fesom_halo_site')
+       import :: real64
+       integer, value :: cat, iend, nfields
+       real(real64), value :: sec
+     end subroutine
+     subroutine fesom_halo_site_dump(rank) bind(C, name='fesom_halo_site_dump')
+       integer, value :: rank
+     end subroutine
+  end interface
+
 contains
 
   ! Called at the start of every fesom_runloop; counts from the first call (a coupled model may
   ! call the run loop once per coupling step)
-  subroutine ht_start(enable, nl)
+  subroutine ht_start(enable, nl, sites)
     logical, intent(in) :: enable
     integer, intent(in) :: nl
+    logical, intent(in), optional :: sites
     if (ht_on .or. .not. enable) return
     ht_on = enable
+    if (present(sites)) ht_sites = sites
     nl_ref = nl
     pending = 0
     t_post = 0; t_done = 0; n_call = 0; n_field = 0; n_msg = 0
@@ -51,6 +65,7 @@ contains
     integer,      intent(in) :: side, cat, nfields, nneigh
     real(real64), intent(in) :: dt
     pending(side) = cat
+    if (ht_sites) call fesom_halo_site(cat, 0, nfields, dt)
     t_post(cat)  = t_post(cat) + dt
     n_call(cat)  = n_call(cat) + 1
     n_field(cat) = n_field(cat) + nfields
@@ -61,6 +76,7 @@ contains
     integer,      intent(in) :: side
     real(real64), intent(in) :: dt
     if (pending(side) > 0) t_done(pending(side)) = t_done(pending(side)) + dt
+    if (ht_sites .and. pending(side) > 0) call fesom_halo_site(pending(side), 1, 0, dt)
     pending(side) = 0
   end subroutine ht_done
 
@@ -70,6 +86,7 @@ contains
 
   subroutine ht_sum_done()
     t_done(HT_SUM) = t_done(HT_SUM) + (MPI_Wtime() - t_mark)
+    if (ht_sites) call fesom_halo_site(HT_SUM, 1, 0, MPI_Wtime() - t_mark)
     n_call(HT_SUM) = n_call(HT_SUM) + 1
   end subroutine ht_sum_done
 
@@ -79,6 +96,7 @@ contains
     integer(int64) :: cnt(3*NCAT), cmx(3*NCAT)
     integer        :: c, ierr
     if (.not. ht_on) return
+    if (ht_sites) call fesom_halo_site_dump(mype)
     loc(1:NCAT) = t_post; loc(NCAT+1:2*NCAT) = t_done; loc(2*NCAT+1) = MPI_Wtime() - t_loop0
     cnt = [n_call, n_field, n_msg]
     call MPI_Reduce(loc, mx, size(loc), MPI_DOUBLE_PRECISION, MPI_MAX, 0, comm, ierr)

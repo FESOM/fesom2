@@ -255,7 +255,7 @@ add_subdirectory(async_threads_cpp)
 
 
 # fesom library
-add_library(${PROJECT_NAME} ${sources_Fortran} $<TARGET_OBJECTS:async_threads_cpp>)
+add_library(${PROJECT_NAME} ${sources_Fortran} ${src_home}/gen_halo_sites.c $<TARGET_OBJECTS:async_threads_cpp>)
 add_dependencies(${PROJECT_NAME} fesom_version_info-generated.F90)
 
 target_include_directories(${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${CMAKE_Fortran_MODULE_DIRECTORY}>)

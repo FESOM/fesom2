@@ -987,7 +987,7 @@ contains
 #if defined (FESOM_PROFILING)
         call fesom_profiler_start("fesom_runloop_total")
 #endif
-        call ht_start(halo_timing, f%mesh%nl)
+        call ht_start(halo_timing, f%mesh%nl, halo_timing_sites)
     !___MODEL TIME STEPPING LOOP________________________________________________
     nstart=f%from_nstep
     ntotal=f%from_nstep-1+current_nsteps
