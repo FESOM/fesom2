@@ -426,6 +426,8 @@ if (Grazing_detritus) then    ! only for the case if grazing detritus is used, a
      locgrazmacro_mic  = sum(vertgrazmacro_mic(1:nn) * thick(1:nn))
      locgrazmacro_det2 = sum(vertgrazmacro_det2(1:nn) * thick(1:nn))
 
+#endif 
+
 ! Microzooplankton
      locgrazmicro_tot = sum(vertgrazmicro_tot(1:nn) * thick(1:nn))
      locgrazmicro_n   = sum(vertgrazmicro_n(1:nn) * thick(1:nn))
@@ -439,8 +441,7 @@ if (Grazing_detritus) then    ! only for the case if grazing detritus is used, a
      locgrazmicro_c = sum(vertgrazmicro_c(1:nn) * thick(1:nn))
      locgrazmicro_p = sum(vertgrazmicro_p(1:nn) * thick(1:nn))
 #endif
-
-#endif        
+       
    endif
 
     ! Dissolution ! R2OMIP

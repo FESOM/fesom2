@@ -641,8 +641,8 @@ subroutine recom_init(tracers, partit, mesh)
         locDFemin = locDINmin
         locO2max  = locDINmax
         locO2min  = locDINmin
-        locDICremax = locDICremax ! init DIC remin (added by Sina)
-        locDICremin = locDICremin ! init DIC remin (added by Sina)
+        locDICremax = locDINmax ! init DIC remin (added by Sina)
+        locDICremin = locDINmin ! init DIC remin (added by Sina)
 
         do n=1, myDim_nod2d
             locDINmax = max(locDINmax,maxval(tracers%data(3)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )

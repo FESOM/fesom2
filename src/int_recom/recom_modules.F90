@@ -197,7 +197,7 @@ module recom_config
                        Grazing_detritus,        &
                                                                                  het_resp_noredfield,     &
                        diatom_mucus,                                                                      &
-                       O2dep_remin,                       use_ballasting,        use_density_scaling,     & ! O2remin, NEW BALL
+                       O2dep_remin,                       use_ballasting,        use_density_scaling,     &
                        use_viscosity_scaling,             OmegaC_diss,           CO2lim,                  & ! BALL, DISS added OmegaC_diss, added CO2lim
                        Diags      ,                       constant_CO2,                                   &
                        UseFeDust,                         UseDustClim, UseFeDust_vsol,                    &

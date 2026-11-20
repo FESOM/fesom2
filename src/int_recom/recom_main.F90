@@ -416,7 +416,7 @@ if (UseDustClimMyrio) dust_sol=1.0 !Solubulity set to one, because it is already
             vertNPPdiaH = 0.d0
             vertGPPdiaH = 0.d0
             vertNNAdiaH = 0.d0
-            ChldegdiaH = 0.d0
+            vertChldegdiaH = 0.d0
 #endif
 
     ! Zooplankton Grazing
@@ -431,7 +431,6 @@ if (UseDustClimMyrio) dust_sol=1.0 !Solubulity set to one, because it is already
         vertgrazmeso_d    = 0.d0
         vertgrazmeso_det  = 0.d0
 
-#if defined (__3Zoo2Det)
             ! Microzooplankton
             allocate(vertgrazmicro_tot(nl-1), vertgrazmicro_n(nl-1), vertgrazmicro_d(nl-1))
             
@@ -441,9 +440,11 @@ if (UseDustClimMyrio) dust_sol=1.0 !Solubulity set to one, because it is already
 
             ! Mesozooplankton
 
+#if defined (__3Zoo2Det)
             allocate(vertgrazmeso_mic(nl-1), vertgrazmeso_det2(nl-1))
             vertgrazmeso_mic  = 0.d0
             vertgrazmeso_det2 = 0.d0
+#endif
             
 #if defined (__coccos)
                 allocate(vertgrazmicro_c(nl-1), vertgrazmicro_p(nl-1))
@@ -463,6 +464,7 @@ if (UseDustClimMyrio) dust_sol=1.0 !Solubulity set to one, because it is already
                 vertgrazmeso_diaH  = 0.d0
 #endif
 
+#if defined (__3Zoo2Det)
             ! Macrozooplankton
             allocate(vertgrazmacro_tot(nl-1), vertgrazmacro_n(nl-1), vertgrazmacro_d(nl-1))
             allocate(vertgrazmacro_mes(nl-1), vertgrazmacro_det(nl-1))
@@ -749,6 +751,8 @@ if (Grazing_detritus) then
             deallocate(vertgrazmacro_diaH)
 #endif
 
+#endif
+
             deallocate(vertgrazmicro_tot, vertgrazmicro_n, vertgrazmicro_d)
             
 #if defined (__coccos)
@@ -759,7 +763,6 @@ if (Grazing_detritus) then
             deallocate(vertgrazmicro_diaH)
 #endif
 
-#endif
 
     endif
 

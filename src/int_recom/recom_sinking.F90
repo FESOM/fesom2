@@ -140,7 +140,10 @@ subroutine ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)
         if( tracers%data(tr_num)%ID==1004 .or. &  !iphyn
             tracers%data(tr_num)%ID==1007 .or. &  !idetn
             tracers%data(tr_num)%ID==1013 .or. &  !idian
-            tracers%data(tr_num)%ID==1025 ) then  !idetz2n
+            tracers%data(tr_num)%ID==1025 .or. &  !idetz2n
+            tracers%data(tr_num)%ID==1029 .or. &  !icocn
+            tracers%data(tr_num)%ID==1032 .or. &  !iphan
+            tracers%data(tr_num)%ID==1037) then !idiaH_N  
             Benthos(n,1)= Benthos(n,1) +  add_benthos_2d(n) ![mmol]
 
             if (use_MEDUSA) then
@@ -160,7 +163,10 @@ subroutine ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)
         if( tracers%data(tr_num)%ID==1005 .or. &  !iphyc
             tracers%data(tr_num)%ID==1008 .or. &  !idetc
             tracers%data(tr_num)%ID==1014 .or. &  !idiac
-            tracers%data(tr_num)%ID==1026 ) then  !idetz2c
+            tracers%data(tr_num)%ID==1026 .or. &  !idetz2c
+            tracers%data(tr_num)%ID==1030 .or. &  !icocc
+            tracers%data(tr_num)%ID==1033 .or. &  !iphac
+            tracers%data(tr_num)%ID==1038 ) then !idiaH_C  
             Benthos(n,2)= Benthos(n,2) + add_benthos_2d(n)
 
             if (use_MEDUSA) then
@@ -177,7 +183,8 @@ subroutine ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)
         !! *Particulate Organic Silicon *
         if( tracers%data(tr_num)%ID==1016 .or. &  !idiasi
             tracers%data(tr_num)%ID==1017 .or. &  !idetsi
-            tracers%data(tr_num)%ID==1027 ) then  !idetz2si
+            tracers%data(tr_num)%ID==1027 .or. &  !idetz2si
+            tracers%data(tr_num)%ID==1040 ) then !idiaH_Si  
             Benthos(n,3)= Benthos(n,3) + add_benthos_2d(n)
 
             if (use_MEDUSA) then
