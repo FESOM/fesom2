@@ -3,7 +3,7 @@ module solver_module
     USE MOD_PARTIT
     USE MOD_DYN
     USE g_comm_auto
-    USE halo_timing, only: ht_on, ht_sum_mark, ht_sum_done
+    USE halo_timing_mod, only: ht_on, ht_sum_mark, ht_sum_done
 #if defined(FESOM_PROFILING)
   USE fesom_rtdiagnostics, only: diag_count
 #endif
