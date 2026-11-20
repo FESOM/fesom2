@@ -2762,9 +2762,12 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
         end do
 !$OMP END PARALLEL DO
     !___________________________________________________________________________
-    call exchange_nod(Wvel, partit)
+    if (Fer_GM) then
+       call exchange_nod(Wvel, fer_Wvel, partit)
+    else
+       call exchange_nod(Wvel, partit)
+    end if
     call exchange_nod_h(mesh%hnode_new, partit)   ! Or extend cycles above  
-    if (Fer_GM) call exchange_nod(fer_Wvel, partit)
 !$OMP BARRIER    
 
     !___________________________________________________________________________
@@ -3176,8 +3179,11 @@ subroutine compute_vert_vel_transpv(dynamics, partit, mesh)
 
     !___________________________________________________________________________
 !$OMP MASTER    
-    call exchange_nod(Wvel, partit)
-    if (Fer_GM) call exchange_nod(fer_Wvel, partit)
+    if (Fer_GM) then
+       call exchange_nod(Wvel, fer_Wvel, partit)
+    else
+       call exchange_nod(Wvel, partit)
+    end if
 !$OMP END MASTER    
 !$OMP BARRIER
 

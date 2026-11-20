@@ -413,9 +413,7 @@ contains
      call fesom_profiler_start("kpp_smooth_final")
 #endif
      if (smooth_blmc) then
-        call exchange_nod(blmc(:,:,1), partit)
-        call exchange_nod(blmc(:,:,2), partit)
-        call exchange_nod(blmc(:,:,3), partit)
+        call exchange_nod(blmc(:,:,1), blmc(:,:,2), blmc(:,:,3), partit)
 #ifdef ENABLE_OPENACC
         ! blmc smoothing on the device (smooth_nod3D_acc)
         if (.not. kpp_blmc_created) then
@@ -456,12 +454,11 @@ contains
      !_____________________________________________________________________________
      ! do all node loops only over myDim_nod2D --> therefore do an halo exchange 
      ! only at the end should save some time
-     call exchange_nod(diffK(:,:,1), partit)
-     call exchange_nod(diffK(:,:,2), partit)
+     ! diffK and viscA have nl levels and share one exchange; ghats has nl-1
+     call exchange_nod(diffK(:,:,1), diffK(:,:,2), viscA, partit)
      call exchange_nod(ghats, partit)
   
-     ! OVER ELEMENTS 
-     call exchange_nod(viscA, partit) !Warning: don't forget to communicate before averaging on elements!!!
+     ! OVER ELEMENTS: viscA was communicated above, before the averaging on elements
 !$OMP BARRIER
      minmix=3.0e-3_WP
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, elnodes, nz, nzmin, nzmax)

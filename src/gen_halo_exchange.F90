@@ -639,7 +639,8 @@ end if
 #endif
 
 #ifndef ENABLE_OPENACC
-  if (partit%halo_pack .and. is_contiguous(nod1_array3D) .and. is_contiguous(nod2_array3D)) then
+  if (partit%halo_pack .and. size(nod1_array3D,1) == size(nod2_array3D,1) .and. &
+      is_contiguous(nod1_array3D) .and. is_contiguous(nod2_array3D)) then
      call g2g_cols_begin(1, size(nod1_array3D,1), size(nod1_array3D,2), partit, nod1_array3D, nod2_array3D, &
           nlev=size(nod1_array3D,1), nval=1)
      return
@@ -692,6 +693,81 @@ end if
 
  endif
 END SUBROUTINE exchange_nod3D_2fields_begin_x
+
+! Three 3D nodal fields (vertical, horizontal) in one exchange: with halo_pack_fields one message per
+! neighbour, otherwise one datatype message per field (tags offset by npes as in the two-field case)
+subroutine exchange_nod3D_3fields(nod1_array3D, nod2_array3D, nod3_array3D, partit, luse_g2g)
+USE MOD_PARTIT
+IMPLICIT NONE
+type(t_partit), intent(inout), target :: partit
+real(kind=WP),   intent(inout), target :: nod1_array3D(:,:), nod2_array3D(:,:), nod3_array3D(:,:)
+logical,        intent(in),optional   :: luse_g2g
+
+if (partit%npes > 1) then
+   call exchange_nod3D_3fields_begin(nod1_array3D, nod2_array3D, nod3_array3D, partit, luse_g2g)
+   call exchange_nod_end(partit)
+endif
+END SUBROUTINE exchange_nod3D_3fields
+
+subroutine exchange_nod3D_3fields_begin_x(nod1_array3D, nod2_array3D, nod3_array3D, partit, luse_g2g)
+USE MOD_PARTIT
+use par_support_module, only: par_abort
+IMPLICIT NONE
+type(t_partit), intent(inout), target :: partit
+real(kind=WP),   intent(inout), target :: nod1_array3D(:,:), nod2_array3D(:,:), nod3_array3D(:,:)
+logical,        intent(in),optional   :: luse_g2g
+integer                               :: n, k, sn, rn, nl(3)
+logical                               :: lg2g, same
+
+lg2g = .false.
+if (present(luse_g2g)) lg2g = luse_g2g
+if (partit%npes <= 1) return
+sn=partit%com_nod2D%sPEnum
+rn=partit%com_nod2D%rPEnum
+nl = [ubound(nod1_array3D,1), ubound(nod2_array3D,1), ubound(nod3_array3D,1)]
+do k=1, 3
+   if ((nl(k)<ubound(partit%r_mpitype_nod3D, 2)-1) .or. (nl(k)>ubound(partit%r_mpitype_nod3D, 2))) then
+      if (partit%mype==0) print *,'Subroutine exchange_nod3D_3fields not implemented for',nl(k),'layers.'
+      call par_abort(partit%MPI_COMM_FESOM, partit%mype)
+   endif
+end do
+same = (nl(1)==nl(2) .and. nl(1)==nl(3))
+#ifdef ENABLE_OPENACC
+if (lg2g) then
+   if (.not. same) then
+      if (partit%mype==0) print *,'exchange_nod3D_3fields on the device needs equal level counts'
+      call par_abort(partit%MPI_COMM_FESOM, partit%mype)
+   end if
+   call g2g_cols_begin(1, nl(1), size(nod1_array3D,2), partit, nod1_array3D, nod2_array3D, nod3_array3D, &
+        nlev=nl(1), nval=1)
+   return
+end if
+#else
+if (partit%halo_pack .and. same .and. is_contiguous(nod1_array3D) .and. is_contiguous(nod2_array3D) &
+    .and. is_contiguous(nod3_array3D)) then
+   call g2g_cols_begin(1, nl(1), size(nod1_array3D,2), partit, nod1_array3D, nod2_array3D, nod3_array3D, &
+        nlev=nl(1), nval=1)
+   return
+end if
+#endif
+DO n=1,rn
+   call MPI_IRECV(nod1_array3D, 1, partit%r_mpitype_nod3D(n,nl(1),1), partit%com_nod2D%rPE(n), &
+        partit%com_nod2D%rPE(n),              partit%MPI_COMM_FESOM, partit%com_nod2D%req(3*n-2), partit%MPIerr)
+   call MPI_IRECV(nod2_array3D, 1, partit%r_mpitype_nod3D(n,nl(2),1), partit%com_nod2D%rPE(n), &
+        partit%com_nod2D%rPE(n)+partit%npes,   partit%MPI_COMM_FESOM, partit%com_nod2D%req(3*n-1), partit%MPIerr)
+   call MPI_IRECV(nod3_array3D, 1, partit%r_mpitype_nod3D(n,nl(3),1), partit%com_nod2D%rPE(n), &
+        partit%com_nod2D%rPE(n)+2*partit%npes, partit%MPI_COMM_FESOM, partit%com_nod2D%req(3*n  ), partit%MPIerr)
+END DO
+DO n=1, sn
+   call MPI_ISEND(nod1_array3D, 1, partit%s_mpitype_nod3D(n,nl(1),1), partit%com_nod2D%sPE(n), &
+        partit%mype,              partit%MPI_COMM_FESOM, partit%com_nod2D%req(3*rn+3*n-2), partit%MPIerr)
+   call MPI_ISEND(nod2_array3D, 1, partit%s_mpitype_nod3D(n,nl(2),1), partit%com_nod2D%sPE(n), &
+        partit%mype+partit%npes,   partit%MPI_COMM_FESOM, partit%com_nod2D%req(3*rn+3*n-1), partit%MPIerr)
+   call MPI_ISEND(nod3_array3D, 1, partit%s_mpitype_nod3D(n,nl(3),1), partit%com_nod2D%sPE(n), &
+        partit%mype+2*partit%npes, partit%MPI_COMM_FESOM, partit%com_nod2D%req(3*rn+3*n  ), partit%MPIerr)
+END DO
+partit%com_nod2D%nreq = 3*(rn+sn)
+END SUBROUTINE exchange_nod3D_3fields_begin_x
 ! ========================================================================
 subroutine exchange_nod3D_n(nod_array3D, partit, luse_g2g)
 use MOD_MESH
@@ -3964,6 +4040,24 @@ t0=MPI_Wtime()
 call exchange_elem_end_x(partit)
 call ht_done(2, MPI_Wtime()-t0)
 END SUBROUTINE exchange_elem_end
+
+! Timing wrapper (halo_timing): posting time of exchange_nod3D_3fields_begin_x
+subroutine exchange_nod3D_3fields_begin(nod1_array3D, nod2_array3D, nod3_array3D, partit, luse_g2g)
+USE MOD_PARTIT
+IMPLICIT NONE
+real(kind=WP),   intent(inout), target :: nod1_array3D(:,:), nod2_array3D(:,:), nod3_array3D(:,:)
+type(t_partit), intent(inout), target :: partit
+logical,        intent(in),optional   :: luse_g2g
+real(real64) :: t0
+if (.not. ht_on) then
+   call exchange_nod3D_3fields_begin_x(nod1_array3D, nod2_array3D, nod3_array3D, partit, luse_g2g)
+   return
+end if
+t0=MPI_Wtime()
+pk_last=.false.
+call exchange_nod3D_3fields_begin_x(nod1_array3D, nod2_array3D, nod3_array3D, partit, luse_g2g)
+call ht_post(1, ht_kind(1, size(nod1_array3D,1)), 3, partit%com_nod2D%rPEnum, MPI_Wtime()-t0, pk_last)
+END SUBROUTINE exchange_nod3D_3fields_begin
 end module g_comm
 
 
@@ -3978,6 +4072,7 @@ interface exchange_nod
       module procedure exchange_nod2D_3fields
       module procedure exchange_nod3D
       module procedure exchange_nod3D_2fields
+      module procedure exchange_nod3D_3fields
       module procedure exchange_nod3D_n
 end interface exchange_nod
 
@@ -3988,6 +4083,7 @@ interface exchange_nod_begin
       module procedure exchange_nod2D_3fields_begin
       module procedure exchange_nod3D_begin
       module procedure exchange_nod3D_2fields_begin
+      module procedure exchange_nod3D_3fields_begin
       module procedure exchange_nod3D_n_begin
 end interface exchange_nod_begin
 
