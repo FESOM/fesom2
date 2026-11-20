@@ -36,6 +36,7 @@ levante:
         test_neverworld2: ./test/meshes/neverworld2/
         pi: /pool/data/AWICM/FESOM2/MESHES_FESOM2.1/pi/
         core2: /pool/data/AWICM/FESOM2/MESHES_FESOM2.1/core2/
+        core3: /pool/data/AWICM/FESOM2/MESHES_FESOM2.1/core3/
         mr: /pool/data/AWICM/FESOM2/MESHES_FESOM2.1/mr/
         hr: /pool/data/AWICM/FESOM2/MESHES_FESOM2.1/hr/
         orca25: /pool/data/AWICM/FESOM2/MESHES_FESOM2.1/orca25/
