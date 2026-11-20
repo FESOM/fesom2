@@ -945,8 +945,10 @@ nf=1
 if (present(a2)) nf=2
 if (present(a3)) nf=3
 if (partit%halo_wet .and. present(nlev)) then
+   if (nlev >= partit%wet_nl-1) then
    call g2g_cols_wet_begin(st, kind, com, inner, ntot, nlev, nval, nf, partit, a1, a2, a3)
    return
+   end if
 end if
 st%wet=.false.
 blk=nf*inner
@@ -1357,8 +1359,7 @@ if (partit%npes> 1) then
 #endif
         if(lg2g) then
 #ifdef ENABLE_OPENACC
-           call g2g_cols_begin(2, size(elem_array3D,1), size(elem_array3D,2), partit, elem_array3D, &
-                nlev=size(elem_array3D,1), nval=1)
+           call g2g_cols_begin(2, size(elem_array3D,1), size(elem_array3D,2), partit, elem_array3D)
            return
 #endif
           !$ACC HOST_DATA USE_DEVICE(elem_array3D)
