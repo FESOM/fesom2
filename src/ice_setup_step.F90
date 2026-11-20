@@ -20,7 +20,6 @@ module ice_setup_step_module
 #endif
     use cavity_param_module, only: cavity_heat_water_fluxes_3eq, cavity_heat_water_fluxes_2eq, cavity_ice_clean_vel, cavity_ice_clean_ma, cavity_momentum_fluxes
     USE o_arrays
-    use g_forcing_arrays, only: sidm_dyn, sidm_cut, sidm_mpre, sisn_dyn, sisn_cut, sisn_spre, sidc_dyn, sidc_cut, sidc_apre
     USE g_read_other_NetCDF, only: read_other_NetCDF
     use ice_init_module, only: ice_init
 #if defined (__icepack)
@@ -97,6 +96,20 @@ subroutine ice_timestep(step, ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: a_ice, ice_temp
     !LA 2023-03-08
     real(kind=WP), dimension(:), pointer  :: a_ice_ib
+#endif
+#if !defined (__icepack)
+    ! mass budget diagnostics (ice_import / ice_export)
+    real(kind=WP), dimension(:), pointer  :: sidm_dyn, sidm_cut, sidm_mpre, sisn_dyn, sisn_cut, sisn_spre
+    real(kind=WP), dimension(:), pointer  :: sidc_dyn, sidc_cut, sidc_apre
+    sidm_dyn  => ice%forc%sidm_dyn
+    sidm_cut  => ice%forc%sidm_cut
+    sidm_mpre => ice%forc%sidm_mpre
+    sisn_dyn  => ice%forc%sisn_dyn
+    sisn_cut  => ice%forc%sisn_cut
+    sisn_spre => ice%forc%sisn_spre
+    sidc_dyn  => ice%forc%sidc_dyn
+    sidc_cut  => ice%forc%sidc_cut
+    sidc_apre => ice%forc%sidc_apre
 #endif
 
 !---------------------------------------------

@@ -161,6 +161,11 @@ subroutine thermodynamics(ice, partit, mesh)
     real(kind=WP), dimension(:)  , pointer :: thdgr, thdgrsn, thdgra, thdgr_old, t_skin, ustar_aux
     real(kind=WP), dimension(:)  , pointer :: S_oc_array, T_oc_array, u_w, v_w
     real(kind=WP), dimension(:)  , pointer :: fresh_wa_flux, net_heat_flux
+    ! forcing and fluxes of this step (ice_import / ice_export), under the names of the global arrays
+    real(kind=WP), dimension(:)  , pointer :: shortwave, longwave, tair, shum, u_wind, v_wind, runoff
+    real(kind=WP), dimension(:)  , pointer :: ch_atm_oce_arr, ce_atm_oce_arr, prec_rain, prec_snow, evaporation
+    real(kind=WP), dimension(:)  , pointer :: ice_sublimation, flice, fw_ice, fw_snw, real_salt_flux
+    real(kind=WP), dimension(:)  , pointer :: hf_qlat, hf_qsen, hf_qradtot, hf_qswr, hf_qlwr, hf_qlwrout
     myDim_nod2d   => partit%myDim_nod2D
     eDim_nod2D    => partit%eDim_nod2D
     ulevels_nod2D  (1    :myDim_nod2D+eDim_nod2D) => mesh%ulevels_nod2D(:)
@@ -185,6 +190,29 @@ subroutine thermodynamics(ice, partit, mesh)
     S_oc_array    => ice%srfoce_salt(:)
     net_heat_flux => ice%flx_h(:)
     fresh_wa_flux => ice%flx_fw(:)
+    shortwave       => ice%forc%shortwave
+    longwave        => ice%forc%longwave
+    tair            => ice%forc%tair
+    shum            => ice%forc%shum
+    u_wind          => ice%forc%u_wind
+    v_wind          => ice%forc%v_wind
+    runoff          => ice%forc%runoff
+    ch_atm_oce_arr  => ice%forc%ch_atm_oce_arr
+    ce_atm_oce_arr  => ice%forc%ce_atm_oce_arr
+    prec_rain       => ice%forc%prec_rain
+    prec_snow       => ice%forc%prec_snow
+    evaporation     => ice%forc%evaporation
+    ice_sublimation => ice%forc%ice_sublimation
+    flice           => ice%forc%flice
+    fw_ice          => ice%forc%fw_ice
+    fw_snw          => ice%forc%fw_snw
+    real_salt_flux  => ice%forc%real_salt_flux
+    hf_qlat         => ice%forc%hf_qlat
+    hf_qsen         => ice%forc%hf_qsen
+    hf_qradtot      => ice%forc%hf_qradtot
+    hf_qswr         => ice%forc%hf_qswr
+    hf_qlwr         => ice%forc%hf_qlwr
+    hf_qlwrout      => ice%forc%hf_qlwrout
   
     !___________________________________________________________________________
     rsss=ref_sss
@@ -1074,6 +1102,11 @@ subroutine thermodynamics_acc(ice, partit, mesh)
     real(kind=WP), dimension(:)  , pointer :: u_ice, v_ice, a_ice, m_ice, m_snow, a_ice_old, m_ice_old, m_snow_old
     real(kind=WP), dimension(:)  , pointer :: thdgr, thdgrsn, thdgra, thdgr_old, t_skin, ustar_aux
     real(kind=WP), dimension(:)  , pointer :: S_oc_array, T_oc_array, u_w, v_w, fresh_wa_flux, net_heat_flux
+    ! forcing and fluxes of this step (ice_import / ice_export), under the names of the global arrays
+    real(kind=WP), dimension(:)  , pointer :: shortwave, longwave, tair, shum, u_wind, v_wind, runoff
+    real(kind=WP), dimension(:)  , pointer :: ch_atm_oce_arr, ce_atm_oce_arr, prec_rain, prec_snow, evaporation
+    real(kind=WP), dimension(:)  , pointer :: ice_sublimation, flice, fw_ice, fw_snw, real_salt_flux
+    real(kind=WP), dimension(:)  , pointer :: hf_qlat, hf_qsen, hf_qradtot, hf_qswr, hf_qlwr, hf_qlwrout
 
     myDim_nod2D = partit%myDim_nod2D
     nod_size    = partit%myDim_nod2D+partit%eDim_nod2D
@@ -1097,6 +1130,29 @@ subroutine thermodynamics_acc(ice, partit, mesh)
     S_oc_array    => ice%srfoce_salt(:)
     net_heat_flux => ice%flx_h(:)
     fresh_wa_flux => ice%flx_fw(:)
+    shortwave       => ice%forc%shortwave
+    longwave        => ice%forc%longwave
+    tair            => ice%forc%tair
+    shum            => ice%forc%shum
+    u_wind          => ice%forc%u_wind
+    v_wind          => ice%forc%v_wind
+    runoff          => ice%forc%runoff
+    ch_atm_oce_arr  => ice%forc%ch_atm_oce_arr
+    ce_atm_oce_arr  => ice%forc%ce_atm_oce_arr
+    prec_rain       => ice%forc%prec_rain
+    prec_snow       => ice%forc%prec_snow
+    evaporation     => ice%forc%evaporation
+    ice_sublimation => ice%forc%ice_sublimation
+    flice           => ice%forc%flice
+    fw_ice          => ice%forc%fw_ice
+    fw_snw          => ice%forc%fw_snw
+    real_salt_flux  => ice%forc%real_salt_flux
+    hf_qlat         => ice%forc%hf_qlat
+    hf_qsen         => ice%forc%hf_qsen
+    hf_qradtot      => ice%forc%hf_qradtot
+    hf_qswr         => ice%forc%hf_qswr
+    hf_qlwr         => ice%forc%hf_qlwr
+    hf_qlwrout      => ice%forc%hf_qlwrout
     ! parameters
     hmin=ice%thermo%hmin;  Sice=ice%thermo%Sice;  Armin=ice%thermo%Armin;  cc=ice%thermo%cc;  cl=ice%thermo%cl
     con=ice%thermo%con;  consn=ice%thermo%consn;  rhosno=ice%thermo%rhosno;  rhoice=ice%thermo%rhoice

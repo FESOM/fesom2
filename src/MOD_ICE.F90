@@ -143,6 +143,25 @@ TYPE T_ICE_ATMCOUPL
 END TYPE T_ICE_ATMCOUPL
 #endif /* (__oasis) || __ifsinterface|| __yac */ 
 
+! Atmospheric forcing and surface fluxes the sea-ice step reads and writes. They are
+! copies of the g_forcing_arrays / o_arrays fields, filled by ice_import before the
+! ice step and copied back by ice_export after it (ice_import_export.F90), so that the
+! ice step works only on the ice derived type.
+TYPE T_ICE_FORC
+    ! in
+    real(kind=WP), allocatable, dimension(:) :: shortwave, longwave, tair, shum, u_wind, v_wind
+    real(kind=WP), allocatable, dimension(:) :: runoff, ch_atm_oce_arr, ce_atm_oce_arr
+    ! in and out
+    real(kind=WP), allocatable, dimension(:) :: prec_rain, prec_snow, evaporation
+    ! out
+    real(kind=WP), allocatable, dimension(:) :: ice_sublimation, flice, fw_ice, fw_snw, real_salt_flux
+    real(kind=WP), allocatable, dimension(:) :: hf_qlat, hf_qsen, hf_qradtot, hf_qswr, hf_qlwr, hf_qlwrout
+    ! mass budget diagnostics of the ice step
+    real(kind=WP), allocatable, dimension(:) :: sidm_dyn, sidm_cut, sidm_mpre, sisn_dyn, sisn_cut, sisn_spre
+    real(kind=WP), allocatable, dimension(:) :: sidc_dyn, sidc_cut, sidc_apre
+END TYPE T_ICE_FORC
+!
+!_______________________________________________________________________________
 !
 !
 !_______________________________________________________________________________
@@ -196,6 +215,9 @@ TYPE T_ICE
 
     ! put thermodynamics arrays
     type(t_ice_thermo)                          :: thermo
+
+    ! forcing and fluxes of the ice step (ice_import / ice_export)
+    type(t_ice_forc)                            :: forc
     
 #if defined (__oasis) || defined (__ifsinterface) || defined (__yac)
     !___________________________________________________________________________

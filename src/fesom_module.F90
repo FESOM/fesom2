@@ -34,6 +34,7 @@ module fesom_main_storage_module
   use oce_setup_step_module, only: tracer_init
   use oce_setup_step_module, only: ocean_setup
   use ice_setup_step_module, only: ice_setup, ice_timestep
+  use ice_import_export_module, only: ice_import, ice_export
   use ice_oce_coupling_module, only: ocean2ice
   use ice_oce_coupling_module, only: oce_fluxes, oce_fluxes_mom
   use oce_hosing_module, only: fw_surf_anomaly, fw_depth_anomaly
@@ -1156,7 +1157,9 @@ contains
 #if defined (FESOM_PROFILING)
         call fesom_profiler_start("ice_timestep")
 #endif
+                call ice_import(f%ice, f%partit)
                 call ice_timestep(n, f%ice, f%partit, f%mesh)
+                call ice_export(f%ice, f%partit)
 #if defined (FESOM_PROFILING)
         call fesom_profiler_end("ice_timestep")
 #endif
