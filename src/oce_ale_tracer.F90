@@ -449,7 +449,11 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 #if defined (FESOM_PROFILING)
         call fesom_profiler_start("tr_exchange")
 #endif
+#if defined(__recom) && defined(__usetp)
         call exchange_nod(tracers%data(tr_num)%values(:,:), partit)
+#else
+        if (.not. halo_tracers_together) call exchange_nod(tracers%data(tr_num)%values(:,:), partit)
+#endif
 #if defined (FESOM_PROFILING)
         call fesom_profiler_end("tr_exchange")
 #endif
@@ -487,6 +491,32 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         end if ! (num_fesom_groups > 1) then
 #endif
     end do ! EITHER: tr_num = tr_num_start, tr_num_end OR 1, tracers%num_tracers, depending on __usetp
+
+#if !(defined(__recom) && defined(__usetp))
+    ! halo_tracers_together: the halos of all tracers after the loop, three per exchange
+    if (halo_tracers_together) then
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("tr_exchange")
+#endif
+        tr_num = 1
+        do while (tr_num <= tracers%num_tracers)
+            if (tr_num+2 <= tracers%num_tracers) then
+                call exchange_nod(tracers%data(tr_num)%values, tracers%data(tr_num+1)%values, &
+                                  tracers%data(tr_num+2)%values, partit)
+                tr_num = tr_num+3
+            else if (tr_num+1 <= tracers%num_tracers) then
+                call exchange_nod(tracers%data(tr_num)%values, tracers%data(tr_num+1)%values, partit)
+                tr_num = tr_num+2
+            else
+                call exchange_nod(tracers%data(tr_num)%values, partit)
+                tr_num = tr_num+1
+            end if
+        end do
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("tr_exchange")
+#endif
+    end if
+#endif
     
 #if defined(__recom) && defined(__usetp)
 ! if tracer in group was added to compensate for fragmentation its broadcast of the last index is handled here
