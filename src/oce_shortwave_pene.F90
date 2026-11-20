@@ -84,6 +84,7 @@ subroutine cal_shortwave_rad(ice, partit, mesh)
      nzmax=(mesh%nlevels_nod2D(n2))
      nzmin=(mesh%ulevels_nod2D(n2))
      sw_3d(nzmin, n2)=swsurf
+!GCC$ novector
      do k=nzmin+1, nzmax
         aux=v1*exp((mesh%zbar_3d_n(k,n2)-mesh%zbar_3d_n(nzmin,n2))/sc1) &
            +v2*exp((mesh%zbar_3d_n(k,n2)-mesh%zbar_3d_n(nzmin,n2))/sc2)
