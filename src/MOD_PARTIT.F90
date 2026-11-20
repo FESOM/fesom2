@@ -133,6 +133,10 @@ TYPE T_PARTIT
   integer, allocatable ::  remPtr_elem2D(:), remList_elem2D(:)
 
   logical :: elem_full_flag
+  ! 3D halo exchange of wet levels only (halo_wet_levels): level bounds of all local points
+  logical :: halo_wet = .false.
+  integer :: wet_nl = 0
+  integer, allocatable :: wet_ulev_nod(:), wet_nlev_nod(:), wet_ulev_elem(:), wet_nlev_elem(:)
 
   contains
 #if defined(__PGI)

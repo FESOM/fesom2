@@ -231,6 +231,8 @@ module g_config
   logical                       :: use_hosing=.false.     ! impose an Antarctic freshwater anomaly
   character(10)                 :: hosing_mode='surf'     ! 'surf' = surface virtual salinity flux, 'depth' = distributed over depth
   real(kind=WP)                 :: hosing_hSv=0.0_WP      ! freshwater anomaly magnitude [Sv]
+  ! *** parallel communication ***
+  logical                       :: halo_wet_levels=.false. ! 3D halo exchange sends only the wet levels of each halo point
   logical                       :: compute_oasis_corners=.false. ! switches on corner calculation for 1st order conserv remapping 
   logical                       :: use_atm_ice_tskin=.false.  ! OpenIFS: receive the ice-tile skin temperature (tsk_ico) and use it as the ice surface temperature
   logical                       :: use_atm_mslp=.false.       ! OpenIFS: receive mean sea-level pressure (mslp_oce) into press_air, for the air-sea gas exchange (REcoM, transient tracers)
@@ -242,13 +244,13 @@ module g_config
                         use_cavity_partial_cell, cavity_partial_cell_thresh, &
                         use_cavity_fw2press, cavity_gamma_scale, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso, &
                         use_transit, compute_oasis_corners, use_atm_ice_tskin, use_atm_mslp, num_fesom_groups, &
-                        use_hosing, hosing_mode, hosing_hSv
+                        use_hosing, hosing_mode, hosing_hSv, halo_wet_levels
 #else
   namelist /run_config/ use_ice,use_floatice, use_sw_pene, conservation_freq, use_cavity, & 
                         use_cavity_partial_cell, cavity_partial_cell_thresh, &
                         use_cavity_fw2press, cavity_gamma_scale, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso, &
                         use_transit, compute_oasis_corners, use_atm_ice_tskin, use_atm_mslp, &
-                        use_hosing, hosing_mode, hosing_hSv
+                        use_hosing, hosing_mode, hosing_hSv, halo_wet_levels
 #endif
 
   !_____________________________________________________________________________

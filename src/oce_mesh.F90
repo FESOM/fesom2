@@ -4,7 +4,7 @@ module oce_mesh_module
     use par_support_module, only: par_abort
     USE g_config
     USE g_ROTATE_grid
-    USE par_support_module, only: par_abort, init_mpi_types, init_gatherLists
+    USE par_support_module, only: par_abort, init_mpi_types, init_mpi_types_wet, init_gatherLists
     USE iso_fortran_env, only: error_unit
     USE o_PARAM
     USE o_ARRAYS
@@ -68,6 +68,7 @@ IMPLICIT NONE
       
       if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call find_levels_min_e2n'//achar(27)//'[0m'
       call find_levels_min_e2n(partit, mesh)
+      if (halo_wet_levels) call init_mpi_types_wet(partit, mesh)
       
       if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call mesh_areas'//achar(27)//'[0m'
       call mesh_areas(partit, mesh)

@@ -41,6 +41,12 @@ module g_comm
      type(c_ptr)                :: f(3)
      integer                    :: nf = 0, inner = 0, ntot = 0
      logical                    :: pending = .false.
+     ! wet levels only (halo_wet_levels): per send/receive point the top level, the level
+     ! count and its prefix sum, for nl-1 layer (1) and nl interface (2) arrays
+     logical                    :: wet = .false.
+     integer                    :: lay = 1, nval = 1
+     integer,       allocatable :: wtop_s(:), wcnt_s(:,:), wpre_s(:,:)
+     integer,       allocatable :: wtop_r(:), wcnt_r(:,:), wpre_r(:,:)
   end type g2g_cols_state
   type(g2g_cols_state), target :: g2g_cols(2)
 #endif
@@ -506,7 +512,8 @@ end if
 #endif
     if(lg2g) then
 #ifdef ENABLE_OPENACC
-       call g2g_cols_begin(1, size(nod_array3D,1), size(nod_array3D,2), partit, nod_array3D)
+       call g2g_cols_begin(1, size(nod_array3D,1), size(nod_array3D,2), partit, nod_array3D, &
+            nlev=size(nod_array3D,1), nval=1)
        return
 #endif
       !$ACC HOST_DATA USE_DEVICE(nod_array3D) 
@@ -608,7 +615,8 @@ end if
 
   if(lg2g) then 
 #ifdef ENABLE_OPENACC
-     call g2g_cols_begin(1, size(nod1_array3D,1), size(nod1_array3D,2), partit, nod1_array3D, nod2_array3D)
+     call g2g_cols_begin(1, size(nod1_array3D,1), size(nod1_array3D,2), partit, nod1_array3D, nod2_array3D, &
+          nlev=size(nod1_array3D,1), nval=1)
      return
 #endif
      !$ACC HOST_DATA USE_DEVICE(nod1_array3D, nod2_array3D) 
@@ -718,7 +726,8 @@ if (partit%npes>1) then
 
   if(lg2g) then
 #ifdef ENABLE_OPENACC
-     call g2g_cols_begin(1, size(nod_array3D,1)*size(nod_array3D,2), size(nod_array3D,3), partit, nod_array3D)
+     call g2g_cols_begin(1, size(nod_array3D,1)*size(nod_array3D,2), size(nod_array3D,3), partit, nod_array3D, &
+          nlev=size(nod_array3D,2), nval=size(nod_array3D,1))
      return
 #endif
     !$ACC HOST_DATA USE_DEVICE(nod_array3D)
@@ -907,13 +916,14 @@ END SUBROUTINE g2g_unpack_2fields
 
 ! Packed device exchange of nf (1-3) contiguous device fields over the nodal (kind=1) or elemental (kind=2)
 ! halo: whole columns of the listed points, same values as the MPI indexed datatypes, one message per neighbour.
-SUBROUTINE g2g_cols_begin(kind, inner, ntot, partit, a1, a2, a3)
+SUBROUTINE g2g_cols_begin(kind, inner, ntot, partit, a1, a2, a3, nlev, nval)
 USE MOD_PARTIT
 IMPLICIT NONE
 integer,        intent(in)                     :: kind, inner, ntot
 type(t_partit), intent(inout), target          :: partit
 real(kind=WP),  intent(inout), target          :: a1(*)
 real(kind=WP),  intent(inout), target, optional:: a2(*), a3(*)
+integer,        intent(in),            optional:: nlev, nval
 type(g2g_cols_state), pointer :: st
 type(com_struct),     pointer :: com
 real(kind=WP), pointer :: f1(:), f2(:), f3(:), sb(:), rb(:)
@@ -933,6 +943,11 @@ nr=com%rptr(rn+1)-1
 nf=1
 if (present(a2)) nf=2
 if (present(a3)) nf=3
+if (partit%halo_wet .and. present(nlev)) then
+   call g2g_cols_wet_begin(st, kind, com, inner, ntot, nlev, nval, nf, partit, a1, a2, a3)
+   return
+end if
+st%wet=.false.
 blk=nf*inner
 call g2g_cols_alloc(st, com, blk*ns, blk*nr)
 
@@ -998,6 +1013,10 @@ integer, pointer       :: rl(:)
 integer :: i, j, k, nr, inner, blk
 
 st => g2g_cols(kind)
+if (st%wet) then
+   call g2g_cols_wet_unpack(st, kind, partit)
+   return
+end if
 if (kind==1) then
    nr=partit%com_nod2D%rptr(partit%com_nod2D%rPEnum+1)-1
 else
@@ -1020,6 +1039,183 @@ end do
 st%pending=.false.
 st%nf=0
 END SUBROUTINE g2g_cols_unpack
+
+! Packed device exchange of wet levels only: per point the levels ulevels..nlevels-1 (layer
+! arrays, nlev = nl-1) or ulevels..nlevels (interface arrays, nlev = nl), each with nval values;
+! the same values as the MPI datatypes built by init_mpi_types_wet.
+SUBROUTINE g2g_cols_wet_begin(st, kind, com, inner, ntot, nlev, nval, nf, partit, a1, a2, a3)
+USE MOD_PARTIT
+IMPLICIT NONE
+type(g2g_cols_state), intent(inout), target    :: st
+integer,        intent(in)                     :: kind, inner, ntot, nlev, nval, nf
+type(com_struct), intent(inout)                :: com
+type(t_partit), intent(inout), target          :: partit
+real(kind=WP),  intent(inout), target          :: a1(*)
+real(kind=WP),  intent(inout), target, optional:: a2(*), a3(*)
+real(kind=WP), pointer :: f1(:), f2(:), f3(:), sb(:), rb(:)
+integer, pointer       :: sl(:), tp(:), cp(:,:), pp(:,:)
+integer :: i, j, n, sn, rn, ns, nr, a, l, blk, lay, c, base, off
+
+sn=com%sPEnum
+rn=com%rPEnum
+ns=com%sptr(sn+1)-1
+nr=com%rptr(rn+1)-1
+if (.not. allocated(st%wtop_s)) call g2g_cols_wet_init(st, kind, com, partit)
+lay=2
+if (nlev==partit%wet_nl-1) lay=1
+blk=nf*nval
+call g2g_cols_alloc(st, com, blk*st%wpre_s(ns,lay), blk*st%wpre_r(nr,lay))
+
+st%f(1)=c_loc(a1(1)); call c_f_pointer(st%f(1), f1, [inner*ntot])
+if (nf>=2) then; st%f(2)=c_loc(a2(1)); call c_f_pointer(st%f(2), f2, [inner*ntot]); end if
+if (nf==3) then; st%f(3)=c_loc(a3(1)); call c_f_pointer(st%f(3), f3, [inner*ntot]); end if
+sb => st%sbuf
+rb => st%rbuf
+sl => st%slist
+tp => st%wtop_s
+cp => st%wcnt_s
+pp => st%wpre_s
+!$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) PRIVATE(c, base, off)
+do i=1, ns
+   c=cp(i,lay)*nval
+   base=pp(i-1,lay)*blk
+   off=(sl(i)-1)*inner+(tp(i)-1)*nval
+!$ACC LOOP VECTOR
+   do j=1, c
+      sb(base+j)=f1(off+j)
+   end do
+end do
+!$ACC END PARALLEL LOOP
+if (nf>=2) then
+!$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) PRIVATE(c, base, off)
+do i=1, ns
+   c=cp(i,lay)*nval
+   base=pp(i-1,lay)*blk+c
+   off=(sl(i)-1)*inner+(tp(i)-1)*nval
+!$ACC LOOP VECTOR
+   do j=1, c
+      sb(base+j)=f2(off+j)
+   end do
+end do
+!$ACC END PARALLEL LOOP
+end if
+if (nf==3) then
+!$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) PRIVATE(c, base, off)
+do i=1, ns
+   c=cp(i,lay)*nval
+   base=pp(i-1,lay)*blk+2*c
+   off=(sl(i)-1)*inner+(tp(i)-1)*nval
+!$ACC LOOP VECTOR
+   do j=1, c
+      sb(base+j)=f3(off+j)
+   end do
+end do
+!$ACC END PARALLEL LOOP
+end if
+
+!$ACC HOST_DATA USE_DEVICE(sb, rb)
+do n=1, rn
+   a=st%wpre_r(com%rptr(n)-1,lay)*blk+1
+   l=(st%wpre_r(com%rptr(n+1)-1,lay)-st%wpre_r(com%rptr(n)-1,lay))*blk
+   call MPI_IRECV(rb(a), l, MPI_WP, com%rPE(n), com%rPE(n), partit%MPI_COMM_FESOM, com%req(n), partit%MPIerr)
+end do
+do n=1, sn
+   a=st%wpre_s(com%sptr(n)-1,lay)*blk+1
+   l=(st%wpre_s(com%sptr(n+1)-1,lay)-st%wpre_s(com%sptr(n)-1,lay))*blk
+   call MPI_ISEND(sb(a), l, MPI_WP, com%sPE(n), partit%mype, partit%MPI_COMM_FESOM, com%req(rn+n), partit%MPIerr)
+end do
+!$ACC END HOST_DATA
+com%nreq=rn+sn
+st%nf=nf
+st%inner=inner
+st%ntot=ntot
+st%nval=nval
+st%lay=lay
+st%wet=.true.
+st%pending=.true.
+END SUBROUTINE g2g_cols_wet_begin
+
+SUBROUTINE g2g_cols_wet_unpack(st, kind, partit)
+USE MOD_PARTIT
+IMPLICIT NONE
+type(g2g_cols_state), intent(inout), target :: st
+integer,        intent(in)            :: kind
+type(t_partit), intent(inout), target :: partit
+real(kind=WP), pointer :: f(:), rb(:)
+integer, pointer       :: rl(:), tp(:), cp(:,:), pp(:,:)
+integer :: i, j, k, nr, inner, nval, lay, blk, c, base, off
+
+if (kind==1) then
+   nr=partit%com_nod2D%rptr(partit%com_nod2D%rPEnum+1)-1
+else
+   nr=partit%com_elem2D%rptr(partit%com_elem2D%rPEnum+1)-1
+end if
+inner=st%inner
+nval=st%nval
+lay=st%lay
+blk=st%nf*nval
+rb => st%rbuf
+rl => st%rlist
+tp => st%wtop_r
+cp => st%wcnt_r
+pp => st%wpre_r
+do k=1, st%nf
+   call c_f_pointer(st%f(k), f, [inner*st%ntot])
+!$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) PRIVATE(c, base, off)
+   do i=1, nr
+      c=cp(i,lay)*nval
+      base=pp(i-1,lay)*blk+(k-1)*c
+      off=(rl(i)-1)*inner+(tp(i)-1)*nval
+!$ACC LOOP VECTOR
+      do j=1, c
+         f(off+j)=rb(base+j)
+      end do
+   end do
+!$ACC END PARALLEL LOOP
+end do
+st%pending=.false.
+st%nf=0
+st%wet=.false.
+END SUBROUTINE g2g_cols_wet_unpack
+
+! Top level, wet level counts and their prefix sums of the send and receive points.
+SUBROUTINE g2g_cols_wet_init(st, kind, com, partit)
+USE MOD_PARTIT
+IMPLICIT NONE
+type(g2g_cols_state), intent(inout) :: st
+integer,          intent(in)        :: kind
+type(com_struct), intent(in)        :: com
+type(t_partit),   intent(in)        :: partit
+integer :: ns, nr
+
+ns=com%sptr(com%sPEnum+1)-1
+nr=com%rptr(com%rPEnum+1)-1
+allocate(st%wtop_s(max(1,ns)), st%wcnt_s(max(1,ns),2), st%wpre_s(0:ns,2))
+allocate(st%wtop_r(max(1,nr)), st%wcnt_r(max(1,nr),2), st%wpre_r(0:nr,2))
+call levels(com%slist, ns, st%wtop_s, st%wcnt_s, st%wpre_s)
+call levels(com%rlist, nr, st%wtop_r, st%wcnt_r, st%wpre_r)
+!$ACC ENTER DATA COPYIN(st%wtop_s, st%wcnt_s, st%wpre_s, st%wtop_r, st%wcnt_r, st%wpre_r)
+contains
+subroutine levels(list, np, top, cnt, pre)
+   integer, intent(in)  :: list(:), np
+   integer, intent(out) :: top(:), cnt(:,:), pre(0:,:)
+   integer :: i, p, u, b, nl
+   nl=partit%wet_nl
+   pre(0,:)=0
+   do i=1, np
+      p=list(i)
+      if (kind==1) then
+         u=partit%wet_ulev_nod(p); b=partit%wet_nlev_nod(p)
+      else
+         u=partit%wet_ulev_elem(p); b=partit%wet_nlev_elem(p)
+      end if
+      top(i)=u
+      cnt(i,1)=max(0, min(b-1, nl-1)-u+1)
+      cnt(i,2)=max(0, min(b, nl)-u+1)
+      pre(i,:)=pre(i-1,:)+cnt(i,:)
+   end do
+end subroutine levels
+END SUBROUTINE g2g_cols_wet_init
 
 ! Device buffers (grown on demand) and lists of one halo kind.
 SUBROUTINE g2g_cols_alloc(st, com, nsb, nrb)
@@ -1122,7 +1318,8 @@ if (partit%npes> 1) then
 
         if(lg2g) then
 #ifdef ENABLE_OPENACC
-           call g2g_cols_begin(2, size(elem_array3D,1), size(elem_array3D,2), partit, elem_array3D)
+           call g2g_cols_begin(2, size(elem_array3D,1), size(elem_array3D,2), partit, elem_array3D, &
+                nlev=size(elem_array3D,1), nval=1)
            return
 #endif
          !$ACC HOST_DATA USE_DEVICE(elem_array3D)
@@ -1159,7 +1356,8 @@ if (partit%npes> 1) then
 #endif
         if(lg2g) then
 #ifdef ENABLE_OPENACC
-           call g2g_cols_begin(2, size(elem_array3D,1), size(elem_array3D,2), partit, elem_array3D)
+           call g2g_cols_begin(2, size(elem_array3D,1), size(elem_array3D,2), partit, elem_array3D, &
+                nlev=size(elem_array3D,1), nval=1)
            return
 #endif
           !$ACC HOST_DATA USE_DEVICE(elem_array3D)
@@ -1359,7 +1557,8 @@ end if
 #endif
      if(lg2g) then
 #ifdef ENABLE_OPENACC
-        call g2g_cols_begin(2, size(elem_array3D,1)*size(elem_array3D,2), size(elem_array3D,3), partit, elem_array3D)
+        call g2g_cols_begin(2, size(elem_array3D,1)*size(elem_array3D,2), size(elem_array3D,3), partit, elem_array3D, &
+             nlev=size(elem_array3D,2), nval=size(elem_array3D,1))
         return
 #endif
        !$ACC HOST_DATA USE_DEVICE(elem_array3D)
