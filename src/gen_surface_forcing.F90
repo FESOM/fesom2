@@ -250,30 +250,30 @@ CONTAINS
 
       ! get dimensions
       if (partit%mype==0) then
-         iost = nf_inq_dimid(ncid,    "LAT",      id_latd)
+         iost = nf_inq_dimid(ncid, "LAT", id_latd)
          if (iost .ne. NF_NOERR) then
-            iost = nf_inq_dimid(ncid, "lat",      id_latd)
+            iost = nf_inq_dimid(ncid, "lat", id_latd)
          end if
          if (iost .ne. NF_NOERR) then
             iost = nf_inq_dimid(ncid, "latitude", id_latd)
          end if
          if (iost .ne. NF_NOERR) then
-            iost = nf_inq_dimid(ncid, "LAT1",     id_latd)
+            iost = nf_inq_dimid(ncid, "LAT1", id_latd)
          end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name,partit)  
 
       if (partit%mype==0) then 
-         iost = nf_inq_dimid(ncid,    "LON",       id_lond)
+         iost = nf_inq_dimid(ncid, "LON", id_lond)
          if (iost .ne. NF_NOERR) then
-            iost = nf_inq_dimid(ncid, "lon",       id_lond)
+            iost = nf_inq_dimid(ncid, "lon", id_lond)
          end if
          if (iost .ne. NF_NOERR) then
             iost = nf_inq_dimid(ncid, "longitude", id_lond)
          end if
          if (iost .ne. NF_NOERR) then
-            iost = nf_inq_dimid(ncid, "LON1",      id_lond)
+            iost = nf_inq_dimid(ncid, "LON1", id_lond)
          end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
@@ -281,11 +281,11 @@ CONTAINS
 
       if (partit%mype==0) then   
          iost = nf_inq_dimid(ncid, "TIME", id_timed)
-         if      (iost .ne. NF_NOERR) then
-                 iost = nf_inq_dimid(ncid, "time",  id_timed)
+         if (iost .ne. NF_NOERR) then
+            iost = nf_inq_dimid(ncid, "time", id_timed)
          end if
-         if      (iost .ne. NF_NOERR) then
-                 iost = nf_inq_dimid(ncid, "TIME1", id_timed)
+         if (iost .ne. NF_NOERR) then
+            iost = nf_inq_dimid(ncid, "TIME1", id_timed)
          end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
@@ -293,29 +293,29 @@ CONTAINS
 
       ! get variable id
       if (partit%mype==0) then
-         iost = nf_inq_varid(ncid,    "LAT",      id_lat)
+         iost = nf_inq_varid(ncid, "LAT", id_lat)
          if (iost .ne. NF_NOERR) then
-            iost = nf_inq_varid(ncid, "lat",      id_lat)
+            iost = nf_inq_varid(ncid, "lat", id_lat)
          end if
          if (iost .ne. NF_NOERR) then
             iost = nf_inq_varid(ncid, "latitude", id_lat)
          end if
          if (iost .ne. NF_NOERR) then
-            iost = nf_inq_varid(ncid, "LAT1",     id_lat)
+            iost = nf_inq_varid(ncid, "LAT1", id_lat)
          end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name,partit)
       if (partit%mype==0) then
-         iost = nf_inq_varid(ncid,    "LON",       id_lon)
-         if      (iost .ne. NF_NOERR) then
+         iost = nf_inq_varid(ncid, "LON", id_lon)
+         if (iost .ne. NF_NOERR) then
             iost = nf_inq_varid(ncid, "longitude", id_lon)
          end if
          if (iost .ne. NF_NOERR) then
-            iost = nf_inq_varid(ncid, "lon",       id_lon)
+            iost = nf_inq_varid(ncid, "lon", id_lon)
          end if
          if (iost .ne. NF_NOERR) then
-            iost = nf_inq_varid(ncid, "LON1",      id_lon)
+            iost = nf_inq_varid(ncid, "LON1", id_lon)
          end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
@@ -323,11 +323,11 @@ CONTAINS
 
       if (partit%mype==0) then
          iost = nf_inq_varid(ncid, "TIME", id_time)
-         if      (iost .ne. NF_NOERR) then
-                 iost = nf_inq_varid(ncid, "time", id_time)
+         if (iost .ne. NF_NOERR) then
+            iost = nf_inq_varid(ncid, "time", id_time)
          end if
-         if      (iost .ne. NF_NOERR) then
-                 iost = nf_inq_varid(ncid, "TIME1",id_time)
+         if (iost .ne. NF_NOERR) then
+            iost = nf_inq_varid(ncid, "TIME1",id_time)
          end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
@@ -390,14 +390,14 @@ CONTAINS
         iost = nf_get_vara_double(ncid, id_time, nf_start, nf_edges, flf%nc_time)
         ! digg for calendar attribute in time axis variable         
     end if
-    call MPI_BCast(flf%nc_time, flf%nc_Ntime,   MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
+    call MPI_BCast(flf%nc_time, flf%nc_Ntime, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
     call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
     call check_nferr(iost,flf%file_name,partit)
       
     ! digg for calendar attribute in time axis variable
     if (partit%mype==0) then
-        iost         = nf_inq_attlen(ncid, id_time,'calendar',aux_len)
-        iost         = nf_get_att(ncid, id_time,'calendar',aux_calendar)
+        iost = nf_inq_attlen(ncid, id_time, 'calendar', aux_len)
+        iost = nf_get_att(ncid, id_time, 'calendar', aux_calendar)
         aux_calendar = aux_calendar(1:aux_len)
         if (iost .ne. NF_NOERR) then
             flf%calendar='none'
@@ -1209,13 +1209,24 @@ endif
       
       !==========================================================================
 #endif
-      ! runoff
-      if (runoff_data_source=='CORE1' .or. runoff_data_source=='CORE2' ) then
-         ! runoff in CORE is constant in time
-         ! Warning: For a global mesh, conservative scheme is to be updated!!
-         call read_other_NetCDF(nm_runoff_file, 'Foxx_o_roff', 1, runoff, .false., .true., partit, mesh) 
-         runoff=runoff/1000.0_WP  ! Kg/s/m2 --> m/s
-      end if
+    
+    !___________________________________________________________________________
+    ! check river runoff
+    ! when used runoff_data_source='CORE1' or 'CORE2' we use a total climatological 
+    ! runoff, so only one runoff time slice for the entire simulation is used. 
+    ! This part is only read ones when the forcing is first time initialized
+    if (runoff_data_source=='CORE1' .or. runoff_data_source=='CORE2' ) then
+        if (mype==0) then 
+            write(*,*) ' --> using total longterm runoff climatology (only 1 time slice) '
+            write(*,*) '     runoff_data_source = ', runoff_data_source
+            write(*,*) '     nm_runoff_file     = ', trim(nm_runoff_file)
+            write(*,*)
+        end if     
+        ! runoff in CORE is constant in time
+        ! Warning: For a global mesh, conservative scheme is to be updated!!
+        call read_other_NetCDF(nm_runoff_file, 'Foxx_o_roff', 1, runoff, .false., .true., partit, mesh) 
+        runoff=runoff/1000.0_WP  ! Kg/s/m2 --> m/s
+    end if
 
       if (use_sw_pene) then
          if (chl_data_source == 'Sweeney') then
@@ -1227,8 +1238,9 @@ endif
          end if
       end if
 
-      if (mype==0) write(*,*) "DONE:  Ocean forcing initialization."
-      if (mype==0) write(*,*) 'Parts of forcing data (only constant in time fields) are read'
+    !___________________________________________________________________________
+    if (mype==0) write(*,*) "DONE:  Ocean forcing initialization."
+    if (mype==0) write(*,*) 'Parts of forcing data (only constant in time fields) are read'
 
 #if defined(__recom)
         ! OPEN and read namelist for SBC REcoM
@@ -1240,6 +1252,9 @@ endif
             call par_ex(partit%MPI_COMM_FESOM, partit%mype)
             stop
         endif
+
+    
+
         READ( nm_sbc_unit+1, nml=nam_rsbc, iostat=iost )
         close( nm_sbc_unit+1 )
 #endif
@@ -1278,7 +1293,8 @@ endif
       character(4)              :: currentCO2year_char
       real(kind=8), allocatable :: ncdata(:)
       integer                   :: CO2start, CO2count
-      integer	                :: status, ncid, varid
+      real(kind=8)              :: locmax, locmin, glo
+      integer	                :: status, ncid, varid, ierror
       character(300)            :: sedfilename
       logical                   :: do_read=.false.
       integer                   :: n_lb
@@ -1294,6 +1310,7 @@ endif
 #include "associate_mesh_ass.h"
 
       force_newcoeff=.false.
+      update_daily_flag = .false.
       if (yearnew/=yearold) then
          ! use next set of forcing files
          call nc_sbc_ini_fillnames(yearnew)
@@ -1371,111 +1388,127 @@ endif
 !$OMP END PARALLEL DO
       end if
       
-      !==========================================================================
+    !===========================================================================
 
-      ! prepare a flag which checks whether to update monthly data (SSS, river runoff)
-      update_monthly_flag=( (day_in_month==num_day_in_month(fleapyear,month) .AND. timenew==86400._WP) .OR. mstep==1  )
+    ! prepare a flag which checks whether to update monthly data (SSS, river runoff)
+     update_monthly_flag=( (day_in_month==num_day_in_month(fleapyear,month) .AND. timenew==86400._WP) .OR. mstep==1)
      !AWICM
      if (enable_AWICM) then
          !update_daily_flag = ( (timenew==86400._WP) .OR. mstep==1)
          update_daily_flag = (( MOD(timenew, 86400._WP) == 0._WP ) .OR. (mstep == 1))
      endif
 
-      ! read in SSS for applying SSS restoring
-      if (surf_relax_S > 0._WP) then
-         if (sss_data_source=='CORE1' .or. sss_data_source=='CORE2') then
+    !___________________________________________________________________________ 
+    ! read in SSS for applying SSS restoring
+    if (surf_relax_S > 0._WP) then
+        if (sss_data_source=='CORE1' .or. sss_data_source=='CORE2') then
             if (update_monthly_flag) then
-               i=month
-               if (mstep > 1) i=i+1 
-               if (i > 12) i=1
-               if (mype==0) write(*,*) 'Updating SSS restoring data for month     ', i 
-               call read_other_NetCDF(nm_sss_data_file, 'SALT', i, Ssurf, .true., .true., partit, mesh) 
+                i=month
+                if (mstep > 1) i=i+1 
+                if (i > 12) i=1
+                if (mype==0) write(*,*) 'Updating SSS restoring data for month     ', i 
+                call read_other_NetCDF(nm_sss_data_file, 'SALT', i, Ssurf, .true., .true., partit, mesh) 
             end if
-         end if
-      end if
+        end if
+    end if
 
-      ! read in CHL for applying shortwave penetration
-      if (use_sw_pene) then
-         if (chl_data_source=='Sweeney') then
+    !___________________________________________________________________________
+    ! read inCHL for applying shortwave penetration
+    if (use_sw_pene) then
+        if (chl_data_source=='Sweeney') then
             if (update_monthly_flag) then
-               i=month
-               if (mstep > 1) i=i+1 
-               if (i > 12) i=1
-               if (mype==0) write(*,*) 'Updating chlorophyll climatology for month ', i 
-               call read_other_NetCDF(nm_chl_data_file, 'chl', i, chl, .true., .true., partit, mesh) 
+                i=month
+                if (mstep > 1) i=i+1 
+                if (i > 12) i=1
+                if (mype==0) write(*,*) 'Updating chlorophyll climatology for month ', i 
+                call read_other_NetCDF(nm_chl_data_file, 'chl', i, chl, .true., .true., partit, mesh) 
             end if
-         end if
-      end if
+        end if
+    end if
 
-     ! runoff  
-     if(runoff_data_source=='Dai09' .or. runoff_data_source=='JRA55') then
-       
-       if(update_monthly_flag) then
-         if(runoff_climatology) then
-           !climatology monthly mean
-           i=month
-           if (mstep > 1) i=i+1 
-           if (i > 12) i=1
-           if (mype==0) write(*,*) 'Updating monthly climatology runoff for month ', i 
-           filename=trim(nm_runoff_file)
-           call read_2ddata_on_grid_NetCDF(filename,'runoff', i, runoff, partit, mesh)
+    !___________________________________________________________________________
+    ! runoff --> depends on simulated month
+    if(runoff_data_source=='Dai09' .or. runoff_data_source=='JRA55') then
+        ! its the time point for reading the runoff, always at the beginning of 
+        ! a new month
+        if(update_monthly_flag) then
+        
+            ! runnoff can be a monthly climatology
+            if(runoff_climatology) then
+                !climatology monthly mean
+                i=month
+                if (mstep > 1) i=i+1 
+                if (i > 12) i=1
+                if (mype==0) write(*,*) 'Updating monthly climatology runoff for month ', i 
+                filename=trim(nm_runoff_file)
+                call read_2ddata_on_grid_NetCDF(filename,'runoff', i, runoff, partit, mesh)
 
-           !kg/m2/s -> m/s
-           runoff=runoff/1000.0_WP
+                !kg/m2/s -> m/s
+                runoff=runoff/1000.0_WP
 
-         else
-           !monthly data
-           i=month
-           if (mstep > 1) i=i+1 
-           if (i > 12) i=1
-           if (mype==0) write(*,*) 'Updating monthly runoff for month             ', i 
-           filename=trim(nm_runoff_file)//cyearnew//'.nc' 
-           call read_2ddata_on_grid_NetCDF(filename,'runoff', i, runoff, partit, mesh)
-
-           !kg/m2/s -> m/s
-           runoff=runoff/1000.0_WP
-         end if
-       end if
-     end if
+            else
+                !monthly data
+                i=month
+                if (mstep > 1) i=i+1 
+                if (i > 12) i=1
+                if (mype==0) write(*,*) 'Updating monthly runoff for month             ', i 
+                filename=trim(nm_runoff_file)//cyearnew//'.nc' 
+                call read_2ddata_on_grid_NetCDF(filename,'runoff', i, runoff, partit, mesh)
+                !kg/m2/s -> m/s
+                runoff=runoff/1000.0_WP
+            end if ! --> if(runoff_climatology) then
+        end if ! --> if(update_monthly_flag) then
+    end if ! --> if(runoff_data_source=='Dai09' .or. ... 
 
     !river runoff AWICM
+if (enable_AWICM) then
     if(runoff_data_source == 'AWICM') then
             if(update_daily_flag) then
                     !daily data already in m/s
                     i = daynew
+                    if (mstep > 1) i = daynew + 1
                     filename=trim(nm_runoff_file)//cyearnew//'0101_redistributed.nc'
                     if (mype==0) write(*,*) 'Updating daily runoff from:             ', trim(filename)
                     if (mype==0) write(*,*) 'daynew:             ', daynew
                     call read_2ddata_on_grid_NetCDF(filename,'runoff', i, runoff, partit, mesh)
             end if
     end if
+endif
 
 #if defined (__recom)
 
-!<  read surface atmospheric deposition for Fe, N, CO2
+! ============================================================
+!  Read surface atmospheric deposition for Fe, N, CO2
+! ============================================================
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'//achar(27)//'[0m'
 
-! ******** Atmospheric CO2 *********
-    if (mstep == 1) then ! The year has changed
+    ! ----------------------------------------------------------------
+    !  Atmospheric CO2 — update once per year (when mstep == 1)
+    ! ----------------------------------------------------------------
 
-    if (use_atbox) then  
-!     Atmospheric box model CO2 values
-      AtmCO2(:)                   = x_co2atm(1)
-      if (ciso) then 
-        AtmCO2_13(:)              = x_co2atm_13(1)
-        if (ciso_14) AtmCO2_14(:,1) = x_co2atm_14(1)
-      end if
-    else 
-!     Prescribed atmospheric CO2 values
+    if (mstep == 1) then
 
-        if (constant_CO2) then
-            AtmCO2(:) = CO2_for_spinup
-            if (mype==0) write(*,*) 'Constant_CO2 = ', CO2_for_spinup 
-            if (mype==0) write(*,*),'Atm CO2=', AtmCO2     
-            if (ciso) then
-                AtmCO2_13          = CO2_for_spinup * (1. + 0.001 * delta_co2_13)
-                if (ciso_14) then
-!               Atmospheric 14C varies with latitude
+        ! --- Source: Atmospheric box model ---
+        if (use_atbox) then  
+            AtmCO2(:) = x_co2atm(1)
+
+            if (ciso) then 
+                AtmCO2_13(:) = x_co2atm_13(1)
+                if (ciso_14) AtmCO2_14(:,1) = x_co2atm_14(1)
+            end if
+
+        ! --- Source: Prescribed CO2 values ---
+        else
+
+            ! Option A: Constant CO2 (spinup mode)
+            if (constant_CO2) then
+                AtmCO2(:) = CO2_for_spinup
+                if (mype==0) write(*,*) 'Constant_CO2 = ', CO2_for_spinup 
+                if (mype==0) write(*,*),'Atm CO2=', AtmCO2     
+                if (ciso) then
+                    AtmCO2_13          = CO2_for_spinup * (1. + 0.001 * delta_co2_13)
+                    if (ciso_14) then
+!                   Atmospheric 14C varies with latitude
                     do i=1, myDim_nod2D
 !                       Latitude of atmospheric input data
                         lat_val = geo_coord_nod2D(2,i) / rad
@@ -1799,38 +1832,45 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
         if (mype==0) write(*,*) 'Myrio is switched off --> Check namelist.recom'     
     end if
 
-! ******** N deposition *********
+    ! ----------------------------------------------------------------
+    !  Nitrogen (N) deposition
+    ! ----------------------------------------------------------------
     if (useAeolianN) then
-! todo: check below when useAeolianN is .true.
-        if (mstep==1) then ! The year has changed
-            i=month
-!            if (mstep > 1) i=i+1 
-!            if (i > 12) i=1
-!            if (mype==0) write(*,*) 'Updating iron climatology for month ', i 
-            filename=trim(nm_aen_data_file)
-            if (mype==0) write(*,*) 'Updating nitrogen climatology for month   ', i,' from ', trim(filename)
-            if (yearnew .gt. 2009) then
+        ! TODO: verify behaviour when useAeolianN is .true.
+        if (mstep == 1) then  ! Year has changed — update annually
+
+            i        = month
+            filename = trim(nm_aen_data_file)
+
+            ! Select variable name based on year bounds
+            if (yearnew > 2009) then
                 Nvari = 'NDep2009'
-            else if (yearnew .lt. 1850) then
+            else if (yearnew < 1850) then
                 Nvari = 'NDep1850'
             else
-                Nvari = 'NDep'//cyearnew
-            endif
+                Nvari = 'NDep' // cyearnew
+            end if
 
             call read_2ddata_on_grid_NetCDF(filename, Nvari, i, GloNDust, partit, mesh)
+
         end if
     else
         GloNDust = 0.0_WP
-        if (mstep==1 .and. mype==0) write(*,*) 'useAeolianN is switched off'       
+        if (mstep==1 .and. mype==0) write(*,*) 'useAeolianN is switched off'
     end if
 
-! ******** Riverine input (Nutrients) *********
+    !-----------------------------------------------------------------------------
+    ! Configure river nutrient inputs
+    !-----------------------------------------------------------------------------
+
     if (useRivers) then
-!<  read riverine input
+
     ! *** River inputs are in mmol/m2/s ***
-    ! add river nutrients as surface boundary condition (surface_bc function in oce_ale_tracers)
+
         if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'   --> River_input'//achar(27)//'[0m'
 
+        ! add river nutrients as surface boundary condition (surface_bc function in oce_ale_tracers)
+        ! Enable river input flag
         is_riverinput = 1.0d0
 
         if (update_monthly_flag) then
@@ -1858,41 +1898,70 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
 
             RiverDSi2D = RiverDIN2D * (16/15)
         end if
-    else
-        is_riverinput = 0.0d0
-        if (mype==0 .and. mstep==1) write(*,*) 'No riverine input' 
-    end if
+        !-------------------------------------------------------------------------
+        ! RIVERS DISABLED: zero out all riverine fluxes
+        !-------------------------------------------------------------------------
+        else
+ 
+            is_riverinput = 0.0d0
+            if (mype==0 .and. mstep==1) write(*,*) 'No riverine input' 
+        end if ! useRivers
 
-! ******** Riverine input of iron *********
+    !-----------------------------------------------------------------------------
+    ! Riverine iron input
+    !-----------------------------------------------------------------------------
+
     if (useRivFe) then
-    ! River runoff (m/s) is multiplied with Fe concentration * muemolFe/m3 -> muemolFe/m2/s
-    ! add river nutrients as surface boundary condition (surface_bc function in
-    ! oce_ale_tracers)
+
+        ! River runoff (m/s) is multiplied with Fe concentration * muemolFe/m3 -> muemolFe/m2/s
+        ! add river nutrients as surface boundary condition (surface_bc function in
+        ! oce_ale_tracers)
         RiverFe = runoff * RiverFeConc
     else
+
         RiverFe = 0.0d0
+
     end if
 
-! ******** Erosion (Nutrients) *********
-    if (useErosion) then
-!<  read erosion input
-    ! *** River inputs are in mmol/m2/s ***
-    ! add erosion nutrients as surface boundary condition (surface_bc function in oce_ale_tracers)
-    if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//' --> Erosion_input'//achar(27)//'[0m'
+        !=========================================================================
+        ! EROSION INPUT MODULE — REcoM Biogeochemistry
+        !
+        ! Applies monthly erosion fluxes as a surface boundary condition.
+        ! Units: mmol m⁻² s⁻¹  (passed to surface_bc in oce_ale_tracers)
+        !
+        ! Variables loaded:
+        !   POC  → ErosionTOC2D   (particulate organic carbon)
+        !   PON  → ErosionTON2D   (particulate organic nitrogen)
+        !   TSi  → ErosionTSi2D   (silicate, derived from TON via Redfield ratio)
+        !
+        ! Note: Silicate is not stored in the erosion file; it is estimated
+        !       from TON using a Redfield-like Si:N ratio of 16:15.
+        !=========================================================================
+ 
+        if (useErosion) then
 
-    is_erosioninput = 1.0d0
+            is_erosioninput = 1.0d0
 
+            !--- Optional debug trace (ANSI cyan, rank 0 only) ---
+            !if (recom_debug .and. mype == 0) then
+            !    print *, achar(27)//'[36m'//' --> Erosion_input'//achar(27)//'[0m'
+            !end if
         if (update_monthly_flag) then
-            i=month
-            if (mstep > 1) i=i+1 
-            if (i > 12) i=1
-            filename=trim(nm_erosion_data_file)
-            if (mype==0) write(*,*) 'Updating erosion restoring data for month ', i,' from ', trim(filename)
-            call read_2ddata_on_grid_NetCDF(filename,'POC', i, ErosionTOC2D, partit, mesh)
-            ! write(*,*) mype, 'ErosionTOC2D', maxval(ErosionTOC2D(:)), minval(ErosionTOC2D(:))    
+ 
+                !--- Compute current month index with year-end wrap-around ---
+                ! At mstep == 1 the month index is used as-is; thereafter it is
+                ! incremented by 1 to advance to the next calendar month.
+                i = month
+                if (mstep > 1) i = i + 1
+                if (i > 12)    i = 1
+
+                filename = trim(nm_erosion_data_file)
+                if (mype==0) write(*,*) 'Updating erosion restoring data for month ', i,' from ', trim(filename)
+                call read_2ddata_on_grid_NetCDF(filename,'POC', i, ErosionTOC2D, partit, mesh)
+                ! write(*,*) mype, 'ErosionTOC2D', maxval(ErosionTOC2D(:)), minval(ErosionTOC2D(:))    
     
-            call read_2ddata_on_grid_NetCDF(filename,'PON', i, ErosionTON2D, partit, mesh)
-            ! write(*,*) mype, 'ErosionTON2D', maxval(ErosionTON2D(:)), minval(ErosionTON2D(:))        
+                call read_2ddata_on_grid_NetCDF(filename,'PON', i, ErosionTON2D, partit, mesh)
+                ! write(*,*) mype, 'ErosionTON2D', maxval(ErosionTON2D(:)), minval(ErosionTON2D(:))        
 
             ! No silicates in erosion, we convert from nitrogen with redfieldian ratio     
 	    ErosionTSi2D=ErosionTON2D * 16/15

@@ -517,6 +517,9 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
             Tair(i)     = 0.0_WP
             prec_rain(i)= 0.0_WP
             prec_snow(i)= 0.0_WP
+!            if (l_snow) then
+!               prec_rain(n) = max(prec_rain(n) - prec_snow(n), 0.0_WP) !PREC already included snow, now corrected by new forcing files
+!            end if
             if (l_mslp) then
                press_air(i)= 0.0_WP 
             end if
