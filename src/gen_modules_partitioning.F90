@@ -11,7 +11,7 @@ module par_support_module
     implicit none
 
     private
-    public :: par_init, par_abort, par_finalize, init_mpi_types, init_mpi_types_fbin, &
+    public :: par_init, par_abort, par_finalize, init_mpi_types, init_mpi_types_wet, init_mpi_types_fbin, &
               init_gatherLists, status_check
 
 contains
@@ -508,6 +508,106 @@ subroutine init_mpi_types(partit, mesh)
       deallocate(blocklen_tmp, displace_tmp)
    endif
 end subroutine init_mpi_types
+
+!=======================================================================
+! Rebuild the 3D halo datatypes so that each halo point carries only its wet
+! levels (ulevels..nlevels-1 for nl-1 layer arrays, ulevels..nlevels for nl
+! interface arrays) instead of whole columns, and keep the level bounds of all
+! local points for the packed device exchange. Called from mesh_setup after the
+! level arrays are known (halo_wet_levels in namelist.config).
+subroutine init_mpi_types_wet(partit, mesh)
+  implicit none
+  type(t_partit), intent(inout), target :: partit
+  type(t_mesh),   intent(in),    target :: mesh
+  integer          :: n, nl1, n_val, sz, ierr
+  integer(8)       :: bytes(4), tot(4)
+
+  partit%halo_wet = .true.
+  partit%wet_nl   = mesh%nl
+  allocate(partit%wet_ulev_nod(size(mesh%ulevels_nod2D)), partit%wet_nlev_nod(size(mesh%nlevels_nod2D)))
+  allocate(partit%wet_ulev_elem(size(mesh%ulevels)),      partit%wet_nlev_elem(size(mesh%nlevels)))
+  partit%wet_ulev_nod  = mesh%ulevels_nod2D
+  partit%wet_nlev_nod  = mesh%nlevels_nod2D
+  partit%wet_ulev_elem = mesh%ulevels
+  partit%wet_nlev_elem = mesh%nlevels
+  if (partit%npes <= 1) return
+
+  bytes = 0
+  do n = 1, partit%com_nod2D%rPEnum
+     call MPI_TYPE_SIZE(partit%r_mpitype_nod3D(n,mesh%nl-1,1), sz, ierr); bytes(1) = bytes(1) + sz
+  end do
+  do n = 1, partit%com_elem2D%rPEnum
+     call MPI_TYPE_SIZE(partit%r_mpitype_elem3D(n,mesh%nl-1,1), sz, ierr); bytes(3) = bytes(3) + sz
+  end do
+  do nl1 = mesh%nl-1, mesh%nl
+     do n_val = 1, 4
+        do n = 1, partit%com_elem2D%rPEnum
+           call wet_type(partit%com_elem2D%rlist, partit%com_elem2D%rptr(n), partit%com_elem2D%rptr(n+1)-1, &
+                mesh%ulevels, mesh%nlevels, nl1, n_val, MPI_WP, partit%r_mpitype_elem3D(n,nl1,n_val))
+        end do
+        do n = 1, partit%com_elem2D%sPEnum
+           call wet_type(partit%com_elem2D%slist, partit%com_elem2D%sptr(n), partit%com_elem2D%sptr(n+1)-1, &
+                mesh%ulevels, mesh%nlevels, nl1, n_val, MPI_WP, partit%s_mpitype_elem3D(n,nl1,n_val))
+        end do
+        do n = 1, partit%com_elem2D_full%rPEnum
+           call wet_type(partit%com_elem2D_full%rlist, partit%com_elem2D_full%rptr(n), partit%com_elem2D_full%rptr(n+1)-1, &
+                mesh%ulevels, mesh%nlevels, nl1, n_val, MPI_WP, partit%r_mpitype_elem3D_full(n,nl1,n_val))
+        end do
+        do n = 1, partit%com_elem2D_full%sPEnum
+           call wet_type(partit%com_elem2D_full%slist, partit%com_elem2D_full%sptr(n), partit%com_elem2D_full%sptr(n+1)-1, &
+                mesh%ulevels, mesh%nlevels, nl1, n_val, MPI_WP, partit%s_mpitype_elem3D_full(n,nl1,n_val))
+        end do
+        if (n_val > 3) cycle
+        do n = 1, partit%com_nod2D%rPEnum
+           call wet_type(partit%com_nod2D%rlist, partit%com_nod2D%rptr(n), partit%com_nod2D%rptr(n+1)-1, &
+                mesh%ulevels_nod2D, mesh%nlevels_nod2D, nl1, n_val, MPI_WP, partit%r_mpitype_nod3D(n,nl1,n_val))
+#if defined(USE_SINGLE_PRECISION)
+           call wet_type(partit%com_nod2D%rlist, partit%com_nod2D%rptr(n), partit%com_nod2D%rptr(n+1)-1, &
+                mesh%ulevels_nod2D, mesh%nlevels_nod2D, nl1, n_val, MPI_WP_FULL, partit%r_mpitype_nod3D_r8(n,nl1,n_val))
+#endif
+        end do
+        do n = 1, partit%com_nod2D%sPEnum
+           call wet_type(partit%com_nod2D%slist, partit%com_nod2D%sptr(n), partit%com_nod2D%sptr(n+1)-1, &
+                mesh%ulevels_nod2D, mesh%nlevels_nod2D, nl1, n_val, MPI_WP, partit%s_mpitype_nod3D(n,nl1,n_val))
+#if defined(USE_SINGLE_PRECISION)
+           call wet_type(partit%com_nod2D%slist, partit%com_nod2D%sptr(n), partit%com_nod2D%sptr(n+1)-1, &
+                mesh%ulevels_nod2D, mesh%nlevels_nod2D, nl1, n_val, MPI_WP_FULL, partit%s_mpitype_nod3D_r8(n,nl1,n_val))
+#endif
+        end do
+     end do
+  end do
+  do n = 1, partit%com_nod2D%rPEnum
+     call MPI_TYPE_SIZE(partit%r_mpitype_nod3D(n,mesh%nl-1,1), sz, ierr); bytes(2) = bytes(2) + sz
+  end do
+  do n = 1, partit%com_elem2D%rPEnum
+     call MPI_TYPE_SIZE(partit%r_mpitype_elem3D(n,mesh%nl-1,1), sz, ierr); bytes(4) = bytes(4) + sz
+  end do
+  call MPI_REDUCE(bytes, tot, 4, MPI_INTEGER8, MPI_SUM, 0, partit%MPI_COMM_FESOM, ierr)
+  if (partit%mype == 0) write(*,'(a,2(f7.3,a))') ' 3D halo exchange of wet levels only, bytes per field wet/full: nodes ', &
+       real(tot(2))/max(1_8,tot(1)), ', elements ', real(tot(4))/max(1_8,tot(3))
+
+contains
+
+  subroutine wet_type(list, nini, nend, ulev, nlev, nl1, n_val, base, mtype)
+    integer, intent(in)    :: list(:), nini, nend, ulev(:), nlev(:), nl1, n_val, base
+    integer, intent(inout) :: mtype
+    integer, allocatable   :: bl(:), dp(:)
+    integer                :: i, p, top, bot, ierr
+
+    allocate(bl(max(1, nend-nini+1)), dp(max(1, nend-nini+1)))
+    do i = nini, nend
+       p   = list(i)
+       top = ulev(p)
+       bot = min(nlev(p) - (mesh%nl - nl1), nl1)
+       bl(i-nini+1) = max(0, bot-top+1)*n_val
+       dp(i-nini+1) = ((p-1)*nl1 + top-1)*n_val
+    end do
+    call MPI_TYPE_FREE(mtype, ierr)
+    call MPI_TYPE_INDEXED(nend-nini+1, bl, dp, base, mtype, ierr)
+    call MPI_TYPE_COMMIT(mtype, ierr)
+    deallocate(bl, dp)
+  end subroutine wet_type
+end subroutine init_mpi_types_wet
 
 
 
