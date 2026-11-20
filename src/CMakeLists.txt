@@ -255,7 +255,11 @@ add_subdirectory(async_threads_cpp)
 
 
 # fesom library
-add_library(${PROJECT_NAME} ${sources_Fortran} ${src_home}/gen_halo_sites.c $<TARGET_OBJECTS:async_threads_cpp>)
+# C helper of halo_timing_sites, built on its own so that the Fortran options of the fesom target
+# do not reach the C compiler
+add_library(halo_sites_c OBJECT ${src_home}/gen_halo_sites.c)
+set_target_properties(halo_sites_c PROPERTIES POSITION_INDEPENDENT_CODE ON)
+add_library(${PROJECT_NAME} ${sources_Fortran} $<TARGET_OBJECTS:async_threads_cpp> $<TARGET_OBJECTS:halo_sites_c>)
 add_dependencies(${PROJECT_NAME} fesom_version_info-generated.F90)
 
 target_include_directories(${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${CMAKE_Fortran_MODULE_DIRECTORY}>)
