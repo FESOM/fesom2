@@ -27,48 +27,26 @@ subroutine adv_tra_vert_impl(dt, w, ttf, partit, mesh, tend)
     real(kind=WP_full), intent(inout)   :: tend(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
     real(kind=WP_full)                  :: a(mesh%nl), b(mesh%nl), c(mesh%nl), tr(mesh%nl)
     real(kind=WP_full)                  :: cp(mesh%nl), tp(mesh%nl)
-    real(kind=WP_full)                  :: zbar_n(mesh%nl), z_n(mesh%nl-1)
     integer                            :: nz, n, nzmax, nzmin
     real(kind=WP_full)                  :: m, zinv, dt_inv, dz
     real(kind=WP_full)                  :: c1, v_adv
 
 
     dt_inv=1.0_WP/dt
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(a, b, c, tr, cp, tp, n, nz, nzmax, nzmin, m, zinv, dz, c1, v_adv, zbar_n, z_n)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(a, b, c, tr, cp, tp, n, nz, nzmax, nzmin, m, zinv, dz, c1, v_adv)
 !$OMP DO
     !___________________________________________________________________________
     ! loop over local nodes
     do n=1,partit%myDim_nod2D
 
-        ! initialise
-        a  = 0.0_WP
-        b  = 0.0_WP
-        c  = 0.0_WP
-        tr = 0.0_WP
-        tp = 0.0_WP
-        cp = 0.0_WP
+        ! a, b, c, tr, cp, tp are set on nzmin..nzmax-1 before they are read; no full-column
+        ! initialisation (it cost a fixed 6*nl stores per node, also for shallow columns)
 
         ! max. number of levels at node n
         nzmax=mesh%nlevels_nod2D(n)
 
         ! upper surface index, in case of cavity !=1
         nzmin=mesh%ulevels_nod2D(n)
-
-        !___________________________________________________________________________
-        ! Here can not exchange zbar_n & Z_n with zbar_3d_n & Z_3d_n because
-        ! they be calculate from the actualized mesh with hnode_new
-        ! calculate new zbar (depth of layers) and Z (mid depths of layers)
-        ! depending on layer thinkness over depth at node n
-        ! Be carefull here vertical operation have to be done on NEW vertical mesh !!!
-        zbar_n=0.0_WP
-        Z_n=0.0_WP
-        zbar_n(nzmax)=mesh%zbar_n_bot(n)
-        Z_n(nzmax-1) =zbar_n(nzmax) + mesh%hnode_new(nzmax-1,n)/2.0_WP
-        do nz=nzmax-1,nzmin+1,-1
-            zbar_n(nz) = zbar_n(nz+1) + mesh%hnode_new(nz,n)
-            Z_n(nz-1)  = zbar_n(nz)   + mesh%hnode_new(nz-1,n)/2.0_WP
-        end do
-        zbar_n(nzmin) = zbar_n(nzmin+1) + mesh%hnode_new(nzmin,n)
 
         !_______________________________________________________________________
         ! Regular part of coefficients: --> surface layer
@@ -315,6 +293,22 @@ subroutine adv_tra_ver_qr4c(w, ttf, partit, mesh, num_ord, flux, o_init_zero)
        ! mesh information)
        !_______________________________________________________________________
        ! vert. flux at remaining levels
+#ifndef ENABLE_OPENACC
+       ! gradient at each interface k (between levels k-1 and k), computed once: the level loop
+       ! below needs it at nz-1, nz and nz+1, which took three divisions per level
+       do nz=nzmin+1,nzmax-1
+            tvert(nz)=(ttf(nz-1,n)-ttf(nz,n))/(mesh%Z_3d_n(nz-1,n)-mesh%Z_3d_n(nz,n))
+       end do
+       do nz=nzmin+2,nzmax-2
+            qc=tvert(nz)
+            qu=tvert(nz+1)
+            qd=tvert(nz-1)
+            Tmean1=ttf(nz  ,n)+(2*qc+qu)*(mesh%zbar_3d_n(nz,n)-mesh%Z_3d_n(nz  ,n))/3.0_WP
+            Tmean2=ttf(nz-1,n)+(2*qc+qd)*(mesh%zbar_3d_n(nz,n)-mesh%Z_3d_n(nz-1,n))/3.0_WP
+            Tmean =(W(nz,n)+abs(W(nz,n)))*Tmean1+(W(nz,n)-abs(W(nz,n)))*Tmean2
+            flux(nz,n)=(-0.5_WP*(1.0_WP-num_ord)*Tmean - num_ord*(0.5_WP*(Tmean1+Tmean2))*W(nz,n))*mesh%area(nz,n)-flux(nz,n)
+       end do
+#else
        !$ACC LOOP VECTOR
        do nz=nzmin+2,nzmax-2
             !centered (4th order)
@@ -328,6 +322,7 @@ subroutine adv_tra_ver_qr4c(w, ttf, partit, mesh, num_ord, flux, o_init_zero)
             flux(nz,n)=(-0.5_WP*(1.0_WP-num_ord)*Tmean - num_ord*(0.5_WP*(Tmean1+Tmean2))*W(nz,n))*mesh%area(nz,n)-flux(nz,n)
        end do
        !$ACC END LOOP
+#endif
     end do
 #ifndef ENABLE_OPENACC
 !$OMP END DO

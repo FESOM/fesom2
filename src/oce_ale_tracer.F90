@@ -132,14 +132,14 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     integer                                  :: i, tr_num, node, elem, nzmax, nzmin
     real(kind=WP)                            :: ttf_rhs_bak (mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D) ! local variable
     integer                                  :: nz, n, nu1, nl1
-    real(kind=WP), dimension(:,:), pointer   :: salt_dev
+    real(kind=WP), dimension(:,:), pointer, contiguous   :: salt_dev
     !___________________________________________________________________________
     ! pointer on necessary derived types
     logical :: gm_on_device = .false.
     integer :: nlu, nlw
-    real(kind=WP), dimension(:,:,:), pointer :: UV, fer_UV, UVadv
-    real(kind=WP), dimension(:,:)  , pointer :: Wvel, Wvel_e, Wvel_i, fer_Wvel, Wadv, Weadv
-    real(kind=WP_full), dimension(:,:)  , pointer :: del_ttf
+    real(kind=WP), dimension(:,:,:), pointer, contiguous :: UV, fer_UV, UVadv
+    real(kind=WP), dimension(:,:)  , pointer, contiguous :: Wvel, Wvel_e, Wvel_i, fer_Wvel, Wadv, Weadv
+    real(kind=WP_full), dimension(:,:)  , pointer, contiguous :: del_ttf
     UV     => dynamics%uv(:,:,:)
     UVadv  => UV
     Wadv   => dynamics%w(:,:)
@@ -788,7 +788,7 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
 #endif
     !___________________________________________________________________________
     ! pointer on necessary derived types
-    real(kind=WP_full), pointer                :: del_ttf(:,:)
+    real(kind=WP_full), pointer, contiguous                :: del_ttf(:,:)
     real(kind=WP_full)                         :: acc
     real(kind=WP)                             :: tnew
 
@@ -835,7 +835,13 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     ! write there also horizontal diffusion rhs to del_ttf which is equal the R_T^n
     ! in danilovs srcipt
     ! includes Redi diffusivity if Redi=.true.
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_start("diff_hor")
+#endif
     call diff_part_hor_redi(tracers, partit, mesh)  ! seems to be ~9% faster than diff_part_hor
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_end("diff_hor")
+#endif
     if (conservation_freq > 0) call conservation_probe('hor_diff', 'a', tr_num, tracers, partit, mesh)
 
     if (tracers%data(tr_num)%ltra_diag) then
@@ -1075,7 +1081,13 @@ end if
         ! (w/out Redi)
         if (conservation_freq > 0) call conservation_probe('divided', 'b', tr_num, tracers, partit, mesh)
         if (tracers%data(tr_num)%ltra_diag .and. use_tracer_carry) carry_bak = tracers%work%carry(:,:,tr_num)
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("diff_ver_impl")
+#endif
         call diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("diff_ver_impl")
+#endif
         if (impl_on_device) then
             !$ACC UPDATE HOST(tracers%data(tr_num)%values)
         end if
@@ -1182,7 +1194,7 @@ subroutine diff_ver_part_expl_ale(tr_num, tracers, partit, mesh)
     real(kind=WP)            :: zinv1
     !___________________________________________________________________________
     ! pointer on necessary derived types
-    real(kind=WP_full), pointer   :: del_ttf(:,:)
+    real(kind=WP_full), pointer, contiguous   :: del_ttf(:,:)
     del_ttf => tracers%work%del_ttf
 
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nl1, ul1, vd_flux, rdata, flux, rlx, zinv1)
@@ -1245,17 +1257,17 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     real(kind=WP_full)        :: rsss, Ty, Ty1, c1, zinv1, zinv2, v_adv
     real(kind=WP_full)        :: isredi=0._WP_full
     logical                  :: do_wimpl=.true.
-    real(kind=WP_full)        :: zbar_n(impl_nl_max), z_n(impl_nl_max)
+    real(kind=WP_full)        :: zbar_n(impl_nl_max), z_n(impl_nl_max), zi(impl_nl_max)
     real(kind=WP_full)        :: acc
     real(kind=WP)            :: tnew
     integer                  :: tr_id
     logical                  :: sw_dbgyre, hosing_depth
     !___________________________________________________________________________
     ! pointer on necessary derived types
-    real(kind=WP), dimension(:,:), pointer :: trarr
-    real(kind=WP), dimension(:,:), pointer :: Wvel_i
-    real(kind=WP), dimension(:,:), pointer :: sst, sss ! auxiliary variables needed for transient tracers
-    real(kind=WP), dimension(:),   pointer :: a_ice
+    real(kind=WP), dimension(:,:), pointer, contiguous :: trarr
+    real(kind=WP), dimension(:,:), pointer, contiguous :: Wvel_i
+    real(kind=WP), dimension(:,:), pointer, contiguous :: sst, sss ! auxiliary variables needed for transient tracers
+    real(kind=WP), dimension(:),   pointer, contiguous :: a_ice
     trarr  => tracers%data(tr_num)%values(:,:)
     Wvel_i => dynamics%w_i(:,:)
 
@@ -1422,31 +1434,32 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
 
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, nzmax, nzmin, a, b, c, tr, cp, tp, m, zinv, dz, &
-!$OMP                                         rsss, Ty, Ty1, c1, zinv1, zinv2, v_adv, zbar_n, z_n, acc, tnew)
+!$OMP                                         rsss, Ty, Ty1, c1, zinv1, zinv2, v_adv, zbar_n, z_n, zi, acc, tnew)
 !$OMP DO
 #else
 !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) IF(impl_on_device) &
-!$ACC PRIVATE(nz, nzmax, nzmin, a, b, c, tr, cp, tp, m, zinv, dz, rsss, Ty, Ty1, c1, zinv1, zinv2, v_adv, zbar_n, z_n, acc, tnew)
+!$ACC PRIVATE(nz, nzmax, nzmin, a, b, c, tr, cp, tp, m, zinv, dz, rsss, Ty, Ty1, c1, zinv1, zinv2, v_adv, zbar_n, z_n, zi, acc, tnew)
 #endif
     do n=1,partit%myDim_nod2D
-        ! initialise
-        a  = 0.0_WP
-        b  = 0.0_WP
-        c  = 0.0_WP
-        tr = 0.0_WP
-        tp = 0.0_WP
-        cp = 0.0_WP
         ! max. number of levels at node n
         nzmax=mesh%nlevels_nod2D(n)
         nzmin=mesh%ulevels_nod2D(n)
+        ! initialise the column's levels and one on each side (not all impl_nl_max: that cost a
+        ! fixed 8*128 stores per node and tracer, whatever the depth)
+        a (max(1,nzmin-1):min(impl_nl_max,nzmax+1)) = 0.0_WP
+        b (max(1,nzmin-1):min(impl_nl_max,nzmax+1)) = 0.0_WP
+        c (max(1,nzmin-1):min(impl_nl_max,nzmax+1)) = 0.0_WP
+        tr(max(1,nzmin-1):min(impl_nl_max,nzmax+1)) = 0.0_WP
+        tp(max(1,nzmin-1):min(impl_nl_max,nzmax+1)) = 0.0_WP
+        cp(max(1,nzmin-1):min(impl_nl_max,nzmax+1)) = 0.0_WP
         !___________________________________________________________________________
         ! Here can not exchange zbar_n & Z_n with zbar_3d_n & Z_3d_n because
         ! they be calculate from the actualized mesh with hnode_new
         ! calculate new zbar (depth of layers) and Z (mid depths of layers)
         ! depending on layer thinkness over depth at node n
         ! Be carefull here vertical operation have to be done on NEW vertical mesh !!!
-        zbar_n=0.0_WP
-        Z_n=0.0_WP
+        zbar_n(max(1,nzmin-1):min(impl_nl_max,nzmax+1))=0.0_WP
+        Z_n(max(1,nzmin-1):min(impl_nl_max,nzmax+1))=0.0_WP
         zbar_n(nzmax)=mesh%zbar_n_bot(n)
         Z_n(nzmax-1)=zbar_n(nzmax) + mesh%hnode_new(nzmax-1,n)/2.0_WP
         do nz=nzmax-1,nzmin+1,-1
@@ -1491,10 +1504,16 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
         zinv1=zinv2
         !_______________________________________________________________________
         ! Regular part of coefficients: --> 2nd...nl-2 layer
+        ! 1/dz of every interface first (zi(nzmin) is zinv2 above): taking zinv1 from the previous
+        ! iteration made the level loop a recurrence that does not vectorise
+        do nz=nzmin, nzmax-2
+            zi(nz)=1.0_WP/(Z_n(nz)-Z_n(nz+1))
+        end do
         do nz=nzmin+1, nzmax-2
 
             ! 1/dz(nz)
-            zinv2=1.0_WP/(Z_n(nz)-Z_n(nz+1))
+            zinv1=zi(nz-1)
+            zinv2=zi(nz)
             ! calculate isoneutral diffusivity : Kd*s^2 --> K_33 = Kv + Kd*s^2
             Ty = (zbar_n(nz  )-Z_n(nz     ))*zinv1 *slope_tapered(3,nz-1,n)**2*Ki(nz-1,n)+ &
                  (Z_n(nz-1   )-zbar_n(nz  ))*zinv1 *slope_tapered(3,nz  ,n)**2*Ki(nz  ,n)
@@ -1819,7 +1838,7 @@ subroutine diff_ver_part_redi_expl(tracers, partit, mesh)
     real(kind=WP)            :: Tx, Ty, flux, flux_below, zb, zb_below, zn, zn_up
     !___________________________________________________________________________
     ! pointer on necessary derived types
-    real(kind=WP_full), pointer   :: del_ttf(:,:)
+    real(kind=WP_full), pointer, contiguous   :: del_ttf(:,:)
     del_ttf => tracers%work%del_ttf
     if (.not. allocated(tr_xynodes)) then
         allocate(tr_xynodes(2,mesh%nl-1,partit%myDim_nod2D+partit%eDim_nod2D))
@@ -1908,13 +1927,13 @@ subroutine diff_part_hor_redi(tracers, partit, mesh)
     integer                  :: edge, n, k
     real(kind=WP)            :: deltaX1, deltaY1, deltaX2, deltaY2
     integer                  :: nl1, ul1, nl2, ul2, nl12, ul12, nz, el(2), elnodes(3), enodes(2)
-    real(kind=WP), pointer   :: edge_flux(:,:)
+    real(kind=WP), pointer, contiguous   :: edge_flux(:,:)
     real(kind=WP)            :: c, Fx, Fy, Tx, Ty, Tx_z, Ty_z, SxTz, SyTz, Tz(2)
     real(kind=WP)            :: Kh, dz
     real(kind=WP)            :: isredi=0._WP
     !___________________________________________________________________________
     ! pointer on necessary derived types
-    real(kind=WP_full), pointer   :: del_ttf(:,:)
+    real(kind=WP_full), pointer, contiguous   :: del_ttf(:,:)
     del_ttf => tracers%work%del_ttf
     if (.not. allocated(tracers%work%edge_flux)) then
         allocate(tracers%work%edge_flux(mesh%nl-1, partit%myDim_edge2D))
@@ -2095,11 +2114,11 @@ SUBROUTINE diff_part_bh(tr_num, dynamics, tracers, partit, mesh)
     integer                                  :: n, nz, ed, el(2), en(2), k, elem, nzmin, nzmax
     integer                                  :: elnodes1(3), elnodes2(3)
     real(kind=WP)                            :: u1, v1, len, vi, ww, tt(mesh%nl-1)
-    real(kind=WP), pointer                   :: temporary_ttf(:,:)
+    real(kind=WP), pointer, contiguous                   :: temporary_ttf(:,:)
     real(kind=WP), allocatable, target, save :: bh_ws(:,:)
-    real(kind=WP), pointer                   :: edge_flux(:,:)
-    real(kind=WP), pointer                   :: UV(:,:,:)
-    real(kind=WP), pointer                   :: ttf(:,:)
+    real(kind=WP), pointer, contiguous                   :: edge_flux(:,:)
+    real(kind=WP), pointer, contiguous                   :: UV(:,:,:)
+    real(kind=WP), pointer, contiguous                   :: ttf(:,:)
 
 
     UV            => dynamics%uv(:,:,:)

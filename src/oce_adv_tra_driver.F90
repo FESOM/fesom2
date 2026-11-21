@@ -6,10 +6,14 @@ module oce_adv_tra_driver_module
     USE MOD_DYN
     USE g_comm_auto
     USE diagnostics, only: ldiag_DVD
-    use oce_adv_tra_hor_module, only: adv_tra_hor_upw1, adv_tra_hor_muscl, adv_tra_hor_mfct, adv_tra_hor_spbee
+    use oce_adv_tra_hor_module, only: adv_tra_hor_upw1, adv_tra_hor_muscl, adv_tra_hor_mfct, adv_tra_hor_spbee, &
+                                      adv_tra_hor_upw1_mfct, adv_edge_levels
+    use g_config, only: tra_adv_hor_fused, tra_adv_fct_fused
     use oce_adv_tra_ver_module, only: adv_tra_vert_impl, adv_tra_ver_upw1, adv_tra_ver_qr4c, adv_tra_ver_ppm, adv_tra_ver_cdiff, adv_tra_ver_spbee
-    USE oce_adv_tra_fct_module, only: oce_adv_tra_fct_init, oce_tra_adv_fct
+    USE oce_adv_tra_fct_module, only: oce_adv_tra_fct_init, oce_tra_adv_fct, oce_tra_adv_fct_fused
     USE o_ARRAYS
+    use o_PARAM, only: r_earth
+    use dwarf_dump_module
 
     implicit none
 
@@ -34,15 +38,15 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
     real(kind=WP),  intent(in), target    :: WI(mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
     real(kind=WP),  intent(in), target    :: WE(mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
 
-    real(kind=WP),  pointer, dimension (:,:)   :: pwvel
-    real(kind=WP),  pointer, dimension (:,:)   :: ttf, ttfAB, fct_LO
-    real(kind=WP),  pointer, dimension (:,:)   :: adv_flux_hor, adv_flux_ver
-    real(kind=WP_full), pointer, dimension (:,:) :: fct_LO_tend, dttf_h, dttf_v
-    real(kind=WP),  pointer, dimension (:,:)   :: fct_ttf_min, fct_ttf_max
-    real(kind=WP),  pointer, dimension (:,:)   :: fct_plus, fct_minus
+    real(kind=WP),  pointer, contiguous, dimension (:,:)   :: pwvel
+    real(kind=WP),  pointer, contiguous, dimension (:,:)   :: ttf, ttfAB, fct_LO
+    real(kind=WP),  pointer, contiguous, dimension (:,:)   :: adv_flux_hor, adv_flux_ver
+    real(kind=WP_full), pointer, contiguous, dimension (:,:) :: fct_LO_tend, dttf_h, dttf_v
+    real(kind=WP),  pointer, contiguous, dimension (:,:)   :: fct_ttf_min, fct_ttf_max
+    real(kind=WP),  pointer, contiguous, dimension (:,:)   :: fct_plus, fct_minus
 
-    integer,        pointer, dimension (:)     :: nboundary_lay
-    real(kind=WP),  pointer, dimension (:,:,:) :: edge_up_dn_grad
+    integer,        pointer, contiguous, dimension (:)     :: nboundary_lay
+    real(kind=WP),  pointer, contiguous, dimension (:,:,:) :: edge_up_dn_grad
 
     integer       :: el(2), enodes(2), nz, n, e, k, edge
     integer       :: nl12, nu12, nl1, nl2, nu1, nu2
@@ -52,6 +56,9 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
     real(kind=WP) :: Tmean, Tmean1, Tmean2, num_ord
     real(kind=WP) :: opth, optv
     logical       :: do_zero_flux
+    logical       :: ldump
+    logical       :: fused, fct_fused
+    real(kind=WP),  pointer, contiguous, dimension (:,:)   :: flux_lo
 
     ttf             => tracers%data(tr_num)%values
     ttfAB           => tracers%data(tr_num)%valuesAB
@@ -69,15 +76,69 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
     fct_minus       => tracers%work%fct_minus
     dttf_h          => tracers%work%del_ttf_advhoriz
     dttf_v          => tracers%work%del_ttf_advvert
+
+    ! tra_adv_hor_fused: low- and high-order horizontal flux in one edge pass (MFCT with FCT, CPU)
+    fused = .false.
+#ifndef ENABLE_OPENACC
+    fused = tra_adv_hor_fused .and. trim(tracers%data(tr_num)%tra_adv_lim)=='FCT' .and. &
+            trim(tracers%data(tr_num)%tra_adv_hor)=='MFCT'
+#endif
+    fct_fused = .false.
+#ifndef ENABLE_OPENACC
+    fct_fused = tra_adv_fct_fused .and. trim(tracers%data(tr_num)%tra_adv_lim)=='FCT'
+#endif
+    if (fused .and. .not. allocated(tracers%work%adv_flux_hor_lo)) &
+        allocate(tracers%work%adv_flux_hor_lo(mesh%nl-1, partit%myDim_edge2D))
+    if ((fused .or. fct_fused) .and. .not. allocated(tracers%work%edge_nzt)) then
+        allocate(tracers%work%edge_nzt(partit%myDim_edge2D), tracers%work%edge_nzb(partit%myDim_edge2D))
+        call adv_edge_levels(partit, mesh, tracers%work%edge_nzt, tracers%work%edge_nzb)
+    end if
+    flux_lo => adv_flux_hor
+    if (fused) flux_lo => tracers%work%adv_flux_hor_lo
+
+    ! inputs of the horizontal advection for the dwarf (dwarf/tra_adv_hor), one call, per rank
+    ldump = dwarf_dump_active(tr_num)
+    if (ldump) then
+        call dwarf_dump_open(partit%mype)
+        call dput('dims', [mesh%nl, partit%myDim_nod2D, partit%eDim_nod2D, partit%myDim_elem2D, &
+                           partit%eDim_elem2D, partit%eXDim_elem2D, partit%myDim_edge2D, partit%eDim_edge2D])
+        call dput('r_earth', real(r_earth, 8))
+        call dput('dt', real(dt, 8))
+        call dput('opth', real(tracers%data(tr_num)%tra_adv_ph, 8))
+        call dput('edges', mesh%edges)
+        call dput('edge_tri', mesh%edge_tri)
+        call dput('nlevels', mesh%nlevels)
+        call dput('ulevels', mesh%ulevels)
+        call dput('nlevels_nod2D', mesh%nlevels_nod2D)
+        call dput('ulevels_nod2D', mesh%ulevels_nod2D)
+        call dput('nod_in_edge2D_num', mesh%nod_in_edge2D_num)
+        call dput('nod_in_edge2D', mesh%nod_in_edge2D)
+        call dput('nod_in_edge2D_sgn', mesh%nod_in_edge2D_sgn)
+        call dput('edge_cross_dxdy', real(mesh%edge_cross_dxdy, 8))
+        call dput('edge_dxdy', real(mesh%edge_dxdy, 8))
+        call dput('elem_cos', real(mesh%elem_cos, 8))
+        call dput('helem', real(mesh%helem, 8))
+        call dput('areasvol', real(mesh%areasvol, 8))
+        call dput('ttf', real(ttf, 8))
+        call dput('ttfAB', real(ttfAB, 8))
+        call dput('vel', real(vel, 8))
+        call dput('edge_up_dn_grad', real(edge_up_dn_grad, 8))
+    end if
     
     !___________________________________________________________________________
     ! compute FCT horzontal and vertical low order solution as well as lw order
     ! part of antidiffusive flux
     if (trim(tracers%data(tr_num)%tra_adv_lim)=='FCT') then
+        call adv_prof('adv_lo_hor', .true.)
         ! compute the low order upwind horizontal flux
         ! o_init_zero=.true.  : zero the horizontal flux before computation
         ! o_init_zero=.false. : input flux will be substracted
-        call adv_tra_hor_upw1(vel, ttf, partit, mesh, adv_flux_hor, o_init_zero=.true.)
+        if (fused) then
+            call adv_tra_hor_upw1_mfct(vel, ttf, ttfAB, partit, mesh, opth, flux_lo, adv_flux_hor, edge_up_dn_grad, &
+                                       tracers%work%edge_nzt, tracers%work%edge_nzb)
+        else
+            call adv_tra_hor_upw1(vel, ttf, partit, mesh, adv_flux_hor, o_init_zero=.true.)
+        end if
         ! update the LO solution for horizontal contribution
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO
@@ -99,6 +160,11 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
         ! (mesh%nod_in_edge2D, sign +1 for the edge's first node, -1 for its second) in
         ! ascending edge order, so the result does not depend on the number of threads.
         ! (also the OpenACC version without atomics: reproducible gather, no host round trip)
+#ifndef ENABLE_OPENACC
+        if (fused) then
+            call lo_tend_gather(flux_lo, fct_LO_tend, tracers%work%edge_nzt, tracers%work%edge_nzb, partit, mesh)
+        else
+#endif
 #if !defined(ENABLE_OPENACC) || defined(DISABLE_OPENACC_ATOMICS)
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, k, edge, el, nl1, nu1, nl2, nu2, nu12, nl12, nz)
@@ -187,6 +253,13 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
  
 
 !#if defined (__recom)
+#ifndef ENABLE_OPENACC
+        end if
+#endif
+        if (ldump) then
+            call dput('flux_lo', real(flux_lo, 8))
+            call dput('lo_tend', real(fct_LO_tend, 8))
+        end if
         if (tracers%data(tr_num)%ltra_diag) then
            do n=1, partit%myDim_nod2D+partit%eDim_nod2D
               nu1 = mesh%ulevels_nod2D(n)
@@ -202,6 +275,8 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
 
         ! compute the low order upwind vertical flux (explicit part only)
         ! zero the input/output flux before computation
+        call adv_prof('adv_lo_hor', .false.)
+        call adv_prof('adv_lo_ver', .true.)
         call adv_tra_ver_upw1(we, ttf, partit, mesh, adv_flux_ver, o_init_zero=.true.)
         ! update the LO solution for vertical contribution
 
@@ -294,6 +369,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
             !     has to be done on the full vertical velocity w
             call adv_tra_ver_upw1(w, ttf, partit, mesh, adv_flux_ver, o_init_zero=.true.)
         end if
+        call adv_prof('adv_lo_ver', .false.)
         call exchange_nod(fct_LO, partit, luse_g2g = .true.)
 !$OMP BARRIER
     end if !--> if (trim(tracers%data(tr_num)%tra_adv_lim)=='FCT') then
@@ -302,11 +378,13 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
     if (trim(tracers%data(tr_num)%tra_adv_lim)=='FCT') do_zero_flux=.false.
     !___________________________________________________________________________
     ! do horizontal tracer advection, in case of FCT high order solution
+    call adv_prof('adv_ho_hor', .true.)
     SELECT CASE(trim(tracers%data(tr_num)%tra_adv_hor))
         CASE('MUSCL')
             ! compute the antidiffusive horizontal flux (o_init_zero=.false.: input is the LO horizontal flux computed above)
             call adv_tra_hor_muscl(vel, ttfAB, partit, mesh, opth,  adv_flux_hor, edge_up_dn_grad, nboundary_lay, o_init_zero=do_zero_flux)
         CASE('MFCT')
+             if (.not. fused) &
              call adv_tra_hor_mfct(vel, ttfAB, partit, mesh, opth,  adv_flux_hor, edge_up_dn_grad,                o_init_zero=do_zero_flux)
         CASE('UPW1')
              call adv_tra_hor_upw1(vel, ttfAB, partit, mesh,        adv_flux_hor,                                 o_init_zero=do_zero_flux)
@@ -314,6 +392,11 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
             if (partit%mype==0) write(*,*) 'Unknown horizontal advection type ',  trim(tracers%data(tr_num)%tra_adv_hor), '! Check your namelists!'
             call par_abort(partit%MPI_COMM_FESOM, partit%mype)
     END SELECT
+    call adv_prof('adv_ho_hor', .false.)
+    if (ldump) then
+        call dput('flux_ho', real(adv_flux_hor, 8))
+        call dwarf_dump_close()
+    end if
     if (trim(tracers%data(tr_num)%tra_adv_lim)=='FCT') then
        pwvel=>w
     else
@@ -322,6 +405,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
 
     !___________________________________________________________________________
     ! do vertical tracer advection, in case of FCT high order solution
+    call adv_prof('adv_ho_ver', .true.)
     SELECT CASE(trim(tracers%data(tr_num)%tra_adv_ver))
         CASE('QR4C')
             ! compute the untidiffusive vertical flux   (o_init_zero=.false.:input is the LO vertical flux computed above)
@@ -339,12 +423,27 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
         !     oce_ale_tracer.F90 --> subroutine diff_ver_part_impl_ale(tr_num, partit, mesh)
         !     for do_wimpl=.true.
     END SELECT
+    call adv_prof('adv_ho_ver', .false.)
     
     !___________________________________________________________________________
     if (trim(tracers%data(tr_num)%tra_adv_lim)=='FCT') then
        !edge_up_dn_grad will be used as an auxuary array here
-       call oce_tra_adv_fct(dt, ttf, fct_LO, adv_flux_hor, adv_flux_ver, fct_ttf_min, fct_ttf_max, fct_plus, fct_minus, edge_up_dn_grad, partit, mesh)
-       call oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, adv_flux_hor, adv_flux_ver, partit, mesh, lo_tend=fct_LO_tend)
+       call adv_prof('adv_fct', .true.)
+       if (fct_fused) then
+          call oce_tra_adv_fct_fused(dt, ttf, fct_LO, adv_flux_hor, adv_flux_ver, fct_ttf_min, fct_ttf_max, fct_plus, fct_minus, &
+                                     edge_up_dn_grad, tracers%work%edge_nzt, tracers%work%edge_nzb, partit, mesh)
+       else
+          call oce_tra_adv_fct(dt, ttf, fct_LO, adv_flux_hor, adv_flux_ver, fct_ttf_min, fct_ttf_max, fct_plus, fct_minus, edge_up_dn_grad, partit, mesh)
+       end if
+       call adv_prof('adv_fct', .false.)
+       call adv_prof('adv_update', .true.)
+       if (fused) then
+          call oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, adv_flux_hor, adv_flux_ver, partit, mesh, lo_tend=fct_LO_tend, &
+                                        nzt=tracers%work%edge_nzt, nzb=tracers%work%edge_nzb)
+       else
+          call oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, adv_flux_hor, adv_flux_ver, partit, mesh, lo_tend=fct_LO_tend)
+       end if
+       call adv_prof('adv_update', .false.)
     else
        call oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, adv_flux_hor, adv_flux_ver, partit, mesh)
     end if
@@ -459,7 +558,8 @@ end subroutine do_oce_adv_tra
 !
 !
 !===============================================================================
-subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, mesh, lo_tend)
+! nzt, nzb (tra_adv_hor_fused): each edge's level range, precomputed by adv_edge_levels
+subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, mesh, lo_tend, nzt, nzb)
     implicit none
     real(kind=WP), intent(in),    target :: dt
     type(t_partit),intent(inout), target :: partit
@@ -469,6 +569,7 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
     real(kind=WP), intent(inout)      :: flux_h(mesh%nl-1, partit%myDim_edge2D)
     real(kind=WP), intent(inout)      :: flux_v(mesh%nl,   partit%myDim_nod2D)
     real(kind=WP_full), intent(in), optional :: lo_tend(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    integer,            intent(in), optional :: nzt(partit%myDim_edge2D), nzb(partit%myDim_edge2D)
     integer                           :: n, nz, k, elem, enodes(3), num, el(2), nu12, nl12, nu1, nu2, nl1, nl2, edge
     !___________________________________________________________________________
     ! c. Update the solution
@@ -521,6 +622,20 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
     ! sign +1 for the edge's first node, -1 for its second). No two threads write the same
     ! node, and the summation order per node is the ascending edge order at any thread count.
     ! (also the OpenACC version without atomics: reproducible gather, no host round trip)
+#ifndef ENABLE_OPENACC
+    if (present(nzt)) then
+!$OMP DO
+    do n=1, partit%myDim_nod2D+partit%eDim_nod2D
+        do k=1, mesh%nod_in_edge2D_num(n)
+            edge=mesh%nod_in_edge2D(k,n)
+            do nz=nzt(edge), nzb(edge)
+                dttf_h(nz,n)=dttf_h(nz,n)+mesh%nod_in_edge2D_sgn(k,n)*real(flux_h(nz,edge), WP_full)*dt/mesh%areasvol(nz,n)
+            end do
+        end do
+    end do
+!$OMP END DO
+    else
+#endif
 #if !defined(ENABLE_OPENACC) || defined(DISABLE_OPENACC_ATOMICS)
 #ifndef ENABLE_OPENACC
 !$OMP DO
@@ -549,6 +664,7 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
     end do
 #ifndef ENABLE_OPENACC
 !$OMP END DO
+    end if
 !$OMP END PARALLEL
 #else
     !$ACC END PARALLEL LOOP
@@ -603,4 +719,45 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
 
 end subroutine oce_tra_adv_flux2dtracer
 
+!===============================================================================
+! Low-order tendency of tra_adv_hor_fused: as the gather in do_oce_adv_tra, with each edge's level
+! range precomputed (adv_edge_levels). Same results.
+subroutine lo_tend_gather(flux_lo, fct_LO_tend, nzt, nzb, partit, mesh)
+    implicit none
+    type(t_partit), intent(in), target :: partit
+    type(t_mesh),   intent(in), target :: mesh
+    real(kind=WP),      intent(in)    :: flux_lo(mesh%nl-1, partit%myDim_edge2D)
+    real(kind=WP_full), intent(inout) :: fct_LO_tend(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    integer,            intent(in)    :: nzt(partit%myDim_edge2D), nzb(partit%myDim_edge2D)
+    integer :: n, k, edge, nz, k1, k2
+    real(kind=WP_full) :: sgn
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, k, edge, nz, k1, k2, sgn)
+    do n=1, partit%myDim_nod2D+partit%eDim_nod2D
+        do k=1, mesh%nod_in_edge2D_num(n)
+            edge=mesh%nod_in_edge2D(k,n)
+            k1=nzt(edge)
+            k2=nzb(edge)
+            do nz=k1, k2
+                fct_LO_tend(nz, n)=fct_LO_tend(nz, n)+mesh%nod_in_edge2D_sgn(k,n)*real(flux_lo(nz, edge), WP_full)
+            end do
+        end do
+    end do
+!$OMP END PARALLEL DO
+end subroutine lo_tend_gather
+
+! profiler sub-sections of tr_adv (FESOM_PROFILING builds)
+subroutine adv_prof(name, start)
+#if defined (FESOM_PROFILING)
+    use fesom_profiler
+#endif
+    character(len=*), intent(in) :: name
+    logical,          intent(in) :: start
+#if defined (FESOM_PROFILING)
+    if (start) then
+        call fesom_profiler_start(name)
+    else
+        call fesom_profiler_end(name)
+    end if
+#endif
+end subroutine adv_prof
 end module oce_adv_tra_driver_module

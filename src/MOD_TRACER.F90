@@ -78,6 +78,10 @@ real(kind=WP),allocatable,dimension(:,:)      :: fct_plus,fct_minus
 integer,allocatable,dimension(:)              :: nboundary_lay
 integer,allocatable,dimension(:,:)            :: edge_up_dn_tri
 real(kind=WP),allocatable,dimension(:,:,:)    :: edge_up_dn_grad
+! tra_adv_hor_fused: low-order horizontal flux kept apart from adv_flux_hor, and each edge's level
+! range over both adjacent elements (top of either to bottom of either), set on first use
+real(kind=WP),allocatable,dimension(:,:)      :: adv_flux_hor_lo
+integer,      allocatable,dimension(:)        :: edge_nzt, edge_nzb
 
 contains
 procedure WRITE_T_TRACER_WORK

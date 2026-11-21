@@ -7,7 +7,7 @@ module oce_adv_tra_fct_module
     implicit none
 
     private
-    public :: oce_adv_tra_fct_init, oce_tra_adv_fct
+    public :: oce_adv_tra_fct_init, oce_tra_adv_fct, oce_tra_adv_fct_fused
 
 contains
 
@@ -477,5 +477,173 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
 !$ACC END DATA
 #endif
 end subroutine oce_tra_adv_fct
+!===============================================================================
+! oce_tra_adv_fct (CPU) with the node passes after the element pass merged into one pass per node
+! column: the vertical max/min over the surrounding elements (in a column-local array instead of the
+! two full-size automatic arrays tvert_max/min), the bounds, and the antidiffusive sums and ratios
+! fct_plus/fct_minus. Each edge's level range comes from nzt/nzb (adv_edge_levels). The operations
+! and their order are those of oce_tra_adv_fct, so the results are the same. Only owned nodes are
+! summed: the halo of fct_plus/fct_minus comes from the exchange, as before.
+subroutine oce_tra_adv_fct_fused(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, fct_plus, fct_minus, AUX, &
+                                 nzt, nzb, partit, mesh)
+    implicit none
+    real(kind=WP), intent(in),    target :: dt
+    type(t_mesh),  intent(in),    target :: mesh
+    type(t_partit),intent(inout), target :: partit
+    real(kind=WP), intent(inout)      :: fct_ttf_min(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP), intent(inout)      :: fct_ttf_max(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP), intent(in)         :: ttf(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP), intent(in)         :: lo (mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP), intent(inout)      :: adf_h(mesh%nl-1, partit%myDim_edge2D)
+    real(kind=WP), intent(inout)      :: adf_v(mesh%nl,   partit%myDim_nod2D)
+    real(kind=WP), intent(inout)      :: fct_plus (mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP), intent(inout)      :: fct_minus(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP), intent(inout), contiguous :: AUX(:,:,:)
+    integer,       intent(in)         :: nzt(partit%myDim_edge2D), nzb(partit%myDim_edge2D)
+    integer                           :: n, nz, k, elem, enodes(3), edge, nu1, nl1, k1, k2
+    real(kind=WP)                     :: flux, ae, sgn
+    real(kind=WP)                     :: tmax(mesh%nl), tmin(mesh%nl)
+    real(kind=WP)                     :: flux_eps=1e-16
+    real(kind=WP)                     :: bignumber=1e3
+
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, k, elem, enodes, edge, nu1, nl1, k1, k2, flux, ae, sgn, tmax, tmin)
+    ! a. bounds of the low-order solution and the old tracer at each node
+!$OMP DO
+    do n=1, partit%myDim_nod2D + partit%eDim_nod2D
+        nu1 = mesh%ulevels_nod2D(n)
+        nl1 = mesh%nlevels_nod2D(n)
+        do nz=nu1, nl1-1
+            fct_ttf_max(nz,n)=max(LO(nz,n), ttf(nz,n))
+            fct_ttf_min(nz,n)=min(LO(nz,n), ttf(nz,n))
+        end do
+    end do
+!$OMP END DO
+    ! b. bounds over the nodes of each element
+!$OMP DO
+    do elem=1, partit%myDim_elem2D
+        enodes=mesh%elem2D_nodes(:,elem)
+        nu1 = mesh%ulevels(elem)
+        nl1 = mesh%nlevels(elem)
+        if (nu1>1) then
+            do nz=1,nu1-1
+                AUX(1,nz,elem)=-bignumber
+                AUX(2,nz,elem)= bignumber
+            end do
+        endif
+        do nz=nu1, nl1-1
+            AUX(1,nz,elem)=max(fct_ttf_max(nz,enodes(1)), fct_ttf_max(nz,enodes(2)), fct_ttf_max(nz,enodes(3)))
+            AUX(2,nz,elem)=min(fct_ttf_min(nz,enodes(1)), fct_ttf_min(nz,enodes(2)), fct_ttf_min(nz,enodes(3)))
+        end do
+        if (nl1<=mesh%nl-1) then
+            do nz=nl1,mesh%nl-1
+                AUX(1,nz,elem)=-bignumber
+                AUX(2,nz,elem)= bignumber
+            end do
+        endif
+    end do
+!$OMP END DO
+    ! c. per node column: bounds over the elements around the node and over three levels, the sums
+    !    of the incoming and outgoing antidiffusive fluxes, and the limiting ratios
+!$OMP DO
+    do n=1, partit%myDim_nod2D
+        nu1 = mesh%ulevels_nod2D(n)
+        nl1 = mesh%nlevels_nod2D(n)
+        elem=mesh%nod_in_elem2D(1, n)
+        do nz=nu1,nl1-1
+            tmax(nz) = AUX(1,nz,elem)
+            tmin(nz) = AUX(2,nz,elem)
+        end do
+        do k=2,mesh%nod_in_elem2D_num(n)
+            elem=mesh%nod_in_elem2D(k,n)
+            do nz=nu1,nl1-1
+                tmax(nz) = max(tmax(nz), AUX(1,nz,elem))
+                tmin(nz) = min(tmin(nz), AUX(2,nz,elem))
+            end do
+        end do
+        fct_ttf_max(nu1,n)=tmax(nu1)-LO(nu1,n)
+        fct_ttf_min(nu1,n)=tmin(nu1)-LO(nu1,n)
+        do nz=nu1+1,nl1-2
+            fct_ttf_max(nz,n)=max(tmax(nz-1), tmax(nz), tmax(nz+1))-LO(nz,n)
+            fct_ttf_min(nz,n)=min(tmin(nz-1), tmin(nz), tmin(nz+1))-LO(nz,n)
+        end do
+        nz=nl1-1
+        fct_ttf_max(nz,n)=tmax(nz)-LO(nz,n)
+        fct_ttf_min(nz,n)=tmin(nz)-LO(nz,n)
+        do nz=nu1,nl1-1
+            fct_plus(nz,n) =0._WP +(max(0.0_WP,adf_v(nz,n))+max(0.0_WP,-adf_v(nz+1,n)))
+            fct_minus(nz,n)=0._WP +(min(0.0_WP,adf_v(nz,n))+min(0.0_WP,-adf_v(nz+1,n)))
+        end do
+        do k=1, mesh%nod_in_edge2D_num(n)
+            edge=mesh%nod_in_edge2D(k,n)
+            sgn=mesh%nod_in_edge2D_sgn(k,n)
+            k1=nzt(edge)
+            k2=nzb(edge)
+            do nz=k1, k2
+                fct_plus (nz,n)=fct_plus (nz,n) + max(0.0_WP, sgn*adf_h(nz,edge))
+                fct_minus(nz,n)=fct_minus(nz,n) + min(0.0_WP, sgn*adf_h(nz,edge))
+            end do
+        end do
+        do nz=nu1,nl1-1
+            flux=fct_plus(nz,n)*dt/mesh%areasvol(nz,n)/mesh%hnode_new(nz,n)+flux_eps
+            fct_plus(nz,n)=min(1.0_WP,fct_ttf_max(nz,n)/flux)
+            flux=fct_minus(nz,n)*dt/mesh%areasvol(nz,n)/mesh%hnode_new(nz,n)-flux_eps
+            fct_minus(nz,n)=min(1.0_WP,fct_ttf_min(nz,n)/flux)
+        end do
+    end do
+!$OMP END DO
+!$OMP MASTER
+    call exchange_nod(fct_plus, fct_minus, partit, luse_g2g = .true.)
+!$OMP END MASTER
+!$OMP BARRIER
+    ! d. limit the vertical antidiffusive fluxes
+!$OMP DO
+    do n=1, partit%myDim_nod2D
+        nu1=mesh%ulevels_nod2D(n)
+        nl1=mesh%nlevels_nod2D(n)
+        nz=nu1
+        ae=1.0_WP
+        flux=adf_v(nz,n)
+        if(flux>=0.0_WP) then
+            ae=min(ae,fct_plus(nz,n))
+        else
+            ae=min(ae,fct_minus(nz,n))
+        end if
+        adf_v(nz,n)=ae*adf_v(nz,n)
+        do nz=nu1+1,nl1-1
+            ae=1.0_WP
+            flux=adf_v(nz,n)
+            if(flux>=0._WP) then
+                ae=min(ae,fct_minus(nz-1,n))
+                ae=min(ae,fct_plus(nz,n))
+            else
+                ae=min(ae,fct_plus(nz-1,n))
+                ae=min(ae,fct_minus(nz,n))
+            end if
+            adf_v(nz,n)=ae*adf_v(nz,n)
+        end do
+    end do
+!$OMP END DO
+    ! e. limit the horizontal antidiffusive fluxes
+!$OMP DO
+    do edge=1, partit%myDim_edge2D
+        enodes(1:2)=mesh%edges(:,edge)
+        k1=nzt(edge)
+        k2=nzb(edge)
+        do nz=k1, k2
+            ae=1.0_WP
+            flux=adf_h(nz,edge)
+            if(flux>=0._WP) then
+                ae=min(ae,fct_plus(nz,enodes(1)))
+                ae=min(ae,fct_minus(nz,enodes(2)))
+            else
+                ae=min(ae,fct_minus(nz,enodes(1)))
+                ae=min(ae,fct_plus(nz,enodes(2)))
+            endif
+            adf_h(nz,edge)=ae*adf_h(nz,edge)
+        end do
+    end do
+!$OMP END DO
+!$OMP END PARALLEL
+end subroutine oce_tra_adv_fct_fused
 
 end module oce_adv_tra_fct_module

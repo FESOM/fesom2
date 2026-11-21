@@ -1,0 +1,4 @@
+*.o
+*.mod
+dwarf.x
+vec_*.txt

@@ -8,7 +8,7 @@ module oce_adv_tra_hor_module
     implicit none
 
     private
-    public :: adv_tra_hor_upw1, adv_tra_hor_muscl, adv_tra_hor_mfct, &
+    public :: adv_tra_hor_upw1, adv_tra_hor_muscl, adv_tra_hor_mfct, adv_tra_hor_upw1_mfct, adv_edge_levels, &
               adv_tra_hor_spbee
 
 contains
@@ -207,6 +207,121 @@ end subroutine adv_tra_hor_upw1
 !
 !
 !===============================================================================
+!===============================================================================
+! Level range of each edge over its two adjacent elements: from the top of either element to the
+! bottom of either. These are the levels on which the edge has a horizontal flux.
+subroutine adv_edge_levels(partit, mesh, nzt, nzb)
+    implicit none
+    type(t_partit), intent(in), target :: partit
+    type(t_mesh),   intent(in), target :: mesh
+    integer,        intent(out)        :: nzt(partit%myDim_edge2D), nzb(partit%myDim_edge2D)
+    integer :: edge, el(2), nl1, nl2, nu1, nu2
+    do edge=1, partit%myDim_edge2D
+        el=mesh%edge_tri(:,edge)
+        nl1=mesh%nlevels(el(1))-1
+        nu1=mesh%ulevels(el(1))
+        nl2=0
+        nu2=0
+        if (el(2)>0) then
+            nl2=mesh%nlevels(el(2))-1
+            nu2=mesh%ulevels(el(2))
+        end if
+        nzb(edge)=max(nl1,nl2)
+        nzt(edge)=nu1
+        if (nu2>0) nzt(edge)=min(nu1,nu2)
+    end do
+end subroutine adv_edge_levels
+!===============================================================================
+! adv_tra_hor_upw1 (on ttf) and adv_tra_hor_mfct (on ttfAB, o_init_zero=.false.) in one edge pass,
+! as the FCT scheme uses them: flux_lo is the low-order flux, flux the high-order minus the
+! low-order flux. Velocity, layer thickness and edge geometry are read once. One level loop per
+! edge over nzt..nzb, with 0/1 weights for the two adjacent elements instead of the loops (A)-(E);
+! per-edge values are held in scalars so that the level loop vectorises. Same results as the two
+! separate kernels.
+subroutine adv_tra_hor_upw1_mfct(vel, ttf, ttfAB, partit, mesh, num_ord, flux_lo, flux, edge_up_dn_grad, nzt, nzb)
+    implicit none
+    type(t_partit),intent(in), target :: partit
+    type(t_mesh),  intent(in), target :: mesh
+    real(kind=WP), intent(in)         :: num_ord
+    real(kind=WP), intent(in)         :: ttf(   mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP), intent(in)         :: ttfAB( mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, partit%myDim_elem2D+partit%eDim_elem2D)
+    real(kind=WP), intent(out)        :: flux_lo(mesh%nl-1, partit%myDim_edge2D)
+    real(kind=WP), intent(out)        :: flux(   mesh%nl-1, partit%myDim_edge2D)
+    real(kind=WP), intent(in)         :: edge_up_dn_grad(4, mesh%nl-1, partit%myDim_edge2D)
+    integer,       intent(in)         :: nzt(partit%myDim_edge2D), nzb(partit%myDim_edge2D)
+    integer, parameter                :: blk = 256
+    integer                           :: e0, nn, ne, nel
+    nn  = partit%myDim_nod2D+partit%eDim_nod2D
+    nel = partit%myDim_elem2D+partit%eDim_elem2D
+    ne  = partit%myDim_edge2D
+    ! the edge work is in a separate routine with explicit-shape arrays: inside the OpenMP region
+    ! gfortran does not vectorise the level loop of this kernel
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(e0) SCHEDULE(STATIC)
+    do e0 = 1, ne, blk
+        call upw1_mfct_edges(e0, min(e0+blk-1, ne), mesh%nl, nn, nel, ne, num_ord, vel, ttf, ttfAB, &
+                             mesh%helem, edge_up_dn_grad, mesh%edges, mesh%edge_tri, mesh%nlevels, mesh%ulevels, &
+                             mesh%edge_cross_dxdy, mesh%edge_dxdy, mesh%elem_cos, nzt, nzb, flux_lo, flux)
+    end do
+!$OMP END PARALLEL DO
+end subroutine adv_tra_hor_upw1_mfct
+
+subroutine upw1_mfct_edges(ebeg, eend, nl, nn, nel, ne, num_ord, vel, ttf, ttfAB, helem, grad, edges, edge_tri, &
+                           nlevels, ulevels, edge_cross_dxdy, edge_dxdy, elem_cos, nzt, nzb, flux_lo, flux)
+    implicit none
+    integer,       intent(in)    :: ebeg, eend, nl, nn, nel, ne
+    real(kind=WP), intent(in)    :: num_ord
+    real(kind=WP), intent(in)    :: vel(2, nl-1, nel), ttf(nl-1, nn), ttfAB(nl-1, nn), helem(nl-1, *)
+    real(kind=WP), intent(in)    :: grad(4, nl-1, ne), edge_cross_dxdy(4, *), edge_dxdy(2, *), elem_cos(*)
+    integer,       intent(in)    :: edges(2, *), edge_tri(2, *), nlevels(*), ulevels(*), nzt(ne), nzb(ne)
+    real(kind=WP), intent(inout) :: flux_lo(nl-1, ne), flux(nl-1, ne)
+    real(kind=WP) :: deltaX1, deltaY1, deltaX2, deltaY2, a, ex, ey
+    real(kind=WP) :: w1, w2, vflux, flo, t1, t2, Tmean1, Tmean2, cHO
+    integer       :: el(2), enodes(2), e2, nz, edge, nl1, nl2, nu1, nu2, k1, k2
+    do edge=ebeg, eend
+        enodes=edges(:,edge)
+        el=edge_tri(:,edge)
+        nl1=nlevels(el(1))-1
+        nu1=ulevels(el(1))
+        deltaX1=edge_cross_dxdy(1,edge)
+        deltaY1=edge_cross_dxdy(2,edge)
+        a=r_earth*elem_cos(el(1))
+        e2=el(1)
+        nl2=0
+        nu2=huge(nu2)
+        deltaX2=0.0_WP
+        deltaY2=0.0_WP
+        if(el(2)>0) then
+            e2=el(2)
+            deltaX2=edge_cross_dxdy(3,edge)
+            deltaY2=edge_cross_dxdy(4,edge)
+            nl2=nlevels(el(2))-1
+            nu2=ulevels(el(2))
+            a=0.5_WP*(a+r_earth*elem_cos(el(2)))
+        end if
+        ex=edge_dxdy(1,edge)*a
+        ey=edge_dxdy(2,edge)*r_earth
+        k1=nzt(edge)
+        k2=nzb(edge)
+        flux_lo(:,edge)=0.0_WP
+        flux(:,edge)=0.0_WP
+        do nz=k1, k2
+            w1=merge(1.0_WP, 0.0_WP, nz>=nu1 .and. nz<=nl1)
+            w2=merge(1.0_WP, 0.0_WP, nz>=nu2 .and. nz<=nl2)
+            vflux=w1*(-vel(2,nz,el(1))*deltaX1 + vel(1,nz,el(1))*deltaY1)*helem(nz,el(1)) &
+                 +w2*( vel(2,nz,e2)*deltaX2    - vel(1,nz,e2)*deltaY2)*helem(nz,e2)
+            flo=-0.5_WP*(ttf(nz, enodes(1))*(vflux+abs(vflux))+ttf(nz, enodes(2))*(vflux-abs(vflux)))
+            flux_lo(nz,edge)=flo
+            t1=ttfAB(nz,enodes(1))
+            t2=ttfAB(nz,enodes(2))
+            Tmean2=t2-(2.0_WP*(t2-t1)+ex*grad(2,nz,edge)+ey*grad(4,nz,edge))/6.0_WP
+            Tmean1=t1+(2.0_WP*(t2-t1)+ex*grad(1,nz,edge)+ey*grad(3,nz,edge))/6.0_WP
+            cHO=(vflux+abs(vflux))*Tmean1 + (vflux-abs(vflux))*Tmean2
+            flux(nz,edge)=-0.5_WP*(1.0_WP-num_ord)*cHO - vflux*num_ord*0.5_WP*(Tmean1+Tmean2)-flo
+        end do
+    end do
+end subroutine upw1_mfct_edges
+
 subroutine adv_tra_hor_muscl(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_grad, nboundary_lay, o_init_zero)
     implicit none
     type(t_partit),intent(in), target :: partit
