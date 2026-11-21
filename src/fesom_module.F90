@@ -35,6 +35,8 @@ module fesom_main_storage_module
   use oce_setup_step_module, only: ocean_setup
   use ice_setup_step_module, only: ice_setup, ice_timestep
   use ice_import_export_module, only: ice_import, ice_export
+  use ice_setup_step_module, only: ice_setup_partition
+  use ice_partition_module, only: ice_part_mesh_extras, ice_part_setup_plans, ice_part_alloc_forc, ice_part_to_ice, ice_part_to_ocean
   use ice_oce_coupling_module, only: ocean2ice
   use ice_oce_coupling_module, only: oce_fluxes, oce_fluxes_mom
   use oce_hosing_module, only: fw_surf_anomaly, fw_depth_anomaly
@@ -135,6 +137,10 @@ use mod_transit, only: year_ce, r14c_nh, r14c_tz, r14c_sh, r14c_ti, xCO2_ti, xf1
     type(t_dyn)    dynamics
     type(t_partit) partit
     type(t_ice)    ice
+    ! sea ice on its own partition (ice_dist_name)
+    type(t_mesh)   mesh_i
+    type(t_partit) partit_i
+    type(t_ice)    ice_i
 
 
     character(LEN=256)               :: dump_dir, dump_filename
@@ -438,7 +444,16 @@ contains
 #if defined (FESOM_PROFILING)
         call fesom_profiler_start("mesh_setup")
 #endif
+        if (use_ice .and. len_trim(ice_dist_name) > 0) f%partit_i = f%partit
         call mesh_setup(f%partit, f%mesh)
+        if (use_ice .and. len_trim(ice_dist_name) > 0) then
+#if defined (ENABLE_OPENACC) || defined (__icepack) || defined (__oasis) || defined (__ifsinterface) || defined (__yac)
+            if (f%mype==0) write(*,*) 'ice_dist_name: a separate sea-ice partition is not supported in this build'
+            call par_abort(f%partit%MPI_COMM_FESOM, f%mype)
+#endif
+            f%partit_i%pack_slot = 2
+            call mesh_setup(f%partit_i, f%mesh_i, trim(ice_dist_name))
+        end if
 #if defined (FESOM_PROFILING)
         call fesom_profiler_end("mesh_setup")
 #endif
@@ -608,6 +623,12 @@ contains
         if (use_ice) then 
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call ice_setup'//achar(27)//'[0m'
             call ice_setup(f%ice, f%tracers, f%partit, f%mesh)
+            if (len_trim(ice_dist_name) > 0) then
+                call ice_part_mesh_extras(f%partit_i, f%mesh_i)
+                call ice_setup_partition(f%ice_i, f%partit_i, f%mesh_i)
+                call ice_part_alloc_forc(f%ice_i, f%partit_i)
+                call ice_part_setup_plans(f%partit, f%mesh, f%partit_i, f%mesh_i)
+            end if
             f%ice%ice_steps_since_upd = f%ice%ice_ave_steps-1
             f%ice%ice_update=.true.
 
@@ -1158,7 +1179,13 @@ contains
         call fesom_profiler_start("ice_timestep")
 #endif
                 call ice_import(f%ice, f%partit)
-                call ice_timestep(n, f%ice, f%partit, f%mesh)
+                if (len_trim(ice_dist_name) > 0) then
+                    call ice_part_to_ice(f%ice, f%ice_i, f%partit)
+                    call ice_timestep(n, f%ice_i, f%partit_i, f%mesh_i)
+                    call ice_part_to_ocean(f%ice, f%ice_i, f%partit)
+                else
+                    call ice_timestep(n, f%ice, f%partit, f%mesh)
+                end if
                 call ice_export(f%ice, f%partit)
 #if defined (FESOM_PROFILING)
         call fesom_profiler_end("ice_timestep")

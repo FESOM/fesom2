@@ -1448,6 +1448,7 @@ subroutine init_stiff_mat_ale(partit, mesh)
     ! 0 proc reads the data in chunks and distributes it between other procs
     write(npes_string,"(I10)") partit%npes
     dist_mesh_dir=trim(meshpath)//'dist_'//trim(ADJUSTL(npes_string))//'/'
+    if (len_trim(partit%dist_dir) > 0) dist_mesh_dir=trim(partit%dist_dir)
     file_name=trim(dist_mesh_dir)//'rpart.out'
     fileID=10
     if (partit%mype==0) then

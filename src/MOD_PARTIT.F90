@@ -137,6 +137,10 @@ TYPE T_PARTIT
   logical :: halo_wet = .false.
   ! halo exchanges through packed buffers, one message per neighbour for all fields (halo_pack_fields)
   logical :: halo_pack = .false.
+  ! slot of the packed-exchange buffers and lists of this decomposition (1 ocean, 2 sea ice)
+  integer :: pack_slot = 1
+  ! partition directory this decomposition was read from (read_mesh)
+  character(len=4096) :: dist_dir = ''
   integer :: wet_nl = 0
   integer, allocatable :: wet_ulev_nod(:), wet_nlev_nod(:), wet_ulev_elem(:), wet_nlev_elem(:)
 

@@ -48,7 +48,7 @@ module g_comm
      integer,       allocatable :: wtop_s(:), wcnt_s(:,:), wpre_s(:,:)
      integer,       allocatable :: wtop_r(:), wcnt_r(:,:), wpre_r(:,:)
   end type g2g_cols_state
-  type(g2g_cols_state), target :: g2g_cols(2)
+  type(g2g_cols_state), target :: g2g_cols(2, 2)   ! (nodes/elements, partit%pack_slot)
   logical :: pk_last = .false.   ! the last exchange_*_begin went through the packed path (halo_timing)
 
 contains
@@ -893,7 +893,7 @@ if (partit%npes > 1) &
 #ifdef ENABLE_OPENACC
 if (g2g_unpack_pending) call g2g_unpack_2fields(partit)
 #endif
-if (g2g_cols(1)%pending) call g2g_cols_unpack(1, partit)
+if (g2g_cols(1, partit%pack_slot)%pending) call g2g_cols_unpack(1, partit)
 
 END SUBROUTINE exchange_nod_end_x
 
@@ -1048,7 +1048,7 @@ real(kind=WP), pointer :: f1(:), f2(:), f3(:), sb(:), rb(:)
 integer, pointer       :: sl(:)
 integer :: i, j, n, sn, rn, ns, nr, nf, a, l, blk
 
-st => g2g_cols(kind)
+st => g2g_cols(kind, partit%pack_slot)
 if (kind==1) then
    com => partit%com_nod2D
 else
@@ -1133,7 +1133,7 @@ real(kind=WP), pointer :: f(:), rb(:)
 integer, pointer       :: rl(:)
 integer :: i, j, k, nr, inner, blk
 
-st => g2g_cols(kind)
+st => g2g_cols(kind, partit%pack_slot)
 if (st%wet) then
    call g2g_cols_wet_unpack(st, kind, partit)
    return
@@ -1380,7 +1380,7 @@ type(t_partit), intent(inout), target :: partit
              partit%com_elem2D%req, MPI_STATUSES_IGNORE, partit%MPIerr)
      endif
   end if
-  if (g2g_cols(2)%pending) call g2g_cols_unpack(2, partit)
+  if (g2g_cols(2, partit%pack_slot)%pending) call g2g_cols_unpack(2, partit)
 END SUBROUTINE exchange_elem_end_x
 !=============================================================================
 subroutine exchange_elem3D(elem_array3D, partit, luse_g2g)

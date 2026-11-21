@@ -32,7 +32,7 @@ module ice_setup_step_module
     implicit none
 
     private
-    public :: ice_setup, ice_timestep, ice_initial_state
+    public :: ice_setup, ice_timestep, ice_initial_state, ice_setup_partition
 
 contains
 
@@ -71,6 +71,21 @@ subroutine ice_setup(ice, tracers, partit, mesh)
 
     if(partit%mype==0) write(*,*) 'Ice is initialized'
 end subroutine ice_setup
+!
+!_______________________________________________________________________________
+! Ice derived type on the separate sea-ice partition (ice_dist_name): arrays, parameters and the
+! mass matrix of that partition. Its state comes from the ice on the ocean partition.
+subroutine ice_setup_partition(ice, partit, mesh)
+    implicit none
+    type(t_ice)   , intent(inout), target :: ice
+    type(t_mesh)  , intent(inout), target :: mesh
+    type(t_partit), intent(inout), target :: partit
+    call ice_init(ice, partit, mesh)
+    ice%ice_dt   = real(ice%ice_ave_steps,WP)*dt
+    ice%Tevp_inv = 3.0_WP/ice%ice_dt
+    ice%Clim_evp = ice%Clim_evp*(ice%evp_rheol_steps/ice%ice_dt)**2/ice%Tevp_inv
+    call ice_mass_matrix_fill(ice, partit, mesh)
+end subroutine ice_setup_partition
 !
 !
 !_______________________________________________________________________________

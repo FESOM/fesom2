@@ -27,16 +27,18 @@ contains
 ! At the beginning of each routine I list arrays it initializes.
 ! Array sizes vary (sometimes we need only myDim, yet sometimes more)! 
 ! S. Danilov, 2012
-SUBROUTINE mesh_setup(partit, mesh)
+! dist_name: partition directory under MeshPath (default dist_<npes>), e.g. a separate one for sea ice
+SUBROUTINE mesh_setup(partit, mesh, dist_name)
 IMPLICIT NONE
       type(t_mesh),   intent(inout)         :: mesh
       type(t_partit), intent(inout), target :: partit
+      character(len=*), intent(in), optional :: dist_name
       
       if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call set_mesh_transform_matrix'//achar(27)//'[0m'
       call set_mesh_transform_matrix  !(rotated grid)
       
       if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call read_mesh'//achar(27)//'[0m'
-      call read_mesh(partit, mesh)
+      call read_mesh(partit, mesh, dist_name)
       
       if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_mpi_types'//achar(27)//'[0m'
       call init_mpi_types(partit, mesh)
@@ -81,10 +83,11 @@ END SUBROUTINE mesh_setup
 !======================================================================
 ! Reads distributed mesh
 ! The mesh will be read only by 0 proc and broadcasted to the others.
-SUBROUTINE read_mesh(partit, mesh)
+SUBROUTINE read_mesh(partit, mesh, dist_name)
 IMPLICIT NONE
 type(t_mesh),   intent(inout), target :: mesh
 type(t_partit), intent(inout), target :: partit
+character(len=*), intent(in), optional :: dist_name
  integer        :: n, nn, k, m, fileID
  integer        :: error_status !0/1=no error/error
  integer        :: vert_nodes(1000)
@@ -121,6 +124,8 @@ type(t_partit), intent(inout), target :: partit
   write(mype_string,'(i5.5)') partit%mype  
   write(npes_string,"(I10)")  partit%npes
   dist_mesh_dir=trim(meshpath)//'dist_'//trim(ADJUSTL(npes_string))//'/'
+  if (present(dist_name)) dist_mesh_dir=trim(meshpath)//trim(dist_name)//'/'
+  partit%dist_dir = dist_mesh_dir
   !=======================
   ! rank partitioning vector
   ! will be read by 0 proc
