@@ -248,6 +248,7 @@ module g_config
   logical                       :: tra_adv_hor_fused=.false. ! MFCT+FCT: low- and high-order horizontal tracer flux in one edge pass (CPU)
   logical                       :: tra_adv_fct_fused=.false. ! FCT limiter: node passes merged into one pass per column (CPU)
   logical                       :: tra_grad_nodal=.false.    ! up/downwind gradients: node means computed once per node (CPU)
+  logical                       :: ice_evp_lists=.false.     ! EVP: active elements, ice pressure and node lists once per ice step (CPU)
   character(len=100)            :: ice_dist_name=''          ! sea ice on its own partition: directory under MeshPath (e.g. 'dist_8_ice'); '' = ocean partition
   logical                       :: compute_oasis_corners=.false. ! switches on corner calculation for 1st order conserv remapping 
   logical                       :: use_atm_ice_tskin=.false.  ! OpenIFS: receive the ice-tile skin temperature (tsk_ico) and use it as the ice surface temperature
@@ -261,14 +262,14 @@ module g_config
                         use_cavity_fw2press, cavity_gamma_scale, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso, &
                         use_transit, compute_oasis_corners, use_atm_ice_tskin, use_atm_mslp, num_fesom_groups, &
                         use_hosing, hosing_mode, hosing_hSv, halo_wet_levels, halo_timing, halo_timing_sites, &
-                        halo_pack_fields, halo_tracers_together, ice_dist_name, tra_adv_hor_fused, tra_adv_fct_fused, tra_grad_nodal
+                        halo_pack_fields, halo_tracers_together, ice_dist_name, tra_adv_hor_fused, tra_adv_fct_fused, tra_grad_nodal, ice_evp_lists
 #else
   namelist /run_config/ use_ice,use_floatice, use_sw_pene, conservation_freq, use_cavity, & 
                         use_cavity_partial_cell, cavity_partial_cell_thresh, &
                         use_cavity_fw2press, cavity_gamma_scale, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso, &
                         use_transit, compute_oasis_corners, use_atm_ice_tskin, use_atm_mslp, &
                         use_hosing, hosing_mode, hosing_hSv, halo_wet_levels, halo_timing, halo_timing_sites, &
-                        halo_pack_fields, halo_tracers_together, ice_dist_name, tra_adv_hor_fused, tra_adv_fct_fused, tra_grad_nodal
+                        halo_pack_fields, halo_tracers_together, ice_dist_name, tra_adv_hor_fused, tra_adv_fct_fused, tra_grad_nodal, ice_evp_lists
 #endif
 
   !_____________________________________________________________________________

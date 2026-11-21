@@ -252,6 +252,119 @@ subroutine stress2rhs(ice, partit, mesh)
 #endif
 end subroutine stress2rhs
 !
+!_______________________________________________________________________________
+! ice_evp_lists (CPU): stress_tensor over a list of the active elements (no cavity, ice at all three
+! nodes), with the element ice pressure pelem computed once per ice step. Ice mass and concentration
+! do not change in the EVP subcycles, so the list and pelem are those stress_tensor finds and computes
+! in every subcycle. Same results.
+subroutine stress_tensor_act(elist, pel, ice, partit, mesh)
+    implicit none
+    integer       , intent(in)            :: elist(:)
+    real(kind=WP) , intent(in)            :: pel(:)
+    type(t_partit), intent(inout), target :: partit
+    type(t_ice)   , intent(inout), target :: ice
+    type(t_mesh)  , intent(in)   , target :: mesh
+    integer         :: i, el
+    real(kind=WP)   :: dte, vale, r1, r2, r3, si1, si2, det1, det2
+    real(kind=WP)   :: zeta, delta, delta_inv, pelem
+    real(kind=WP), dimension(:), pointer, contiguous :: u_ice, v_ice
+    real(kind=WP), dimension(:), pointer, contiguous :: eps11, eps12, eps22
+    real(kind=WP), dimension(:), pointer, contiguous :: sigma11, sigma12, sigma22
+    u_ice       => ice%uice(:)
+    v_ice       => ice%vice(:)
+    eps11       => ice%work%eps11(:)
+    eps12       => ice%work%eps12(:)
+    eps22       => ice%work%eps22(:)
+    sigma11     => ice%work%sigma11(:)
+    sigma12     => ice%work%sigma12(:)
+    sigma22     => ice%work%sigma22(:)
+    vale = 1.0_WP/(ice%ellipse**2)
+    dte  = ice%ice_dt/(1.0_WP*ice%evp_rheol_steps)
+    det1 = 1.0_WP/(1.0_WP + 0.5_WP*ice%Tevp_inv*dte)
+    det2 = 1.0_WP/(1.0_WP + 0.5_WP*ice%Tevp_inv*dte)
+!$OMP DO PRIVATE(i, el, pelem, r1, r2, r3, si1, si2, zeta, delta, delta_inv)
+    do i=1,size(elist)
+        el = elist(i)
+        pelem = pel(el)
+        eps11(el) = sum(mesh%gradient_sca(1:3,el)*U_ice(mesh%elem2D_nodes(1:3,el))) &
+            - mesh%metric_factor(el) * sum(V_ice(mesh%elem2D_nodes(1:3,el)))/3.0_WP
+        eps22(el) = sum(mesh%gradient_sca(4:6, el)*V_ice(mesh%elem2D_nodes(1:3,el)))
+        eps12(el) = 0.5_WP*(sum(mesh%gradient_sca(4:6,el)*U_ice(mesh%elem2D_nodes(1:3,el))) &
+                    + sum(mesh%gradient_sca(1:3,el)*V_ice(mesh%elem2D_nodes(1:3,el))) &
+                    + mesh%metric_factor(el) * sum(U_ice(mesh%elem2D_nodes(1:3,el)))/3.0_WP)
+        delta = sqrt((eps11(el)*eps11(el) + eps22(el)*eps22(el))*(1.0_WP+vale) + 4.0_WP*vale*eps12(el)*eps12(el) + &
+                            2.0_WP*eps11(el)*eps22(el)*(1.0_WP-vale))
+        delta_inv = 1.0_WP/max(delta,ice%delta_min)
+        zeta = pelem*delta_inv
+        zeta = zeta*ice%Tevp_inv
+        r1  = zeta*(eps11(el)+eps22(el)) - pelem*ice%Tevp_inv
+        r2  = zeta*(eps11(el)-eps22(el))*vale
+        r3  = zeta*eps12(el)*vale
+        si1 = det1*(sigma11(el) + sigma22(el) + dte*r1)
+        si2 = det2*(sigma11(el) - sigma22(el) + dte*r2)
+        sigma12(el) = det2*(sigma12(el)+dte*r3)
+        sigma11(el) = 0.5_WP*(si1+si2)
+        sigma22(el) = 0.5_WP*(si1-si2)
+    end do
+!$OMP END DO
+end subroutine stress_tensor_act
+!
+!_______________________________________________________________________________
+! ice_evp_lists (CPU): stress2rhs with each node's active elements and its corner in each of them
+! listed once per ice step (nptr/nel/ncorner), in nod_in_elem2D order. Same results.
+subroutine stress2rhs_act(nptr, nel, ncorner, ice, partit, mesh)
+    IMPLICIT NONE
+    integer       , intent(in)            :: nptr(:), nel(:), ncorner(:)
+    type(t_ice)   , intent(inout), target :: ice
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
+    INTEGER                   :: n, el, k, j
+    REAL(kind=WP)             :: val3, su, sv
+    real(kind=WP), dimension(:), pointer, contiguous :: sigma11, sigma12, sigma22
+    real(kind=WP), dimension(:), pointer, contiguous :: u_rhs_ice, v_rhs_ice, rhs_a, rhs_m
+    real(kind=WP), dimension(:), pointer, contiguous :: inv_areamass
+    sigma11      => ice%work%sigma11(:)
+    sigma12      => ice%work%sigma12(:)
+    sigma22      => ice%work%sigma22(:)
+    u_rhs_ice    => ice%uice_rhs(:)
+    v_rhs_ice    => ice%vice_rhs(:)
+    rhs_a        => ice%data(1)%values_rhs(:)
+    rhs_m        => ice%data(2)%values_rhs(:)
+    inv_areamass => ice%work%inv_areamass(:)
+    val3=1/3.0_WP
+!$OMP DO PRIVATE(n, el, k, j, su, sv)
+    DO n=1, partit%myDim_nod2D
+        su = 0.0_WP
+        sv = 0.0_WP
+        do k=nptr(n), nptr(n+1)-1
+            el = nel(k)
+            j  = ncorner(k)
+            su = su - mesh%elem_area(el) * &
+                 (sigma11(el)*mesh%gradient_sca(j,el) + sigma12(el)*mesh%gradient_sca(j+3,el) &
+                 +sigma12(el)*val3*mesh%metric_factor(el))
+            sv = sv - mesh%elem_area(el) * &
+                 (sigma12(el)*mesh%gradient_sca(j,el) + sigma22(el)*mesh%gradient_sca(j+3,el) &
+                 -sigma11(el)*val3*mesh%metric_factor(el))
+        end do
+        U_rhs_ice(n) = su
+        V_rhs_ice(n) = sv
+    END DO
+!$OMP END DO
+!$OMP DO
+    DO n=1, partit%myDim_nod2D
+        if (mesh%ulevels_nod2d(n)>1) cycle
+        if (inv_areamass(n) > 0._WP) then
+            U_rhs_ice(n) = U_rhs_ice(n)*inv_areamass(n) + rhs_a(n)
+            V_rhs_ice(n) = V_rhs_ice(n)*inv_areamass(n) + rhs_m(n)
+        else
+            U_rhs_ice(n) = 0._WP
+            V_rhs_ice(n) = 0._WP
+        endif
+    END DO
+!$OMP END DO
+end subroutine stress2rhs_act
+
+!
 !
 !_______________________________________________________________________________
 ! EVP implementation. Does subcycling and boundary conditions.
@@ -279,6 +392,12 @@ subroutine EVPdynamics(ice, partit, mesh)
     INTEGER         :: elem
     integer         :: n_inner, n_halo
     integer, allocatable :: elem_inner(:), elem_halo(:)
+    ! ice_evp_lists: active elements and per-node lists built once per call (see stress_tensor_act)
+    logical         :: lists
+    integer         :: i, na, nna, nnz, nnb, cnt
+    integer, allocatable :: nptr(:), nel(:), ncor(:), nact(:), nzero(:), nbc(:)
+    real(kind=WP), allocatable :: pel(:)
+    logical         :: zero_bc
     !_______________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
@@ -521,6 +640,102 @@ subroutine EVPdynamics(ice, partit, mesh)
         end if
     end do
 
+    ! ice_evp_lists: ice mass and concentration do not change in the subcycles, so the elements
+    ! stress_tensor and stress2rhs skip, their ice pressure, the nodes without ice and the
+    ! boundary nodes are the same in every subcycle: find them once
+    lists = .false.
+#ifndef ENABLE_OPENACC
+    lists = ice_evp_lists
+#endif
+    if (lists) then
+        allocate(pel(partit%myDim_elem2D))
+        pel = 0.0_WP
+        na = 0
+        do i=1, n_inner
+            el = elem_inner(i)
+            if (evp_active(el)) then
+                na = na+1
+                elem_inner(na) = el
+            end if
+        end do
+        n_inner = na
+        na = 0
+        do i=1, n_halo
+            el = elem_halo(i)
+            if (evp_active(el)) then
+                na = na+1
+                elem_halo(na) = el
+            end if
+        end do
+        n_halo = na
+        do i=1, n_inner+n_halo
+            if (i <= n_inner) then
+                el = elem_inner(i)
+            else
+                el = elem_halo(i-n_inner)
+            end if
+            elnodes = mesh%elem2D_nodes(:,el)
+            pel(el) = 0.5_WP * ice%pstar * (sum(m_ice(elnodes)) / 3.0_WP) &
+                      * exp(-ice%c_pressure * (1.0_WP - sum(a_ice(elnodes)) / 3.0_WP))
+        end do
+        allocate(nptr(partit%myDim_nod2D+1))
+        nptr(1) = 1
+        do n=1, partit%myDim_nod2D
+            cnt = 0
+            do k=1, mesh%nod_in_elem2D_num(n)
+                if (evp_active(mesh%nod_in_elem2D(k,n))) cnt = cnt+1
+            end do
+            nptr(n+1) = nptr(n)+cnt
+        end do
+        allocate(nel(max(1,nptr(partit%myDim_nod2D+1)-1)), ncor(max(1,nptr(partit%myDim_nod2D+1)-1)))
+        do n=1, partit%myDim_nod2D
+            cnt = nptr(n)
+            do k=1, mesh%nod_in_elem2D_num(n)
+                el = mesh%nod_in_elem2D(k,n)
+                if (.not. evp_active(el)) cycle
+                elnodes = mesh%elem2D_nodes(:,el)
+                j = 3
+                if (elnodes(1) == n) j = 1
+                if (elnodes(2) == n) j = 2
+                nel(cnt) = el
+                ncor(cnt) = j
+                cnt = cnt+1
+            end do
+        end do
+        allocate(nact(partit%myDim_nod2D), nzero(partit%myDim_nod2D), nbc(partit%myDim_nod2D+partit%eDim_nod2D))
+        nna = 0
+        nnz = 0
+        do n=1, partit%myDim_nod2D
+            if (mesh%ulevels_nod2d(n)>1) cycle
+            if (a_ice(n) >= 0.01_WP) then
+                nna = nna+1
+                nact(nna) = n
+            else
+                nnz = nnz+1
+                nzero(nnz) = n
+            end if
+        end do
+        nnb = 0
+        do n=1, partit%myDim_nod2D+partit%eDim_nod2D
+            zero_bc = .false.
+            do k=1, mesh%nod_in_edge2D_num(n)
+                ed=mesh%nod_in_edge2D(k,n)
+                if (partit%myList_edge2D(ed) > mesh%edge2D_in) zero_bc = .true.
+                if (use_cavity) then
+                    if (mesh%ulevels(mesh%edge_tri(1,ed))>1) then
+                        zero_bc = .true.
+                    elseif ( mesh%edge_tri(2,ed)>0) then
+                        if (mesh%ulevels(mesh%edge_tri(2,ed))>1) zero_bc = .true.
+                    end if
+                end if
+            end do
+            if (zero_bc) then
+                nnb = nnb+1
+                nbc(nnb) = n
+            end if
+        end do
+    end if
+
     ! stress_tensor and stress2rhs contain orphaned worksharing loops that bind to
     ! this region; the master thread starts and completes the halo exchange.
 #ifndef ENABLE_OPENACC
@@ -533,19 +748,35 @@ subroutine EVPdynamics(ice, partit, mesh)
 	!dir$ noinline
 #endif
 #ifndef ENABLE_OPENACC
-        call stress_tensor(elem_inner(1:n_inner), ice, partit, mesh)
+        if (lists) then
+            call stress_tensor_act(elem_inner(1:n_inner), pel, ice, partit, mesh)
+        else
+            call stress_tensor(elem_inner(1:n_inner), ice, partit, mesh)
+        end if
 !$OMP MASTER
         if (shortstep > 1) call exchange_nod_end(partit)
 !$OMP END MASTER
 !$OMP BARRIER
-        call stress_tensor(elem_halo(1:n_halo), ice, partit, mesh)
+        if (lists) then
+            call stress_tensor_act(elem_halo(1:n_halo), pel, ice, partit, mesh)
+        else
+            call stress_tensor(elem_halo(1:n_halo), ice, partit, mesh)
+        end if
 #else
         call stress_tensor(elem_inner(1:0), ice, partit, mesh)
 #endif
 #if defined(_CRAYFTN)
 	!dir$ noinline
 #endif
+#ifndef ENABLE_OPENACC
+        if (lists) then
+            call stress2rhs_act(nptr, nel, ncor, ice, partit, mesh)
+        else
+            call stress2rhs(ice, partit, mesh)
+        end if
+#else
         call stress2rhs(ice, partit, mesh)
+#endif
 
         !_______________________________________________________________________
 #ifndef ENABLE_OPENACC
@@ -561,6 +792,40 @@ subroutine EVPdynamics(ice, partit, mesh)
 !$OMP END DO
 #else
         !$ACC END PARALLEL LOOP
+#endif
+#ifndef ENABLE_OPENACC
+        if (lists) then
+!$OMP DO PRIVATE(i, n, umod, drag, rhsu, rhsv, r_a, r_b, det)
+        do i=1, nna
+            n = nact(i)
+            umod = sqrt((U_ice(n)-U_w(n))**2+(V_ice(n)-V_w(n))**2)
+            drag = ice%cd_oce_ice*umod*density_0*inv_mass(n)
+            rhsu = U_ice(n) +rdt*(drag*(ax*U_w(n) - ay*V_w(n))+ &
+                    inv_mass(n)*stress_atmice_x(n) + U_rhs_ice(n))
+            rhsv = V_ice(n) +rdt*(drag*(ax*V_w(n) + ay*U_w(n))+ &
+                    inv_mass(n)*stress_atmice_y(n) + V_rhs_ice(n))
+            r_a      = 1._WP + ax*drag*rdt
+            r_b      = rdt*(mesh%coriolis_node(n) + ay*drag)
+            det      = 1.0_WP/(r_a*r_a + r_b*r_b)
+            U_ice(n) = det*(r_a*rhsu +r_b*rhsv)
+            V_ice(n) = det*(r_a*rhsv -r_b*rhsu)
+        end do
+!$OMP END DO NOWAIT
+!$OMP DO PRIVATE(i, n)
+        do i=1, nnz
+            n = nzero(i)
+            U_ice(n) = 0.0_WP
+            V_ice(n) = 0.0_WP
+        end do
+!$OMP END DO
+!$OMP DO PRIVATE(i, n)
+        do i=1, nnb
+            n = nbc(i)
+            U_ice(n) = 0.0_WP
+            V_ice(n) = 0.0_WP
+        end do
+!$OMP END DO
+        else
 #endif
 #ifndef ENABLE_OPENACC
 !$OMP DO
@@ -636,6 +901,9 @@ subroutine EVPdynamics(ice, partit, mesh)
 #else
         !$ACC END PARALLEL LOOP
 #endif
+#ifndef ENABLE_OPENACC
+        end if
+#endif
 
 !write(*,*) partit%mype, shortstep, 'CP4'
         !_______________________________________________________________________
@@ -654,7 +922,20 @@ subroutine EVPdynamics(ice, partit, mesh)
 !$OMP END PARALLEL
 #endif
     deallocate(elem_inner, elem_halo)
+    if (lists) deallocate(pel, nptr, nel, ncor, nact, nzero, nbc)
 
+contains
+
+    ! element with ice at its three nodes and not under an ice shelf (stress_tensor's test)
+    logical function evp_active(e)
+        integer, intent(in) :: e
+        integer :: en(3)
+        evp_active = .false.
+        if (mesh%ulevels(e) > 1) return
+        en = mesh%elem2D_nodes(:,e)
+        if (any(m_ice(en) <= 0._WP) .or. any(a_ice(en) <= 0._WP)) return
+        evp_active = .true.
+    end function evp_active
 end subroutine EVPdynamics
 
 end module ice_EVP_module
