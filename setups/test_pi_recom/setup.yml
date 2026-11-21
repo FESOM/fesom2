@@ -34,6 +34,10 @@ namelist.config:
         restart_length_unit: "d"
         logfile_outfreq: 10
 
+namelist.oce:
+    oce_dyn:
+        redi_positive: True
+
 namelist.dyn:
     dynamics_general:
         use_wsplit: True
