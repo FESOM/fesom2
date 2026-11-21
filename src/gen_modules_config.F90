@@ -128,7 +128,10 @@ module g_config
   ! part_ice_hemispheres, otherwise one for both
   real                   :: part_ice_lat = 0.0
   logical                :: part_ice_hemispheres = .true.
-  namelist /machine/ n_levels, n_part, part_ice_lat, part_ice_hemispheres
+  ! Partitioner only: with part_weight_offset >= 0 one constraint, node weight = levels + offset (a
+  ! fixed cost per node plus a cost per level), instead of the pair (1, levels+100)
+  integer                :: part_weight_offset = -1
+  namelist /machine/ n_levels, n_part, part_ice_lat, part_ice_hemispheres, part_weight_offset
 
   ! --- parallel output/restart writing -------------------------------------
   ! Lives in namelist.config, NOT namelist.io: namelist.io is read by

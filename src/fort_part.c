@@ -48,6 +48,14 @@
 static idx_t *g_ice = NULL;
 static int g_nice = 0;
 
+/* Optional single node weight nlevels + g_wgt_offset (one constraint) instead of the 2D and 3D pair */
+static int g_wgt_offset = -1;
+
+void set_partit_wgt_offset(idx_t offset)
+{
+  g_wgt_offset = offset;
+}
+
 void set_partit_ice(idx_t *ice, idx_t nice)
 {
   g_ice = ice;
@@ -216,6 +224,22 @@ static void partit_rec(idx_t *n, idx_t *ptr, idx_t *adj, idx_t *wgt, idx_t *ice,
     exit(1);
   }
 
+  if (g_wgt_offset >= 0 && wgt != NULL)
+  {
+    if (wgt_2d3d != NULL && wgt_2d3d != wgt)
+      free(wgt_2d3d);
+    ncon = 1;
+    wgt_2d3d = (idx_t*) malloc(*n*sizeof(idx_t));
+    if (wgt_2d3d == NULL)
+    {
+      printf("Error allocating dynamic memory for node weights!\n");
+      exit(1);
+    }
+    for (i=0; i<*n; i++)
+      wgt_2d3d[i] = wgt[i] + g_wgt_offset;
+    printf("Distribution weight: one constraint, levels + %d per node\n", g_wgt_offset);
+  }
+
   if (ice != NULL && g_nice > 0)
   {
     idx_t tot[2] = {0, 0}, nb = ncon, *w;
@@ -370,6 +394,11 @@ static void partit_rec(idx_t *n, idx_t *ptr, idx_t *adj, idx_t *wgt, idx_t *ice,
 }
 
 #elif METIS_VERSION == 4 /* ---------------- METIS 4 part ------------------------ */
+
+void set_partit_wgt_offset(int offset)
+{
+  if (offset >= 0) printf("part_weight_offset needs METIS 5; ignored\n");
+}
 
 void set_partit_ice(int *ice, int nice)
 {

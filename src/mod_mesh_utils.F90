@@ -1548,6 +1548,10 @@ subroutine set_par_support_ini(partit, mesh)
        integer(idx_t), intent(in)  :: n, ptr(*), adj(*), wgt(*), np(*)
        integer(idx_t), intent(out) :: part(*)
      end subroutine do_partit
+     subroutine set_partit_wgt_offset(offset) bind(C)
+       use iso_c_binding, only: idx_t=>C_INT32_T
+       integer(idx_t), value :: offset
+     end subroutine set_partit_wgt_offset
      subroutine set_partit_ice(ice, nice) bind(C)
        use iso_c_binding, only: idx_t=>C_INT32_T
        integer(idx_t), intent(in) :: ice(*)
@@ -1585,6 +1589,7 @@ subroutine set_par_support_ini(partit, mesh)
      stop
   end if
   
+  if (part_weight_offset >= 0) call set_partit_wgt_offset(int(part_weight_offset, idx_t))
   if (allocated(part_ice)) then
      write(*,'(a,f6.1,a,2i9)') ' sea-ice constraint: nodes poleward of ', part_ice_lat, &
           ' deg, north / south: ', count(part_ice == 1), count(part_ice == 2)
