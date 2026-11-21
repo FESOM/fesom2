@@ -82,6 +82,9 @@ real(kind=WP),allocatable,dimension(:,:,:)    :: edge_up_dn_grad
 ! range over both adjacent elements (top of either to bottom of either), set on first use
 real(kind=WP),allocatable,dimension(:,:)      :: adv_flux_hor_lo
 integer,      allocatable,dimension(:)        :: edge_nzt, edge_nzb
+! tra_grad_nodal: mean tracer gradient around each node on the levels its edges need, and those levels
+real(kind=WP),allocatable,dimension(:,:,:)    :: gnod
+integer,      allocatable,dimension(:)        :: gnod_top_hi, gnod_bot_lo
 
 contains
 procedure WRITE_T_TRACER_WORK

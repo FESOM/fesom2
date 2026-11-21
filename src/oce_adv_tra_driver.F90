@@ -8,7 +8,7 @@ module oce_adv_tra_driver_module
     USE diagnostics, only: ldiag_DVD
     use oce_adv_tra_hor_module, only: adv_tra_hor_upw1, adv_tra_hor_muscl, adv_tra_hor_mfct, adv_tra_hor_spbee, &
                                       adv_tra_hor_upw1_mfct, adv_edge_levels
-    use g_config, only: tra_adv_hor_fused, tra_adv_fct_fused
+    use g_config, only: tra_adv_hor_fused, tra_adv_fct_fused, tra_grad_nodal
     use oce_adv_tra_ver_module, only: adv_tra_vert_impl, adv_tra_ver_upw1, adv_tra_ver_qr4c, adv_tra_ver_ppm, adv_tra_ver_cdiff, adv_tra_ver_spbee
     USE oce_adv_tra_fct_module, only: oce_adv_tra_fct_init, oce_tra_adv_fct, oce_tra_adv_fct_fused
     USE o_ARRAYS
@@ -134,8 +134,14 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
         ! o_init_zero=.true.  : zero the horizontal flux before computation
         ! o_init_zero=.false. : input flux will be substracted
         if (fused) then
-            call adv_tra_hor_upw1_mfct(vel, ttf, ttfAB, partit, mesh, opth, flux_lo, adv_flux_hor, edge_up_dn_grad, &
-                                       tracers%work%edge_nzt, tracers%work%edge_nzb)
+            if (tra_grad_nodal) then
+                call adv_tra_hor_upw1_mfct(vel, ttf, ttfAB, partit, mesh, opth, flux_lo, adv_flux_hor, edge_up_dn_grad, &
+                                           tracers%work%edge_nzt, tracers%work%edge_nzb, &
+                                           tracers%work%edge_up_dn_tri, tr_xy, tracers%work%gnod)
+            else
+                call adv_tra_hor_upw1_mfct(vel, ttf, ttfAB, partit, mesh, opth, flux_lo, adv_flux_hor, edge_up_dn_grad, &
+                                           tracers%work%edge_nzt, tracers%work%edge_nzb)
+            end if
         else
             call adv_tra_hor_upw1(vel, ttf, partit, mesh, adv_flux_hor, o_init_zero=.true.)
         end if

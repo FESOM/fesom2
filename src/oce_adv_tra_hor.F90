@@ -238,7 +238,11 @@ end subroutine adv_edge_levels
 ! edge over nzt..nzb, with 0/1 weights for the two adjacent elements instead of the loops (A)-(E);
 ! per-edge values are held in scalars so that the level loop vectorises. Same results as the two
 ! separate kernels.
-subroutine adv_tra_hor_upw1_mfct(vel, ttf, ttfAB, partit, mesh, num_ord, flux_lo, flux, edge_up_dn_grad, nzt, nzb)
+! With updn_tri, trxy and gnod (tra_grad_nodal) the up- and downwind gradients are taken per level from
+! the triangles' gradients (shared levels) or the node means, as fill_up_dn_grad(_nodal) would store
+! them, instead of reading edge_up_dn_grad, which then need not be filled.
+subroutine adv_tra_hor_upw1_mfct(vel, ttf, ttfAB, partit, mesh, num_ord, flux_lo, flux, edge_up_dn_grad, nzt, nzb, &
+                                 updn_tri, trxy, gnod)
     implicit none
     type(t_partit),intent(in), target :: partit
     type(t_mesh),  intent(in), target :: mesh
@@ -250,6 +254,8 @@ subroutine adv_tra_hor_upw1_mfct(vel, ttf, ttfAB, partit, mesh, num_ord, flux_lo
     real(kind=WP), intent(out)        :: flux(   mesh%nl-1, partit%myDim_edge2D)
     real(kind=WP), intent(in)         :: edge_up_dn_grad(4, mesh%nl-1, partit%myDim_edge2D)
     integer,       intent(in)         :: nzt(partit%myDim_edge2D), nzb(partit%myDim_edge2D)
+    integer,       intent(in), optional :: updn_tri(2, partit%myDim_edge2D)
+    real(kind=WP), intent(in), optional :: trxy(2, mesh%nl-1, *), gnod(2, mesh%nl-1, *)
     integer, parameter                :: blk = 256
     integer                           :: e0, nn, ne, nel
     nn  = partit%myDim_nod2D+partit%eDim_nod2D
@@ -259,9 +265,16 @@ subroutine adv_tra_hor_upw1_mfct(vel, ttf, ttfAB, partit, mesh, num_ord, flux_lo
     ! gfortran does not vectorise the level loop of this kernel
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(e0) SCHEDULE(STATIC)
     do e0 = 1, ne, blk
+        if (present(gnod)) then
+        call upw1_mfct_edges_otf(e0, min(e0+blk-1, ne), mesh%nl, nn, nel, ne, num_ord, vel, ttf, ttfAB, &
+                             mesh%helem, updn_tri, trxy, gnod, mesh%ulevels_nod2D_max, mesh%nlevels_nod2D_min, &
+                             mesh%edges, mesh%edge_tri, mesh%nlevels, mesh%ulevels, &
+                             mesh%edge_cross_dxdy, mesh%edge_dxdy, mesh%elem_cos, nzt, nzb, flux_lo, flux)
+        else
         call upw1_mfct_edges(e0, min(e0+blk-1, ne), mesh%nl, nn, nel, ne, num_ord, vel, ttf, ttfAB, &
                              mesh%helem, edge_up_dn_grad, mesh%edges, mesh%edge_tri, mesh%nlevels, mesh%ulevels, &
                              mesh%edge_cross_dxdy, mesh%edge_dxdy, mesh%elem_cos, nzt, nzb, flux_lo, flux)
+        end if
     end do
 !$OMP END PARALLEL DO
 end subroutine adv_tra_hor_upw1_mfct
@@ -321,6 +334,83 @@ subroutine upw1_mfct_edges(ebeg, eend, nl, nn, nel, ne, num_ord, vel, ttf, ttfAB
         end do
     end do
 end subroutine upw1_mfct_edges
+
+subroutine upw1_mfct_edges_otf(ebeg, eend, nl, nn, nel, ne, num_ord, vel, ttf, ttfAB, helem, tri, trxy, gnod, ulev_max, nlev_min, edges, edge_tri, &
+                           nlevels, ulevels, edge_cross_dxdy, edge_dxdy, elem_cos, nzt, nzb, flux_lo, flux)
+    implicit none
+    integer,       intent(in)    :: ebeg, eend, nl, nn, nel, ne
+    real(kind=WP), intent(in)    :: num_ord
+    real(kind=WP), intent(in)    :: vel(2, nl-1, nel), ttf(nl-1, nn), ttfAB(nl-1, nn), helem(nl-1, *)
+    real(kind=WP), intent(in)    :: edge_cross_dxdy(4, *), edge_dxdy(2, *), elem_cos(*)
+    real(kind=WP), intent(in)    :: trxy(2, nl-1, *), gnod(2, nl-1, nn)
+    integer,       intent(in)    :: tri(2, ne), ulev_max(nn), nlev_min(nn)
+    integer,       intent(in)    :: edges(2, *), edge_tri(2, *), nlevels(*), ulevels(*), nzt(ne), nzb(ne)
+    real(kind=WP), intent(inout) :: flux_lo(nl-1, ne), flux(nl-1, ne)
+    real(kind=WP) :: deltaX1, deltaY1, deltaX2, deltaY2, a, ex, ey
+    real(kind=WP) :: w1, w2, vflux, flo, t1, t2, Tmean1, Tmean2, cHO
+    integer       :: el(2), enodes(2), e2, nz, edge, nl1, nl2, nu1, nu2, k1, k2, up, dn, zs, ze
+    real(kind=WP) :: g1, g2, g3, g4
+    logical       :: sh
+    do edge=ebeg, eend
+        enodes=edges(:,edge)
+        el=edge_tri(:,edge)
+        nl1=nlevels(el(1))-1
+        nu1=ulevels(el(1))
+        deltaX1=edge_cross_dxdy(1,edge)
+        deltaY1=edge_cross_dxdy(2,edge)
+        a=r_earth*elem_cos(el(1))
+        e2=el(1)
+        nl2=0
+        nu2=huge(nu2)
+        deltaX2=0.0_WP
+        deltaY2=0.0_WP
+        if(el(2)>0) then
+            e2=el(2)
+            deltaX2=edge_cross_dxdy(3,edge)
+            deltaY2=edge_cross_dxdy(4,edge)
+            nl2=nlevels(el(2))-1
+            nu2=ulevels(el(2))
+            a=0.5_WP*(a+r_earth*elem_cos(el(2)))
+        end if
+        ex=edge_dxdy(1,edge)*a
+        ey=edge_dxdy(2,edge)*r_earth
+        k1=nzt(edge)
+        k2=nzb(edge)
+        ! levels with both triangles (fill_up_dn_grad: shared levels), otherwise the node means
+        if (tri(1,edge)/=0 .and. tri(2,edge)/=0) then
+            up=tri(1,edge)
+            dn=tri(2,edge)
+            zs=max(ulev_max(enodes(1)), ulev_max(enodes(2)))
+            ze=min(nlev_min(enodes(1)), nlev_min(enodes(2)))-1
+        else
+            up=el(1)
+            dn=el(1)
+            zs=huge(zs)
+            ze=-huge(ze)
+        end if
+        flux_lo(:,edge)=0.0_WP
+        flux(:,edge)=0.0_WP
+        do nz=k1, k2
+            w1=merge(1.0_WP, 0.0_WP, nz>=nu1 .and. nz<=nl1)
+            w2=merge(1.0_WP, 0.0_WP, nz>=nu2 .and. nz<=nl2)
+            vflux=w1*(-vel(2,nz,el(1))*deltaX1 + vel(1,nz,el(1))*deltaY1)*helem(nz,el(1)) &
+                 +w2*( vel(2,nz,e2)*deltaX2    - vel(1,nz,e2)*deltaY2)*helem(nz,e2)
+            flo=-0.5_WP*(ttf(nz, enodes(1))*(vflux+abs(vflux))+ttf(nz, enodes(2))*(vflux-abs(vflux)))
+            flux_lo(nz,edge)=flo
+            t1=ttfAB(nz,enodes(1))
+            t2=ttfAB(nz,enodes(2))
+            sh=nz>=zs .and. nz<=ze
+            g1=merge(trxy(1,nz,up), gnod(1,nz,enodes(1)), sh)
+            g2=merge(trxy(1,nz,dn), gnod(1,nz,enodes(2)), sh)
+            g3=merge(trxy(2,nz,up), gnod(2,nz,enodes(1)), sh)
+            g4=merge(trxy(2,nz,dn), gnod(2,nz,enodes(2)), sh)
+            Tmean2=t2-(2.0_WP*(t2-t1)+ex*g2+ey*g4)/6.0_WP
+            Tmean1=t1+(2.0_WP*(t2-t1)+ex*g1+ey*g3)/6.0_WP
+            cHO=(vflux+abs(vflux))*Tmean1 + (vflux-abs(vflux))*Tmean2
+            flux(nz,edge)=-0.5_WP*(1.0_WP-num_ord)*cHO - vflux*num_ord*0.5_WP*(Tmean1+Tmean2)-flo
+        end do
+    end do
+end subroutine upw1_mfct_edges_otf
 
 subroutine adv_tra_hor_muscl(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_grad, nboundary_lay, o_init_zero)
     implicit none

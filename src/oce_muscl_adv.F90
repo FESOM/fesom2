@@ -11,7 +11,7 @@ module oce_muscl_adv_module
 
     private
     public :: muscl_adv_init, find_up_downwind_triangles, &
-              fill_up_dn_grad
+              fill_up_dn_grad, fill_up_dn_grad_nodal
 
 contains
 
@@ -465,4 +465,139 @@ type(t_tracer_work), intent(inout), target :: twork
 #endif
 END SUBROUTINE fill_up_dn_grad
 
+!_______________________________________________________________________________
+! fill_up_dn_grad with the mean gradient around each node computed once per node (tra_grad_nodal,
+! CPU). fill_up_dn_grad computes, for the levels where an edge's two nodes do not share both
+! up- and downwind triangles (and on surface boundary edges for all levels), the area-weighted mean of
+! the element gradients around each of the edge's nodes; that mean depends only on the node and the
+! level, but was recomputed for every edge of the node. Here it is computed per node on the levels
+! any of its edges needs (elements outer, levels inner, the elements of each level summed in the same
+! order), then copied by the edge pass. Same results.
+SUBROUTINE fill_up_dn_grad_nodal(twork, partit, mesh, edges)
+! edges=.false.: the node means only (the fused advection takes the gradients per level itself)
+IMPLICIT NONE
+type(t_mesh),        intent(in),    target :: mesh
+type(t_partit),      intent(inout), target :: partit
+type(t_tracer_work), intent(inout), target :: twork
+logical,             intent(in)            :: edges
+integer            :: edge, n, nz, elem, k, ednodes(2), nzmin, nzmax, i, nn, ne, k1, k2, a1, a2, b1, b2
+real(kind=WP)      :: ar, tv(mesh%nl), tx(mesh%nl), ty(mesh%nl)
+logical            :: bnd
+
+nn = partit%myDim_nod2D+partit%eDim_nod2D
+ne = partit%myDim_edge2D
+!___________________________________________________________________________
+! once: per node, the levels its edges need: [ulevels, top_hi] and [bot_lo, nlevels-1]
+if (.not. allocated(twork%gnod_top_hi)) then
+    allocate(twork%gnod_top_hi(nn), twork%gnod_bot_lo(nn), twork%gnod(2, mesh%nl-1, nn))
+    twork%gnod = 0.0_WP
+    do n=1, nn
+        twork%gnod_top_hi(n) = mesh%ulevels_nod2D(n)-1
+        twork%gnod_bot_lo(n) = mesh%nlevels_nod2D(n)
+    end do
+    do edge=1, ne
+        ednodes=mesh%edges(:,edge)
+        bnd = .not. ((twork%edge_up_dn_tri(1,edge).ne.0.0_WP).and.(twork%edge_up_dn_tri(2,edge).ne.0.0_WP))
+        if (bnd) then
+            nzmin = huge(nzmin)
+            nzmax = -huge(nzmax)
+        else
+            nzmin = maxval(mesh%ulevels_nod2D_max(ednodes))
+            nzmax = minval(mesh%nlevels_nod2D_min(ednodes))
+        end if
+        do i=1, 2
+            n=ednodes(i)
+            if (bnd) then
+                twork%gnod_top_hi(n) = mesh%nlevels_nod2D(n)-1
+            else
+                twork%gnod_top_hi(n) = max(twork%gnod_top_hi(n), nzmin-1)
+                twork%gnod_bot_lo(n) = min(twork%gnod_bot_lo(n), nzmax)
+            end if
+        end do
+    end do
+end if
+
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, n, nz, elem, k, ednodes, nzmin, nzmax, k1, k2, a1, a2, b1, b2, ar, tv, tx, ty, bnd)
+!___________________________________________________________________________
+! mean gradient around each node on the needed levels
+!$OMP DO
+DO n=1, nn
+    a1=mesh%ulevels_nod2D(n)
+    a2=min(twork%gnod_top_hi(n), mesh%nlevels_nod2D(n)-1)
+    b1=max(twork%gnod_bot_lo(n), a2+1)
+    b2=mesh%nlevels_nod2D(n)-1
+    if (a2 < a1 .and. b2 < b1) cycle
+    tv(a1:b2)=0.0_WP
+    tx(a1:b2)=0.0_WP
+    ty(a1:b2)=0.0_WP
+    DO k=1, mesh%nod_in_elem2D_num(n)
+        elem=mesh%nod_in_elem2D(k,n)
+        ar=mesh%elem_area(elem)
+        k1=max(a1, mesh%ulevels(elem))
+        k2=min(a2, mesh%nlevels(elem)-1)
+        DO nz=k1, k2
+            tv(nz)=tv(nz)+ar
+            tx(nz)=tx(nz)+tr_xy(1,nz,elem)*ar
+            ty(nz)=ty(nz)+tr_xy(2,nz,elem)*ar
+        END DO
+        k1=max(b1, mesh%ulevels(elem))
+        k2=min(b2, mesh%nlevels(elem)-1)
+        DO nz=k1, k2
+            tv(nz)=tv(nz)+ar
+            tx(nz)=tx(nz)+tr_xy(1,nz,elem)*ar
+            ty(nz)=ty(nz)+tr_xy(2,nz,elem)*ar
+        END DO
+    END DO
+    DO nz=a1, a2
+        twork%gnod(1,nz,n)=tx(nz)/tv(nz)
+        twork%gnod(2,nz,n)=ty(nz)/tv(nz)
+    END DO
+    DO nz=b1, b2
+        twork%gnod(1,nz,n)=tx(nz)/tv(nz)
+        twork%gnod(2,nz,n)=ty(nz)/tv(nz)
+    END DO
+END DO
+!$OMP END DO
+!___________________________________________________________________________
+! edges: the triangles' gradients on the shared levels, the node means elsewhere
+!$OMP DO
+DO edge=1, merge(ne, 0, edges)
+    ednodes=mesh%edges(:,edge)
+    if((twork%edge_up_dn_tri(1,edge).ne.0.0_WP).and.(twork%edge_up_dn_tri(2,edge).ne.0.0_WP)) then
+        nzmin = maxval(mesh%ulevels_nod2D_max(ednodes))
+        nzmax = minval(mesh%nlevels_nod2D_min(ednodes))
+        DO nz=mesh%ulevels_nod2D(ednodes(1)), nzmin-1
+            twork%edge_up_dn_grad(1,nz,edge)=twork%gnod(1,nz,ednodes(1))
+            twork%edge_up_dn_grad(3,nz,edge)=twork%gnod(2,nz,ednodes(1))
+        END DO
+        DO nz=mesh%ulevels_nod2D(ednodes(2)), nzmin-1
+            twork%edge_up_dn_grad(2,nz,edge)=twork%gnod(1,nz,ednodes(2))
+            twork%edge_up_dn_grad(4,nz,edge)=twork%gnod(2,nz,ednodes(2))
+        END DO
+        DO nz=nzmin, nzmax-1
+            twork%edge_up_dn_grad(1:2,nz,edge)=tr_xy(1,nz,twork%edge_up_dn_tri(:,edge))
+            twork%edge_up_dn_grad(3:4,nz,edge)=tr_xy(2,nz,twork%edge_up_dn_tri(:,edge))
+        END DO
+        DO nz=nzmax, mesh%nlevels_nod2D(ednodes(1))-1
+            twork%edge_up_dn_grad(1,nz,edge)=twork%gnod(1,nz,ednodes(1))
+            twork%edge_up_dn_grad(3,nz,edge)=twork%gnod(2,nz,ednodes(1))
+        END DO
+        DO nz=nzmax, mesh%nlevels_nod2D(ednodes(2))-1
+            twork%edge_up_dn_grad(2,nz,edge)=twork%gnod(1,nz,ednodes(2))
+            twork%edge_up_dn_grad(4,nz,edge)=twork%gnod(2,nz,ednodes(2))
+        END DO
+    else
+        DO nz=mesh%ulevels_nod2D(ednodes(1)), mesh%nlevels_nod2D(ednodes(1))-1
+            twork%edge_up_dn_grad(1,nz,edge)=twork%gnod(1,nz,ednodes(1))
+            twork%edge_up_dn_grad(3,nz,edge)=twork%gnod(2,nz,ednodes(1))
+        END DO
+        DO nz=mesh%ulevels_nod2D(ednodes(2)), mesh%nlevels_nod2D(ednodes(2))-1
+            twork%edge_up_dn_grad(2,nz,edge)=twork%gnod(1,nz,ednodes(2))
+            twork%edge_up_dn_grad(4,nz,edge)=twork%gnod(2,nz,ednodes(2))
+        END DO
+    end if
+END DO
+!$OMP END DO
+!$OMP END PARALLEL
+END SUBROUTINE fill_up_dn_grad_nodal
 end module oce_muscl_adv_module

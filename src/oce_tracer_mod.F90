@@ -4,7 +4,7 @@ USE MOD_MESH
 USE MOD_TRACER
 USE MOD_PARTIT
 use par_support_module, only: par_abort
-use oce_muscl_adv_module, only: fill_up_dn_grad
+use oce_muscl_adv_module, only: fill_up_dn_grad, fill_up_dn_grad_nodal
 IMPLICIT NONE
 
 CONTAINS
@@ -16,15 +16,21 @@ SUBROUTINE init_tracers_AB(tr_num, tracers, partit, mesh)
     USE MOD_PARTIT
     use par_support_module, only: par_abort
     USE MOD_TRACER
-    use g_config, only: flag_debug
+    use g_config, only: flag_debug, tra_grad_nodal, tra_adv_hor_fused
     use o_arrays
     use g_comm_auto
+#if defined (FESOM_PROFILING)
+    use fesom_profiler
+#endif
     IMPLICIT NONE
     integer,        intent(in)            :: tr_num
     type(t_mesh),   intent(in),    target :: mesh
     type(t_partit), intent(inout), target :: partit
     type(t_tracer), intent(inout), target :: tracers
     integer                               :: n,nz 
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_start("ab_arrays")
+#endif
 
 #ifndef ENABLE_OPENACC
 #else
@@ -123,7 +129,13 @@ end do
 #endif
     end if
 
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_end("ab_arrays")
+#endif
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_elements'//achar(27)//'[0m'
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_start("ab_grad")
+#endif
 !PS     call tracer_gradient_elements(tracers%data(tr_num)%valuesAB, partit, mesh)
 #ifndef ENABLE_OPENACC
     call tracer_gradient_elements(tracers%data(tr_num)%values, tr_xy, partit, mesh)
@@ -150,12 +162,37 @@ end do
     call exchange_nod_begin(tr_z, partit, luse_g2g=.true.) ! not used in fill_up_dn_grad
 #endif
 
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_end("ab_grad")
+#endif
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[38m'//'             --> call fill_up_dn_grad'//achar(27)//'[0m'
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_start("ab_fill_updn")
+#endif
+#ifndef ENABLE_OPENACC
+    if (tra_grad_nodal) then
+        ! with tra_adv_hor_fused (MFCT with FCT) the advection takes the gradients per level itself
+        call fill_up_dn_grad_nodal(tracers%work, partit, mesh, edges=.not. (tra_adv_hor_fused .and. &
+             trim(tracers%data(tr_num)%tra_adv_hor)=='MFCT' .and. trim(tracers%data(tr_num)%tra_adv_lim)=='FCT'))
+    else
+        call fill_up_dn_grad(tracers%work, partit, mesh)
+    end if
+#else
     call fill_up_dn_grad(tracers%work, partit, mesh)
+#endif
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_end("ab_fill_updn")
+#endif
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_start("ab_exch")
+#endif
     call exchange_nod_end(partit)       ! tr_z halos should have arrived by now.
 
-    call exchange_elem(tr_xy, partit)
-
+    ! tr_xy was exchanged above (exchange_elem_begin/end) and fill_up_dn_grad only reads it
+    if (.not. tra_grad_nodal) call exchange_elem(tr_xy, partit)
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_end("ab_exch")
+#endif
 END SUBROUTINE init_tracers_AB
 !
 !
