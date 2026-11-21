@@ -870,7 +870,13 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
        call backup_ttf_rhs(del_ttf, ttf_rhs_bak, mesh%ulevels_nod2D, mesh%nlevels_nod2D, partit%myDim_nod2D, partit%eDim_nod2D)
     end if
 
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_start("diff_ver_redi")
+#endif
     if (Redi) call diff_ver_part_redi_expl(tracers, partit, mesh)
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_end("diff_ver_redi")
+#endif
     if (conservation_freq > 0) call conservation_probe('vert_expl', 'a', tr_num, tracers, partit, mesh)
 
     if (tracers%data(tr_num)%ltra_diag .and. Redi) then
@@ -1836,6 +1842,10 @@ subroutine diff_ver_part_redi_expl(tracers, partit, mesh)
     integer                  :: n, k, elem, nz
     integer                  :: n2, nl1, ul1, nl2
     real(kind=WP)            :: Tx, Ty, flux, flux_below, zb, zb_below, zn, zn_up
+#ifndef ENABLE_OPENACC
+    integer                  :: k1, k2
+    real(kind=WP)            :: ar, txv(mesh%nl), tyv(mesh%nl), zbv(mesh%nl+1), znv(mesh%nl+1), flv(mesh%nl+1)
+#endif
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP_full), pointer, contiguous   :: del_ttf(:,:)
@@ -1846,11 +1856,34 @@ subroutine diff_ver_part_redi_expl(tracers, partit, mesh)
     end if
 
 #ifndef ENABLE_OPENACC
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, k, elem, nz, n2, nl1, ul1, nl2, Tx, Ty, flux, flux_below, zb, zb_below, zn, zn_up)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, k, elem, nz, n2, nl1, ul1, nl2, Tx, Ty, flux, flux_below, zb, zb_below, zn, zn_up, &
+!$OMP                                  k1, k2, ar, txv, tyv, zbv, znv, flv)
 !$OMP DO
+    ! node gradients: the elements around the node outside and each element's levels inside, so that
+    ! the level loop is contiguous and has no condition; per level the elements are summed in the
+    ! same order as before
+    do n=1, partit%myDim_nod2D
+        nl1=mesh%nlevels_nod2D(n)-1
+        ul1=mesh%ulevels_nod2D(n)
+        txv(ul1:nl1)=0.0_WP
+        tyv(ul1:nl1)=0.0_WP
+        do k=1, mesh%nod_in_elem2D_num(n)
+            elem=mesh%nod_in_elem2D(k,n)
+            k1=max(ul1, mesh%ulevels(elem))
+            k2=min(nl1, mesh%nlevels(elem)-1)
+            ar=mesh%elem_area(elem)
+            do nz=k1, k2
+                txv(nz)=txv(nz)+tr_xy(1,nz,elem)*ar
+                tyv(nz)=tyv(nz)+tr_xy(2,nz,elem)*ar
+            end do
+        end do
+        do nz=ul1, nl1
+            tr_xynodes(1,nz,n)=txv(nz)/3.0_WP/mesh%areasvol(nz,n)
+            tr_xynodes(2,nz,n)=tyv(nz)/3.0_WP/mesh%areasvol(nz,n)
+        end do
+    end do
 #else
 !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) IF(diff_on_device) PRIVATE(nl1, ul1) VECTOR_LENGTH(32)
-#endif
     !___________________________________________________________________________
     do n=1, partit%myDim_nod2D
         nl1=mesh%nlevels_nod2D(n)-1
@@ -1874,6 +1907,7 @@ subroutine diff_ver_part_redi_expl(tracers, partit, mesh)
             tr_xynodes(2,nz,n)=ty/3.0_WP/mesh%areasvol(nz,n)
         end do
     end do
+#endif
 
 #ifndef ENABLE_OPENACC
 !$OMP END DO
@@ -1883,9 +1917,31 @@ subroutine diff_ver_part_redi_expl(tracers, partit, mesh)
     ! no halo exchange of tr_xynodes is needed !
 #ifndef ENABLE_OPENACC
 !$OMP DO
+    ! depths first (the same running sums), then the fluxes and the update as separate loops
+    ! without a carried scalar; zbv(nz) = zbar_n(nz), znv(nz) = z_n(nz), flv(nz) = vd_flux(nz)
+    do n=1, partit%myDim_nod2D
+        nl1=mesh%nlevels_nod2D(n)-1
+        ul1=mesh%ulevels_nod2D(n)
+        zbv(nl1+1)= mesh%zbar_n_bot(n)
+        znv(nl1)  = zbv(nl1+1) + mesh%hnode(nl1,n)/2.0_WP
+        do nz=nl1, ul1+1, -1
+            zbv(nz)   = zbv(nz+1) + mesh%hnode(nz,n)
+            znv(nz-1) = zbv(nz)   + mesh%hnode(nz-1,n)/2.0_WP
+        end do
+        do nz=ul1+1, nl1
+            flv(nz) = (znv(nz-1)-zbv(nz))*(slope_tapered(1,nz-1,n)*tr_xynodes(1,nz-1,n)+slope_tapered(2,nz-1,n)*tr_xynodes(2,nz-1,n))*Ki(nz-1,n)
+            flv(nz) = flv(nz)+&
+                      (zbv(nz)-znv(nz))*(slope_tapered(1,nz,n)  *tr_xynodes(1,nz,n)  +slope_tapered(2,nz,n)  *tr_xynodes(2,nz,n))  *Ki(nz,n)
+            flv(nz) = flv(nz)/(znv(nz-1)-znv(nz))*mesh%area(nz,n)
+        end do
+        flv(nl1+1) = 0.0_WP
+        do nz=ul1+1, nl1
+            del_ttf(nz,n) = del_ttf(nz,n) + (flv(nz)-flv(nz+1)) * dt/mesh%areasvol(nz,n)
+        end do
+        del_ttf(ul1,n) = del_ttf(ul1,n) + (0.0_WP-flv(ul1+1)) * dt/mesh%areasvol(ul1,n)
+    end do
 #else
 !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) IF(diff_on_device) PRIVATE(nz, nl1, ul1, flux, flux_below, zb, zb_below, zn, zn_up)
-#endif
     do n=1, partit%myDim_nod2D
         nl1=mesh%nlevels_nod2D(n)-1
         ul1=mesh%ulevels_nod2D(n)
@@ -1908,6 +1964,7 @@ subroutine diff_ver_part_redi_expl(tracers, partit, mesh)
         enddo
         del_ttf(ul1,n) = del_ttf(ul1,n) + (0.0_WP-flux_below) * dt/mesh%areasvol(ul1,n)
     end do
+#endif
 #ifndef ENABLE_OPENACC
 !$OMP END DO
 !$OMP END PARALLEL
@@ -1919,6 +1976,7 @@ end subroutine diff_ver_part_redi_expl
 !
 !===============================================================================
 subroutine diff_part_hor_redi(tracers, partit, mesh)
+    use oce_adv_tra_hor_module, only: adv_edge_levels
     IMPLICIT NONE
     type(t_tracer), intent(inout), target :: tracers
     type(t_partit), intent(inout), target :: partit
@@ -1940,6 +1998,11 @@ subroutine diff_part_hor_redi(tracers, partit, mesh)
         !$ACC ENTER DATA CREATE(tracers%work%edge_flux)
     end if
     edge_flux => tracers%work%edge_flux
+    ! each edge's level range (also used by the advection with tra_adv_*_fused)
+    if (.not. allocated(tracers%work%edge_nzt)) then
+        allocate(tracers%work%edge_nzt(partit%myDim_edge2D), tracers%work%edge_nzb(partit%myDim_edge2D))
+        call adv_edge_levels(partit, mesh, tracers%work%edge_nzt, tracers%work%edge_nzb)
+    end if
 
     !___________________________________________________________________________
     if (Redi) isredi=1._WP
@@ -1979,9 +2042,7 @@ subroutine diff_part_hor_redi(tracers, partit, mesh)
         nl12=min(nl1,nl2)
         ul12=max(ul1,ul2)
         ! flux of this edge over its column, accumulated per level from (A)-(E) below (no per-edge work array)
-        do nz=min(ul1, merge(ul2, ul1, ul2>0)), max(nl1, nl2)
-            edge_flux(nz,edge)=0.0_WP
-        end do
+        ! each level of the edge's range is set by exactly one of the loops below
         !_______________________________________________________________________
         ! (A)
         do nz=ul1, ul12-1
@@ -1995,7 +2056,7 @@ subroutine diff_part_hor_redi(tracers, partit, mesh)
             Fx=Kh*(Tx+SxTz*isredi)
             Fy=Kh*(Ty+SyTz*isredi)
             c=(-deltaX1*Fy+deltaY1*Fx)*dz
-            edge_flux(nz,edge) = edge_flux(nz,edge) + c
+            edge_flux(nz,edge) = c
         end do
         !_______________________________________________________________________
         ! (B)
@@ -2011,7 +2072,7 @@ subroutine diff_part_hor_redi(tracers, partit, mesh)
                 Fx=Kh*(Tx+SxTz*isredi)
                 Fy=Kh*(Ty+SyTz*isredi)
                 c=(deltaX2*Fy-deltaY2*Fx)*dz
-                edge_flux(nz,edge) = edge_flux(nz,edge) + c
+                edge_flux(nz,edge) = c
             end do
         end if
         !_______________________________________________________________________
@@ -2027,7 +2088,7 @@ subroutine diff_part_hor_redi(tracers, partit, mesh)
             Fx=Kh*(Tx+SxTz*isredi)
             Fy=Kh*(Ty+SyTz*isredi)
             c=((deltaX2-deltaX1)*Fy-(deltaY2-deltaY1)*Fx)*dz
-            edge_flux(nz,edge) = edge_flux(nz,edge) + c
+            edge_flux(nz,edge) = c
         enddo
         !_______________________________________________________________________
         ! (D)
@@ -2042,7 +2103,7 @@ subroutine diff_part_hor_redi(tracers, partit, mesh)
             Fx=Kh*(Tx+SxTz*isredi)
             Fy=Kh*(Ty+SyTz*isredi)
             c=(-deltaX1*Fy+deltaY1*Fx)*dz
-            edge_flux(nz,edge) = edge_flux(nz,edge) + c
+            edge_flux(nz,edge) = c
         end do
         !_______________________________________________________________________
         ! (E)
@@ -2057,7 +2118,7 @@ subroutine diff_part_hor_redi(tracers, partit, mesh)
             Fx=Kh*(Tx+SxTz*isredi)
             Fy=Kh*(Ty+SyTz*isredi)
             c=(deltaX2*Fy-deltaY2*Fx)*dz
-            edge_flux(nz,edge) = edge_flux(nz,edge) + c
+            edge_flux(nz,edge) = c
         end do
         !_______________________________________________________________________
     end do
@@ -2070,10 +2131,17 @@ subroutine diff_part_hor_redi(tracers, partit, mesh)
     ! node gets +edge_flux, the second -edge_flux) in ascending edge order.
 #ifndef ENABLE_OPENACC
 !$OMP DO
+    do n=1, partit%myDim_nod2D+partit%eDim_nod2D
+        do k=1, mesh%nod_in_edge2D_num(n)
+            edge=mesh%nod_in_edge2D(k,n)
+            do nz=tracers%work%edge_nzt(edge), tracers%work%edge_nzb(edge)
+                del_ttf(nz,n)=del_ttf(nz,n)+mesh%nod_in_edge2D_sgn(k,n)*edge_flux(nz,edge)*dt/mesh%areasvol(nz,n)
+            end do
+        end do
+    end do
 #else
 !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) IF(diff_on_device) &
 !$ACC PRIVATE(k, edge, el, nl1, ul1, nl2, ul2, nl12, ul12, nz)
-#endif
     do n=1, partit%myDim_nod2D+partit%eDim_nod2D
         do k=1, mesh%nod_in_edge2D_num(n)
             edge=mesh%nod_in_edge2D(k,n)
@@ -2094,6 +2162,7 @@ subroutine diff_part_hor_redi(tracers, partit, mesh)
             end do
         end do
     end do
+#endif
 #ifndef ENABLE_OPENACC
 !$OMP END DO
 !$OMP END PARALLEL
