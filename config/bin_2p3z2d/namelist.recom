@@ -53,7 +53,7 @@ use_REcoM             = .true.      ! switch REcoM on
 REcoM_restart         = .true.      ! read the REcoM tracers from the restart (false = initialize from climatology)
 recom_debug           = .false.     ! extra REcoM debug output
 diag_tiny_clamp       = .false.     ! daily table of the mass added by the lower bounds (diagnostic only)
-conserve_lower_bounds = .false.     ! take the mass for the lower bounds from the same column (recommended .true.)
+conserve_lower_bounds = .true.      ! take the mass for the lower bounds from the same column (recommended .true.)
 Diags                 = .true.      ! compute REcoM diagnostics
 
 ! --- Tracer Counts ---
@@ -79,8 +79,8 @@ Grazing_detritus      = .true.      ! zooplankton also graze on detritus
 het_resp_noredfield   = .true.      ! respiration formulation of the first zooplankton (copepods)
 diatom_mucus          = .true.      ! nutrient limitation enhances diatom aggregation
 O2dep_remin           = .true.      ! oxygen-dependent remineralization of organic matter (k_o2_remin)
-O2dep_benthos         = .false.     ! O2 dependency of the benthic remineralisation of organic N and C (recommended .true.)
-ben_anox_min          = 0.0d0       ! minimum benthic remineralisation under anoxia, uses no O2 (recommended 0.3)
+O2dep_benthos         = .true.      ! O2 dependency of the benthic remineralisation of organic N and C (recommended .true.)
+ben_anox_min          = 0.3d0       ! minimum benthic remineralisation under anoxia, uses no O2 (recommended 0.3)
 use_photodamage       = .true.      ! light-dependent chlorophyll degradation after Alvarez et al. (2018)
 CO2lim                = .true.      ! CO2 dependence of growth and calcification (&paco2lim)
 OmegaC_diss           = .false.     ! calcite dissolution from the mocsy saturation state OmegaC

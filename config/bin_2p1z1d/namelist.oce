@@ -39,6 +39,7 @@ scaling_FESOM14    = .false. ! use FESOM 1.4 GM treatment in Northern Hemisphere
 
 ! --- Redi Isopycnal Diffusion ---
 Redi               = .true.  ! enable Redi isopycnal diffusion
+redi_positive      = .true.  ! limit Redi so tracers with ID > 2 (REcoM) do not go negative
 
 ! --- Vertical Mixing Scheme ---
 visc_sh_limit      = 5.0e-3  ! maximum viscosity due to shear instability [m²/s] (for KPP)

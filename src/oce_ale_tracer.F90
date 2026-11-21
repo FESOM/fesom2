@@ -86,6 +86,14 @@ module oce_ale_tracer_module
     ! horizontal tracer gradient at nodes in diff_ver_part_redi_expl; allocated (and created
     ! on the device) once: an automatic array in a device data region is not reliably present
     real(kind=WP), allocatable :: tr_xynodes(:,:,:)
+    ! Redi positivity limiter (redi_positive): vertical Redi flux at the top of each level
+    ! (stored by diff_ver_part_redi_expl), the limiting factor of each cell, its Redi
+    ! inflow and outflow, and per tracer the daily count of limited cells and of the
+    ! flux held back (limited cells, all wet cells, flux), summed over the day
+    real(kind=WP), allocatable :: redi_vflux(:,:), redi_r(:,:)
+    real(kind=WP_full), allocatable :: redi_in(:,:), redi_out(:,:)
+    real(kind=WP_full), allocatable :: redi_lim_acc(:,:)
+    logical :: redi_store_vflux = .false.
 
 contains
 
@@ -761,8 +769,11 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     real(kind=WP_full), pointer                :: del_ttf(:,:)
     real(kind=WP_full)                         :: acc
     real(kind=WP)                             :: tnew
+    logical                                   :: limit_redi
 
     del_ttf => tracers%work%del_ttf
+    ! Redi positivity limiter for this tracer (CPU path only)
+    limit_redi = Redi .and. redi_positive .and. tracers%data(tr_num)%positive
 #if defined(__recom)
     dtr_bf         = 0.0_WP
     str_bf         = 0.0_WP
@@ -776,7 +787,8 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     ! single precision (use_tracer_carry): the rounding carry of the tracer update is
     ! not on the device, so the diffusion runs on the host
     diff_on_device = .not. (tracers%data(tr_num)%ltra_diag .or. ldiag_diapmix &
-                            .or. (.not. tracers%data(tr_num)%i_vert_diff) .or. use_tracer_carry)
+                            .or. (.not. tracers%data(tr_num)%i_vert_diff) .or. use_tracer_carry &
+                            .or. limit_redi)
 #if defined(__recom)
     diff_on_device = .false.
 #endif
@@ -834,7 +846,12 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
        call backup_ttf_rhs(del_ttf, ttf_rhs_bak, mesh%ulevels_nod2D, mesh%nlevels_nod2D, partit%myDim_nod2D, partit%eDim_nod2D)
     end if
 
+    redi_store_vflux = limit_redi
     if (Redi) call diff_ver_part_redi_expl(tracers, partit, mesh)
+    redi_store_vflux = .false.
+    ! Redi positivity limiter: scales the horizontal and vertical Redi fluxes already in
+    ! del_ttf; with ltra_diag its correction is counted in tra_diff_part_ver_redi_expl
+    if (limit_redi) call limit_redi_positive(tr_num, tracers, partit, mesh)
     if (conservation_freq > 0) call conservation_probe('vert_expl', 'a', tr_num, tracers, partit, mesh)
 
     if (tracers%data(tr_num)%ltra_diag .and. Redi) then
@@ -1787,6 +1804,7 @@ subroutine diff_ver_part_redi_expl(tracers, partit, mesh)
     integer                  :: n, k, elem, nz
     integer                  :: n2, nl1, ul1, nl2
     real(kind=WP)            :: Tx, Ty, flux, flux_below, zb, zb_below, zn, zn_up
+    logical                  :: store_vflux
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP_full), pointer   :: del_ttf(:,:)
@@ -1795,6 +1813,14 @@ subroutine diff_ver_part_redi_expl(tracers, partit, mesh)
         allocate(tr_xynodes(2,mesh%nl-1,partit%myDim_nod2D+partit%eDim_nod2D))
         !$ACC ENTER DATA CREATE(tr_xynodes)
     end if
+    ! interface fluxes for the Redi positivity limiter (allocated, and created on the
+    ! device, once, like tr_xynodes, so that the device loop below can reference it)
+    if (.not. allocated(redi_vflux)) then
+        allocate(redi_vflux(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D))
+        redi_vflux = 0.0_WP
+        !$ACC ENTER DATA CREATE(redi_vflux)
+    end if
+    store_vflux = redi_store_vflux
 
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, k, elem, nz, n2, nl1, ul1, nl2, Tx, Ty, flux, flux_below, zb, zb_below, zn, zn_up)
@@ -1852,6 +1878,7 @@ subroutine diff_ver_part_redi_expl(tracers, partit, mesh)
             flux  = flux+&
                     (zb-zn)  *(slope_tapered(1,nz,n)  *tr_xynodes(1,nz,n)  +slope_tapered(2,nz,n)  *tr_xynodes(2,nz,n))  *Ki(nz,n)
             flux  = flux/(zn_up-zn)*mesh%area(nz,n)
+            if (store_vflux) redi_vflux(nz,n) = flux
             del_ttf(nz,n) = del_ttf(nz,n) + (flux-flux_below) * dt/mesh%areasvol(nz,n)
             flux_below = flux
             zb_below   = zb
@@ -1866,6 +1893,183 @@ subroutine diff_ver_part_redi_expl(tracers, partit, mesh)
 !$ACC END PARALLEL LOOP
 #endif
 end subroutine diff_ver_part_redi_expl
+!
+!
+!===============================================================================
+! Redi positivity limiter (redi_positive = .true. in &oce_dyn)
+!
+! The explicit Redi fluxes (diff_part_hor_redi: edge fluxes incl. the Kh*S*dT/dz
+! cross term; diff_ver_part_redi_expl: interface fluxes Ki*S*grad_h T) are not
+! limited and can take more tracer out of a cell than it holds near sharp vertical
+! gradients. For tracers marked positive this routine scales the outgoing Redi
+! fluxes of each cell by r = min(1, available/outflow), where available is the
+! cell content without the Redi fluxes and outflow the sum of its outgoing Redi
+! fluxes, both over the step. Each flux is multiplied by r of the cell it leaves,
+! on both sides, so the scheme conserves the tracer exactly and only blocks
+! going below zero (inflow is not counted, which keeps the bound safe).
+! One halo exchange of r per tracer and step. Called after both Redi parts have
+! added their fluxes to del_ttf; it adds (r-1)*flux. Prints once a day per tracer
+! the share of limited cells and the flux held back.
+!===============================================================================
+subroutine limit_redi_positive(tr_num, tracers, partit, mesh)
+    IMPLICIT NONE
+    integer,        intent(in)            :: tr_num
+    type(t_tracer), intent(inout), target :: tracers
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh),   intent(in),    target :: mesh
+    !___________________________________________________________________________
+    integer                     :: n, k, nz, edge, el(2), donor
+    integer                     :: nl1, ul1, nl2, ul2, nl12, ul12, steps_per_day
+    real(kind=WP_full)          :: c, avail, rr
+    real(kind=WP_full)          :: acc_glob(3)
+    real(kind=WP_full), pointer :: del_ttf(:,:)
+    real(kind=WP),      pointer :: edge_flux(:,:)
+    del_ttf   => tracers%work%del_ttf
+    edge_flux => tracers%work%edge_flux
+
+    if (.not. allocated(redi_r)) then
+        allocate(redi_r  (mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D))
+        allocate(redi_in (mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D))
+        allocate(redi_out(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D))
+        allocate(redi_lim_acc(3, tracers%num_tracers))
+        redi_lim_acc = 0.0_WP_full
+        if (partit%mype==0) write(*,*) 'Redi positivity limiter on (redi_positive): tracers with ID > 2'
+    end if
+    redi_r   = 1.0_WP
+    redi_in  = 0.0_WP_full
+    redi_out = 0.0_WP_full
+
+    !___________________________________________________________________________
+    ! 1. Redi inflow and outflow of each own cell over the step [tracer * m], and
+    !    the limiting factor r
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, k, nz, edge, el, nl1, ul1, nl2, ul2, nl12, ul12, c, avail)
+    do n=1, partit%myDim_nod2D
+        ! horizontal: the edges and levels as in pass 2 of diff_part_hor_redi
+        do k=1, mesh%nod_in_edge2D_num(n)
+            edge=mesh%nod_in_edge2D(k,n)
+            el=mesh%edge_tri(:,edge)
+            nl1=mesh%nlevels(el(1))-1
+            ul1=mesh%ulevels(el(1))
+            nl2=0
+            ul2=0
+            if (el(2)>0) then
+                nl2=mesh%nlevels(el(2))-1
+                ul2=mesh%ulevels(el(2))
+            endif
+            nl12=max(nl1,nl2)
+            ul12 = ul1
+            if (ul2>0) ul12=min(ul1,ul2)
+            do nz=ul12, nl12
+                c = mesh%nod_in_edge2D_sgn(k,n)*edge_flux(nz,edge)*dt/mesh%areasvol(nz,n)
+                if (c < 0.0_WP_full) then
+                    redi_out(nz,n) = redi_out(nz,n) - c
+                else
+                    redi_in(nz,n)  = redi_in(nz,n)  + c
+                end if
+            end do
+        end do
+        ! vertical: redi_vflux(nz,n) at the top of level nz enters level nz (> 0: from nz-1)
+        nl1=mesh%nlevels_nod2D(n)-1
+        ul1=mesh%ulevels_nod2D(n)
+        do nz=ul1+1, nl1
+            c = redi_vflux(nz,n)*dt
+            if (c > 0.0_WP_full) then
+                redi_in(nz,n)    = redi_in(nz,n)    + c/mesh%areasvol(nz,n)
+                redi_out(nz-1,n) = redi_out(nz-1,n) + c/mesh%areasvol(nz-1,n)
+            else
+                redi_out(nz,n)   = redi_out(nz,n)   - c/mesh%areasvol(nz,n)
+                redi_in(nz-1,n)  = redi_in(nz-1,n)  - c/mesh%areasvol(nz-1,n)
+            end if
+        end do
+        ! limiting factor: content without the Redi fluxes against the Redi outflow
+        do nz=ul1, nl1
+            if (redi_out(nz,n) > 0.0_WP_full) then
+                avail = tracers%data(tr_num)%values(nz,n)*mesh%hnode(nz,n) + del_ttf(nz,n) &
+                        - redi_in(nz,n) + redi_out(nz,n)
+                redi_r(nz,n) = real(max(0.0_WP_full, min(1.0_WP_full, avail/redi_out(nz,n))), WP)
+            end if
+        end do
+    end do
+!$OMP END PARALLEL DO
+
+    !___________________________________________________________________________
+    ! 2. r of the halo nodes, for edges that cross the partition boundary
+    call exchange_nod(redi_r, partit)
+
+    !___________________________________________________________________________
+    ! 3. add (r-1)*flux, with r of the cell each flux leaves
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, k, nz, edge, el, nl1, ul1, nl2, ul2, nl12, ul12, c, donor, rr)
+    do n=1, partit%myDim_nod2D
+        do k=1, mesh%nod_in_edge2D_num(n)
+            edge=mesh%nod_in_edge2D(k,n)
+            el=mesh%edge_tri(:,edge)
+            nl1=mesh%nlevels(el(1))-1
+            ul1=mesh%ulevels(el(1))
+            nl2=0
+            ul2=0
+            if (el(2)>0) then
+                nl2=mesh%nlevels(el(2))-1
+                ul2=mesh%ulevels(el(2))
+            endif
+            nl12=max(nl1,nl2)
+            ul12 = ul1
+            if (ul2>0) ul12=min(ul1,ul2)
+            ! the other node of the edge
+            donor = mesh%edges(1,edge) + mesh%edges(2,edge) - n
+            do nz=ul12, nl12
+                c = mesh%nod_in_edge2D_sgn(k,n)*edge_flux(nz,edge)*dt/mesh%areasvol(nz,n)
+                if (c < 0.0_WP_full) then
+                    rr = redi_r(nz,n)          ! leaves this cell
+                else
+                    rr = redi_r(nz,donor)      ! comes from the other node
+                end if
+                del_ttf(nz,n) = del_ttf(nz,n) + (rr - 1.0_WP_full)*c
+            end do
+        end do
+        nl1=mesh%nlevels_nod2D(n)-1
+        ul1=mesh%ulevels_nod2D(n)
+        do nz=ul1+1, nl1
+            c = redi_vflux(nz,n)*dt
+            if (c > 0.0_WP_full) then
+                rr = redi_r(nz-1,n)            ! from the level above into nz
+            else
+                rr = redi_r(nz,n)              ! from nz into the level above
+            end if
+            del_ttf(nz,n)   = del_ttf(nz,n)   + (rr - 1.0_WP_full)*c/mesh%areasvol(nz,n)
+            del_ttf(nz-1,n) = del_ttf(nz-1,n) - (rr - 1.0_WP_full)*c/mesh%areasvol(nz-1,n)
+        end do
+    end do
+!$OMP END PARALLEL DO
+
+    !___________________________________________________________________________
+    ! 4. daily diagnostic: limited cells, all wet cells, flux held back [tracer * m3]
+    do n=1, partit%myDim_nod2D
+        nl1=mesh%nlevels_nod2D(n)-1
+        ul1=mesh%ulevels_nod2D(n)
+        do nz=ul1, nl1
+            redi_lim_acc(2,tr_num) = redi_lim_acc(2,tr_num) + 1.0_WP_full
+            if (redi_r(nz,n) < 1.0_WP) then
+                redi_lim_acc(1,tr_num) = redi_lim_acc(1,tr_num) + 1.0_WP_full
+                redi_lim_acc(3,tr_num) = redi_lim_acc(3,tr_num) &
+                    + (1.0_WP_full - redi_r(nz,n))*redi_out(nz,n)*mesh%areasvol(nz,n)
+            end if
+        end do
+    end do
+    steps_per_day = max(1, nint(86400.0_WP/dt))
+    if (mod(mstep, steps_per_day) == 0) then
+        acc_glob = redi_lim_acc(:,tr_num)
+        call MPI_Allreduce(MPI_IN_PLACE, acc_glob, 3, MPI_DOUBLE_PRECISION, MPI_SUM, &
+                           partit%MPI_COMM_FESOM, partit%MPIerr)
+        if (partit%mype==0) then
+            write(*,'(a,i6,a,es10.2,a,f9.5,a,es10.2)') &
+                ' Redi positivity limiter, day: tracer ID ', tracers%data(tr_num)%ID, &
+                '  limited cell-steps ', acc_glob(1), &
+                '  share [%] ', 100.0_WP_full*acc_glob(1)/max(1.0_WP_full, acc_glob(2)), &
+                '  flux held back [tracer*m3] ', acc_glob(3)
+        end if
+        redi_lim_acc(:,tr_num) = 0.0_WP_full
+    end if
+end subroutine limit_redi_positive
 !
 !
 !===============================================================================

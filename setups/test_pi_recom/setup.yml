@@ -34,6 +34,10 @@ namelist.config:
         restart_length_unit: "d"
         logfile_outfreq: 10
 
+namelist.oce:
+    oce_dyn:
+        redi_positive: True
+
 namelist.dyn:
     dynamics_general:
         use_wsplit: True
@@ -146,6 +150,6 @@ fcheck:
     temp: 2.473605991288022
     u: -0.0015858196213775744
     v: 5.530180870217261e-05
-    DIN: 20.24913013427907
-    DIC: 2197.042550811117
+    DIN: 20.249130143963654
+    DIC: 2197.0425509705597
 
