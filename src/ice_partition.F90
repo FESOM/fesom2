@@ -26,6 +26,7 @@ module ice_partition_module
     type t_pair
         real(kind=WP), pointer :: o(:) => null(), i(:) => null()   ! ocean side, ice side
         integer                :: kind = 1                         ! 1 nodes, 2 elements
+        integer                :: dir  = 3                         ! 1 to the ice, 2 to the ocean, 3 both
     end type t_pair
 
     type(t_plan), save, target :: pn_o2i, pn_i2o, pe_o2i, pe_i2o
@@ -206,9 +207,9 @@ contains
         end associate
     end subroutine ice_part_alloc_forc
 
-    subroutine add(o, i, kind)
+    subroutine add(o, i, kind, dir)
         real(kind=WP), allocatable, target, intent(inout) :: o(:), i(:)
-        integer, intent(in) :: kind
+        integer, intent(in) :: kind, dir
         type(t_pair), allocatable :: tmp(:)
         if (.not. (allocated(o) .and. allocated(i))) return
         if (.not. allocated(pairs)) allocate(pairs(64))
@@ -219,68 +220,62 @@ contains
         pairs(npairs)%o => o
         pairs(npairs)%i => i
         pairs(npairs)%kind = kind
+        pairs(npairs)%dir  = dir
     end subroutine add
 
-    ! All ice fields that carry state or coupling between steps. Not moved: geometry-derived
-    ! constants of each partition (inv_mass, inv_areamass, fct_massmatrix) and FCT flux scratch.
+    ! The ice fields each direction needs (I to the ice, O to the ocean, B both). Prognostic state
+    ! and fields the step reads go to the ice; the state and everything the step writes that the
+    ! ocean side, output or restart use come back. Not moved: geometry-derived constants of each
+    ! partition (inv_mass, inv_areamass, fct_massmatrix), scratch of the step (FCT work arrays,
+    ! right-hand sides), and stress_iceoce (computed on the ocean side in oce_fluxes_mom).
     subroutine build_pairs(io, ii)
         type(t_ice), intent(inout), target :: io, ii
+        integer, parameter :: I = 1, O = 2, B = 3
         integer :: k
         npairs = 0
         do k = 1, min(size(io%data), size(ii%data))
-            call add(io%data(k)%values,         ii%data(k)%values,         1)
-            call add(io%data(k)%values_old,     ii%data(k)%values_old,     1)
-            call add(io%data(k)%values_rhs,     ii%data(k)%values_rhs,     1)
-            call add(io%data(k)%values_div_rhs, ii%data(k)%values_div_rhs, 1)
-            call add(io%data(k)%dvalues,        ii%data(k)%dvalues,        1)
-            call add(io%data(k)%valuesl,        ii%data(k)%valuesl,        1)
+            call add(io%data(k)%values,     ii%data(k)%values,     1, B)
+            call add(io%data(k)%values_old, ii%data(k)%values_old, 1, O)
         end do
-        call add(io%uice, ii%uice, 1);         call add(io%vice, ii%vice, 1)
-        call add(io%uice_rhs, ii%uice_rhs, 1); call add(io%vice_rhs, ii%vice_rhs, 1)
-        call add(io%uice_old, ii%uice_old, 1); call add(io%vice_old, ii%vice_old, 1)
-        call add(io%uice_aux, ii%uice_aux, 1); call add(io%vice_aux, ii%vice_aux, 1)
-        call add(io%uice_ib, ii%uice_ib, 1);   call add(io%vice_ib, ii%vice_ib, 1)
-        call add(io%stress_atmice_x, ii%stress_atmice_x, 1); call add(io%stress_atmice_y, ii%stress_atmice_y, 1)
-        call add(io%stress_iceoce_x, ii%stress_iceoce_x, 1); call add(io%stress_iceoce_y, ii%stress_iceoce_y, 1)
-        call add(io%srfoce_temp, ii%srfoce_temp, 1); call add(io%srfoce_salt, ii%srfoce_salt, 1)
-        call add(io%srfoce_ssh, ii%srfoce_ssh, 1)
-        call add(io%srfoce_u, ii%srfoce_u, 1);       call add(io%srfoce_v, ii%srfoce_v, 1)
-        call add(io%flx_fw, ii%flx_fw, 1);           call add(io%flx_h, ii%flx_h, 1)
-        call add(io%h_ice, ii%h_ice, 1);             call add(io%h_snow, ii%h_snow, 1)
-        call add(io%work%fct_tmax, ii%work%fct_tmax, 1);   call add(io%work%fct_tmin, ii%work%fct_tmin, 1)
-        call add(io%work%fct_plus, ii%work%fct_plus, 1);   call add(io%work%fct_minus, ii%work%fct_minus, 1)
-        call add(io%work%ice_strength, ii%work%ice_strength, 1)
-        call add(io%thermo%t_skin, ii%thermo%t_skin, 1);   call add(io%thermo%thdgr, ii%thermo%thdgr, 1)
-        call add(io%thermo%thdgrsn, ii%thermo%thdgrsn, 1); call add(io%thermo%thdgra, ii%thermo%thdgra, 1)
-        call add(io%thermo%thdgr_old, ii%thermo%thdgr_old, 1); call add(io%thermo%ustar, ii%thermo%ustar, 1)
-        call add(io%thermo%dyngr, ii%thermo%dyngr, 1);     call add(io%thermo%dyngrsn, ii%thermo%dyngrsn, 1)
-        call add(io%thermo%dyngra, ii%thermo%dyngra, 1)
-        call add(io%thermo%apnd, ii%thermo%apnd, 1); call add(io%thermo%hpnd, ii%thermo%hpnd, 1)
-        call add(io%thermo%ipnd, ii%thermo%ipnd, 1)
-        associate(a => io%forc, b => ii%forc)
-        call add(a%shortwave, b%shortwave, 1); call add(a%longwave, b%longwave, 1)
-        call add(a%tair, b%tair, 1);           call add(a%shum, b%shum, 1)
-        call add(a%u_wind, b%u_wind, 1);       call add(a%v_wind, b%v_wind, 1)
-        call add(a%runoff, b%runoff, 1)
-        call add(a%ch_atm_oce_arr, b%ch_atm_oce_arr, 1); call add(a%ce_atm_oce_arr, b%ce_atm_oce_arr, 1)
-        call add(a%prec_rain, b%prec_rain, 1); call add(a%prec_snow, b%prec_snow, 1)
-        call add(a%evaporation, b%evaporation, 1); call add(a%ice_sublimation, b%ice_sublimation, 1)
-        call add(a%flice, b%flice, 1);         call add(a%fw_ice, b%fw_ice, 1)
-        call add(a%fw_snw, b%fw_snw, 1);       call add(a%real_salt_flux, b%real_salt_flux, 1)
-        call add(a%hf_qlat, b%hf_qlat, 1);     call add(a%hf_qsen, b%hf_qsen, 1)
-        call add(a%hf_qradtot, b%hf_qradtot, 1); call add(a%hf_qswr, b%hf_qswr, 1)
-        call add(a%hf_qlwr, b%hf_qlwr, 1);     call add(a%hf_qlwrout, b%hf_qlwrout, 1)
-        call add(a%sidm_dyn, b%sidm_dyn, 1);   call add(a%sidm_cut, b%sidm_cut, 1)
-        call add(a%sidm_mpre, b%sidm_mpre, 1); call add(a%sisn_dyn, b%sisn_dyn, 1)
-        call add(a%sisn_cut, b%sisn_cut, 1);   call add(a%sisn_spre, b%sisn_spre, 1)
-        call add(a%sidc_dyn, b%sidc_dyn, 1);   call add(a%sidc_cut, b%sidc_cut, 1)
-        call add(a%sidc_apre, b%sidc_apre, 1)
+        call add(io%uice, ii%uice, 1, B);         call add(io%vice, ii%vice, 1, B)
+        call add(io%uice_aux, ii%uice_aux, 1, B); call add(io%vice_aux, ii%vice_aux, 1, B)
+        call add(io%uice_ib, ii%uice_ib, 1, B);   call add(io%vice_ib, ii%vice_ib, 1, B)
+        call add(io%stress_atmice_x, ii%stress_atmice_x, 1, I); call add(io%stress_atmice_y, ii%stress_atmice_y, 1, I)
+        call add(io%srfoce_temp, ii%srfoce_temp, 1, I); call add(io%srfoce_salt, ii%srfoce_salt, 1, I)
+        call add(io%srfoce_ssh, ii%srfoce_ssh, 1, I)
+        call add(io%srfoce_u, ii%srfoce_u, 1, I);       call add(io%srfoce_v, ii%srfoce_v, 1, I)
+        call add(io%flx_fw, ii%flx_fw, 1, O);           call add(io%flx_h, ii%flx_h, 1, O)
+        call add(io%work%ice_strength, ii%work%ice_strength, 1, O)
+        call add(io%thermo%t_skin, ii%thermo%t_skin, 1, B);   call add(io%thermo%thdgr, ii%thermo%thdgr, 1, B)
+        call add(io%thermo%thdgrsn, ii%thermo%thdgrsn, 1, O); call add(io%thermo%thdgra, ii%thermo%thdgra, 1, O)
+        call add(io%thermo%thdgr_old, ii%thermo%thdgr_old, 1, O); call add(io%thermo%ustar, ii%thermo%ustar, 1, O)
+        call add(io%thermo%dyngr, ii%thermo%dyngr, 1, O);     call add(io%thermo%dyngrsn, ii%thermo%dyngrsn, 1, O)
+        call add(io%thermo%dyngra, ii%thermo%dyngra, 1, O)
+        call add(io%thermo%apnd, ii%thermo%apnd, 1, B); call add(io%thermo%hpnd, ii%thermo%hpnd, 1, B)
+        call add(io%thermo%ipnd, ii%thermo%ipnd, 1, B)
+        associate(a => io%forc, f => ii%forc)
+        call add(a%shortwave, f%shortwave, 1, I); call add(a%longwave, f%longwave, 1, I)
+        call add(a%tair, f%tair, 1, I);           call add(a%shum, f%shum, 1, I)
+        call add(a%u_wind, f%u_wind, 1, I);       call add(a%v_wind, f%v_wind, 1, I)
+        call add(a%runoff, f%runoff, 1, I)
+        call add(a%ch_atm_oce_arr, f%ch_atm_oce_arr, 1, I); call add(a%ce_atm_oce_arr, f%ce_atm_oce_arr, 1, I)
+        call add(a%prec_rain, f%prec_rain, 1, B); call add(a%prec_snow, f%prec_snow, 1, B)
+        call add(a%evaporation, f%evaporation, 1, B)
+        call add(a%ice_sublimation, f%ice_sublimation, 1, O)
+        call add(a%flice, f%flice, 1, O);         call add(a%fw_ice, f%fw_ice, 1, O)
+        call add(a%fw_snw, f%fw_snw, 1, O);       call add(a%real_salt_flux, f%real_salt_flux, 1, O)
+        call add(a%hf_qlat, f%hf_qlat, 1, O);     call add(a%hf_qsen, f%hf_qsen, 1, O)
+        call add(a%hf_qradtot, f%hf_qradtot, 1, O); call add(a%hf_qswr, f%hf_qswr, 1, O)
+        call add(a%hf_qlwr, f%hf_qlwr, 1, O);     call add(a%hf_qlwrout, f%hf_qlwrout, 1, O)
+        call add(a%sidm_dyn, f%sidm_dyn, 1, O);   call add(a%sidm_cut, f%sidm_cut, 1, O)
+        call add(a%sisn_dyn, f%sisn_dyn, 1, O);   call add(a%sisn_cut, f%sisn_cut, 1, O)
+        call add(a%sidc_dyn, f%sidc_dyn, 1, O);   call add(a%sidc_cut, f%sidc_cut, 1, O)
         end associate
-        call add(io%work%sigma11, ii%work%sigma11, 2); call add(io%work%sigma12, ii%work%sigma12, 2)
-        call add(io%work%sigma22, ii%work%sigma22, 2)
-        call add(io%work%eps11, ii%work%eps11, 2);     call add(io%work%eps12, ii%work%eps12, 2)
-        call add(io%work%eps22, ii%work%eps22, 2)
-        call add(io%alpha_evp_array, ii%alpha_evp_array, 2); call add(io%beta_evp_array, ii%beta_evp_array, 2)
+        call add(io%work%sigma11, ii%work%sigma11, 2, B); call add(io%work%sigma12, ii%work%sigma12, 2, B)
+        call add(io%work%sigma22, ii%work%sigma22, 2, B)
+        call add(io%work%eps11, ii%work%eps11, 2, O);     call add(io%work%eps12, ii%work%eps12, 2, O)
+        call add(io%work%eps22, ii%work%eps22, 2, O)
+        call add(io%alpha_evp_array, ii%alpha_evp_array, 2, B); call add(io%beta_evp_array, ii%beta_evp_array, 2, B)
     end subroutine build_pairs
 
     ! Move all fields of one kind: to_ice selects the direction
@@ -290,7 +285,7 @@ contains
         type(t_plan), pointer :: ps, pr
         real(kind=WP), allocatable :: sb(:), rb(:)
         integer, allocatable :: sc(:), sd(:), rc(:), rd(:)
-        integer :: p, nf, f, k, r, ierr
+        integer :: p, nf, f, k, r, ierr, d
         real(kind=WP), pointer :: src(:), dst(:)
         if (kind == 1) then
             if (to_ice) then; ps => pn_o2i; else; ps => pn_i2o; end if
@@ -298,12 +293,14 @@ contains
             if (to_ice) then; ps => pe_o2i; else; ps => pe_i2o; end if
         end if
         pr => ps
-        nf = count(pairs(1:npairs)%kind == kind)
+        d = merge(1, 2, to_ice)
+        nf = count(pairs(1:npairs)%kind == kind .and. iand(pairs(1:npairs)%dir, d) /= 0)
+        if (nf == 0) return
         allocate(sb(max(1, nf*ps%ns)), rb(max(1, nf*pr%nr)), sc(npes), sd(npes), rc(npes), rd(npes))
         sc = nf*ps%scnt; sd = nf*ps%sdsp; rc = nf*pr%rcnt; rd = nf*pr%rdsp
         f = 0
         do p = 1, npairs
-            if (pairs(p)%kind /= kind) cycle
+            if (pairs(p)%kind /= kind .or. iand(pairs(p)%dir, d) == 0) cycle
             f = f + 1
             if (to_ice) then; src => pairs(p)%o; else; src => pairs(p)%i; end if
             do r = 1, npes
@@ -315,7 +312,7 @@ contains
         call MPI_Alltoallv(sb, sc, sd, MPI_WP, rb, rc, rd, MPI_WP, comm, ierr)
         f = 0
         do p = 1, npairs
-            if (pairs(p)%kind /= kind) cycle
+            if (pairs(p)%kind /= kind .or. iand(pairs(p)%dir, d) == 0) cycle
             f = f + 1
             if (to_ice) then; dst => pairs(p)%i; else; dst => pairs(p)%o; end if
             do r = 1, npes
