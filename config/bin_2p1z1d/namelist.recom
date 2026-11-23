@@ -52,6 +52,8 @@ enable_coccos         = .false.     ! coccolithophore and Phaeocystis tracers
 use_REcoM             = .true.      ! switch REcoM on
 REcoM_restart         = .true.      ! read the REcoM tracers from the restart (false = initialize from climatology)
 recom_debug           = .false.     ! extra REcoM debug output
+diag_tiny_clamp       = .false.     ! daily table of the mass added by the lower bounds (diagnostic only)
+conserve_lower_bounds = .false.     ! take the mass for the lower bounds from the same column (recommended .true.)
 Diags                 = .true.      ! compute REcoM diagnostics
 use_DICremin          = .false.     ! additional DIC tracer for the remineralization contribution (tracer 1037)
 
