@@ -21,6 +21,9 @@ module iceberg_element
  public ::   com_integer
  public ::   matrix_inverse_2x2
 
+ ! values of left_mype set by find_new_iceberg_elem
+ real, parameter, public :: ELEM_FOUND = 0.0, ELEM_REJECTED = 1.0, ELEM_NOT_FOUND = 2.0
+
  contains
 
 subroutine mean_gradient(mesh, partit, dynamics, elem, lon_rad, lat_rad, nablaeta)
@@ -463,7 +466,7 @@ do m=1, 3
       !if( reject_elem(mesh, partit, old_iceberg_elem) ) then
       reject_tmp = all( (mesh%cavity_depth(elem2D_nodes(:,elem_containing_n2))/=0.0) .OR. (mesh%bc_index_nod2D(elem2D_nodes(:,elem_containing_n2))==0.0) )
       if(reject_tmp) then
-         left_mype=1.0
+         left_mype=ELEM_REJECTED   ! shelf/coastal element
          !write(*,*) 'iceberg found in shelf region: left_mype = 1'
          old_iceberg_elem=ibelem_tmp
          ! Do NOT return here.  At a cavity boundary the trajectory endpoint
@@ -474,6 +477,7 @@ do m=1, 3
          cycle
       end if
    endif
+   left_mype=ELEM_FOUND   ! a rejected neighbour may have set it before
    RETURN 
   end if
  end do
@@ -481,7 +485,7 @@ end do
 
 !no element found (including old element!)
 !or the iceberg is way too fast..
-left_mype=1.0
+if (left_mype /= ELEM_REJECTED) left_mype=ELEM_NOT_FOUND
 end subroutine find_new_iceberg_elem
 
 

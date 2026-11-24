@@ -67,6 +67,8 @@ subroutine iceberg_calculation(ice, mesh, partit, dynamics, istep)
  real,dimension(16*ib_num):: arr_block_red				!=
  integer,dimension(ib_num):: elem_block_red				!=
  integer,dimension(ib_num):: pe_block_red				!=
+ integer,dimension(ib_num):: elem_snap  ! all bergs' elements/areas for the
+ real,dimension(ib_num)   :: area_snap  ! cell-saturation checks in step1/2
  integer    :: n
  real, dimension(4*ib_num):: vl_block_red				!=
  !integer,dimension(ib_num):: grounded_int, grounded_int_red		!=
@@ -150,7 +152,17 @@ type(t_dyn)   , intent(inout), target :: dynamics
  
  !============================= STEP 1 =================================!
  
- 
+ do ib=1, ib_num
+  if( (.not.melted(ib)) .and. (.not.find_iceberg_elem(ib)) .and. &
+      real(istep) > real(step_per_day)*calving_day(ib) ) then
+    elem_snap(ib) = iceberg_elem(ib)
+    area_snap(ib) = length_ib(ib)*width_ib(ib)*scaling(ib)
+  else
+    elem_snap(ib) = 0
+    area_snap(ib) = 0.0
+  end if
+ end do
+
  do ib=1, ib_num
   lastsubstep = .false.
   if( real(istep) > real(step_per_day)*calving_day(ib) ) then !iceberg calved
@@ -163,7 +175,7 @@ type(t_dyn)   , intent(inout), target :: dynamics
                             conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
                             u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib), lastsubstep,&
                             f_u_ib_old(ib), f_v_ib_old(ib), l_semiimplicit,   &
-                            semiimplicit_coeff, AB_coeff, istep)			
+                            semiimplicit_coeff, AB_coeff, istep, elem_snap, area_snap)
     end if 
   end if
  end do
@@ -271,6 +283,10 @@ completed = .false.
  !============================= STEP 2 =================================!
 
  do ib=1, ib_num
+   area_snap(ib) = arr_block_red((ib-1)*16+2) * arr_block_red((ib-1)*16+3) * scaling(ib)
+ end do
+
+ do ib=1, ib_num
 
   !get the smaller array arr(15) and 
   !the iceberg element for iceberg ib
@@ -297,7 +313,7 @@ completed = .false.
                             u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib), lastsubstep,&
                             f_u_ib_old(ib), f_v_ib_old(ib), l_semiimplicit,   &
                             semiimplicit_coeff, AB_coeff, istep, elem_block_red, &
-                            pe_block_red)
+                            pe_block_red, area_snap)
     end if
   end if
 end do
@@ -348,7 +364,7 @@ subroutine iceberg_step1(ice, mesh, partit, dynamics, ib, height_ib_single,lengt
 			u_ib,v_ib, iceberg_elem, find_iceberg_elem, 	   &
 			lastsubstep, f_u_ib_old,	   &
 			f_v_ib_old, l_semiimplicit, semiimplicit_coeff,    &
-			AB_coeff, istep)
+			AB_coeff, istep, elem_snap, area_snap)
 			
  !============================= MODULES & DECLARATIONS =========================================!=
  												!=
@@ -356,7 +372,7 @@ subroutine iceberg_step1(ice, mesh, partit, dynamics, ib, height_ib_single,lengt
  use g_rotate_grid	!for subroutine g2r, logfile_outfreq					!=
  use g_config, only: steps_per_ib_step, l_allowgrounding
  !=
-use iceberg_params, only: length_ib, width_ib, scaling, elem_block, elem_area_glob !, smallestvol_icb, arr_block, elem_block, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale, reject_elem, melted, grounded !, length_ib, width_ib, scaling
+use iceberg_params, only: scaling, elem_block, elem_area_glob !, smallestvol_icb, arr_block, elem_block, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale, reject_elem, melted, grounded !, length_ib, width_ib, scaling
 !#else
 ! use iceberg_params, only: smallestvol_icb, arr_block, elem_block, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale, melted, grounded, scaling !, length_ib, width_ib, scaling
 !#endif
@@ -366,6 +382,8 @@ use iceberg_params, only: length_ib, width_ib, scaling, elem_block, elem_area_gl
  logical                :: reject_tmp 
  logical                :: melted_local
  integer, intent(in)	:: ib, istep
+ integer, intent(in)	:: elem_snap(ib_num)
+ real,    intent(in)	:: area_snap(ib_num)
  real,    intent(inout)	:: height_ib_single,length_ib_single,width_ib_single
  real,    intent(inout)	:: lon_deg,lat_deg
  real, 	  intent(in)	:: Co,Ca,Ci, Cdo_skin,Cda_skin
@@ -595,8 +613,11 @@ if((local_idx_of(iceberg_elem)>0) .and. (local_idx_of(iceberg_elem)<=partit%myDi
       ! depending on how deep it penetrates the sea floor ... (Marsh etl al. https://doi.org/10.5194/gmd-8-1547-2015)  
       if (l_allowgrounding == 1) then
         fact=1.0-( (draft_scale(ib)*abs(depth_ib)-Zdepth) / (draft_scale(ib)*abs(depth_ib)) ) 
+        fact=max(0.0, min(1.0, fact))
         u_ib = u_ib*fact
         v_ib = v_ib*fact
+        new_u_ib = new_u_ib*fact   ! trajectory() stores the new velocity
+        new_v_ib = new_v_ib*fact
         ! ... and print a message if verbose output is enabled
         if (lverbose_icb) write(*,*) 'iceberg ib ', ib, 'reduced velocity: u_ib=',u_ib,'m/s; v_ib=',v_ib,'m/s,',' fact:', fact
       
@@ -632,7 +653,10 @@ if((local_idx_of(iceberg_elem)>0) .and. (local_idx_of(iceberg_elem)<=partit%myDi
     t3=MPI_Wtime()
     iceberg_elem=partit%myList_elem2D(iceberg_elem)  	!global
   
-    if(left_mype > 0.) then
+    ! coast handling only if the berg hit (or may have crossed) the coast;
+    ! a berg that only changed rank is found by the global search in step2
+    if(left_mype == ELEM_REJECTED .or. (left_mype == ELEM_NOT_FOUND .and. &
+       coastal_nodes(mesh, partit, local_idx_of(iceberg_elem)) > 0)) then
       lon_rad = old_lon
       lat_rad = old_lat
       t4=MPI_Wtime()
@@ -668,9 +692,9 @@ if((local_idx_of(iceberg_elem)>0) .and. (local_idx_of(iceberg_elem)<=partit%myDi
       area_ib_tot = length_ib_single*width_ib_single*scaling(ib)
     end select
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(idx) REDUCTION(+:area_ib_tot)
-    do idx = 1, size(elem_block)
-        if (elem_block(idx) == iceberg_elem) then
-            area_ib_tot = area_ib_tot + length_ib(idx) * width_ib(idx) * scaling(idx)
+    do idx = 1, ib_num
+        if (idx /= ib .and. elem_snap(idx) == iceberg_elem) then
+            area_ib_tot = area_ib_tot + area_snap(idx)
         end if
     end do
 !$OMP END PARALLEL DO
@@ -733,7 +757,7 @@ subroutine iceberg_step2(mesh, partit,arr, elem_from_block, ib, height_ib_single
 			u_ib,v_ib, iceberg_elem, find_iceberg_elem, 	   &
 			lastsubstep, f_u_ib_old,	   &
 			f_v_ib_old, l_semiimplicit, semiimplicit_coeff,    &
-			AB_coeff, istep, elem_block_red, pe_block_red)
+			AB_coeff, istep, elem_block_red, pe_block_red, area_snap)
 			
  !============================= MODULES & DECLARATIONS =========================================!=
  												!=
@@ -743,7 +767,7 @@ subroutine iceberg_step2(mesh, partit,arr, elem_from_block, ib, height_ib_single
  use g_comm_auto
 !=
 use g_comm
-use iceberg_params, only: length_ib, width_ib, scaling !, smallestvol_icb, arr_block, elem_block, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale, reject_elem, melted, grounded !, length_ib, width_ib, scaling
+use iceberg_params, only: scaling !, smallestvol_icb, arr_block, elem_block, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale, reject_elem, melted, grounded !, length_ib, width_ib, scaling
 !#else
 ! use iceberg_params, only: smallestvol_icb, buoy_props, bvl_mean, lvlv_mean, lvle_mean, lvlb_mean, ascii_out, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale, elem_block
 !#endif
@@ -767,6 +791,7 @@ use iceberg_params, only: length_ib, width_ib, scaling !, smallestvol_icb, arr_b
  real,    intent(in)	:: AB_coeff						
  integer, intent(in), dimension(ib_num):: elem_block_red				!=
  integer, intent(in), dimension(ib_num):: pe_block_red				!=
+ real,    intent(in), dimension(ib_num):: area_snap
  
  integer, dimension(:), save, allocatable :: local_idx_of
  real      			:: depth_ib, volume_ib, mass_ib
@@ -884,7 +909,7 @@ type(t_partit), intent(inout), target :: partit
            u_ib    = 0.
            v_ib    = 0.
    else if((cell_saturation>0) .and. (iceberg_elem.ne.old_element)) then
-     if (mype==0) write(*,*) 'iceberg ',ib, ' changed PE or was very fast'
+     if (mype==0 .and. lverbose_icb) write(*,*) 'iceberg ',ib, ' changed PE or was very fast'
      elem_area_tmp = elem_area_glob(iceberg_elem)
      select case(cell_saturation) !num of coastal points
       case(1) 
@@ -896,7 +921,7 @@ type(t_partit), intent(inout), target :: partit
      do idx = 1, size(elem_block_red)
          if (elem_block_red(idx) == iceberg_elem) then
      !        write(*,*) " * Found element ",elem_block_red(idx), " for ib ",idx, ", elem_area=",elem_area_tmp
-             area_ib_tot = area_ib_tot + length_ib(idx) * width_ib(idx) * scaling(idx)
+             area_ib_tot = area_ib_tot + area_snap(idx)
          end if
      end do
 !$OMP END PARALLEL DO
@@ -923,7 +948,7 @@ type(t_partit), intent(inout), target :: partit
          end if
      end if
    else 
-     if (mype==0) write(*,*) 'iceberg ',ib, ' changed PE or was very fast'
+     if (mype==0 .and. lverbose_icb) write(*,*) 'iceberg ',ib, ' changed PE or was very fast'
    end if
  end if
  
@@ -1189,7 +1214,7 @@ type(t_partit), intent(inout), target :: partit
           i = i + 1
         end if
       else
-        if( mesh%bc_index_nod2D(node)==1 ) then
+        if( mesh%bc_index_nod2D(node)==0 ) then
           n(1) = node
         else
           n(i) = node
@@ -1217,7 +1242,7 @@ type(t_partit), intent(inout), target :: partit
          i = i+1
         end if
       else
-        if( mesh%bc_index_nod2D(node)==1 ) then
+        if( mesh%bc_index_nod2D(node)==0 ) then
          n(i) = node
          i = i+1
         end if
