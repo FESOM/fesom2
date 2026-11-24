@@ -483,6 +483,8 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
         tracers%data(n)%ltra_diag   = ltra_diag .and. &
             (ALL(ltra_diag_ids < 0) .or. ANY(ltra_diag_ids == nml_tracer_list(n)%id))
         if (partit%mype==0 .and. tracers%data(n)%ltra_diag) write(*,*) 'ltra_diag: budget diagnostics on for tracer ID ', nml_tracer_list(n)%id
+        ! non-negative tracers: all except temperature (1) and salinity (2)
+        tracers%data(n)%positive      = (nml_tracer_list(n)%id > 2)
     end do
     allocate(tracers%work%del_ttf(mesh%nl-1,node_size))
     allocate(tracers%work%del_ttf_advhoriz(mesh%nl-1,node_size),tracers%work%del_ttf_advvert(mesh%nl-1,node_size))

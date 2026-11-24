@@ -21,6 +21,9 @@ real(kind=WP)                                 :: tra_adv_ph  = 1.  ! a parameter
 real(kind=WP)                                 :: tra_adv_pv  = 1.  ! a parameter to be used in horizontal advection (for QR4C  it is the fraction of fourth-order contribution in the solution)
 integer                                       :: AB_order=2
 integer                                       :: ID
+! the tracer must stay non-negative (all tracers except temperature and salinity);
+! set from ID in tracer_init and on reading, used by the Redi positivity limiter
+logical                                       :: positive = .false.
 !___________________________________________________________________________
 ! TODO: Make it as a part of namelist.tra
 logical                                      :: ltra_diag       = .true.
@@ -169,6 +172,7 @@ subroutine READ_T_TRACER_DATA(tdata, unit)
     read(unit, iostat=iostat, iomsg=iomsg) tdata%tra_adv_ph
     read(unit, iostat=iostat, iomsg=iomsg) tdata%tra_adv_pv
     read(unit, iostat=iostat, iomsg=iomsg) tdata%ID
+    tdata%positive = (tdata%ID > 2)
 end subroutine READ_T_TRACER_DATA
 
 ! Unformatted writing for T_TRACER_WORK
