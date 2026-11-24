@@ -2438,7 +2438,6 @@ SUBROUTINE sbc_do_recom(partit, mesh)
 
        end if ! ciso_14 .and. ciso_organic_14
       end if ! ciso
-        deallocate(ncdata)
         status=nf_close(ncid)
 
 ! calculating fluxes back to ocean surface through rivers (mmol/m2/s)
@@ -2448,6 +2447,7 @@ SUBROUTINE sbc_do_recom(partit, mesh)
         end do
 
       end if ! add_loopback
+      deallocate(ncdata)
         end if ! mstep == 1
     else ! if not use_MEDUSA or sedflx_num = 0
 #if defined(__usetp)
