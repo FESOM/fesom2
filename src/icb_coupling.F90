@@ -110,8 +110,8 @@ type(t_partit), intent(inout), target :: partit
 
         do i=1, 3
             iceberg_node=ib_nods_in_ib_elem(i)
-            ! Skip nodes with no ocean column; do NOT skip valid cavity nodes
-            if (iceberg_node <= 0 .or. ulevels_nod2d(iceberg_node) == 0) cycle
+            ! freshwater only on open-ocean nodes (cavity nodes have no surface area)
+            if (iceberg_node <= 0 .or. ulevels_nod2d(iceberg_node) /= 1) cycle
 
             if (iceberg_node>0) then
                 ! Guard: tot_area at level 1 is zero when all element nodes are cavity nodes
@@ -122,55 +122,48 @@ type(t_partit), intent(inout), target :: partit
                     ibfwl(iceberg_node) = ibfwl(iceberg_node) - fwl_flux_ib(ib) / tot_area_nods_in_ib_elem(1)
                     ibfwe(iceberg_node) = ibfwe(iceberg_node) - fwe_flux_ib(ib) / tot_area_nods_in_ib_elem(1)
                 end if
-                !ibhf(iceberg_node) = ibhf(iceberg_node) - hfb_flux_ib(ib) / tot_area_nods_in_ib_elem(1)
-
-                ! Guard against idx_d=0 (can happen if nlevels_nod2D is 0 or loop didn't execute)
-                if (idx_d(i) <= 0) cycle
-
-                do j=1,idx_d(i)
-                    lev_up  = mesh%zbar_3d_n(j, iceberg_node)
-                    if( j==nlevels_nod2D(iceberg_node) ) then
-                        lev_low = mesh%zbar_n_bot(iceberg_node)
-                    else
-                        lev_low = mesh%zbar_3d_n(j+1, iceberg_node)
-                    end if
-                    dz = abs( lev_low - lev_up )
-                    if( (abs(lev_low)>=abs(depth_ib)) .and. (abs(lev_up)<abs(depth_ib)) ) then 
-                        dz = abs(abs(lev_up) - abs(depth_ib))
-                    end if              
-                   
-                    ! Also guard tot_area(j): at levels where only some nodes extend,
-                    ! the remaining nodes contribute zero area, making tot_area very small.
-                    if( abs(depth_ib) > 0.0 .and. tot_area_nods_in_ib_elem(j) > 0.0 ) then
-                        ibhf_n(j,iceberg_node) = ibhf_n(j,iceberg_node) & 
-                                                    - (hfbv_flux_ib(ib,j)+hfl_flux_ib(ib,j)) & 
-                                                    / tot_area_nods_in_ib_elem(j)
-                    end if
-                end do
-                
-                if( idx_d(i) > 1 ) then
-                    if (tot_area_nods_in_ib_elem(idx_d(i)) > 0.0) &
-                        ibhf_n(idx_d(i),iceberg_node) = ibhf_n(idx_d(i),iceberg_node) - 0.5 * hfb_flux_ib(ib) / tot_area_nods_in_ib_elem(idx_d(i))
-                    if (tot_area_nods_in_ib_elem(idx_d(i)-1) > 0.0) &
-                        ibhf_n(idx_d(i)-1,iceberg_node) = ibhf_n(idx_d(i)-1,iceberg_node) - 0.5 * hfb_flux_ib(ib) / tot_area_nods_in_ib_elem(idx_d(i)-1)
-                else if( idx_d(i) == 1 ) then
-                    if (tot_area_nods_in_ib_elem(idx_d(i)) > 0.0) &
-                        ibhf_n(idx_d(i),iceberg_node) = ibhf_n(idx_d(i),iceberg_node) - hfb_flux_ib(ib) / tot_area_nods_in_ib_elem(idx_d(i))
-                end if
-                
-                ! Wave erosion heat applied at level 1 only on open-ocean nodes (ulevels==1).
-                ! Cavity nodes (ulevels>1) skip nz=1 in oce_ale_tracer, so setting ibhf_n(1)
-                ! for them wastes the flux and overcounts the heat on the open-ocean node.
-                if( height_ib_single .ne. 0.0 .and. tot_area_nods_in_ib_elem(1) > 0.0 &
-                        .and. ulevels_nod2d(iceberg_node) == 1 ) then
-                    ibhf_n(1,iceberg_node) = ibhf_n(1,iceberg_node) - hfe_flux_ib(ib) &
-                            !* abs(height_ib_single) &
-                            !* ((abs(height_ib_single)-abs(depth_ib))/abs(height_ib_single)) &
-                            / tot_area_nods_in_ib_elem(1)
-                end if
             end if
         end do
+
+        ! heat: lateral per layer, basal half in the keel layer and half above,
+        ! wave erosion at the surface of open-ocean nodes
+        do j=1, size(hfl_flux_ib,2)
+            call deposit_heat(hfbv_flux_ib(ib,j)+hfl_flux_ib(ib,j), (/j,j,j/), .false.)
+        end do
+        call deposit_heat(0.5*hfb_flux_ib(ib), idx_d, .false.)
+        call deposit_heat(0.5*hfb_flux_ib(ib), idx_d-1, .false.)
+        if (height_ib_single .ne. 0.0) call deposit_heat(hfe_flux_ib(ib), (/1,1,1/), .true.)
     end if
+
+contains
+
+    ! Spread heat flux Q [W] over the owned nodes of the element, node i at
+    ! layer lev(i) clamped into its water column, weighted by mesh%area there.
+    ! oce_ale_tracer applies ibhf_n*area, so the total is conserved.
+    subroutine deposit_heat(Q, lev, open_ocean_only)
+        real,    intent(in) :: Q
+        integer, intent(in) :: lev(3)
+        logical, intent(in) :: open_ocean_only
+        integer :: ii, nn, kk(3)
+        real    :: asum
+        if (Q == 0.0) return
+        asum = 0.0
+        kk   = 0
+        do ii=1,3
+            nn = ib_nods_in_ib_elem(ii)
+            if (nn <= 0) cycle
+            if (ulevels_nod2d(nn) == 0) cycle
+            if (open_ocean_only .and. ulevels_nod2d(nn) > 1) cycle
+            kk(ii) = max(min(lev(ii), nlevels_nod2D(nn)-1), ulevels_nod2d(nn))
+            asum = asum + mesh%area(kk(ii), nn)
+        end do
+        if (asum <= 0.0) return
+        do ii=1,3
+            nn = ib_nods_in_ib_elem(ii)
+            if (kk(ii) > 0) ibhf_n(kk(ii),nn) = ibhf_n(kk(ii),nn) - Q/asum
+        end do
+    end subroutine deposit_heat
+
 end subroutine prepare_icb2fesom
 
 subroutine icb2fesom(mesh, partit, ice)
@@ -271,7 +264,7 @@ end subroutine icb2fesom
 ! this aggregate cap as a backstop. The diagnostic below quantifies the
 ! energy leak so it's monitored rather than silently ignored.
 !
-! Toggle via namelist /icebergs/ l_cap_ibhf_n (default .true.).
+! Toggle via namelist /icebergs/ l_cap_ibhf_n (default .false.).
 !_______________________________________________________________________________
 subroutine cap_ibhf_n(tracers, mesh, partit)
     use o_param
@@ -291,10 +284,9 @@ subroutine cap_ibhf_n(tracers, mesh, partit)
     ! halo nodes), then MPI-summed and logged on PE 0.
     real(kind=WP)  :: heat_disc_loc, heat_disc_glob
     integer        :: cells_capped_loc, cells_capped_glob
-    ! Lowest temperature we allow iceberg cooling to drive a cell to.
-    ! Slightly above the freezing point of seawater at S~34, so the cap kicks
-    ! in before we reach the freezing point and protects the blow-up check.
-    real(kind=WP), parameter :: ibhf_n_t_threshold = -1.85_WP
+    ! Lowest temperature we allow iceberg cooling to drive a cell to:
+    ! local freezing point Tf(S,z) (as in the 3-eq. solver) + 0.02 K
+    real(kind=WP)  :: ibhf_n_t_threshold
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -305,7 +297,7 @@ subroutine cap_ibhf_n(tracers, mesh, partit)
     heat_disc_loc    = 0.0_WP
     cells_capped_loc = 0
 
-!$OMP PARALLEL DO PRIVATE(n, nz, nzmin, nzmax, t_now, hloc, ibhf_n_min, dheat_cell) &
+!$OMP PARALLEL DO PRIVATE(n, nz, nzmin, nzmax, t_now, hloc, ibhf_n_min, dheat_cell, ibhf_n_t_threshold) &
 !$OMP             REDUCTION(+: heat_disc_loc, cells_capped_loc)
     do n = 1, myDim_nod2D + eDim_nod2D
         nzmin = ulevels_nod2D(n)
@@ -315,6 +307,8 @@ subroutine cap_ibhf_n(tracers, mesh, partit)
             hloc = hnode(nz, n)
             if (hloc <= 0.0_WP) cycle
             t_now = tracers%data(1)%values(nz, n)
+            ibhf_n_t_threshold = -0.0575_WP*tracers%data(2)%values(nz, n) + 0.0901_WP &
+                                 + 7.61e-4_WP*mesh%Z_3d_n(nz, n) + 0.02_WP
             if (t_now <= ibhf_n_t_threshold) then
                 ! Water already at/below the safe threshold; disallow further
                 ! iceberg-driven cooling entirely.
