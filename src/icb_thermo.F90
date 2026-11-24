@@ -218,8 +218,10 @@ subroutine iceberg_newdimensions(partit, ib, depth_ib,height_ib,length_ib,width_
   
   real			:: dh_b, dh_v, dh_e, dh_bv, bvl, lvl_b, lvl_v, lvl_e, tvl, volume_before, volume_after
   real			:: hf_scale
+  real, parameter	:: max_aspect_icb = 1000.0   ! real bergs >= 50 m thick stay below ~500
   integer		:: icbID
   logical		:: force_last_output
+  logical		:: l_height_gone
   real, dimension(4)	:: arr
   integer               :: istep
   ! LA: include latent heat 2023-04-04
@@ -255,14 +257,21 @@ type(t_partit), intent(inout), target :: partit
 					! surrounding one node
     volume_before=height_ib*length_ib*width_ib
 
-    if((tvl .ge. volume_before) .OR. (volume_before .le. smallestvol_icb)) then
-        ! Scale heat fluxes when melt exceeds remaining volume
-        hf_scale = volume_before / max(tvl, 1.0e-30)
-        hfb_flux_ib(ib)    = hfb_flux_ib(ib)    * hf_scale
-        hfe_flux_ib(ib)    = hfe_flux_ib(ib)    * hf_scale
-        hfbv_flux_ib(ib,:) = hfbv_flux_ib(ib,:) * hf_scale
-        hfl_flux_ib(ib,:)  = hfl_flux_ib(ib,:)  * hf_scale
-    	volume_after=0.0    	
+    ! melted out if basal melt removes the height (else branch: sqrt(V/0) -> NaN)
+    l_height_gone = (height_ib - dh_b <= 1.0e-3*height_ib)
+
+    if((tvl .ge. volume_before) .OR. (volume_before .le. smallestvol_icb) .OR. l_height_gone) then
+        if (tvl > volume_before) then
+            hf_scale = volume_before / tvl
+            hfb_flux_ib(ib)    = hfb_flux_ib(ib)    * hf_scale
+            hfe_flux_ib(ib)    = hfe_flux_ib(ib)    * hf_scale
+            hfbv_flux_ib(ib,:) = hfbv_flux_ib(ib,:) * hf_scale
+            hfl_flux_ib(ib,:)  = hfl_flux_ib(ib,:)  * hf_scale
+        else
+            ! remaining ice melts now: add its latent heat
+            hfe_flux_ib(ib) = hfe_flux_ib(ib) + (volume_before - tvl) * rho_icb * (L + dL_cold) / dt / REAL(steps_per_ib_step) * scaling(ib)
+        end if
+    	volume_after=0.0
 	    depth_ib = 0.0
     	height_ib= 0.0
     	length_ib= 0.0
@@ -290,10 +299,18 @@ type(t_partit), intent(inout), target :: partit
     
     	volume_after=height_ib*length_ib*width_ib
 
+        ! too flat (thinned by basal melt): reshape at constant volume
+        if (volume_after > 0.0 .and. length_ib > max_aspect_icb*height_ib) then
+            height_ib = (volume_after/max_aspect_icb**2)**(1.0/3.0)
+            length_ib = max_aspect_icb*height_ib
+            width_ib  = length_ib
+            depth_ib  = -height_ib * rho_icb/rho_h2o
+        end if
+
         !iceberg smaller than critical value after melting?
         if (volume_after .le. smallestvol_icb) then
             ! Add latent heat for remnant volume to erosion heat flux (bug 5)
-            hfe_flux_ib(ib) = hfe_flux_ib(ib) + (volume_before - tvl) * rho_icb * L / dt / REAL(steps_per_ib_step) * scaling(ib)
+            hfe_flux_ib(ib) = hfe_flux_ib(ib) + (volume_before - tvl) * rho_icb * (L + dL_cold) / dt / REAL(steps_per_ib_step) * scaling(ib)
             volume_after=0.0    	
 	        depth_ib = 0.0
     	    height_ib= 0.0
