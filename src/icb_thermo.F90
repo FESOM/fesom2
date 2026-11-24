@@ -612,7 +612,7 @@ subroutine potit_ib(ib,salz,pt,pres,rfpres,tin)
   ! eines Iterationsverfahrens aus.
 
   integer ib
-  integer iter
+  integer iter, ierr
   real salz,pt,pres,rfpres,tin
   real epsi,tpmd,pt1,ptd,pttmpr
 
@@ -629,7 +629,7 @@ subroutine potit_ib(ib,salz,pt,pres,rfpres,tin)
   write(*,*) ' WARNING FOR ICEBERG #',ib
   write(*,*) ' in-situ temperature calculation has not converged.'
   write(*,*) ' values: salt ', salz,', pot. temp ',pt, ', pressure ', pres, ', refpressure ', rfpres, ', temp ', tin
-  stop
+  call MPI_Abort(MPI_COMM_WORLD, 1, ierr)
   return
 end subroutine potit_ib
 

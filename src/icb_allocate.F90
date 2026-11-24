@@ -23,6 +23,7 @@ subroutine allocate_icb(partit, mesh)
   use o_param
   use MOD_PARTIT
   use MOD_MESH
+  use MOD_PARSUP, only: par_ex
 
   integer       :: n2
 type(t_partit), intent(inout), target :: partit
@@ -31,6 +32,11 @@ type(t_mesh), intent(in), target :: mesh
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+  ! the iceberg code reads mesh%cavity_depth per node, but it is per element here
+  if (use_cavity .and. use_cavityonelem) then
+    if (mype==0) write(*,*) 'FATAL: icebergs do not support use_cavityonelem=.true.'
+    call par_ex(partit%MPI_COMM_FESOM, partit%mype, abort=1)
+  end if
   n2=myDim_nod2D+eDim_nod2D
   icb_outfreq = step_per_day / steps_per_ib_step
 

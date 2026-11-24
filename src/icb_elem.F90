@@ -678,15 +678,11 @@ type(t_partit), intent(inout), target :: partit
 !#include "associate_part_ass.h"
 
 ! kh 10.02.22
- if(i_have_element) then
+ ! MPI_IN_PLACE on all ranks; a literal 0 is no valid buffer for a non-blocking call
+ if (.not. i_have_element) iceberg_element = 0
 !$omp critical
-     call MPI_IAllreduce(MPI_IN_PLACE, iceberg_element, 1, MPI_INTEGER, MPI_SUM, partit%MPI_COMM_FESOM_IB, req, partit%MPIERR_IB)
+ call MPI_IAllreduce(MPI_IN_PLACE, iceberg_element, 1, MPI_INTEGER, MPI_SUM, partit%MPI_COMM_FESOM_IB, req, partit%MPIERR_IB)
 !$omp end critical
- else
-!$omp critical
-     call MPI_IAllreduce(0,            iceberg_element, 1, MPI_INTEGER, MPI_SUM, partit%MPI_COMM_FESOM_IB, req, partit%MPIERR_IB)
-!$omp end critical
- end if
 
  !bugfix 2026-08-12: com_integer is a collective - every rank in
  !MPI_COMM_FESOM_IB must reach this call for a given iceberg, or the ranks
