@@ -36,6 +36,7 @@ subroutine iceberg_dyn(mesh, partit, ice, dynamics, ib, new_u_ib, new_v_ib, u_ib
  use g_forcing_arrays 	!for u_wind, v_wind or u_wind_ib, v_wind_ib respectively
  use o_arrays, only: Tsurf_ib, Ssurf_ib
  use o_param		!for dt
+ use g_config, only: lverbose_icb
 
  integer                :: ib_n_lvls, m
  integer, intent(IN) 	:: ib !current iceberg's index
@@ -71,6 +72,7 @@ subroutine iceberg_dyn(mesh, partit, ice, dynamics, ib, new_u_ib, new_v_ib, u_ib
  real, dimension(2,2) 	:: SI_matrix
  real, dimension(2)	:: SI_velo
  real 			:: u_ib_tmp, v_ib_tmp, normold, normnew, abs_omib, abs_omib_skin, ocean_drag
+ real 			:: air_ice_drag, speed_ib
  integer 		:: iter_ib, n, n2
  real          		:: M_b, M_v, M_e, M_bv, sst_ib, sss_ib ! meltrates (basal, lateral, erosion, lateral 'basal'), temp. & salinity
  real			:: T_ave_ib, S_ave_ib, T_keel_ib, S_keel_ib
@@ -148,7 +150,7 @@ arr_S_ave_ib = 0.0
  P_ib = 20000. * hi_ib * exp(-20.*(1-conci_ib))
  
  call compute_areas(Ao, Aa, Ai, Ad, depth_ib, &
-                    height_ib, length_ib, width_ib, hi_ib)
+                    height_ib, length_ib, width_ib, hi_ib/max(conci_ib,0.01)) ! floe thickness
 
  coriolis => mesh%coriolis(:)
  fcoriolis = coriolis(iceberg_elem) * coriolis_scale(ib)
@@ -184,6 +186,10 @@ arr_S_ave_ib = 0.0
   new_u_ib = u_ib + au_ib * dt_ib
   new_v_ib = v_ib + av_ib * dt_ib
 
+ ! air and sea-ice drag damping, treated implicitly like ocean drag
+ air_ice_drag = (0.5*Ca*rho_air*Aa + rho_air*Cda_skin*Ad) * sqrt((ua_ib-u_ib)**2 + (va_ib-v_ib)**2) / mass_ib
+ if (conci_ib > 0.15) air_ice_drag = air_ice_drag + 0.5*Ci*rho_ice*Ai * sqrt((ui_ib-u_ib)**2 + (vi_ib-v_ib)**2) / mass_ib
+
  if (l_semiimplicit) then !a matrix multiplication is to be performed
   			  !for semiimpl. coriolis term and implicit
 			  !water drag
@@ -195,7 +201,7 @@ arr_S_ave_ib = 0.0
   	           * abs_omib_skin)/mass_ib
    
   
-   SI_matrix(1,1) = 1. + dt_ib*ocean_drag
+   SI_matrix(1,1) = 1. + dt_ib*(ocean_drag + air_ice_drag)
    SI_matrix(1,2) = dt_ib*fcoriolis*semiimplicit_coeff
    SI_matrix(2,1) =-SI_matrix(1,2)
    SI_matrix(2,2) = SI_matrix(1,1)
@@ -219,7 +225,7 @@ arr_S_ave_ib = 0.0
    ocean_drag = (0.5 * Co * rho_h2o * Ao * abs_omib + rho_h2o * Cdo_skin * Ad  &
   	           * abs_omib_skin)/mass_ib  
    		   
-   SI_matrix(1,1) = 1. + dt_ib*ocean_drag
+   SI_matrix(1,1) = 1. + dt_ib*(ocean_drag + air_ice_drag)
    SI_matrix(1,2) = 0.0
    SI_matrix(2,1) = 0.0
    SI_matrix(2,2) = SI_matrix(1,1)
@@ -240,6 +246,13 @@ arr_S_ave_ib = 0.0
       
  new_u_ib = (1-frozen_in) * new_u_ib + frozen_in * ui_ib
  new_v_ib = (1-frozen_in) * new_v_ib + frozen_in * vi_ib
+
+ speed_ib = sqrt(new_u_ib**2 + new_v_ib**2)
+ if (speed_ib > maxspeed_icb) then
+   if (lverbose_icb) write(*,*) ' * iceberg ', ib, ' speed capped from ', speed_ib, ' m/s'
+   new_u_ib = new_u_ib * maxspeed_icb/speed_ib
+   new_v_ib = new_v_ib * maxspeed_icb/speed_ib
+ end if
  
 end subroutine iceberg_dyn
 
@@ -379,7 +392,7 @@ type(t_dyn)   , intent(inout), target :: dynamics
  abs_imib = sqrt( (ui_ib - u_ib)**2 + (vi_ib - v_ib)**2 )  
  abs_omib_skin = sqrt( (uo_skin_ib - u_ib)**2 + (vo_skin_ib - v_ib)**2 )
  
- ! u-components
+ ! u-components (air/ice drag: damping part -k*u_ib is implicit in iceberg_dyn)
  ocean_drag_u     = (0.5 * Co * rho_h2o * Ao  &
                    * abs_omib * uo_ib)/mass_ib	!calculate part of it implicitly
 
@@ -387,12 +400,12 @@ type(t_dyn)   , intent(inout), target :: dynamics
   	           * abs_omib_skin * uo_skin_ib)/mass_ib !calculate part of it implicitly
 		       
  air_drag_u       = (0.5 * Ca * rho_air * Aa  &
-	           * abs_amib * (ua_ib - u_ib))/mass_ib
+	           * abs_amib * ua_ib)/mass_ib
  air_skin_u       = (rho_air * Cda_skin * Ad   &
-  	           * abs_amib * (ua_ib - u_ib))/mass_ib 
+  	           * abs_amib * ua_ib)/mass_ib 
 	     
  ice_drag_u       = (0.5 * Ci * rho_ice * Ai  &
-	           * abs_imib * (ui_ib - u_ib))/mass_ib
+	           * abs_imib * ui_ib)/mass_ib
 		   
  if(l_wave(ib)) then
    wave_radiation_u = 1./4. * rho_h2o * g * length_ib &
@@ -423,12 +436,12 @@ type(t_dyn)   , intent(inout), target :: dynamics
  
 	     
  air_drag_v       = (0.5 * Ca * rho_air * Aa  &
-	           * abs_amib * (va_ib - v_ib))/mass_ib
+	           * abs_amib * va_ib)/mass_ib
  air_skin_v       = (rho_air * Cda_skin * Ad   &
-  	           * abs_amib * (va_ib - v_ib))/mass_ib 
+  	           * abs_amib * va_ib)/mass_ib 
 	     
  ice_drag_v       = (0.5 * Ci * rho_ice * Ai  &
-	           * abs_imib * (vi_ib - v_ib))/mass_ib
+	           * abs_imib * vi_ib)/mass_ib
  
  if(l_wave(ib)) then	       
    wave_radiation_v = 1./4. * rho_h2o * g * length_ib &
