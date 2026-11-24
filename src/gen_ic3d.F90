@@ -890,8 +890,8 @@ CONTAINS
           end do
         end do
         ! sync halos
-        !call exchange_nod3D(tracers%data(1)%values, partit)
-        !call exchange_nod3D(tracers%data(2)%values, partit)
+        call exchange_nod(tracers%data(1)%values, partit)
+        call exchange_nod(tracers%data(2)%values, partit)
 
         ! ================================================================
         ! PERTURBATION REPORTING - COMPLETION
