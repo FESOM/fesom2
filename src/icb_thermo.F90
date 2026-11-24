@@ -16,6 +16,9 @@ module iceberg_thermodynamics
  public ::  potit_ib
  public ::  fcn_density
 
+ ! heat [J/kg] to warm iceberg ice from -20 degC to ~-1.9 degC (as in the 3-eq. solver)
+ real(kind=8), parameter, private :: dL_cold = (152.5+7.122*253.15)*18.1
+
  contains 
 
 !!=============================================================================
@@ -138,7 +141,7 @@ type(t_partit), intent(inout), target :: partit
     !M_v is a function of the 'thermal driving', NOT just sst! Cf. Neshyba and Josberger (1979)
     M_v = 0.00762 * T_d + 0.00129 * T_d**2
     M_v = M_v/86400.
-    H_v = M_v * rho_icb * L
+    H_v = M_v * rho_icb * (L + dL_cold)
     M_v_dz = M_v_dz + M_v*dz
     hfl_flux_ib(ib,n) = H_v * (2*length_ib*dz  + 2*length_ib*dz ) * scaling(ib)
     !fwl_flux_ib = M_v
@@ -164,7 +167,7 @@ type(t_partit), intent(inout), target :: partit
   ! which reverses the sign of the FW and heat flux delivered to the ocean,
   ! creating a runaway cooling feedback via the ALE bc_surface term. Clamp here.
   if (M_e < 0.0) M_e = 0.0
-  H_e = M_e * rho_icb * L
+  H_e = M_e * rho_icb * (L + dL_cold)
   
   ! check wave erosion potential
   ib_wave_erosion_pot = abs(H_e * dt * REAL(steps_per_ib_step) * 2 * length_ib * abs(height_ib) * scaling(ib))
@@ -435,7 +438,7 @@ subroutine iceberg_heat_water_fluxes_3eq(partit, ib, M_b, H_b, T_ib,S_ib,v_rel, 
   real(kind=8),parameter ::  tob=  -20.                       !temperatur at the ice surface
   !real(kind=8),parameter ::  rhoi=  920.                      !mean ice density
   !real(kind=8),parameter ::  rhoh2o=  1027.5		      !water density
-  real(kind=8),parameter ::  rhoi=  850.0 		      !mean ice(berg) density (see values in icb_modules.F90)
+  real(kind=8)           ::  rhoi                         != rho_icb(ib)
   real(kind=8),parameter ::  cpw =  4180.0                    !Barnier et al. (1995)
   real(kind=8),parameter ::  lhf =  3.33e+5                   !latent heat of fusion
   real(kind=8),parameter ::  tdif=  1.54e-6                   !thermal conductivity of ice shelf !RG4190 / RG44027
@@ -448,6 +451,7 @@ type(t_partit), intent(inout), target :: partit
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
 
+     rhoi = rho_icb(ib)
      temp = T_ib
      sal = S_ib
      zice = depth_ib !(<0)
