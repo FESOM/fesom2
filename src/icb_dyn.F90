@@ -19,6 +19,14 @@ implicit none
 
  contains
 
+! first ocean level of node n: 1, or ulevels_nod2D under an ice shelf
+integer function first_wet_level(mesh, n)
+ type(t_mesh), intent(in) :: mesh
+ integer,      intent(in) :: n
+ first_wet_level = 1
+ if (use_cavity .AND. mesh%cavity_depth(n) /= 0.0) first_wet_level = mesh%ulevels_nod2D(n)
+end function first_wet_level
+
 !==============================================================================
 ! calculates basically the new iceberg velocity; if melting is enabled, the
 ! iceberg dimensions are adjusted as well.
@@ -670,7 +678,7 @@ subroutine iceberg_levelwise_andkeel(mesh, partit, dynamics, uo_dz,vo_dz, uo_kee
   REAL, dimension(:,:,:), pointer :: UV_ib
 
   real           :: lev_up, lev_low
-  integer        :: m, k, n2, max_node_level_count, safe_lev
+  integer        :: m, k, n2, max_node_level_count, safe_lev, k_top, kf, kl
   ! depth over which is integrated (layer and sum)
   real           :: dz, ufkeel1, ufkeel2, Temkeel, Salkeel
 
@@ -714,6 +722,7 @@ type(t_partit), intent(inout), target :: partit
   nodeloop: do m=1, 3
    !for each 2D node of the iceberg element..
    n2=elem2D_nodes(m,iceberg_elem)
+   k_top = first_wet_level(mesh, n2)
 
    ! LOOP over mid-levels: Z_3d_n_ib(k) gives depth where UV_ib(k) lives
    innerloop: do k=1, nlevels_nod2d(n2)
@@ -748,7 +757,7 @@ type(t_partit), intent(inout), target :: partit
 
     ! Cavity check: use zbar_3d_n for geometric comparison
     if (use_cavity .AND. mesh%cavity_depth(elem2D_nodes(m,iceberg_elem)) /= 0.0 &
-        .AND. abs(depth_ib) < abs(mesh%zbar_3d_n(k, n2))) then
+        .AND. k == k_top .AND. abs(depth_ib) < abs(mesh%zbar_3d_n(k, n2))) then
       ! Iceberg draft is above the ocean surface at this cavity node.
       ! Clamp to shallowest valid ocean level (ulevels_nod2d) to avoid
       ! reading ice-shelf level T/S which are never initialised by the
@@ -766,12 +775,12 @@ type(t_partit), intent(inout), target :: partit
 
     ! Keel layer: mid-level k is at or below the iceberg draft
     else if( abs(lev_low)>=abs(depth_ib) ) then
-      if( k==1 ) then
+      if( k==k_top ) then
         ! Draft within first half-layer: use first mid-level value
-        ufkeel1 = UV_ib(1,1,n2)
-        ufkeel2 = UV_ib(2,1,n2)
-        Temkeel = Tclim_ib(1,n2)
-        Salkeel = Sclim_ib(1,n2)
+        ufkeel1 = UV_ib(1,k,n2)
+        ufkeel2 = UV_ib(2,k,n2)
+        Temkeel = Tclim_ib(k,n2)
+        Salkeel = Sclim_ib(k,n2)
       else if( k > nlevels_nod2D(n2)-1 ) then
         ! Last half-layer to bottom: no UV_ib(k), use piecewise constant
         ufkeel1 = UV_ib(1,k-1,n2)
@@ -826,6 +835,17 @@ type(t_partit), intent(inout), target :: partit
     end if
 
    end do innerloop
+
+   ! fill levels this node does not cover (still 0, valid ones have S > 0) with
+   ! its nearest valid value, so FEM_3eval does not interpolate towards zero
+   kf = findloc(S_dz(m,:) > 0.0, .true., dim=1)
+   kl = findloc(S_dz(m,:) > 0.0, .true., dim=1, back=.true.)
+   if (kf > 0) then
+     uo_dz(m,:kf-1) = uo_dz(m,kf); uo_dz(m,kl+1:) = uo_dz(m,kl)
+     vo_dz(m,:kf-1) = vo_dz(m,kf); vo_dz(m,kl+1:) = vo_dz(m,kl)
+     T_dz(m,:kf-1)  = T_dz(m,kf);  T_dz(m,kl+1:)  = T_dz(m,kl)
+     S_dz(m,:kf-1)  = S_dz(m,kf);  S_dz(m,kl+1:)  = S_dz(m,kl)
+   end if
  end do nodeloop !loop over all nodes of iceberg element
  
  do m=1,3
@@ -894,7 +914,8 @@ subroutine iceberg_average_andkeel(mesh, partit, dynamics, uo_dz,vo_dz, uo_keel,
   real           :: lev_up, lev_low
   integer        :: m, k, n2, safe_lev
   ! depth over which is integrated (layer and sum)
-  real           :: dz, ufkeel1, ufkeel2, Temkeel, Salkeel
+  real           :: dz, ufkeel1, ufkeel2, Temkeel, Salkeel, zsum
+  integer        :: k_top
 
 type(t_mesh), intent(in) , target :: mesh
 type(t_dyn), intent(in) , target :: dynamics
@@ -910,6 +931,8 @@ type(t_partit), intent(inout), target :: partit
   nodeloop: do m=1, 3
    !for each 2D node of the iceberg element..
    n2=elem2D_nodes(m,iceberg_elem)
+   k_top = first_wet_level(mesh, n2)
+   zsum = 0.0
 
    uo_dz(m)=0.0
    vo_dz(m)=0.0
@@ -953,7 +976,7 @@ type(t_partit), intent(inout), target :: partit
 
     ! Cavity check: use zbar_3d_n for geometric comparison
     if (use_cavity .AND. mesh%cavity_depth(elem2D_nodes(m,iceberg_elem)) /= 0.0 &
-        .AND. abs(depth_ib) < abs(mesh%zbar_3d_n(k, n2))) then
+        .AND. k == k_top .AND. abs(depth_ib) < abs(mesh%zbar_3d_n(k, n2))) then
       ! Iceberg draft is above the ocean surface at this cavity node.
       ! Clamp to shallowest valid ocean level (ulevels_nod2d) to avoid
       ! reading ice-shelf level T/S which are never initialised by the
@@ -967,18 +990,20 @@ type(t_partit), intent(inout), target :: partit
       S_dz(m)=Sclim_ib(safe_lev,n2)*abs(depth_ib)
       T_keel(m)=Tclim_ib(safe_lev,n2)
       S_keel(m)=Sclim_ib(safe_lev,n2)
+      zsum = abs(depth_ib)
       exit innerloop
 
     ! Keel layer: mid-level k is at or below the iceberg draft
     else if( abs(lev_low)>=abs(depth_ib) ) then
       dz = abs( lev_up - depth_ib )
+      zsum = zsum + dz
 
-      if( k==1 ) then
+      if( k==k_top ) then
         ! Draft within first half-layer: piecewise constant
-        ufkeel1 = UV_ib(1,1,n2)
-        ufkeel2 = UV_ib(2,1,n2)
-        Temkeel = Tclim_ib(1,n2)
-        Salkeel = Sclim_ib(1,n2)
+        ufkeel1 = UV_ib(1,k,n2)
+        ufkeel2 = UV_ib(2,k,n2)
+        Temkeel = Tclim_ib(k,n2)
+        Salkeel = Sclim_ib(k,n2)
         uo_dz(m)=ufkeel1*dz 
         vo_dz(m)=ufkeel2*dz
         T_dz(m)=Temkeel*dz
@@ -1015,12 +1040,13 @@ type(t_partit), intent(inout), target :: partit
 
     ! Regular layer: iceberg extends deeper
     else
-      if( k==1 ) then
+      zsum = zsum + dz
+      if( k==k_top ) then
         ! First half-layer (surface to first mid-level): piecewise constant
-        uo_dz(m)=uo_dz(m)+ UV_ib(1,1,n2)*dz
-        vo_dz(m)=vo_dz(m)+ UV_ib(2,1,n2)*dz
-        T_dz(m)=T_dz(m)+ Tclim_ib(1,n2)*dz
-        S_dz(m)=S_dz(m)+ Sclim_ib(1,n2)*dz
+        uo_dz(m)=uo_dz(m)+ UV_ib(1,k,n2)*dz
+        vo_dz(m)=vo_dz(m)+ UV_ib(2,k,n2)*dz
+        T_dz(m)=T_dz(m)+ Tclim_ib(k,n2)*dz
+        S_dz(m)=S_dz(m)+ Sclim_ib(k,n2)*dz
         cycle
       end if
 
@@ -1051,11 +1077,11 @@ type(t_partit), intent(inout), target :: partit
    end do innerloop
 
    ! divide by depth over which was integrated
-   if (abs(depth_ib) > 0.0) then
-     uo_dz(m)=uo_dz(m)/abs(depth_ib)
-     vo_dz(m)=vo_dz(m)/abs(depth_ib)
-     T_dz(m)=T_dz(m)/abs(depth_ib)
-     S_dz(m)=S_dz(m)/abs(depth_ib)
+   if (zsum > 0.0) then
+     uo_dz(m)=uo_dz(m)/zsum
+     vo_dz(m)=vo_dz(m)/zsum
+     T_dz(m)=T_dz(m)/zsum
+     S_dz(m)=S_dz(m)/zsum
    end if
 
  end do nodeloop !loop over all nodes of iceberg element
@@ -1107,7 +1133,8 @@ subroutine iceberg_avvelo(mesh, partit, dynamics, uo_dz,vo_dz,depth_ib,iceberg_e
   real           :: lev_up, lev_low  
   integer        :: m, k, n2, n_up, n_low
   ! depth over which is integrated (layer and sum)
-  real           :: dz, ufkeel1, ufkeel2
+  real           :: dz, ufkeel1, ufkeel2, zsum
+  integer        :: k_top
   ! variables for velocity correction
   real           :: delta_depth, u_bottom_x, u_bottom_y
 
@@ -1129,7 +1156,9 @@ type(t_partit), intent(inout), target :: partit
 
    ! ..consider all neighboring pairs (n_up,n_low) of 3D nodes
    ! below n2..
-   do k=1, nl+1
+   k_top = first_wet_level(mesh, n2)
+   zsum = 0.0
+   do k=1, nlevels_nod2D(n2)-1   ! Z_3d_n_ib has only nl-1 levels
     !bugfix 2026-08-17: mirror the cavity handling already present in
     !iceberg_average_andkeel above. Levels inside the ice shelf are never
     !updated by the tracer solver and the first wet level's upper boundary
@@ -1158,8 +1187,8 @@ type(t_partit), intent(inout), target :: partit
     if ( abs(lev_low)>= abs(depth_ib)) then
   
       dz = abs( lev_up - depth_ib )
-
-      if( k==1 ) then
+      zsum = zsum + dz
+      if( k==k_top ) then
           ufkeel1 = UV_ib(1,k,n2)
           ufkeel2 = UV_ib(2,k,n2)
           uo_dz(m)= ufkeel1*dz 
@@ -1174,7 +1203,8 @@ type(t_partit), intent(inout), target :: partit
       exit
 	 
     else	
-      if( k==1 ) then
+      zsum = zsum + dz
+      if( k==k_top ) then
         uo_dz(m)=uo_dz(m)+ UV_ib(1,k,n2)*dz
         vo_dz(m)=vo_dz(m)+ UV_ib(2,k,n2)*dz
         cycle
@@ -1187,9 +1217,9 @@ type(t_partit), intent(inout), target :: partit
    end do
  
    ! divide by depth over which was integrated
-   if (abs(depth_ib) > 0.0) then
-     uo_dz(m)=uo_dz(m)/abs(depth_ib)
-     vo_dz(m)=vo_dz(m)/abs(depth_ib)
+   if (zsum > 0.0) then
+     uo_dz(m)=uo_dz(m)/zsum
+     vo_dz(m)=vo_dz(m)/zsum
    else
      uo_dz(m)=0.0
      vo_dz(m)=0.0
