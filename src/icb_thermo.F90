@@ -111,6 +111,7 @@ type(t_partit), intent(inout), target :: partit
         lev_low = mesh%zbar_3d_n(n+1, n2)
     end if
     
+    if( abs(lev_up)>=abs(depth_ib) ) exit   ! layer below the keel
     if( abs(lev_low)>=abs(depth_ib) ) then !.AND. (abs(lev_up)<=abs(depth_ib)) ) then
         dz = abs(lev_up - depth_ib)
     elseif(lev_low == lev_up) then
