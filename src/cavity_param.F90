@@ -337,11 +337,7 @@ subroutine cavity_heat_water_fluxes_3eq(ice, dynamics, tracers, partit, mesh)
         ex5 = ex3/ex1
         
         sr1 = 0.25_WP*ex4*ex4-ex5
-        if (sr1 < 0.0_WP) then
-            heat_flux(node) = 0.0_WP
-            water_flux(node) = 0.0_WP
-            cycle
-        end if
+        !sr2 = -0.5*ex4
         sr2 = ex6*ex4   ! modified for RG4190 / RG44027 ! CW
         sf1 = sr2+sqrt(sr1)
         tf1 = a*sf1+ep4
@@ -366,11 +362,7 @@ subroutine cavity_heat_water_fluxes_3eq(ice, dynamics, tracers, partit, mesh)
         !rt  s_surf_flux(i,j)=gas*(sf-(s(i,j,N,lrhs)+35.0))
         
         heat_flux(node)  = rhow*cpw*gat*(tin-tf)      ! [W/m2]  ! positive for upward
-        if (abs(sf) > 0.0_WP) then
-            water_flux(node) = gas*(sf-sal)/sf         ! [m/s]   !
-        else
-            water_flux(node) = 0.0_WP
-        end if
+        water_flux(node) =          gas*(sf-sal)/sf   ! [m/s]   !
         
         !      qo=-rhor*seta*oofw
         !      if(seta.le.0.) then

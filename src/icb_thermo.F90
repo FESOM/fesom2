@@ -529,12 +529,6 @@ type(t_partit), intent(inout), target :: partit
      ex5 = ex3/ex1
 
      sr1 = 0.25*ex4*ex4-ex5
-     if (sr1 < 0.0) then
-       M_b = 0.0
-       H_b = 0.0
-       t_freeze = a*sal + ep4
-       return
-     end if
      sr2 = ex6*ex4               ! modified for RG4190 / RG44027
      sf1 = sr2+sqrt(sr1)
      tf1 = a*sf1+ep4
@@ -559,13 +553,10 @@ type(t_partit), intent(inout), target :: partit
 
      !hfb_flux_ib(ib)  = rhow*cpw*gat*(tin-tf)*scaling(ib)      ! [W/m2]  ! positive for upward
      !hfb_flux_ib(ib)  = rhow*cpw*gat*(tin-tf)*length_ib(ib)*width_ib(ib)*scaling(ib)      ! [W]  ! positive for upward
+     H_b  = rhow*cpw*gat*(tin-tf) !*length_ib(ib)*width_ib(ib)*scaling(ib)      ! [W]  ! positive for upward
 
-     if (abs(sf) > 0.0) then
-        M_b          =          gas*(sf-sal)/sf   ! [m/s]   ! m freshwater per second
-     else
-        M_b          = 0.0
-     end if
      !fw_flux_ib(ib) =          gas*(sf-sal)/sf   ! [m/s]   !
+     M_b 	    =          gas*(sf-sal)/sf   ! [m/s]   ! m freshwater per second
      !fw_flux_ib(ib) = M_b
      !fw = -M_b
      M_b = - (rhow / rhoi) * M_b 		 ! [m (ice) per second], positive for melting? NOW positive for melting
