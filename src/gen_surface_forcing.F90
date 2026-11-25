@@ -2254,7 +2254,7 @@ SUBROUTINE sbc_do_recom(partit, mesh)
             call read_2ddata_on_grid_NetCDF(filename, 'DON', i, RiverDON2D, partit, mesh)
             ! write(*,*) mype, 'RiverDON2D', maxval(RiverDON2D(:)), minval(RiverDON2D(:))     
 
-            RiverDSi2D = RiverDIN2D * (16/15)
+            RiverDSi2D = RiverDIN2D * 16.0_WP / 15.0_WP
         end if
     else
         is_riverinput = 0.0d0
@@ -2313,7 +2313,7 @@ SUBROUTINE sbc_do_recom(partit, mesh)
             ! write(*,*) mype, 'ErosionTON2D', maxval(ErosionTON2D(:)), minval(ErosionTON2D(:))        
 
             ! No silicates in erosion, we convert from nitrogen with redfieldian ratio     
-            ErosionTSi2D=ErosionTON2D * 16/15
+            ErosionTSi2D=ErosionTON2D * 16.0_WP / 15.0_WP
         end if
     else
         is_erosioninput = 0.0d0
@@ -2451,7 +2451,6 @@ SUBROUTINE sbc_do_recom(partit, mesh)
 
        end if ! ciso_14 .and. ciso_organic_14
       end if ! ciso
-        deallocate(ncdata)
         status=nf_close(ncid)
 
 ! calculating fluxes back to ocean surface through rivers (mmol/m2/s)
@@ -2461,6 +2460,7 @@ SUBROUTINE sbc_do_recom(partit, mesh)
         end do
 
       end if ! add_loopback
+      deallocate(ncdata)
         end if ! mstep == 1
     else ! if not use_MEDUSA or sedflx_num = 0
 #if defined(__usetp)
