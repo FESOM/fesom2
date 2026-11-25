@@ -2007,10 +2007,11 @@ SUBROUTINE sbc_do_recom(partit, mesh)
         update_monthly_flag=( (day_in_month==num_day_in_month(fleapyear,month) .AND. timenew==86400._WP) .OR. mstep==1)
 
     ! ----------------------------------------------------------------
-    !  Atmospheric CO2 — update once per year (when mstep == 1)
+    !  Atmospheric CO2: read at the first step of the job and of 
+    !  each new year
     ! ----------------------------------------------------------------
 
-    if (mstep == 1) then
+    if (mstep == 1 .or. yearnew /= yearold) then
 
         ! --- Source: Atmospheric box model ---
         if (use_atbox) then  
@@ -2066,7 +2067,7 @@ SUBROUTINE sbc_do_recom(partit, mesh)
         if (partit%my_fesom_group==0) then
 #endif
 
-            if (partit%mype==0) write(*,*) 'Updating CO2 climatology for month       ', i,' from ', trim(filename)
+            if (partit%mype==0) write(*,*) 'Updating atmospheric CO2 for year ', yearnew,' from ', trim(filename)
 #if defined(__usetp)
         endif !(partit%my_fesom_group==0) then
 #endif
@@ -2099,9 +2100,21 @@ SUBROUTINE sbc_do_recom(partit, mesh)
             ! Read 12-month CO2 array
             allocate(ncdata(12))
             status=nf90_inq_varid(ncid, CO2vari, varid)
+            if (status /= nf90_noerr) then
+                write(error_unit,*) 'ERROR: cannot read ', trim(CO2vari), ' from ', &
+                                    trim(filename), ': ', trim(nf90_strerror(status))
+                call par_abort(partit%MPI_COMM_FESOM, partit%mype)
+                stop
+            end if
             CO2start = 1
             CO2count = 12
             status=nf90_get_var(ncid, varid, ncdata, start=(/CO2start/), count=(/CO2count/))
+            if (status /= nf90_noerr) then
+                write(error_unit,*) 'ERROR: cannot read ', trim(CO2vari), ' from ', &
+                                    trim(filename), ': ', trim(nf90_strerror(status))
+                call par_abort(partit%MPI_COMM_FESOM, partit%mype)
+                stop
+            end if
             AtmCO2(:)=ncdata(:)
             deallocate(ncdata)
 #if defined(__usetp)
@@ -2131,7 +2144,7 @@ SUBROUTINE sbc_do_recom(partit, mesh)
         endif !(partit%my_fesom_group==0) then
 #endif
     end if
-  end if ! mstep ==1
+  end if ! mstep == 1 .or. new year
 
     ! ----------------------------------------------------------------
     !  Iron (Fe) deposition
@@ -2165,9 +2178,9 @@ SUBROUTINE sbc_do_recom(partit, mesh)
     !  Nitrogen (N) deposition
     ! ----------------------------------------------------------------
     if (useAeolianN) then
-! todo: check below when useAeolianN is .true.
-        if (mstep==1) then ! The year has changed
-            i=month
+! NDep<year> is one annual field (nod2d, no time dimension): read record 1
+        if (mstep==1 .or. yearnew /= yearold) then ! first step of the job or of a new year
+            i=1
 !            if (mstep > 1) i=i+1 
 !            if (i > 12) i=1
 !            if (mype==0) write(*,*) 'Updating iron climatology for month ', i 
@@ -2176,7 +2189,7 @@ SUBROUTINE sbc_do_recom(partit, mesh)
         if (partit%my_fesom_group==0) then
 #endif
 
-            if (partit%mype==0) write(*,*) 'Updating nitrogen climatology for month   ', i,' from ', trim(filename)
+            if (partit%mype==0) write(*,*) 'Updating aeolian N deposition for year ', yearnew,' from ', trim(filename)
 #if defined(__usetp)
         endif
 #endif
@@ -2188,7 +2201,7 @@ SUBROUTINE sbc_do_recom(partit, mesh)
                 Nvari = 'NDep'//cyearnew
             endif
 
-            call read_2ddata_on_grid_NetCDF(filename, Nvari, i, GloNDust, partit, mesh)
+            call read_2ddata_on_grid_NetCDF(filename, Nvari, 1, GloNDust, partit, mesh)
         end if
     else
         GloNDust = 0.0_WP
