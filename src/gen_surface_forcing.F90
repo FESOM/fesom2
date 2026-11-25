@@ -1774,9 +1774,11 @@ CONTAINS
       integer      :: fld_idx, i
       logical      :: do_rotation_wind, do_rotation_stre, force_newcoeff, update_monthly_flag
       integer      :: yyyy, dd, mm, flag_flpyr=0
+      integer      :: runoff_year
       integer,   pointer   :: nc_Ntime, t_indx, t_indx_p1
       real(real64), pointer :: nc_time(:)
       character(len=MAX_PATH)               :: filename
+      character(4)                          :: crunoff_year
       logical                               :: file_exist=.false.
 !#if defined (__recom)
 !      character(15)             :: CO2vari, Nvari
@@ -1922,17 +1924,22 @@ CONTAINS
                 if (i > 12) i=1
                 if (partit%mype==0) write(*,*) 'Updating monthly climatology runoff for month ', i 
                 filename=trim(make_full_path(nm_runoff_file))
-                
+
                 ! file existence has here been already checked in sbc_ini
-                
+
             ! runnoff can be a monthly transient field over years
             else
                 !monthly data
                 i=month
+                runoff_year=yearnew
                 if (mstep > 1) i=i+1 
-                if (i > 12) i=1
-                if (partit%mype==0) write(*,*) 'Updating monthly runoff for month             ', i 
-                filename=trim(make_full_path(nm_runoff_file))//cyearnew//'.nc' 
+                if (i > 12) then
+                    i=1
+                    runoff_year=yearnew+1   ! January is read at the last step of December
+                end if
+                write(crunoff_year,'(i4)') runoff_year
+                if (partit%mype==0) write(*,*) 'Updating monthly runoff for month ', i, ' year ', runoff_year
+                filename=trim(make_full_path(nm_runoff_file))//crunoff_year//'.nc'
                 
                 ! check here if transient climatology file exists, quit model if 
                 ! not 
