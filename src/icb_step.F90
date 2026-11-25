@@ -381,6 +381,8 @@ use iceberg_params, only: scaling, elem_block, elem_area_glob !, smallestvol_icb
  
  logical                :: reject_tmp 
  logical                :: melted_local
+ logical                :: coast_hit
+ integer                :: loc_elem
  integer, intent(in)	:: ib, istep
  integer, intent(in)	:: elem_snap(ib_num)
  real,    intent(in)	:: area_snap(ib_num)
@@ -654,9 +656,21 @@ if((local_idx_of(iceberg_elem)>0) .and. (local_idx_of(iceberg_elem)<=partit%myDi
     iceberg_elem=partit%myList_elem2D(iceberg_elem)  	!global
   
     ! coast handling only if the berg hit (or may have crossed) the coast;
-    ! a berg that only changed rank is found by the global search in step2
-    if(left_mype == ELEM_REJECTED .or. (left_mype == ELEM_NOT_FOUND .and. &
-       coastal_nodes(mesh, partit, local_idx_of(iceberg_elem)) > 0)) then
+    ! a berg that only changed rank is found by the global search in step2.
+    ! Separate ifs: Fortran does not short-circuit, and local_idx_of is 0
+    ! for halo elements.
+    coast_hit = (left_mype == ELEM_REJECTED)
+    if (left_mype == ELEM_NOT_FOUND) then
+      loc_elem = local_idx_of(iceberg_elem)
+      ! coastal or shelf node in the element (inline: iceberg_params::coastal_nodes
+      ! compiles to an abort with this compiler)
+      if (loc_elem > 0) then
+        coast_hit = any(mesh%bc_index_nod2D(mesh%elem2D_nodes(:,loc_elem)) == 0.0)
+        if (use_cavity) coast_hit = coast_hit .or. &
+          any(mesh%cavity_depth(mesh%elem2D_nodes(:,loc_elem)) /= 0.0)
+      end if
+    end if
+    if(coast_hit) then
       lon_rad = old_lon
       lat_rad = old_lat
       t4=MPI_Wtime()

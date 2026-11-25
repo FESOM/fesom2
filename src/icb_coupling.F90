@@ -111,7 +111,8 @@ type(t_partit), intent(inout), target :: partit
         do i=1, 3
             iceberg_node=ib_nods_in_ib_elem(i)
             ! freshwater only on open-ocean nodes (cavity nodes have no surface area)
-            if (iceberg_node <= 0 .or. ulevels_nod2d(iceberg_node) /= 1) cycle
+            if (iceberg_node <= 0) cycle   ! halo node; no short-circuit in Fortran
+            if (ulevels_nod2d(iceberg_node) /= 1) cycle
 
             if (iceberg_node>0) then
                 ! Guard: tot_area at level 1 is zero when all element nodes are cavity nodes
