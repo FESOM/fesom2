@@ -470,7 +470,12 @@ subroutine therm_ice(ithermp, h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rss
                 subli=subli+subli_i
              end if
         end do
-        if(.not. new_iclasses) then
+        if(new_iclasses) then
+            ! the tabulated weights hpdf sum to ~1.032, not 1: divide by their sum so that
+            ! growth and sublimation are a weighted mean over the classes (otherwise ~3 % too large)
+            rhice=rhice/sum(hpdf)
+            subli=subli/sum(hpdf)
+        else
             rhice=rhice/real(iclasses,WP)      	! Add to average heat flux
             subli=subli/real(iclasses,WP)
         end if
