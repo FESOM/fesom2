@@ -36,30 +36,9 @@ cp -n ../config/namelist.icepack .
 jobid=$(echo $SLURM_JOB_ID | cut -d"." -f1)
 fname="fesom2_${SLURM_JOB_NAME}_${jobid}.out"
 
-# --- frozen FESOM build: bin/fesom.x + lib64/libfesom.so, so $ORIGIN/../lib64 stays inside it
-RUN_DIR=${SLURM_SUBMIT_DIR:-$PWD}
-BUILD_DIR=$(readlink -f "$RUN_DIR/..")      # the fesom2 tree this run dir sits in (as on line 26); set by hand if not
-FROZEN=$RUN_DIR/fesom_frozen
-freeze() {
-  [ -x "$FROZEN/bin/fesom.x" ] && return 0
-  mkdir -p "$FROZEN/bin" "$FROZEN/lib64"
-  cp -p  "$BUILD_DIR/bin/fesom.x"       "$FROZEN/bin/"     || return 1
-  cp -pL "$BUILD_DIR/lib64/libfesom.so" "$FROZEN/lib64/"   || return 1
-  { date; git -C "$BUILD_DIR" describe --always --dirty
-          git -C "$BUILD_DIR/src/recom" describe --tags --always --dirty; } > "$FROZEN/VERSION"
-  echo "frozen into $FROZEN:"; cat "$FROZEN/VERSION"
-}
-if [ "$1" = freeze ]; then freeze; exit $?; fi
-freeze || { echo "ERROR: freeze failed"; exit 1; }
-if ! ldd "$FROZEN/bin/fesom.x" | grep 'libfesom.so' | grep -q "$FROZEN"; then
-  echo "ERROR: fesom.x does not load the frozen libfesom.so:"; ldd "$FROZEN/bin/fesom.x" | grep libfesom; exit 1
-fi
-cat "$FROZEN/VERSION"
-
 #___PUT JOB IN QUEUE____________________________________________________________
 date
-#srun --mpi=pmi2 ./fesom.x >> ${fname}
-srun --mpi=pmi2 "$FROZEN/bin/fesom.x" >> ${fname}
+srun --mpi=pmi2 ./fesom.x >> ${fname}
 date
 
 #qstat -f $PBS_JOBID
