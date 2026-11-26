@@ -1627,14 +1627,17 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
     CASE (1023:1035)
         bc_surface=0.0_WP  ! OG added bc for recom fields
 #endif
+!---wiso-code: with lwiso, IDs 101-103 are H218O, HDO, H216O (as registered in
+!   oce_setup_step and read/written in io_restart)
     CASE (101) ! apply boundary conditions to tracer ID=101
-        bc_surface= dt*(prec_rain(n))! - real_salt_flux(n)*is_nonlinfs)
-!---wiso-code
-    CASE (102) ! apply boundary conditions to tracer ID=101 (H218O)
-        bc_surface = dt*wiso_flux_oce(n,1)
-    CASE (103)  ! apply boundary conditions to tracer ID=102 (HDO)
+        if (lwiso) then
+           bc_surface = dt*wiso_flux_oce(n,1)
+        else
+           bc_surface= dt*(prec_rain(n))! - real_salt_flux(n)*is_nonlinfs)
+        end if
+    CASE (102) ! apply boundary conditions to tracer ID=102 (HDO)
         bc_surface = dt*wiso_flux_oce(n,2)
-    CASE (104)  ! apply boundary conditions to tracer ID=103 (H216O)
+    CASE (103)  ! apply boundary conditions to tracer ID=103 (H216O)
         bc_surface = dt*wiso_flux_oce(n,3)
 !---wiso-code-end
 !---age-code
