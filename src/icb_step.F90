@@ -688,6 +688,15 @@ if((local_idx_of(iceberg_elem)>0) .and. (local_idx_of(iceberg_elem)<=partit%myDi
 
       t8=MPI_Wtime()
       iceberg_elem=partit%myList_elem2D(iceberg_elem)  	!global
+      ! still blocked: stay in the old element but keep the along-coast
+      ! velocity (step2 would reset the berg with zero velocity every step)
+      if (left_mype == ELEM_REJECTED) then
+        lon_rad   = old_lon
+        lat_rad   = old_lat
+        lon_deg   = lon_rad/rad
+        lat_deg   = lat_rad/rad
+        left_mype = ELEM_FOUND
+      end if
     end if
   end if		   
   !================END OF TRAJECTORY CALCULATION=====================
@@ -1286,6 +1295,7 @@ end subroutine parallel2coast
 
 
 subroutine projection(mesh, partit, velocity, n1, n2)
+use o_param, only: pi
 implicit none
  
  real, dimension(2), intent(inout) :: velocity
@@ -1301,8 +1311,10 @@ type(t_partit), intent(inout), target :: partit
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
- ! direction: node1 - node2 (pointing from 2 to 1)
- direction(1) = coord_nod2D(1, n1) - coord_nod2D(1, n2)
+ ! direction: node1 - node2 (pointing from 2 to 1), in metres east/north like
+ ! the velocity: wrap the longitude difference and scale it by cos(lat)
+ direction(1) = modulo(coord_nod2D(1, n1) - coord_nod2D(1, n2) + pi, 2.0*pi) - pi
+ direction(1) = direction(1) * cos(0.5*(coord_nod2D(2, n1) + coord_nod2D(2, n2)))
  direction(2) = coord_nod2D(2, n1) - coord_nod2D(2, n2)
  length = sqrt( direction(1)**2 + direction(2)**2 )
  direction(1) = direction(1)/length
