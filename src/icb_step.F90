@@ -499,10 +499,10 @@ type(t_dyn)   , intent(inout), target :: dynamics
    
    
    if (use_cavity) then
-      reject_tmp = all( (mesh%cavity_depth(mesh%elem2D_nodes(:,iceberg_elem))/=0.0) .OR. (mesh%bc_index_nod2D(mesh%elem2D_nodes(:,iceberg_elem))==0.0) )
+      reject_tmp = all( (mesh%ulevels_nod2D(mesh%elem2D_nodes(:,iceberg_elem)) > 1) .OR. (mesh%bc_index_nod2D(mesh%elem2D_nodes(:,iceberg_elem))==0.0) )
       if(reject_tmp) then
 !       write(*,*) " * set IB elem ",iceberg_elem,"to zero for IB=",ib
-!       write(*,*) " cavity: ",all((mesh%cavity_depth(mesh%elem2D_nodes(:,iceberg_elem))/=0.0))
+!       write(*,*) " cavity: ",all((mesh%ulevels_nod2D(mesh%elem2D_nodes(:,iceberg_elem)) > 1))
 !       write(*,*) " boundary: ", all(mesh%bc_index_nod2D(mesh%elem2D_nodes(:,iceberg_elem))==1)
        iceberg_elem=0 !reject element
        i_have_element=.false.
@@ -667,7 +667,7 @@ if((local_idx_of(iceberg_elem)>0) .and. (local_idx_of(iceberg_elem)<=partit%myDi
       if (loc_elem > 0) then
         coast_hit = any(mesh%bc_index_nod2D(mesh%elem2D_nodes(:,loc_elem)) == 0.0)
         if (use_cavity) coast_hit = coast_hit .or. &
-          any(mesh%cavity_depth(mesh%elem2D_nodes(:,loc_elem)) /= 0.0)
+          any(mesh%ulevels_nod2D(mesh%elem2D_nodes(:,loc_elem)) > 1)
       end if
     end if
     if(coast_hit) then
@@ -1204,7 +1204,7 @@ type(t_partit), intent(inout), target :: partit
   
   if( use_cavity ) then
     !fld_tmp = coastal_nodes(mesh, partit, elem)
-    fld_tmp =  count( (mesh%cavity_depth(mesh%elem2D_nodes(:,elem))/=0.0) .OR. (mesh%bc_index_nod2D(mesh%elem2D_nodes(:,elem))==0.0) )
+    fld_tmp =  count( (mesh%ulevels_nod2D(mesh%elem2D_nodes(:,elem)) > 1) .OR. (mesh%bc_index_nod2D(mesh%elem2D_nodes(:,elem))==0.0) )
   else
     fld_tmp =  count( (mesh%bc_index_nod2D(mesh%elem2D_nodes(:,elem))==0.0) )
   end if
@@ -1221,7 +1221,7 @@ type(t_partit), intent(inout), target :: partit
     do m = 1, 3
       node = mesh%elem2D_nodes(m,elem)
       if( use_cavity ) then
-        if( mesh%bc_index_nod2D(node)==0.0 .OR.  (mesh%cavity_depth(node)/=0.0) ) then
+        if( mesh%bc_index_nod2D(node)==0.0 .OR.  (mesh%ulevels_nod2D(node) > 1) ) then
           n(1) = node
         else
           n(i) = node
@@ -1251,7 +1251,7 @@ type(t_partit), intent(inout), target :: partit
       node = mesh%elem2D_nodes(m,elem) 
       if( use_cavity ) then
         !if( (mesh%bc_index_nod2D(node)==1) .OR. (cavity_flag_nod2d(node)==1)) then
-        if( mesh%bc_index_nod2D(node)==0.0 .OR.  (mesh%cavity_depth(node)/=0.0) ) then
+        if( mesh%bc_index_nod2D(node)==0.0 .OR.  (mesh%ulevels_nod2D(node) > 1) ) then
          n(i) = node
          i = i+1
         end if

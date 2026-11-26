@@ -141,7 +141,7 @@ type(t_partit), intent(in), target :: partit
 if (use_cavity) then
 ! kh 09.08.21 change index_nod2d -> bc_index_nod2d?
  if (.not. use_cavityonelem) then
-   reject_elem = all( (mesh%cavity_depth(mesh%elem2D_nodes(:,elem))/=0.0) .OR. (mesh%bc_index_nod2D(mesh%elem2D_nodes(:,elem))==0.0) )
+   reject_elem = all( (mesh%ulevels_nod2D(mesh%elem2D_nodes(:,elem)) > 1) .OR. (mesh%bc_index_nod2D(mesh%elem2D_nodes(:,elem))==0.0) )
  !else
  end if
 else
@@ -164,7 +164,7 @@ type(t_partit), intent(inout), target :: partit
 if (use_cavity) then
 ! kh 09.08.21 change index_nod2d -> bc_index_nod2d?
  if (.not. use_cavityonelem) then
-   coastal_nodes = count( (mesh%cavity_depth(mesh%elem2D_nodes(:,elem))/=0.0) .OR. (mesh%bc_index_nod2D(mesh%elem2D_nodes(:,elem))==0.0) )
+   coastal_nodes = count( (mesh%ulevels_nod2D(mesh%elem2D_nodes(:,elem)) > 1) .OR. (mesh%bc_index_nod2D(mesh%elem2D_nodes(:,elem))==0.0) )
  !else
  end if
 else 

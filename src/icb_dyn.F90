@@ -24,7 +24,7 @@ integer function first_wet_level(mesh, n)
  type(t_mesh), intent(in) :: mesh
  integer,      intent(in) :: n
  first_wet_level = 1
- if (use_cavity .AND. mesh%cavity_depth(n) /= 0.0) first_wet_level = mesh%ulevels_nod2D(n)
+ if (use_cavity .AND. mesh%ulevels_nod2D(n) > 1) first_wet_level = mesh%ulevels_nod2D(n)
 end function first_wet_level
 
 !==============================================================================
@@ -729,12 +729,12 @@ type(t_partit), intent(inout), target :: partit
     ! Skip levels inside the ice shelf for cavity nodes.  Tclim_ib/UV_ib at
     ! k < ulevels_nod2d are never updated by the tracer solver; they hold stale
     ! initial values (frozen at model start) that drive extreme spurious melt.
-    if (use_cavity .AND. mesh%cavity_depth(n2) /= 0.0 &
+    if (use_cavity .AND. mesh%ulevels_nod2D(n2) > 1 &
         .AND. k < ulevels_nod2d(n2)) cycle
 
     if( k==1 ) then
         lev_up = 0.0
-    else if (use_cavity .AND. mesh%cavity_depth(n2) /= 0.0 &
+    else if (use_cavity .AND. mesh%ulevels_nod2D(n2) > 1 &
              .AND. k == ulevels_nod2d(n2)) then
         ! First valid ocean level for this cavity node: the top boundary is the
         ! ice shelf base, i.e. zbar_3d_n(ulevels_nod2d, n2) = zbar_n_srf(n2).
@@ -756,7 +756,7 @@ type(t_partit), intent(inout), target :: partit
     dz = abs( lev_low - lev_up )
 
     ! Cavity check: use zbar_3d_n for geometric comparison
-    if (use_cavity .AND. mesh%cavity_depth(elem2D_nodes(m,iceberg_elem)) /= 0.0 &
+    if (use_cavity .AND. mesh%ulevels_nod2D(elem2D_nodes(m,iceberg_elem)) > 1 &
         .AND. k == k_top .AND. abs(depth_ib) < abs(mesh%zbar_3d_n(k, n2))) then
       ! Iceberg draft is above the ocean surface at this cavity node.
       ! Clamp to shallowest valid ocean level (ulevels_nod2d) to avoid
@@ -948,12 +948,12 @@ type(t_partit), intent(inout), target :: partit
     ! Skip levels inside the ice shelf for cavity nodes.  Tclim_ib/UV_ib at
     ! k < ulevels_nod2d are never updated by the tracer solver; they hold stale
     ! initial values (frozen at model start) that drive extreme spurious melt.
-    if (use_cavity .AND. mesh%cavity_depth(n2) /= 0.0 &
+    if (use_cavity .AND. mesh%ulevels_nod2D(n2) > 1 &
         .AND. k < ulevels_nod2d(n2)) cycle
 
     if( k==1 ) then
         lev_up = 0.0
-    else if (use_cavity .AND. mesh%cavity_depth(n2) /= 0.0 &
+    else if (use_cavity .AND. mesh%ulevels_nod2D(n2) > 1 &
              .AND. k == ulevels_nod2d(n2)) then
         ! First valid ocean level for this cavity node: the top boundary is the
         ! ice shelf base, i.e. zbar_3d_n(ulevels_nod2d, n2) = zbar_n_srf(n2).
@@ -975,7 +975,7 @@ type(t_partit), intent(inout), target :: partit
     dz = abs( lev_low - lev_up )
 
     ! Cavity check: use zbar_3d_n for geometric comparison
-    if (use_cavity .AND. mesh%cavity_depth(elem2D_nodes(m,iceberg_elem)) /= 0.0 &
+    if (use_cavity .AND. mesh%ulevels_nod2D(elem2D_nodes(m,iceberg_elem)) > 1 &
         .AND. k == k_top .AND. abs(depth_ib) < abs(mesh%zbar_3d_n(k, n2))) then
       ! Iceberg draft is above the ocean surface at this cavity node.
       ! Clamp to shallowest valid ocean level (ulevels_nod2d) to avoid
@@ -1164,13 +1164,13 @@ type(t_partit), intent(inout), target :: partit
     !updated by the tracer solver and the first wet level's upper boundary
     !is the shelf base, not z=0. iceberg_avvelo was overlooked when that
     !fix was made, so iceberg placement integrated through shelf layers.
-    if (use_cavity .AND. mesh%cavity_depth(n2) /= 0.0 &
+    if (use_cavity .AND. mesh%ulevels_nod2D(n2) > 1 &
         .AND. k < ulevels_nod2d(n2)) cycle
 
 ! kh 18.03.21 use zbar_3d_n_ib buffered values here
     if( k==1 ) then
         lev_up = 0.0
-    else if (use_cavity .AND. mesh%cavity_depth(n2) /= 0.0 &
+    else if (use_cavity .AND. mesh%ulevels_nod2D(n2) > 1 &
              .AND. k == ulevels_nod2d(n2)) then
         lev_up = mesh%zbar_3d_n(k, n2)
     else
