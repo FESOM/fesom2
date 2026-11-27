@@ -5,7 +5,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 # Include our testing utilities
-include(${CMAKE_SOURCE_DIR}/cmake/FesomTesting.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/FesomTesting.cmake)
 
 # Set up MPI for testing
 setup_mpi_testing()
@@ -70,6 +70,11 @@ endif()
 # Add unit tests (for future expansion)
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/unit/CMakeLists.txt")
     add_subdirectory(unit)
+endif()
+
+# Add ecbundle tests if ecbundle is available
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/ecbundle/CMakeLists.txt")
+    add_subdirectory(ecbundle)
 endif()
 
 # Create a convenience target to run all tests

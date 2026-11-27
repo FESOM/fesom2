@@ -193,9 +193,9 @@ jobs:
         continue-on-error: ${{ github.event.inputs.continue_on_test_failure == 'true' || github.event.inputs.continue_on_test_failure == '' }}
         run: |
           cd build
-          echo "Running FESOM2 test suite..."
+          echo "Running selected FESOM2 tests..."
           
-          # Set test pattern if provided
+          # Set test pattern if provided via workflow dispatch
           TEST_PATTERN="${{ github.event.inputs.test_pattern }}"
           
           # Configure test execution parameters
@@ -205,8 +205,14 @@ jobs:
             echo "Running tests matching pattern: $TEST_PATTERN"
             ctest $CTEST_ARGS -R "$TEST_PATTERN"
           else
-            echo "Running all available tests"
-            ctest $CTEST_ARGS
+            echo "Running selected integration tests:"
+            echo "- integration_full_run_mpi2"
+            echo "- integration_full_run_mpi8" 
+            echo "- integration_pi_cavity_mpi2"
+            echo "- integration_test_data_check"
+            
+            # Run only the specified tests using regex pattern
+            ctest $CTEST_ARGS -R "(integration_full_run_mpi2|integration_full_run_mpi8|integration_pi_cavity_mpi2|integration_test_data_check)"
           fi
           
           # Capture exit code

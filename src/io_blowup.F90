@@ -9,8 +9,8 @@ MODULE io_BLOWUP
     USE MOD_DYN
     USE MOD_ICE
     use o_arrays
+    use netcdf
     implicit none
-#include "netcdf.inc"
 	!___________________________________________________________________________
 	type nc_dims
 		integer        :: size
@@ -225,27 +225,27 @@ MODULE io_BLOWUP
 		id%error_status=0
 		! create an ocean output file
 		if(partit%mype==0) write(*,*) 'initializing blowup file ', trim(id%filename)
-		id%error_status(c) = nf_create(id%filename, IOR(NF_NOCLOBBER,IOR(NF_NETCDF4,NF_CLASSIC_MODEL)), id%ncid); c=c+1
+		id%error_status(c) = nf90_create(id%filename, IOR(NF90_NOCLOBBER,IOR(NF90_NETCDF4,NF90_CLASSIC_MODEL)), id%ncid); c=c+1
 		
 		do j=1, id%ndim
 		!___Create mesh related dimentions__________________________________________
-			id%error_status(c) = nf_def_dim(id%ncid, id%dim(j)%name, id%dim(j)%size, id%dim(j)%code ); c=c+1
+			id%error_status(c) = nf90_def_dim(id%ncid, id%dim(j)%name, id%dim(j)%size, id%dim(j)%code ); c=c+1
 		end do
 		
 		!___Create time related dimentions__________________________________________
-		id%error_status(c) = nf_def_dim(id%ncid, 'time', NF_UNLIMITED, id%rec);         c=c+1
+		id%error_status(c) = nf90_def_dim(id%ncid, 'time', NF90_UNLIMITED, id%rec);         c=c+1
 		!___Define the time and iteration variables_________________________________
-		id%error_status(c) = nf_def_var(id%ncid, 'time', NF_DOUBLE, 1, id%rec, id%tID); c=c+1
-		id%error_status(c) = nf_def_var(id%ncid, 'iter', NF_INT,    1, id%rec, id%iID); c=c+1
+		id%error_status(c) = nf90_def_var(id%ncid, 'time', NF90_DOUBLE, dimids=(/id%rec/), varid=id%tID); c=c+1
+		id%error_status(c) = nf90_def_var(id%ncid, 'iter', NF90_INT, dimids=(/id%rec/), varid=id%iID); c=c+1
 		
 		
 		att_text='time'
-		id%error_status(c) = nf_put_att_text(id%ncid, id%tID, 'long_name', len_trim(att_text), trim(att_text)); c=c+1
+		id%error_status(c) = nf90_put_att(id%ncid, id%tID, 'long_name', trim(att_text)); c=c+1
 		write(att_text, '(a14,I4.4,a1,I2.2,a1,I2.2,a6)') 'seconds since ', yearold, '-', 1, '-', 1, ' 0:0:0'
-		id%error_status(c) = nf_put_att_text(id%ncid, id%tID, 'units', len_trim(att_text), trim(att_text)); c=c+1
+		id%error_status(c) = nf90_put_att(id%ncid, id%tID, 'units', trim(att_text)); c=c+1
 		
 		att_text='iteration_count'
-		id%error_status(c) = nf_put_att_text(id%ncid, id%iID, 'long_name', len_trim(att_text), trim(att_text)); c=c+1
+		id%error_status(c) = nf90_put_att(id%ncid, id%iID, 'long_name', trim(att_text)); c=c+1
 		
 		do j=1, id%nvar
 		!___associate physical dimension with the netcdf IDs________________________
@@ -258,13 +258,12 @@ MODULE io_BLOWUP
 				end do
 		!________write(*,*) kdim, ' -> ', dimid(k)__________________________________
 			end do
-			id%error_status(c) = nf_def_var(id%ncid, trim(id%var(j)%name), NF_DOUBLE, id%var(j)%ndim+1, &
-							(/dimid(1:n), id%rec/), id%var(j)%code); c=c+1
-			id%error_status(c)=nf_put_att_text(id%ncid, id%var(j)%code, 'description', len_trim(id%var(j)%longname), id%var(j)%longname); c=c+1
-			id%error_status(c)=nf_put_att_text(id%ncid, id%var(j)%code, 'units',       len_trim(id%var(j)%units),    id%var(j)%units);    c=c+1
+			id%error_status(c) = nf90_def_var(id%ncid, name=trim(id%var(j)%name), xtype=NF90_DOUBLE, dimids=(/dimid(1:n), id%rec/), varid=id%var(j)%code); c=c+1
+			id%error_status(c)=nf90_put_att(id%ncid, id%var(j)%code, name='description', values=trim(id%var(j)%longname)); c=c+1
+			id%error_status(c)=nf90_put_att(id%ncid, id%var(j)%code, name='units', values=trim(id%var(j)%units));    c=c+1
 		end do
 		
-		id%error_status(c)=nf_close(id%ncid); c=c+1
+		id%error_status(c)=nf90_close(id%ncid); c=c+1
 		id%error_count=c-1
 	end subroutine create_new_file
 !
@@ -391,9 +390,9 @@ MODULE io_BLOWUP
 			c=1
 			!id%rec_count=id%rec_count+1
 			write(*,*) 'writing blowup record ', id%rec_count
-			id%error_status(c)=nf_open(id%filename, nf_write, id%ncid); c=c+1
-			id%error_status(c)=nf_put_vara_double(id%ncid, id%tID, id%rec_count, 1, ctime, 1); c=c+1
-			id%error_status(c)=nf_put_vara_int(id%ncid,    id%iID, id%rec_count, 1, globalstep+istep, 1);   c=c+1
+			id%error_status(c)=nf90_open(id%filename, NF90_WRITE, id%ncid); c=c+1
+			id%error_status(c)=nf90_put_var(id%ncid, id%tID, ctime, start=(/id%rec_count/)); c=c+1
+			id%error_status(c)=nf90_put_var(id%ncid, id%iID, globalstep+istep, start=(/id%rec_count/));   c=c+1
 		end if
 		
 		do i=1, id%nvar
@@ -405,7 +404,7 @@ MODULE io_BLOWUP
 				if (size1==nod2D)  call gather_nod (id%var(i)%pt1, aux1, partit)
 				if (size1==elem2D) call gather_elem(id%var(i)%pt1, aux1, partit)
 				if (mype==0) then
-				id%error_status(c)=nf_put_vara_double(id%ncid, id%var(i)%code, (/1, id%rec_count/), (/size1, 1/), aux1, 1); c=c+1
+				id%error_status(c)=nf90_put_var(id%ncid, id%var(i)%code, aux1, start=(/1, id%rec_count/), count=(/size1, 1/)); c=c+1
 				end if
 				if (mype==0) deallocate(aux1)
 		!_______writing 3D fields________________________________________________
@@ -416,7 +415,7 @@ MODULE io_BLOWUP
 				if (size1==nod2D  .or. size2==nod2D)  call gather_nod (id%var(i)%pt2, aux2, partit)
 				if (size1==elem2D .or. size2==elem2D) call gather_elem(id%var(i)%pt2, aux2, partit)
 				if (mype==0) then
-				id%error_status(c)=nf_put_vara_double(id%ncid, id%var(i)%code, (/1, 1, id%rec_count/), (/size1, size2, 1/), aux2, 2); c=c+1
+				id%error_status(c)=nf90_put_var(id%ncid, id%var(i)%code, aux2, start=(/1, 1, id%rec_count/), count=(/size1, size2, 1/)); c=c+1
 				end if
 				if (mype==0) deallocate(aux2)
 			else
@@ -428,7 +427,7 @@ MODULE io_BLOWUP
 		
 		if (mype==0) id%error_count=c-1
 		call was_error(id, partit)
-		if (mype==0) id%error_status(1)=nf_close(id%ncid);
+		if (mype==0) id%error_status(1)=nf90_close(id%ncid);
 		id%error_count=1
 		call was_error(id, partit)
 	end subroutine write_blowup
@@ -449,28 +448,28 @@ MODULE io_BLOWUP
 		! open existing netcdf file
 		write(*,*) 'associating blowup file ', trim(id%filename)
 		
-		id%error_status(c) = nf_open(id%filename, nf_nowrite, id%ncid)
+		id%error_status(c) = nf90_open(id%filename, NF90_NOWRITE, id%ncid)
 		!if the file does not exist it will be created!
-		if (id%error_status(c) .ne. nf_noerr) then
+		if (id%error_status(c) .ne. NF90_NOERR) then
 			call create_new_file(id, partit) ! error status counter will be reset
 			c=id%error_count+1
-			id%error_status(c) = nf_open(id%filename, nf_nowrite, id%ncid); c=c+1
+			id%error_status(c) = nf90_open(id%filename, NF90_NOWRITE, id%ncid); c=c+1
 		end if
 		
 		do j=1, id%ndim
 		!___Associate mesh related dimentions_______________________________________
-			id%error_status(c) = nf_inq_dimid(id%ncid, id%dim(j)%name, id%dim(j)%code); c=c+1
+			id%error_status(c) = nf90_inq_dimid(id%ncid, id%dim(j)%name, id%dim(j)%code); c=c+1
 		end do
 		!___Associate time related dimentions_______________________________________
-		id%error_status(c) = nf_inq_dimid (id%ncid, 'time', id%rec);       c=c+1
-		id%error_status(c) = nf_inq_dimlen(id%ncid, id%rec, id%rec_count); c=c+1
+		id%error_status(c) = nf90_inq_dimid (id%ncid, 'time', id%rec);       c=c+1
+		id%error_status(c) = nf90_inquire_dimension(id%ncid, id%rec, len=id%rec_count); c=c+1
 		!___Associate the time and iteration variables______________________________
-		id%error_status(c) = nf_inq_varid(id%ncid, 'time', id%tID); c=c+1
-		id%error_status(c) = nf_inq_varid(id%ncid, 'iter', id%iID); c=c+1
+		id%error_status(c) = nf90_inq_varid(id%ncid, 'time', id%tID); c=c+1
+		id%error_status(c) = nf90_inq_varid(id%ncid, 'iter', id%iID); c=c+1
 		!___if the time rtime at the rec_count does not equal ctime we look for the closest record with the 
 		! timestamp less than ctime
 		do k=id%rec_count, 1, -1
-			id%error_status(c)=nf_get_vara_double(id%ncid, id%tID, k, 1, rtime, 1);
+			id%error_status(c)=nf90_get_var(id%ncid, id%tID, rtime, start=(/k/));
 			if (ctime > rtime) then
 				id%rec_count=k+1
 				exit ! a proper rec_count detected, ready for writing restart, exit the loop
@@ -485,13 +484,13 @@ MODULE io_BLOWUP
 				id%error_status(c)=-310;
 			end if
 		end do
-		c=c+1 ! check will be made only for the last nf_get_vara_double
+		c=c+1 ! check will be made only for the last nf90_get_var
 		id%rec_count=max(id%rec_count, 1)
 		!___Associate physical variables____________________________________________
 		do j=1, id%nvar
-			id%error_status(c) = nf_inq_varid(id%ncid, id%var(j)%name, id%var(j)%code); c=c+1
+			id%error_status(c) = nf90_inq_varid(id%ncid, id%var(j)%name, id%var(j)%code); c=c+1
 		end do
-		id%error_status(c)=nf_close(id%ncid); c=c+1
+		id%error_status(c)=nf90_close(id%ncid); c=c+1
 		id%error_count=c-1
 		write(*,*) 'current restart counter = ',       id%rec_count
 	end subroutine assoc_ids
@@ -509,7 +508,7 @@ MODULE io_BLOWUP
 		
 		do k=1, id%error_count
 			status=id%error_status(k)
-			if (status .ne. nf_noerr) then
+			if (status .ne. NF90_NOERR) then
 				if (partit%mype==0) write(*,*) 'error counter=', k
 				if (partit%mype==0) call handle_err(status, partit)
 				call par_ex(partit%MPI_COMM_FESOM, partit%mype)

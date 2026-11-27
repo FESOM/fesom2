@@ -297,9 +297,9 @@ CONTAINS
             CALL ctl_stop('send_fesom_domains: ngrid, md%set_string(representation) failed: ', multio_error_string(cerr))
         END IF
 
-        cerr = md%set("globalSize", mesh%nod2D)
+        cerr = md%set("misc-globalSize", mesh%nod2D)
         IF (cerr /= MULTIO_SUCCESS) THEN
-            CALL ctl_stop('send_fesom_domains: ngrid, md%set_int(globalSize) failed: ', multio_error_string(cerr))
+            CALL ctl_stop('send_fesom_domains: ngrid, md%set_int(misc-globalSize) failed: ', multio_error_string(cerr))
         END IF
 
         cerr = md%set("toAllServers", .TRUE._1)
@@ -339,9 +339,9 @@ CONTAINS
             CALL ctl_stop('send_fesom_domains: egrid, md%set_string(representation) failed: ', multio_error_string(cerr))
         END IF
 
-        cerr = md%set("globalSize", mesh%elem2D)
+        cerr = md%set("misc-globalSize", mesh%elem2D)
         IF (cerr /= MULTIO_SUCCESS) THEN
-            CALL ctl_stop('send_fesom_domains: egrid, md%set_int(globalSize) failed: ', multio_error_string(cerr))
+            CALL ctl_stop('send_fesom_domains: egrid, md%set_int(misc-globalSize) failed: ', multio_error_string(cerr))
         END IF
 
         cerr = md%set("toAllServers", .TRUE._1)
@@ -381,9 +381,9 @@ CONTAINS
             CALL ctl_stop('send_fesom_data: md%set_string(category) failed: ', multio_error_string(cerr))
         END IF
 
-        cerr = md%set("globalSize", data%globalSize)
+        cerr = md%set("misc-globalSize", data%globalSize)
         IF (cerr /= MULTIO_SUCCESS) THEN
-            CALL ctl_stop('send_fesom_data: md%set_int(globalSize) failed: ', multio_error_string(cerr))
+            CALL ctl_stop('send_fesom_data: md%set_int(misc-globalSize) failed: ', multio_error_string(cerr))
         END IF
 
         cerr = md%set("level", data%level)

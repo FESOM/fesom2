@@ -18,9 +18,9 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
   USE MOD_MESH
   USE MOD_PARTIT
   USE MOD_PARSUP
+  use netcdf
   implicit none
 
-#include "netcdf.inc" 
   type(t_mesh),   intent(in),    target :: mesh
   type(t_partit), intent(inout), target :: partit
   integer                    :: i, j, ii, jj, k, n, num, flag, cnt
@@ -46,11 +46,11 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
 
   if (mype==0) then
      ! open file
-     status=nf_open(file, nf_nowrite, ncid)
+     status=nf90_open(file, nf90_nowrite, ncid)
   end if
 
   call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-  if (status.ne.nf_noerr)then
+  if (status.ne.nf90_noerr)then
      print*,'ERROR: CANNOT READ 2D netCDF FILE CORRECTLY !!!!!'
      print*,'Error in opening netcdf file '//file
      call par_ex(partit%MPI_COMM_FESOM, partit%mype)
@@ -59,11 +59,11 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
 
   if (mype==0) then
      ! lat
-     status=nf_inq_dimid(ncid, 'lat', latid)
-     status=nf_inq_dimlen(ncid, latid, latlen)
+     status=nf90_inq_dimid(ncid, 'lat', latid)
+     status=nf90_inquire_dimension(ncid, latid, len=latlen)
      ! lon
-     status=nf_inq_dimid(ncid, 'lon', lonid)
-     status=nf_inq_dimlen(ncid, lonid, lonlen)
+     status=nf90_inq_dimid(ncid, 'lon', lonid)
+     status=nf90_inquire_dimension(ncid, lonid, len=lonlen)
   end if
   call MPI_BCast(latlen, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
   call MPI_BCast(lonlen, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
@@ -71,16 +71,16 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
   ! lat
   allocate(lat(latlen))
   if (mype==0) then
-     status=nf_inq_varid(ncid, 'lat', varid)
-     status=nf_get_vara_double(ncid,varid,1,latlen,lat)
+     status=nf90_inq_varid(ncid, 'lat', varid)
+     status=nf90_get_var(ncid, varid, lat, start=(/1/), count=(/latlen/))
   end if
   call MPI_BCast(lat, latlen, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)  
 
   ! lon
   allocate(lon(lonlen))
   if (mype==0) then
-     status=nf_inq_varid(ncid, 'lon', varid)
-     status=nf_get_vara_double(ncid,varid,1,lonlen,lon)
+     status=nf90_inq_varid(ncid, 'lon', varid)
+     status=nf90_get_var(ncid, varid, lon, start=(/1/), count=(/lonlen/))
   end if
   call MPI_BCast(lon, lonlen, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)  
 
@@ -96,15 +96,15 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
   
   if (mype==0) then
     ! data
-     status=nf_inq_varid(ncid, vari, varid)
+     status=nf90_inq_varid(ncid, vari, varid)
      istart = (/1,1,itime/)
      icount= (/lonlen,latlen,1/)
-     status=nf_get_vara_double(ncid,varid,istart,icount,ncdata)
+     status=nf90_get_var(ncid, varid, ncdata, start=istart, count=icount)
 
     ! missing value
-     status= nf_get_att_double(ncid,varid,'missing_value',miss)
+     status= nf90_get_att(ncid, varid, 'missing_value', miss)
     ! close file
-    status=nf_close(ncid)
+    status=nf90_close(ncid)
   end if
   call MPI_BCast(ncdata, lonlen*latlen, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
   call MPI_BCast(miss,               1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
@@ -199,8 +199,9 @@ subroutine read_surf_hydrography_NetCDF(file, vari, itime, model_2Darray, partit
     USE MOD_PARSUP
     use g_rotate_grid
     use, intrinsic :: ISO_FORTRAN_ENV, only: real64
+    use netcdf
     implicit none
-#include "netcdf.inc" 
+
   type(t_mesh),   intent(in),    target :: mesh
   type(t_partit), intent(inout), target :: partit
   integer                       :: i, j,  n, num
@@ -225,11 +226,11 @@ subroutine read_surf_hydrography_NetCDF(file, vari, itime, model_2Darray, partit
 
   if (mype==0) then
      ! open file
-     status=nf_open(file, nf_nowrite, ncid)
+     status=nf90_open(file, nf90_nowrite, ncid)
   end if
 
   call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-  if (status.ne.nf_noerr)then
+  if (status.ne.nf90_noerr)then
      print*,'ERROR: CANNOT READ runoff FILE CORRECTLY !!!!!'
      print*,'Error in opening netcdf file '//file
      call par_ex(partit%MPI_COMM_FESOM, partit%mype)
@@ -238,26 +239,26 @@ subroutine read_surf_hydrography_NetCDF(file, vari, itime, model_2Darray, partit
 
   if (mype==0) then
     ! lat
-    status=nf_inq_dimid(ncid, 'lat', latid)
-    status=nf_inq_dimlen(ncid, latid, latlen)
+    status=nf90_inq_dimid(ncid, 'lat', latid)
+    status=nf90_inquire_dimension(ncid, latid, len=latlen)
     ! lon
-    status=nf_inq_dimid(ncid, 'lon', lonid)
-    status=nf_inq_dimlen(ncid, lonid, lonlen)
+    status=nf90_inq_dimid(ncid, 'lon', lonid)
+    status=nf90_inquire_dimension(ncid, lonid, len=lonlen)
   end if
 
   ! lat
   allocate(lat(latlen))
   if (mype==0) then
-     status=nf_inq_varid(ncid, 'lat', varid)
-     status=nf_get_vara_double(ncid,varid,1,latlen,lat)
+     status=nf90_inq_varid(ncid, 'lat', varid)
+     status=nf90_get_var(ncid, varid, lat, start=(/1/), count=(/latlen/))
    end if
   call MPI_BCast(lat, latlen, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)  
 
   ! lon
   allocate(lon(lonlen))
   if (mype==0) then
-     status=nf_inq_varid(ncid, 'lon', varid)
-     status=nf_get_vara_double(ncid,varid,1,lonlen,lon)
+     status=nf90_inq_varid(ncid, 'lon', varid)
+     status=nf90_get_var(ncid, varid, lon, start=(/1/), count=(/lonlen/))
   end if
   call MPI_BCast(lon, lonlen, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)  
 
@@ -273,17 +274,17 @@ subroutine read_surf_hydrography_NetCDF(file, vari, itime, model_2Darray, partit
   ncdata = 0.0_WP
 
   if (mype==0) then
-     status=nf_inq_varid(ncid, vari, varid)
+     status=nf90_inq_varid(ncid, vari, varid)
      istart = (/1,1,1,itime/)
      icount= (/lonlen,latlen,1,1/)
-     status=nf_get_vara_double(ncid,varid,istart,icount,ncdata)
+     status=nf90_get_var(ncid, varid, ncdata, start=istart, count=icount)
 
      ! missing value
-     status= nf_get_att_double(ncid,varid,'missing_value',miss)
+     status= nf90_get_att(ncid, varid, 'missing_value', miss)
      !write(*,*)'miss', miss
      !write(*,*)'raw',minval(ncdata),maxval(ncdata)
      !close file
-     status=nf_close(ncid)
+     status=nf90_close(ncid)
   end if
   call MPI_BCast(ncdata, lonlen*latlen, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
   call MPI_BCast(miss,               1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
@@ -321,9 +322,9 @@ subroutine read_2ddata_on_grid_NetCDF(file, vari, itime, model_2Darray, partit, 
   USE MOD_PARTIT
   USE MOD_PARSUP
   use g_rotate_grid
+  use netcdf
   implicit none
 
-#include "netcdf.inc" 
   type(t_mesh),   intent(in)   , target :: mesh
   type(t_partit), intent(inout), target :: partit
   integer                       :: n, i
@@ -343,10 +344,10 @@ subroutine read_2ddata_on_grid_NetCDF(file, vari, itime, model_2Darray, partit, 
 
   if (mype==0) then
     ! open file
-    status=nf_open(file, nf_nowrite, ncid)
+    status=nf90_open(file, nf90_nowrite, ncid)
   end if
   call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-  if (status.ne.nf_noerr)then
+  if (status.ne.nf90_noerr)then
      print*,'ERROR: CANNOT READ runoff FILE CORRECTLY !!!!!'
      print*,'Error in opening netcdf file '//file
      call par_ex(partit%MPI_COMM_FESOM, partit%mype)
@@ -355,11 +356,11 @@ subroutine read_2ddata_on_grid_NetCDF(file, vari, itime, model_2Darray, partit, 
 
   if (mype==0) then
   ! get variables
-     status=nf_inq_varid(ncid, vari, varid)
+     status=nf90_inq_varid(ncid, vari, varid)
      istart = (/1, itime/)
      icount= (/nod2D, 1/)
-     status=nf_get_vara_double(ncid,varid,istart,icount,ncdata)
-     status=nf_close(ncid)
+     status=nf90_get_var(ncid, varid, ncdata, start=istart, count=icount)
+     status=nf90_close(ncid)
   end if      
   call MPI_BCast(ncdata, nod2D, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
   model_2Darray=ncdata(myList_nod2D) 
