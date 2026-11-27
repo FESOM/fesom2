@@ -382,7 +382,8 @@ use iceberg_params, only: scaling, elem_block, elem_area_glob !, smallestvol_icb
  logical                :: reject_tmp 
  logical                :: melted_local
  logical                :: coast_hit
- integer                :: loc_elem
+ integer                :: loc_elem, it
+ real                   :: dlon_p, dlat_p, s_in, s_out, s_mid, w_p(3)
  integer, intent(in)	:: ib, istep
  integer, intent(in)	:: elem_snap(ib_num)
  real,    intent(in)	:: area_snap(ib_num)
@@ -688,13 +689,32 @@ if((local_idx_of(iceberg_elem)>0) .and. (local_idx_of(iceberg_elem)<=partit%myDi
 
       t8=MPI_Wtime()
       iceberg_elem=partit%myList_elem2D(iceberg_elem)  	!global
-      ! still blocked: stay in the old element but keep the along-coast
-      ! velocity (step2 would reset the berg with zero velocity every step)
+      ! still blocked (e.g. overshoots a corner of the coast/shelf front):
+      ! move along the coast only as far as the old element reaches and keep
+      ! the velocity of that move (a held berg keeping its full velocity never
+      ! moves but melts with it)
       if (left_mype == ELEM_REJECTED) then
-        lon_rad   = old_lon
-        lat_rad   = old_lat
-        lon_deg   = lon_rad/rad
-        lat_deg   = lat_rad/rad
+        loc_elem = local_idx_of(iceberg_elem)
+        dlon_p = modulo(lon_deg - old_lon/rad + 180.0, 360.0) - 180.0
+        dlat_p = lat_deg - old_lat/rad
+        s_in = 0.0
+        s_out = 1.0
+        do it = 1, 12   ! bisection for the exit point of the path
+          s_mid = 0.5*(s_in + s_out)
+          call locbafu_2D(mesh, partit, w_p, loc_elem, &
+                          [old_lon/rad + s_mid*dlon_p, old_lat/rad + s_mid*dlat_p])
+          if (all(w_p >= 0.0)) then
+            s_in = s_mid
+          else
+            s_out = s_mid
+          end if
+        end do
+        lon_deg   = old_lon/rad + s_in*dlon_p
+        lat_deg   = old_lat/rad + s_in*dlat_p
+        lon_rad   = lon_deg*rad
+        lat_rad   = lat_deg*rad
+        u_ib      = s_in*u_ib
+        v_ib      = s_in*v_ib
         left_mype = ELEM_FOUND
       end if
     end if
