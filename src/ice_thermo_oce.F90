@@ -471,8 +471,8 @@ subroutine therm_ice(ithermp, h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rss
              end if
         end do
         if(new_iclasses) then
-            ! the tabulated weights hpdf sum to ~1.032, not 1: divide by their sum so that
-            ! growth and sublimation are a weighted mean over the classes (otherwise ~3 % too large)
+            ! weighted mean over the classes: hpdf (MOD_ICE.F90) sums to 1, the division by
+            ! sum(hpdf) only guards against a table that is not normalised
             rhice=rhice/sum(hpdf)
             subli=subli/sum(hpdf)
         else
