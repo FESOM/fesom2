@@ -334,11 +334,15 @@ type(t_partit), intent(inout), target :: partit
 
     ! LA 2026 -- passive iron tracer.  The fw fluxes above are volume fluxes of
     ! meltwater [m3 s-1] (negative = leaving the iceberg) and already include
-    ! scaling(ib).  Multiplying by the Fe concentration of the ice [mol m-3]
-    ! gives the Fe release rate [mol s-1], with the same sign convention.
+    ! scaling(ib).  Multiplying by the Fe concentration of the meltwater
+    ! [mol m-3] gives the Fe release rate [mol s-1], with the same sign
+    ! convention.  Only melting releases Fe: a growing component (positive
+    ! flux, accreted seawater) takes up no Fe, since seawater holds far less
+    ! than the berg.
     if (use_icb_iron) then
-      iron_flux_ib(ib) = ( fwb_flux_ib(ib) + fwe_flux_ib(ib)                    &
-                         + fwbv_flux_ib(ib) + fwl_flux_ib(ib) ) * iron_conc_ib(ib)
+      iron_flux_ib(ib) = ( min(fwb_flux_ib(ib), 0.0) + min(fwe_flux_ib(ib), 0.0)  &
+                         + min(fwbv_flux_ib(ib), 0.0) + min(fwl_flux_ib(ib), 0.0) ) &
+                         * iron_conc_ib(ib)
     end if
 
     !stability criterion: icebergs are allowed to roll over

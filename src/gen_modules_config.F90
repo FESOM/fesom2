@@ -137,11 +137,12 @@ module g_config
   integer                       :: steps_per_ib_step=8
 
 ! LA 2026 -- passive iron tracer carried by icebergs
-! Each iceberg carries a fixed Fe concentration of its ice; melting releases
-! Fe in proportion to the meltwater flux.  Purely diagnostic: the resulting
-! ibiron field is written out but does not feed back on the ocean.
+! Each iceberg carries a fixed Fe concentration, given per volume of its
+! meltwater (as measured in melted iceberg samples, not per volume of ice);
+! melting releases Fe in proportion to the meltwater flux.  Purely diagnostic:
+! the resulting ibiron field is written out but does not feed back on the ocean.
   logical                       :: use_icb_iron=.false.      ! master switch
-  real(kind=WP)                 :: icb_iron_const=50.0e-6_WP ! Fe content of iceberg ice
+  real(kind=WP)                 :: icb_iron_const=50.0e-6_WP ! Fe in iceberg meltwater
                                                              ! [mol m-3]; 50e-6 = 50 nmol L-1
   logical                       :: l_icb_iron_file=.false.   ! read per-iceberg Fe from
                                                              ! icb_iron.dat instead of the constant

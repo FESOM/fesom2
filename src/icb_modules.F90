@@ -77,7 +77,7 @@ save
   character(100):: width_icb_file='icb_length.dat' !iceberg width [m]
   character(100):: height_icb_file='icb_height.dat' !iceberg height [m]
   character(100):: scaling_file='icb_scaling.dat' !scaling factor
-  character(100):: iron_icb_file='icb_iron.dat' !Fe concentration of each iceberg [mol m-3]
+  character(100):: iron_icb_file='icb_iron.dat' !Fe concentration of each iceberg's meltwater [mol m-3]
   character(100):: IcebergRestartPath_iron='iceberg.restart.iron'
   character(100):: IcebergRestartPath_iron_ISM='iceberg.restart.iron.ISM'
   character(100):: calving_day_file='icb_calving_day.dat' !calving day for each iceberg
@@ -98,7 +98,7 @@ save
   real,dimension(:), allocatable:: bvl_mean, lvlv_mean, lvle_mean, lvlb_mean !averaged volume losses
   !real,dimension(:), allocatable:: fw_flux_ib, hfb_flux_ib
   real,dimension(:), allocatable:: fwe_flux_ib, fwl_flux_ib, fwb_flux_ib, fwbv_flux_ib
-  real,dimension(:), allocatable:: iron_conc_ib  !Fe concentration of the ice [mol m-3], constant per iceberg
+  real,dimension(:), allocatable:: iron_conc_ib  !Fe concentration of the meltwater [mol m-3], constant per iceberg
   real,dimension(:), allocatable:: iron_flux_ib  !Fe release rate of one iceberg [mol s-1]
   real,dimension(:), allocatable:: hfe_flux_ib, hfb_flux_ib, lhfb_flux_ib
   real,dimension(:,:), allocatable:: hfl_flux_ib, hfbv_flux_ib
