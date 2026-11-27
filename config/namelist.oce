@@ -27,7 +27,7 @@ SPP                = .false. ! enable Salt Plume Parameterization (for brine rej
 
 ! --- Gent-McWilliams (GM) Eddy Parameterization ---
 Fer_GM             = .true.  ! to swith on/off GM after Ferrari et al. 2010
-K_GM_max           = 1000.0  ! max. GM thickness diffusivity (m2/s)
+K_GM_max           = 800.0   ! max. GM thickness diffusivity (m2/s); 800 from the FESOM2.8 GM/Redi/Scr tuning on CORE2 (doi:10.5281/zenodo.24588641), 1000 before
 K_GM_max_NH        = -1.0    ! K_GM_max north of the transition zone (m2/s); <0: same as K_GM_max
 K_GM_hemi_trans    = 10.0    ! width (deg) of the linear SH->NH transition, centred on the equator
 K_GM_min           = 2.0     ! min. GM thickness diffusivity (m2/s)
@@ -63,7 +63,7 @@ scaling_GINsea     = .false. ! Increase K_GM resolution scaling only in the GIN 
 GINsea_fac         = 2.0     ! GIN sea K_GM upscaling factor 
 
 scaling_ODM95      = .true.  ! tapering based on critical slope, Danabasoglu and McWilliams, 1995
-ODM95_Scr          = 0.2e-2  ! Critical slope for tapering
+ODM95_Scr          = 1.0e-2  ! Critical slope for tapering; 1.0e-2 from the FESOM2.8 GM/Redi/Scr tuning on CORE2, 0.2e-2 before
 ODM95_Sd           = 1.0e-3  ! slope width of tapering smoothing zone
 
 scaling_LDD97      = .false. ! tapering in surface, William G. Large, Gokhan Danabasoglu, Scott C. Doney, 1997
@@ -74,7 +74,7 @@ LDD97_rmax         = 100.0e3 ! rossby radius max cutoff [m]
 ! --- Redi Isopycnal Diffusion ---
 Redi               = .true.  ! enable Redi isopycnal diffusion
 Redi_Ktaper        = .true.  ! apply neutral slope tapering function also to the Redi coefficient
-Redi_Kmax          = 0.0	 ! Redi Diffusivity can be different from K_GM_max but recomment to be the same, if Redi_Kmax<=0 its synchronised with Redi_Kmax=K_GM_max 
+Redi_Kmax          = 1500.0	 ! Redi Diffusivity can be different from K_GM_max, if Redi_Kmax<=0 its synchronised with Redi_Kmax=K_GM_max; 1500 from the FESOM2.8 GM/Redi/Scr tuning on CORE2, 0.0 (=K_GM_max) before 
 Redi_Kmin          = 100.0   ! minimum Redi difusivity thats left when Redi_Ktaper= .true.
 
 ! --- Vertical Mixing Scheme ---
