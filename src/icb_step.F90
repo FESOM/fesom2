@@ -690,9 +690,9 @@ if((local_idx_of(iceberg_elem)>0) .and. (local_idx_of(iceberg_elem)<=partit%myDi
       t8=MPI_Wtime()
       iceberg_elem=partit%myList_elem2D(iceberg_elem)  	!global
       ! still blocked (e.g. overshoots a corner of the coast/shelf front):
-      ! move along the coast only as far as the old element reaches and keep
-      ! the velocity of that move (a held berg keeping its full velocity never
-      ! moves but melts with it)
+      ! move the berg to where its path leaves the old element and stop it
+      ! there (a held berg keeping its full velocity never moves but melts
+      ! with it)
       if (left_mype == ELEM_REJECTED) then
         loc_elem = local_idx_of(iceberg_elem)
         dlon_p = modulo(lon_deg - old_lon/rad + 180.0, 360.0) - 180.0
@@ -713,8 +713,8 @@ if((local_idx_of(iceberg_elem)>0) .and. (local_idx_of(iceberg_elem)<=partit%myDi
         lat_deg   = old_lat/rad + s_in*dlat_p
         lon_rad   = lon_deg*rad
         lat_rad   = lat_deg*rad
-        u_ib      = s_in*u_ib
-        v_ib      = s_in*v_ib
+        u_ib      = 0.0
+        v_ib      = 0.0
         left_mype = ELEM_FOUND
       end if
     end if
