@@ -109,9 +109,10 @@ TYPE T_ICE_THERMO
     ! --- melt pond parameters
     logical       :: use_meltponds=.false. ! enable melt pond parameterization
     REAL(kind=WP) :: h_cutoff=3.0      ! cutoff thickness of thickness pdf
-    REAL(kind=WP), DIMENSION(15) :: hpdf = (/ 0.066745491, 0.1462317, 0.17769822, 0.13131106, &
-         0.11518432, 0.08514193, 0.06871303, 0.05592151, 0.04428673, 0.03584652, 0.02970195, 0.02469673, &
-         0.02001543, 0.01653681, 0.0141026 /)  ! pdf of ice thickness based on EM observations
+    REAL(kind=WP), DIMENSION(15) :: hpdf = (/ &
+         0.064603221, 0.14408943, 0.175555969, 0.12916879, 0.11304205, &
+         0.082999660, 0.06657076, 0.053779240, 0.04214446, 0.03370425, &
+         0.027559680, 0.02255446, 0.017873160, 0.01439454, 0.01196033 /)  ! pdf of ice thickness based on EM observations
     contains
         procedure WRITE_T_ICE_THERMO
         procedure READ_T_ICE_THERMO

@@ -470,7 +470,12 @@ subroutine therm_ice(ithermp, h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rss
                 subli=subli+subli_i
              end if
         end do
-        if(.not. new_iclasses) then
+        if(new_iclasses) then
+            ! weighted mean over the classes: hpdf (MOD_ICE.F90) sums to 1, the division by
+            ! sum(hpdf) only guards against a table that is not normalised
+            rhice=rhice/sum(hpdf)
+            subli=subli/sum(hpdf)
+        else
             rhice=rhice/real(iclasses,WP)      	! Add to average heat flux
             subli=subli/real(iclasses,WP)
         end if
