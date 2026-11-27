@@ -102,7 +102,9 @@ type(t_partit), intent(inout), target :: partit
             if (iceberg_node<=mydim_nod2d) then
                 ib_nods_in_ib_elem(i)           = iceberg_node
                 num_ib_nods_in_ib_elem          = num_ib_nods_in_ib_elem + 1
-                tot_area_nods_in_ib_elem        = tot_area_nods_in_ib_elem + mesh%area(:,iceberg_node)
+                ! areasvol, not area: the ocean takes water_flux*areasvol(ulevel) (oce_ale),
+                ! and next to a cavity area(1,n) is smaller than areasvol(1,n)
+                tot_area_nods_in_ib_elem        = tot_area_nods_in_ib_elem + mesh%areasvol(:,iceberg_node)
             else
                 ib_nods_in_ib_elem(i)           = 0
             end if
@@ -116,7 +118,7 @@ type(t_partit), intent(inout), target :: partit
 
             if (iceberg_node>0) then
                 ! Guard: tot_area at level 1 is zero when all element nodes are cavity nodes
-                ! (mesh%area(1,cavity_node)==0), which would give division by zero / NaN.
+                ! (mesh%areasvol(1,cavity_node)==0), which would give division by zero / NaN.
                 if (tot_area_nods_in_ib_elem(1) > 0.0) then
                     ibfwbv(iceberg_node) = ibfwbv(iceberg_node) - fwbv_flux_ib(ib) / tot_area_nods_in_ib_elem(1)
                     ibfwb(iceberg_node) = ibfwb(iceberg_node) - fwb_flux_ib(ib) / tot_area_nods_in_ib_elem(1)
